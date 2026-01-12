@@ -1,0 +1,62 @@
+.app-sidebar-title{
+  font-weight:700;
+  margin-bottom:10px;
+  opacity:.95;
+}
+
+/* === KREISĀ SIDEBAR PLATUMS === */
+.app-sidebar{
+  width: 220px;        /* ⬅️ šeit maini platumu */
+  flex: 0 0 220px;     /* ⬅️ OBLIGĀTI, lai flex neignorē width */
+  height: 100vh;       /* ⬅️ augstums paliek kā ir */
+}
+
+.app-nav{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+.app-nav-link{
+  display:block;
+  padding:8px 10px;
+  border-radius:6px;
+  color:#fff;
+  text-decoration:none;
+  background:rgba(255,255,255,0.06);
+  transition: transform .12s ease, background .12s ease;
+}
+
+/* svarīgi: pārspiež globālo a:hover (zilo + underline) */
+.app-nav-link:hover{
+  background:rgba(255,255,255,0.12);
+  color:#fff !important;
+  text-decoration:none !important;
+  transform: scale(1.03); /* “paliek lielāka” */
+}
+
+.app-nav-link:visited{
+  color:#fff !important;
+  text-decoration:none !important;
+}
+
+.app-nav-link:focus,
+.app-nav-link:focus-visible{
+  outline:none;
+  text-decoration:none !important;
+  color:#fff !important;
+}
+
+/* klikšķa brīdī lai nav “zilais” efekts */
+.app-nav-link:active{
+  color:#fff !important;
+  text-decoration:none !important;
+}
+
+/* aktīvais paliek zaļš */
+.app-nav-link.active{
+  background:#14d65e;
+  color:#062e14 !important;
+  font-weight:700;
+  text-decoration:none !important;
+}

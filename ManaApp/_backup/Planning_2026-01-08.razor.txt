@@ -1,0 +1,670 @@
+@page "/planning"
+@inject HttpClient Http
+@using System.Net.Http.Json
+@using System.Linq
+@using System.Text.Json.Serialization
+@using Syncfusion.Blazor.Grids
+@inject IJSRuntime JS
+@using ManaApp.Shared
+@using ManaApp.Pages
+@using ManaApp.Models
+
+
+<PageHeader Title="Plānošana" />
+
+  <div class="planning-header-card">  
+
+    <div class="planning-content">
+                           <!-- Šeit sākas preču saraksts -->
+        <div class="planning-main">
+            <div class="planning-panel">
+
+<PlanningToolbar
+    SearchText="@searchText"
+    SearchTextChanged="(v) => searchText = v"
+    SelectedView="@selectedView"
+    SelectedViewChanged="(v) => selectedView = v"
+    OnDownloadExcel="DownloadPlanningExcel" />
+
+@* <PlanningGrid Rows="@groupedRows" /> *@
+
+
+<PlanningTable Groups="@FilteredRows"
+               PlannedPlus="OnPlannedPlus"
+               PlannedMinus="OnPlannedMinus" />
+
+
+
+           @if (selected is not null && Summary is not null)
+           {
+               <div style="margin-top:8px;">
+                   <b>@selected.categoryName • @selected.productName (@selected.productCode)</b>
+                   <div style="display:grid;grid-template-columns:200px repeat(7,110px);margin-top:6px;">
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center"><b>VersionId</b></div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center"><b>Planned</b></div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center"><b>Detailed</b></div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center"><b>Assembly</b></div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center"><b>Finishing</b></div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center"><b>Stock</b></div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center"><b>Scrap</b></div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center"><b>Out</b></div>
+
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center">@selected.VersionId</div>
+                       
+                       @{
+                           var planned = selected.Planned;
+                           var bg = planned > 0 ? "#00ff00" : "transparent";
+                       }
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center; background:@bg">
+                           @planned
+                       </div>
+
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center; background:#f9b115">@Summary.Detailed</div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center; background:#f9b115">@Summary.Assembly</div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center; background:#ffe873">@Summary.Finishing</div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center; background:#efefef">@Summary.Stock</div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center; background:#efefef">@Summary.Scrap</div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center; background:#efefef">@Summary.Out</div>
+                   </div>
+               </div>
+           }
+
+        </div>
+        </div>
+        <!-- LABĀ PUSE: jaunais Batch panelis -->
+
+        <div class="planning-right">
+
+    <PlanningBatchPanel Items="batchItems" />
+
+</div>
+    
+</div>
+
+</div>
+
+<BatchLineEditDialog
+    @bind-IsOpen="isAddOpen"
+    Line="addLine"
+    IsAddMode="true"
+    OnSaved="OnAddSaved" />
+
+@code {
+   
+    private List<ProductRow> rows = new();
+    private List<ProductRow> allRows = new();
+private List<CategoryRow> categories = new();
+
+private List<CategoryRow> categoriesFiltered = new();
+
+    private int? draftBatchId = null;
+private bool isCreatingDraft = false;
+
+
+ protected override async Task OnInitializedAsync()
+{
+    await ReloadPlanningDataAsync();
+    await LoadDraftAsync(); // ⬅️ ŠIS IR JAUNAIS
+}
+
+
+    private async Task LoadSummariesForRows(IEnumerable<ProductRow> targetRows)
+    {
+        foreach (var r in targetRows)
+        {
+            var eligible = targetRows.Count(r => r.VersionId.HasValue && r.VersionId > 0);
+
+            if (r.VersionId is null || r.VersionId <= 0)
+{
+    var c = await Http.GetFromJsonAsync<ProductContentDto>(
+        $"http://localhost:5270/api/products/content?id={r.id}");
+    r.VersionId = c?.VersionId;
+    if (!string.IsNullOrWhiteSpace(c?.VersionName))
+    r.versionName = c!.VersionName!;
+
+    if (r.VersionId is null || r.VersionId <= 0) continue;
+}
+
+            var sum = await Http.GetFromJsonAsync<StockSummary>(
+    $"http://localhost:5270/api/stockmovements/summary?versionId={r.VersionId}");
+
+            if (sum is null) continue;
+            
+           r.InStock = sum.Stock;
+
+// AssemblyINProgress / AssemblyFinish vairs NEMAINĀM šeit,
+// tie tagad nāk no /api/batches/list
+// r.AssemblyINProgress  = ...
+// r.AssemblyFinish      = ...
+
+r.FinishingInProgress = sum.Finishing;
+r.InStock            = sum.Stock;
+
+var finAlloc = await Http.GetFromJsonAsync<FinAllocatedDto>(
+    $"http://localhost:5270/api/tasks/finishing-allocated-by-version?versionId={r.VersionId}");
+
+r.FinishingAllocated = finAlloc?.FinishingAllocated ?? 0;
+
+        }
+
+        // tikai vienreiz pēc cikla
+        StateHasChanged();
+    }
+
+private void BuildCategoriesFromRows(IEnumerable<ProductRow> source)
+{
+    categories = source
+        .Where(r => !string.IsNullOrWhiteSpace(r.categoryName))
+        .Select(r => (r.categoryName ?? "").Trim())
+        .Where(name => !string.IsNullOrWhiteSpace(name))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(name => name)
+        .Select(name => new CategoryRow { CategoryName = name })
+        .ToList();
+        // 0. līmeņa datu avots tree-view gridam
+    categoriesFiltered = categories;
+}
+
+
+
+    private List<ProductSimpleRow> simpleRows = new();
+    private string searchText = "";
+    private ProductViewType selectedView = ProductViewType.Kauss;
+    private int VersionId = 1;
+
+    private StockSummary? Summary;
+    private string? Raw;        
+    private string? Error;      
+
+   private async Task Load()
+{
+    Error = null;
+    Summary = null;
+    Raw = null;
+
+    if (selected is null || !(selected.VersionId.HasValue && selected.VersionId > 0))
+{
+    Error = "Nav izvēlēta rinda vai nav VersionId.";
+    return;
+}
+
+    try
+    {
+        var url = $"http://localhost:5270/api/stockmovements/summary?versionId={selected.VersionId}";
+        Console.WriteLine($"CLICK Load -> {url}");
+        
+        Raw = await Http.GetStringAsync(url);
+        Console.WriteLine($"RAW LEN = {Raw?.Length}");
+
+        if (string.IsNullOrWhiteSpace(Raw)) { Error = "Empty response"; return; }
+        Summary = System.Text.Json.JsonSerializer.Deserialize<StockSummary>(Raw)!;
+
+        Console.WriteLine($"Parsed Finishing = {Summary?.Finishing}");
+    }
+    catch (Exception ex)
+    {
+        Error = ex.ToString();
+        Console.WriteLine(Error);
+    }
+}
+
+    
+    private ProductRow? selected;
+
+    private async Task OnRowSelected(RowSelectEventArgs<ProductRow> args)
+{
+    selected = args.Data;
+    VersionId = selected?.VersionId ?? 0; // var paturēt tikai info dēļ
+    await Load();                         // vienmēr lādējam pēc BatchProduct_ID
+}
+
+private async Task ReloadAfterCreate()
+{
+    await ReloadPlanningDataAsync();
+}
+
+
+private IEnumerable<ProductRow> GetRowsForCategory(object catObj)
+{
+    var cat = catObj as CategoryRow;
+    if (cat is null) return Enumerable.Empty<ProductRow>();
+
+    var key = (cat.CategoryName ?? "").Trim();
+
+    // Pamatā – tikai šīs kategorijas preces
+    var query = rows.Where(r =>
+        string.Equals((r.categoryName ?? "").Trim(), key, StringComparison.OrdinalIgnoreCase)
+    );
+
+    // Ja nav meklēšanas teksta – atdod visus šīs kategorijas produktus
+    if (string.IsNullOrWhiteSpace(searchText))
+        return query;
+
+    // Ja ir meklēšana – filtrē šīs kategorijas iekšienē
+    return query.Where(r =>
+        (r.productName?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+        (r.productCode?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+        (r.categoryName?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)
+    );
+}
+
+private async Task ReloadPlanningDataAsync()
+{
+    // 1) Produkti
+    rows = await Http.GetFromJsonAsync<List<ProductRow>>(
+    "http://localhost:5270/api/products/planning-list")
+    ?? new();
+
+    allRows = new List<ProductRow>(rows);
+
+    // 2) Stock + FinishingInProgress
+    await LoadSummariesForRows(rows);
+
+    // 3) Batch dati (Planned / Detailed / Assembly)
+    var plannedList = await Http.GetFromJsonAsync<List<BatchPlannedRow>>(
+        "http://localhost:5270/api/batches/list?batch_type=1")
+        ?? new();
+
+    var plannedByVersion = plannedList
+        .GroupBy(x => x.VersionId)
+        .ToDictionary(g => g.Key, g => g.Sum(x => x.Planned));
+
+    var detailedInProgressByVersion = plannedList
+        .GroupBy(x => x.VersionId)
+        .ToDictionary(g => g.Key, g => g.Sum(x => x.DetailedInProgress));
+
+    var detailedFinishByVersion = plannedList
+        .GroupBy(x => x.VersionId)
+        .ToDictionary(g => g.Key, g => g.Sum(x => x.DetailedFinish));
+
+    var assemblyInProgressByVersion = plannedList
+        .GroupBy(x => x.VersionId)
+        .ToDictionary(g => g.Key, g => g.Sum(x => x.AssemblyInProgress));
+
+    var assemblyFinishByVersion = plannedList
+        .GroupBy(x => x.VersionId)
+        .ToDictionary(g => g.Key, g => g.Sum(x => x.AssemblyFinish));
+
+    // 4) Aizpildām rindas
+    foreach (var r in rows)
+    {
+        if (!r.VersionId.HasValue)
+        {
+            r.Planned = 0;
+            r.DetailedInProgress = 0;
+            r.DetailedFinish = 0;
+            r.AssemblyINProgress = 0;
+            r.AssemblyFinish = 0;
+            continue;
+        }
+
+        var vid = r.VersionId.Value;
+
+        r.Planned = plannedByVersion.TryGetValue(vid, out var p) ? p : 0;
+        r.DetailedInProgress = detailedInProgressByVersion.TryGetValue(vid, out var d) ? d : 0;
+        r.DetailedFinish = detailedFinishByVersion.TryGetValue(vid, out var df) ? df : 0;
+        r.AssemblyINProgress = assemblyInProgressByVersion.TryGetValue(vid, out var ap) ? ap : 0;
+        r.AssemblyFinish = assemblyFinishByVersion.TryGetValue(vid, out var af) ? af : 0;
+    }
+
+    // 5) Sakārtojam
+    rows = allRows
+        .OrderBy(r => r.categoryName)
+        .ThenBy(r => r.productName)
+        .ToList();
+
+    // 6) UI KOREKCIJA:
+    // AssemblyFinish -= FinishingInProgress
+    foreach (var r in rows)
+{
+    if (r.AssemblyFinish > 0 && r.FinishingAllocated > 0)
+    {
+        var corrected = r.AssemblyFinish - r.FinishingAllocated;
+        r.AssemblyFinish = corrected > 0 ? corrected : 0;
+    }
+}
+
+// Uztaisām "viena rinda uz produktu" + bērni = versijas
+groupedRows = rows
+    .GroupBy(r =>
+        $"{(r.categoryName ?? "").Trim()}||{(r.productCode ?? "").Trim()}",
+        StringComparer.OrdinalIgnoreCase)
+    .Select(g =>
+    {
+        var parts = g.Key.Split("||", 2);
+        var cat  = parts.Length > 0 ? parts[0] : "";
+        var code = parts.Length > 1 ? parts[1] : "";
+
+        var first = g.First();
+
+        return new ProductGroupRow
+        {
+            CategoryName = cat,
+            ProductCode  = code,
+            ProductName  = first.productName ?? "",
+
+            InStock = g.Sum(x => x.InStock),
+            Planned = g.Sum(x => x.Planned),
+            DetailedInProgress = g.Sum(x => x.DetailedInProgress),
+            DetailedFinish     = g.Sum(x => x.DetailedFinish),
+            AssemblyINProgress = g.Sum(x => x.AssemblyINProgress),
+            AssemblyFinish     = g.Sum(x => x.AssemblyFinish),
+            FinishingInProgress= g.Sum(x => x.FinishingInProgress),
+            FinishingAllocated = g.Sum(x => x.FinishingAllocated),
+
+            Versions = g
+                .OrderByDescending(x => x.VersionId ?? 0) // jaunākā augšā
+                .ToList()
+        };
+    })
+    
+    .OrderBy(x => x.CategoryName)
+    .ThenBy(x => x.ProductName)
+    .ToList();
+
+flatRows.Clear();
+
+foreach (var grp in groupedRows
+    .GroupBy(g => g.CategoryName)
+    .OrderBy(g => g.Key))
+{
+    flatRows.Add(new CategoryHeaderRow
+    {
+        CategoryName = grp.Key
+    });
+
+    foreach (var row in grp.OrderBy(r => r.ProductName))
+    {
+        flatRows.Add(row);
+    }
+}
+
+
+    BuildLatestVersionByCode();
+    await InvokeAsync(StateHasChanged);
+}
+
+public sealed class FinProgressDto
+{
+    [JsonPropertyName("finishingInProgress")]
+    public int FinishingInProgress { get; set; }
+}
+
+
+private async Task DownloadPlanningExcel()
+{
+    // atver jaunu tabu un lejupielādē failu no API
+    await JS.InvokeVoidAsync("open", "http://localhost:5270/api/reports/planning-excel", "_blank");
+}
+
+// productCode -> latest VersionId
+private readonly Dictionary<string, int> _latestVersionByCode = new(StringComparer.OrdinalIgnoreCase);
+
+private void BuildLatestVersionByCode()
+{
+    _latestVersionByCode.Clear();
+
+    foreach (var g in rows
+        .Where(r => !string.IsNullOrWhiteSpace(r.productCode) && r.VersionId is > 0)
+        .GroupBy(r => r.productCode.Trim(), StringComparer.OrdinalIgnoreCase))
+    {
+        _latestVersionByCode[g.Key] = g.Max(x => x.VersionId!.Value);
+    }
+}
+private bool IsLatestVersion(ProductRow r)
+{
+    if (r is null) return false;
+    if (string.IsNullOrWhiteSpace(r.productCode)) return true; // ja nav koda, lai netraucē
+    if (r.VersionId is not int v || v <= 0) return false;
+
+    return _latestVersionByCode.TryGetValue(r.productCode.Trim(), out var latest) && v == latest;
+}
+
+private List<ProductGroupRow> groupedRows = new();
+
+private List<IPlanningRow> flatRows = new();
+
+private List<ProductGroupRow> FilteredRows =>
+    groupedRows
+        .Where(MatchRoot)
+        .Where(g =>
+            string.IsNullOrWhiteSpace(searchText) ||
+            g.ProductName.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+            g.ProductCode.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+            g.CategoryName.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+            g.Versions.Any(v =>
+                v.productName?.Contains(searchText, StringComparison.OrdinalIgnoreCase) == true ||
+                v.productCode?.Contains(searchText, StringComparison.OrdinalIgnoreCase) == true
+            )
+        )
+        .ToList();
+
+private PlanningBatchPanel? batchPanelRef;
+
+private async Task OnPlannedPlus(ProductGroupRow row)
+{
+    if (row.Versions == null || row.Versions.Count == 0)
+        return;
+
+    var ver = row.Versions
+        .OrderByDescending(v => v.VersionId ?? 0)
+        .FirstOrDefault(v => v.VersionId is > 0);
+
+    if (ver is null)
+        return;
+
+    addLine = new ProductionTasks.BatchLine
+    {
+        BatchId     = draftBatchId ?? 0,   // VAR BŪT 0
+        VersionId   = ver.VersionId!.Value,
+        BatchCode   = ver.productCode,
+        Planned     = 1,
+        Comment     = "",
+        BatchStatus = 5
+    };
+
+    isAddOpen = true; // popup atveras VIENMĒR
+}
+
+
+private async Task OnAddSaved(ProductionTasks.BatchLine line)
+{
+    if (line.Planned <= 0)
+        return;
+
+    // 1) JA NAV draftBatchId -> izveidojam batch (status 4) + ieliekam 1. produktu
+if (!draftBatchId.HasValue)
+{
+    var createDto = new
+    {
+        BatchId = (int?)null,
+        Title = "",
+        Comment = "Melnraksts",
+        Items = new[]
+        {
+            new
+            {
+                VersionId = line.VersionId,
+                Qty       = line.Planned,
+                Comment   = line.Comment
+            }
+        }
+    };
+
+    var createResp = await Http.PostAsJsonAsync(
+        "http://localhost:5270/api/batches/draft/create",
+        createDto);
+
+    if (!createResp.IsSuccessStatusCode)
+        return;
+
+    var data = await createResp.Content.ReadFromJsonAsync<Dictionary<string, int>>();
+    if (data != null && data.TryGetValue("batchId", out var id))
+        draftBatchId = id;
+
+    // ⬇️ KRITISKI SVARĪGI — UI fiksē pirmo preci
+    batchItems.Add(new BatchCartItem
+    {
+        VersionId = line.VersionId,
+        Code      = line.BatchCode,
+        Name      = selected?.productName ?? "",
+        Qty       = line.Planned,
+        Comment   = line.Comment
+    });
+
+    isAddOpen = false;
+    addLine = null;
+    StateHasChanged();
+    return;
+}
+    // 2) JA draftBatchId jau ir -> update
+// 2) JA draftBatchId jau ir -> update
+var dto = new DraftUpdateDto
+{
+    BatchId = draftBatchId.Value
+};
+
+// esošās preces
+foreach (var it in batchItems)
+{
+    dto.Items.Add(new DraftItemDto
+    {
+        VersionId = it.VersionId,
+        Qty       = it.Qty,
+        Comment   = it.Comment
+    });
+}
+
+// ⬇️ KRITISKI: PIEVIENO JAM JAUNO RINDU
+dto.Items.Add(new DraftItemDto
+{
+    VersionId = line.VersionId,
+    Qty       = line.Planned,
+    Comment   = line.Comment
+});
+
+var resp = await Http.PostAsJsonAsync(
+    "http://localhost:5270/api/batches/draft/update",
+    dto);
+
+if (!resp.IsSuccessStatusCode)
+    return;
+
+// UI atjauninām TIKAI PĒC veiksmīga API
+batchItems.Add(new BatchCartItem
+{
+    VersionId = line.VersionId,
+    Code      = line.BatchCode,
+    Name      = selected?.productName ?? "",
+    Qty       = line.Planned,
+    Comment   = line.Comment
+});
+
+isAddOpen = false;
+addLine = null;
+StateHasChanged();
+}
+
+private void OnPlannedMinus(ProductRow row)
+{
+    Console.WriteLine($"MINUS: {row.productName} | VersionId={row.VersionId}");
+}
+
+private bool MatchRoot(ProductGroupRow g)
+{
+    var root = selectedView == ProductViewType.Kauss
+        ? "KAUSS"
+        : "ADAPTERIS";
+
+    // skatāmies uz jebkuru versiju grupā (visām būs viens root)
+    var any = g.Versions?.FirstOrDefault();
+    if (any is null) return false;
+
+    var stem = root.Length > 1 ? root[..^1] : root;
+    return (any.rootName ?? "")
+        .StartsWith(stem, StringComparison.OrdinalIgnoreCase);
+}
+
+private List<BatchCartItem> batchItems = new();
+
+// popup stāvoklis
+private bool isAddOpen = false;
+
+// rinda, no kuras tiek spiests +
+private ProductionTasks.BatchLine? addLine;
+
+
+private sealed class DraftCreateDto
+{
+    public string Title { get; set; } = "";
+    public string? Comment { get; set; }
+}
+
+private sealed class DraftDto
+{
+    public int BatchId { get; set; }
+    public string? Comment { get; set; }
+    public List<DraftItemDto> Items { get; set; } = new();
+}
+
+private sealed class DraftItemDto
+{
+    public int VersionId { get; set; }
+    public int Qty { get; set; }
+    public string? Comment { get; set; }
+}
+
+private sealed class DraftUpdateDto
+{
+    public int? BatchId { get; set; }
+    public List<DraftItemDto> Items { get; set; } = new();
+}
+
+private async Task LoadDraftAsync()
+{
+    Console.WriteLine("LOAD DRAFT: start");
+
+    try
+    {
+        var draft = await Http.GetFromJsonAsync<DraftDto>(
+            "http://localhost:5270/api/Batches/draft/last"
+        );
+
+        if (draft == null)
+        {
+            Console.WriteLine("LOAD DRAFT: draft == null");
+            return;
+        }
+
+        Console.WriteLine($"LOAD DRAFT: batchId={draft.BatchId}, items={draft.Items.Count}");
+
+        // ✅ 1) saglabājam melnraksta ID
+        draftBatchId = draft.BatchId;
+
+        // ✅ 2) iztīrām UI sarakstu
+        batchItems.Clear();
+
+        // ✅ 3) piepildām UI ar DB datiem
+        foreach (var it in draft.Items)
+        {
+            var row = rows.FirstOrDefault(r => r.VersionId == it.VersionId);
+
+            batchItems.Add(new BatchCartItem
+            {
+                VersionId = it.VersionId,
+                Code      = row?.productCode ?? "",
+                Name      = row?.productName ?? "",
+                Qty       = it.Qty,
+                Comment   = it.Comment
+            });
+        }
+
+        StateHasChanged();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("LOAD DRAFT ERROR: " + ex.Message);
+    }
+}
+
+}

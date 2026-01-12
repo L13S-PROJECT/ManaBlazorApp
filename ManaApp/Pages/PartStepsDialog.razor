@@ -1,0 +1,132 @@
+@using System.Collections.Generic
+
+@if (IsOpen)
+{
+    <div style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0,0,0,0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;">
+        
+        <div style="
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 550px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 0 10px rgba(0,0,0,0.4);">
+
+            <h3 style="margin-top:0;">
+                Detaļas soļi: @PartName (@PartCode)
+            </h3>
+
+            <table style="width:100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background:#eee;">
+                        <th style="padding:6px; text-align:left;">Solis</th>
+                        <th style="padding:6px; text-align:left;">Tips</th>
+                        <th style="padding:6px; text-align:left;">Darbnīca</th>
+                        <th style="padding:6px; text-align:left;">Prioritārs</th>
+                        <th style="padding:6px; text-align:left;">Assigned_To</th>
+                        <th style="padding:6px; text-align:left;">Sākts</th>
+                        <th style="padding:6px; text-align:left;">Pabeigts</th>
+                         </tr>
+                </thead>
+                <tbody>
+                @foreach (var s in Steps)
+                {
+                    <tr>
+                        <td style="padding:6px;">@s.StepName</td>
+                        <td style="padding:6px;">@s.StepTypeName</td>
+                        <td style="padding:6px;">@s.WorkCenterName</td>
+                         <!-- Jaunā kolonna: prioritārs -->
+            <td style="text-align:center;">
+                <input type="checkbox" @bind="s.Tasks_Priority" />
+            </td>
+
+            <!-- Jaunā kolonna: Assigned_To -->
+            <td>
+                <input type="number"
+                       style="width:90px;"
+                       @bind="s.Assigned_To" />
+            </td>
+<td style="padding:6px;">
+    @if (s.StartedAt.HasValue)
+    {
+        @s.StartedAt.Value.ToString("yyyy-MM-dd HH:mm")
+    }
+</td>
+
+<td style="padding:6px;">
+    @if (s.FinishedAt.HasValue)
+    {
+        @s.FinishedAt.Value.ToString("yyyy-MM-dd HH:mm")
+    }
+</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+
+           <div style="text-align:right; margin-top:12px;">
+    <button class="e-btn e-primary"
+            style="margin-right:8px;"
+            @onclick="HandleSaveClick">
+        Saglabāt
+    </button>
+
+    <button class="e-btn"
+            @onclick="OnClose">
+        Aizvērt
+    </button>
+</div>
+
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+
+    [Parameter] public string PartName { get; set; } = "";
+
+    [Parameter] public string PartCode { get; set; } = "";
+
+    // Šeit nelietojam StepLine tipu, bet tikai vienkāršu tuple
+   
+[Parameter]
+public IEnumerable<ProductionTasks.StepLine> Steps { get; set; } 
+    = Enumerable.Empty<ProductionTasks.StepLine>();
+
+
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    [Parameter] public bool Tasks_Priority { get; set; }
+
+    [Parameter] public int? Assigned_To { get; set; }
+
+    [Parameter]
+    public EventCallback<IEnumerable<ProductionTasks.StepLine>> OnSave { get; set; }
+
+private async Task HandleSaveClick()
+{
+    if (OnSave.HasDelegate)
+    {
+        await OnSave.InvokeAsync(Steps);
+    }
+
+    // pēc saglabāšanas aizveram dialogu
+    if (OnClose.HasDelegate)
+    {
+        await OnClose.InvokeAsync(null);
+    }
+}
+
+}

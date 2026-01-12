@@ -1,0 +1,635 @@
+@using ManaApp.Shared
+@using ManaApp.Components
+@using ManaApp.Models
+
+
+
+<div class="planning-batch-panel">
+
+    <div class="batch-tabs">
+    <button type="button"
+            class="batch-tab @(activeSheet == BatchPanelSheet.Production ? "active" : "")"
+            @onclick="() => activeSheet = BatchPanelSheet.Production">
+        Ražošanas plāns
+    </button>
+
+    <button type="button"
+            class="batch-tab @(activeSheet == BatchPanelSheet.Sales ? "active" : "")"
+            @onclick="() => activeSheet = BatchPanelSheet.Sales">
+        Pārdošana
+    </button>
+</div>
+
+@if (activeSheet == BatchPanelSheet.Production)
+{
+
+    <h3 class="panel-title">
+        Jauns ražošanas plāns
+    </h3>
+
+    <div class="panel-field">
+        <label class="panel-label">
+            Pagaidu nosaukums:
+        </label>
+        
+        <input type="text"
+       class="panel-input draft-title"
+       value="@DraftTitle"
+       disabled
+       placeholder="Ražošanas plāns" />
+
+
+    </div>
+
+    <div class="panel-field">
+        <label class="panel-label">
+            Komentārs
+        </label>
+
+<textarea class="panel-textarea"
+          placeholder="Komentārs"
+          @bind="Model.Comment"
+          @bind:event="oninput"
+          @bind:after="OnCommentChanged">
+</textarea>
+
+
+    </div>
+
+    <hr class="panel-separator" />
+
+<div class="panel-actions">
+<button type="button"
+        class="panel-btn danger"
+        disabled="@(Model.BatchId == null)"
+        @onclick="DeleteDraftClicked">
+    Dzēst melnrakstu
+</button>
+
+
+    <button type="button"
+        class="panel-btn primary"
+        disabled="@(Items.Count == 0)"
+        @onclick="OpenCreateDialog">
+    IZVEIDOT
+</button>
+
+</div>
+
+
+    <hr />
+
+<h4 class="panel-subtitle">Pievienotās preces</h4>
+
+@if (Items.Count == 0)
+{
+    <div style="opacity:.6;font-size:13px;">Nav pievienotu preču</div>
+}
+else
+{
+    <div style="margin-top:12px;">
+        @foreach (var it in Items)
+        {
+            <div style="display:grid;
+                        grid-template-columns:120px 1fr 60px 1fr;
+                        gap:8px;
+                        align-items:center;
+                        padding:6px 0;
+                        border-bottom:1px solid #e5e7eb;">
+                
+                <div>@it.Code</div>
+                <div>@it.Name</div>
+                <div>@it.Qty</div>
+                <div>@it.Comment</div>
+<div class="batch-row-actions">
+    <button class="icon-btn"
+        title="Labot"
+        @onclick="() => OpenEdit(it)">
+    ✏️
+</button>
+
+
+    <button class="icon-btn"
+            title="Dzēst"
+            @onclick="() => OnDelete.InvokeAsync(it)">
+        🗑️
+    </button>
+</div>
+
+            </div>
+        }
+    </div>
+}
+}
+
+@if (activeSheet == BatchPanelSheet.Sales)
+{
+    // pievienotā poga Pārdošanai
+
+    <div class="panel-actions" style="margin-bottom:12px;">
+    <button class="panel-btn primary"
+            disabled="@(SalesItems.Count == 0)"
+            @onclick="OnSoldClicked">
+        Pārdots
+    </button>
+</div>
+
+    
+    <h4 class="panel-subtitle">Pievienotās preces</h4>
+
+    @if (SalesItems.Count == 0)
+    {
+        <div style="opacity:.6;font-size:13px;">
+            Nav pievienotu preču
+        </div>
+    }
+    else
+    {
+        <div style="margin-top:12px;">
+            @foreach (var it in SalesItems)
+            {
+                <div style="display:grid;
+                            grid-template-columns:1fr 80px 40px 40px;
+                            gap:8px;
+                            align-items:center;
+                            padding:6px 0;
+                            border-bottom:1px solid #e5e7eb;">
+
+                    <div>
+                        <b>@it.ProductName</b>
+                        @if (!string.IsNullOrWhiteSpace(it.VersionName))
+                        {
+                            <span> (@it.VersionName)</span>
+                        }
+                    </div>
+
+                    <div>@it.Qty</div>
+
+                        <button class="icon-btn"
+                                title="Labot"
+                                @onclick="() => EditSalesItem(it)">
+                            ✏️
+                        </button>
+
+                        <button class="icon-btn danger"
+                        title="Dzēst"
+                        @onclick="() => DeleteSalesItem(it)">
+                            🗑️
+                        </button>
+
+                </div>
+            }
+        </div>
+    }
+}
+
+
+
+    </div>
+
+<BatchLineEditDialog
+    IsOpen="isEditOpen"
+    IsOpenChanged="v => isEditOpen = v"
+    Line="editLine"
+    OnSaved="OnEditSaved" />
+
+
+        @if (isCreateOpen)
+        {
+            <CreatePlanDialog
+                ErrorMessage="@createPlanError"
+                OnConfirm="CreateConfirmed"
+                OnCancel="() => isCreateOpen = false" />
+
+        }
+
+@if (isEditSalesOpen && editingSalesItem is not null)
+{
+    <SalesMinusDialog
+        ProductName="@editingSalesItem.ProductName"
+        VersionName="@editingSalesItem.VersionName"
+        InitialQty="@editingSalesItem.Qty"
+        MaxQty="@editingSalesItem.InStock"
+        OnConfirm="OnEditSalesConfirmed"
+        OnCancel="CloseEditSalesDialog" />
+}
+
+@code {
+
+[Inject] private HttpClient Http { get; set; } = default!;
+[Inject] private IJSRuntime JS { get; set; } = default!;
+
+
+[Parameter]
+public IReadOnlyList<BatchCartItem> Items { get; set; }
+    = Array.Empty<BatchCartItem>();
+
+[Parameter] public EventCallback<BatchCartItem> OnEdit { get; set; }
+[Parameter] public EventCallback<BatchCartItem> OnDelete { get; set; }
+
+private string? createPlanError;
+
+private int editQty;
+private string? editComment;
+
+public void StartEdit(ManaApp.Shared.BatchCartItem item)
+{
+    editQty = item.Qty;
+    editComment = item.Comment;
+    StateHasChanged();
+}
+
+private string DraftTitle =>
+    Items.Count == 0
+        ? ""
+        : $"Melnraksts no {DateTime.Now:dd.MM.yyyy}";
+
+
+private void OnEditSaved(ProductionTasks.BatchLine line)
+{
+    // te vēlāk ieliksim precīzu piesaisti pie Items
+    isEditOpen = false;
+    StateHasChanged();
+}
+
+private ProductionTasks.BatchLine? editLine;
+
+private BatchCartModel Model = new();
+
+public class BatchCartModel
+{
+    public int? BatchId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string? Comment { get; set; }
+    public List<ManaApp.Shared.BatchCartItem> Items { get; set; } = new();
+}
+
+private async Task<bool> SaveDraftAsync()
+{
+    var url = Model.BatchId.HasValue
+        ? "http://localhost:5270/api/batches/draft/update"
+        : "http://localhost:5270/api/batches/draft/create";
+
+    try
+    {
+        SyncItemsToModel();
+var resp = await Http.PostAsJsonAsync(url, Model);
+
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            var txt = await resp.Content.ReadAsStringAsync();
+            if (resp.StatusCode == System.Net.HttpStatusCode.Conflict)
+                await JS.InvokeVoidAsync("alert", txt);
+            else
+                await JS.InvokeVoidAsync(
+                    "alert",
+                    $"Draft saglabāšana neizdevās ({(int)resp.StatusCode}).\n{txt}"
+                );
+
+            return false;
+        }
+
+        var data = await resp.Content.ReadFromJsonAsync<Dictionary<string, int>>();
+        if (data != null && data.TryGetValue("batchId", out var id))
+            Model.BatchId = id;
+
+        return true;
+    }
+    catch (Exception ex)
+    {
+        await JS.InvokeVoidAsync(
+            "alert",
+            $"Draft saglabāšanas kļūda.\n{ex.Message}"
+        );
+        return false;
+    }
+}
+
+private int? editingIndex = null;
+private ManaApp.Shared.BatchCartItem itemDraft = new();
+
+private void AddItem(ManaApp.Shared.BatchCartItem item)
+{
+    // dublikātu aizliegums (pēc VersionId vai ProductId)
+    var dupe = Model.Items.Any(x =>
+        x.VersionId == item.VersionId || x.ProductId == item.ProductId);
+
+    if (dupe)
+    {
+        JS.InvokeVoidAsync("alert", "Šī prece jau ir pievienota.");
+        return;
+    }
+
+    Model.Items.Add(item.Clone());
+}
+
+private void StartEditItem(int idx)
+{
+    editingIndex = idx;
+    itemDraft = Model.Items[idx].Clone();
+}
+private void SaveEditItem()
+{
+    if (editingIndex is null)
+        return;
+
+    // dublikātu pārbaude (izņemot pašu sevi)
+    var dupe = Model.Items
+        .Where((_, i) => i != editingIndex.Value)
+        .Any(x =>
+            x.VersionId == itemDraft.VersionId ||
+            x.ProductId == itemDraft.ProductId);
+
+    if (dupe)
+    {
+        JS.InvokeVoidAsync("alert", "Šī prece jau ir pievienota.");
+        return;
+    }
+
+    Model.Items[editingIndex.Value] = itemDraft.Clone();
+    editingIndex = null;
+}
+private async Task DeleteItem(int idx)
+{
+    var ok = await JS.InvokeAsync<bool>("confirm", "Vai dzēst rindu?");
+    if (!ok) return;
+
+    // ja melnraksts jau DB — dzēs arī serverī
+    if (Model.BatchId.HasValue && Model.BatchId > 0)
+    {
+        var line = Model.Items[idx];
+        var url = $"http://localhost:5270/api/batches/{Model.BatchId.Value}/line/{line.VersionId}";
+        await Http.DeleteAsync(url);
+    }
+
+    Model.Items.RemoveAt(idx);
+}
+
+private void SyncItemsToModel()
+{
+    Model.Items.Clear();
+
+    foreach (var it in Items)
+    {
+        Model.Items.Add(new BatchCartItem
+{
+    VersionId = it.VersionId,   // ⬅️ ŠIS SALABO FK
+    Code = it.Code,
+    Name = it.Name,
+    Qty = it.Qty,
+    Comment = it.Comment
+});
+
+    }
+}
+
+private async Task SaveDraftClicked()
+{
+    SyncItemsToModel();
+
+    if (string.IsNullOrWhiteSpace(Model.Title) || Model.Items.Count == 0)
+    {
+        await JS.InvokeVoidAsync("alert", "Nepieciešams nosaukums un vismaz 1 prece.");
+        return;
+    }
+
+    await SaveDraftAsync();
+}
+
+private bool isEditOpen = false;
+private int editIndex = -1;
+private void OpenEdit(BatchCartItem it)
+{
+    // izveidojam rindu dialogam
+    editLine = new ProductionTasks.BatchLine
+    {
+        BatchCode = it.Code,      // ja nav īstā lauka, nav kritiski – tikai virsrakstam
+        Planned   = it.Qty,
+        Comment   = it.Comment,
+        BatchStatus = 5           // lai ļauj labot qty (pēc tava dialoga loģikas)
+    };
+
+    isEditOpen = true;
+}
+
+private enum BatchPanelSheet
+{
+    Production,
+    Sales
+}
+
+private BatchPanelSheet activeSheet = BatchPanelSheet.Production;
+
+private CancellationTokenSource? _commentCts;
+
+private async Task OnCommentChanged()
+{
+    _commentCts?.Cancel();
+    _commentCts = new CancellationTokenSource();
+
+    try
+    {
+        await Task.Delay(600, _commentCts.Token);
+        await SaveCommentToDbAsync(); // ⬅️ VIENMĒR
+    }
+    catch (TaskCanceledException) { }
+}
+
+
+private async Task SaveCommentToDbAsync()
+{
+    // 1️⃣ ja vēl NAV batch → izveidojam draft tikai ar komentāru
+    if (!Model.BatchId.HasValue || Model.BatchId <= 0)
+    {
+        var createDto = new
+        {
+            Title = "",               // backend pats ģenerēs
+            Comment = Model.Comment,
+            Items = new List<BatchCartItem>()
+        };
+
+        var resp = await Http.PostAsJsonAsync(
+            "http://localhost:5270/api/batches/draft/create",
+            createDto
+        );
+
+        if (!resp.IsSuccessStatusCode)
+            return;
+
+        var data = await resp.Content.ReadFromJsonAsync<Dictionary<string, int>>();
+        if (data != null && data.TryGetValue("batchId", out var id))
+        {
+            Model.BatchId = id;
+        }
+
+        return;
+    }
+
+    // 2️⃣ ja batch jau eksistē → update
+    var updateDto = new
+    {
+        BatchId = Model.BatchId.Value,
+        Title = "",                 // nemainām
+        Comment = Model.Comment,
+        Items = Items.Select(it => new
+        {
+            VersionId = it.VersionId,
+            Qty = it.Qty,
+            Comment = it.Comment
+        })
+    };
+
+    await Http.PostAsJsonAsync(
+        "http://localhost:5270/api/batches/draft/update",
+        updateDto
+    );
+}
+
+public void SetComment(string? comment)
+{
+    Model.Comment = comment;
+    StateHasChanged();
+}
+
+[Parameter]
+public int? BatchId { get; set; }
+protected override void OnParametersSet()
+{
+    Model.BatchId = BatchId;
+}
+
+private bool isCreateOpen = false;
+
+private void OpenCreateDialog()
+{
+    isCreateOpen = true;
+}
+
+[Parameter]
+public Func<string, Task<bool>>? OnCreateConfirmed { get; set; }
+
+private async Task CreateConfirmed(string planCode)
+{
+    createPlanError = null;
+
+    if (OnCreateConfirmed is null)
+        return;
+
+    var success = await OnCreateConfirmed(planCode);
+
+    if (success)
+    {
+        // ✅ viss OK → aizveram popup
+        isCreateOpen = false;
+        StateHasChanged();
+    }
+    else
+    {
+        // ❌ kļūda → popup paliek vaļā
+        isCreateOpen = true;
+        StateHasChanged();
+    }
+}
+
+public void SetCreateError(string message)
+{
+    createPlanError = message;
+    isCreateOpen = true;
+    StateHasChanged();
+}
+
+public void CloseCreateDialog()
+{
+    createPlanError = null;
+    isCreateOpen = false;
+    StateHasChanged();
+}
+
+private async Task DeleteDraftClicked()
+{
+    if (Model.BatchId == null || Model.BatchId <= 0)
+        return;
+
+    var ok = await JS.InvokeAsync<bool>(
+        "confirm",
+        "Vai tiešām dzēst melnrakstu?"
+    );
+
+    if (!ok)
+        return;
+
+    // izsaucam parent (Planning.razor)
+    await OnDeleteDraft.InvokeAsync();
+}
+
+[Parameter]
+public EventCallback OnDeleteDraft { get; set; }
+
+[Parameter]
+public IReadOnlyList<SalesCartItem> SalesItems { get; set; }
+    = Array.Empty<SalesCartItem>();
+
+
+public void Refresh()
+{
+    InvokeAsync(StateHasChanged);
+}
+
+// pievienot pogu Pārdošanas panelī
+[Parameter]
+public EventCallback OnSold { get; set; }
+
+private async Task OnSoldClicked()
+{
+    if (OnSold.HasDelegate)
+        await OnSold.InvokeAsync();
+}
+
+// pievienot pogu Pārdošanas panelī pardošanas rindai
+private void EditSalesItem(SalesCartItem item)
+{
+    editingSalesItem = item;
+    isEditSalesOpen = true;
+    StateHasChanged();
+}
+
+private bool isEditSalesOpen = false;
+private SalesCartItem? editingSalesItem;
+
+private void CloseEditSalesDialog()
+{
+    isEditSalesOpen = false;
+    editingSalesItem = null;
+}
+
+private void OnEditSalesConfirmed(int qty)
+{
+    if (editingSalesItem != null)
+    {
+        editingSalesItem.Qty = qty;   // ✅ MAINĀM RINDU
+    }
+
+    CloseEditSalesDialog();
+    StateHasChanged();
+}
+
+private async Task DeleteSalesItem(SalesCartItem item)
+{
+    var ok = await JS.InvokeAsync<bool>(
+        "confirm",
+        "Vai izdzēst rindu?"
+    );
+
+    if (!ok)
+        return;
+
+    SalesItems = SalesItems
+        .Where(x => x != item)
+        .ToList();
+
+    StateHasChanged();
+}
+
+
+}

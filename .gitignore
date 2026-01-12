@@ -1,0 +1,24 @@
+# Visual Studio / VS Code
+.vs/
+.vscode/
+
+# Build results
+bin/
+obj/
+
+# User-specific files
+*.user
+*.suo
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (ja kādreiz būs)
+node_modules/
+
+# Secrets
+appsettings.Development.json

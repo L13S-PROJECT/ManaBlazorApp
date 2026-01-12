@@ -1,0 +1,18 @@
+.page-header{
+  background:#ffffff;
+  border:1px solid #d1d5db;
+  border-radius:12px;
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+  padding:14px 18px;
+  margin-bottom:12px;
+}
+
+.page-header h1{
+  margin:0;
+  font-size:18px;     /* <- mazāks, kā tev bija iepriekš */
+  font-weight:600;
+  color:#444;         /* <- tā pati krāsa kā “Produkti” vecajā stilā */
+  letter-spacing:.2px;
+  text-shadow: 0 1px 0 rgba(11, 236, 11, 0.6);
+}
+

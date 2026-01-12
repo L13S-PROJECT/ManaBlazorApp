@@ -1,0 +1,423 @@
+/* =========================
+   Layout (tikai Planning lapai)
+   ========================= */
+.planning-layout{
+  display:grid;
+  grid-template-columns:0.15fr 0.85fr;
+  gap:8px;
+  min-height:100vh;
+}
+
+.planning-main{
+  display:grid;
+  grid-template-rows:auto auto 1fr;
+  gap:12px;
+  min-width:0;
+}
+
+.planning-panel{
+  padding:8px;
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+  overflow:hidden;   /* bija auto */
+  height:100%;
+}
+
+
+/* ===== Page header (kā Products lapā) ===== */
+.page-header{
+  background:#ffffff;
+  border:1px solid #d1d5db;
+  border-radius:12px;
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+  padding:8px;
+  display:flex;
+  align-items:center;
+}
+
+.page-header h1{
+  margin:0;
+  font-size:18px;
+  font-weight:700;
+  color:#111827;
+}
+
+
+/* =========================
+   Toolbar
+   ========================= */
+.planning-toolbar{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin:6px 0;
+}
+
+.planning-search{
+  flex:1;
+  padding:4px;
+}
+
+.btn-clear{
+  padding:4px 8px;
+}
+
+.cart-badge{
+  min-width:36px;
+  padding:2px 8px;
+  border:1px solid #ccc;
+  border-radius:12px;
+  text-align:center;
+}
+
+/* =========================
+   Syncfusion: template cell padding = 0
+   ========================= */
+::deep .planning-grid td.e-templatecell{
+  padding:0 !important;
+}
+
+/* =========================
+   HEADER krāsas (2 līmeņi)
+   ========================= */
+/* LVL0 (galvenais grids) header */
+::deep .e-grid.lvl0 .e-gridheader .e-headercell,
+::deep .e-grid.lvl0 .e-gridheader .e-headercell .e-headercelldiv{
+  background:#4b5563 !important;
+  border-bottom:1px solid #374151 !important;
+}
+::deep .e-grid.lvl0 .e-gridheader .e-headertext{
+  color:#fff !important;
+  font-weight:600 !important;
+}
+
+/* LVL1 (iekšējais/detail grids) header – gaišāks, lai atšķiras */
+::deep .e-grid.lvl1 .e-gridheader .e-headercell,
+::deep .e-grid.lvl1 .e-gridheader .e-headercell .e-headercelldiv{
+  background:#6b7280 !important;
+  border-bottom:1px solid #4b5563 !important;
+}
+::deep .e-grid.lvl1 .e-gridheader .e-headertext{
+  color:#fff !important;
+  font-weight:600 !important;
+}
+
+/* =========================
+   Rindu foni, lai nesaplūst
+   ========================= */
+/* LVL0 (galvenās rindas) – pelēks fons */
+::deep .e-grid.lvl0 > .e-gridcontent > .e-content
+  > table > tbody > tr:not(.e-detailrow) > td.e-rowcell{
+  background:#e5e7eb !important;
+}
+
+/* LVL0 hover */
+::deep .e-grid.lvl0 > .e-gridcontent > .e-content
+  > table > tbody > tr:not(.e-detailrow):hover > td.e-rowcell{
+  background:#dbe1ea !important;
+}
+
+/* LVL1 (iekšējā tabula) – gaišāks pelēks */
+::deep .e-grid.lvl1 > .e-gridcontent > .e-content
+  > table > tbody > tr > td.e-rowcell{
+  background:#f3f4f6 !important;
+}
+
+/* =========================
+   Detail grid kompaktums
+   ========================= */
+.detail-wrap{
+  padding:2px 0;
+}
+
+::deep .grid-detail-compact.e-grid .e-rowcell,
+::deep .grid-detail-compact.e-grid .e-headercell{
+  padding:0 6px !important;
+  font-size:12px !important;
+  line-height:14px !important;
+}
+
+::deep .grid-detail-compact.e-grid .e-row,
+::deep .grid-detail-compact.e-grid .e-altrow{
+  height:20px !important;
+}
+
+/* =========================
+   Cell wrapper (krāsa uz iekšējā div)
+   ========================= */
+::deep .cell-fill{
+  width:100%;
+  height:100%;
+  min-height:22px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0 !important;
+  box-sizing:border-box;
+}
+
+::deep .cell-fill.bg-neutral   { background:#d9d9d9 !important; }
+::deep .cell-fill.bg-progress  { background:#f9b115 !important; }
+::deep .cell-fill.bg-done      { background:#90ee90 !important; }
+::deep .cell-fill.bg-finishing { background:#ffe873 !important; }
+
+/* =========================
+   Planned box
+   ========================= */
+::deep .planned-box{
+  position:relative;
+  width:100%;
+  height:22px;
+  border:1px solid #ccc;
+  box-sizing:border-box;
+}
+
+::deep .planned-box.bg-planned{
+  background:#00ff00 !important;
+}
+
+::deep .planned-value{
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%, -50%);
+}
+
+::deep .planned-plus,
+::deep .planned-add{
+  position:absolute;
+  right:4px;
+  top:50%;
+  transform:translateY(-50%);
+
+  height:20px;
+  width:20px;
+
+  display:flex;                 /* CENTRĒ + */
+  align-items:center;
+  justify-content:center;
+
+  background:#fff;
+  border:1px solid #333;
+  border-radius:4px;
+
+  font-weight:700;              /* BOLD + */
+  font-size:14px;
+
+  cursor:pointer;
+}
+
+::deep .planned-plus:hover,
+::deep .planned-add:hover{
+  background:#bbf7d0;            /* gaiši zaļš */
+  border-color:#22c55e;
+}
+
+
+/* Planning: tāds pats “galvas bloks” kā Products */
+.planning-header-card{
+  background:#ffffff;
+  border:1px solid #d1d5db;
+  border-radius:12px;
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+
+  padding:8px;
+  margin-bottom:12px; /* tā pati atstarpe zem virsraksta kā Products */
+}
+
+/* ja gribi, lai toolbar iekšā izskatās stingri kā Products */
+.planning-header-card .planning-toolbar{
+  margin: 10px; /* lai nav liekas atstarpes, ja tev planning-toolbar bija ar margin */
+}
+
+/* =========================
+   Products-style toolbar
+   ========================= */
+
+.products-toolbar{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.products-search-wrap{
+  flex:1;
+  position:relative;
+}
+
+.products-search{
+  width:100%;
+  height:36px;
+  padding:0 38px 0 14px;
+  border:1px solid #cbd5e1;
+  border-radius:10px;
+  font-size:14px;
+  box-shadow:0 1px 2px rgba(18, 227, 91, 0.811);
+}
+
+.products-search:focus,
+.products-search:focus-visible{
+  outline: none;
+  border-color: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, .35);
+}
+
+.products-clear{
+  position:absolute;
+  right:6px;
+  top:50%;
+  transform:translateY(-50%);
+  width:28px;
+  height:28px;
+  border-radius:10px;
+  border:1px solid #cbd5e1;
+  background:#fff;
+  cursor:pointer;
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+}
+
+.products-btn{
+  height:36px;
+  padding:0 16px;
+  border:1px solid #cbd5e1;
+  border-radius:10px;
+  background:#fff;
+  font-weight:600;
+  cursor:pointer;
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+}
+
+.products-btn.primary{
+  background:#22c55e;
+  border-color:#22c55e;
+  color:#062e14;
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+}
+
+.products-badge{
+  min-width:32px;
+  height:32px;
+  border-radius:10px;
+  border:1px solid #cbd5e1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:600;
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+}
+
+/* === Planning: Kategorijas grupas rinda (noapaļota kā card) === */
+::deep .planning-grid .e-groupcaptionrow td{
+  background:#f8fafc !important;
+  border-radius:10px !important;
+
+  padding:6px 10px !important;
+  border:1px solid #e5e7eb !important;
+
+  font-weight:600;
+  color:#111827;
+
+  box-shadow:0 1px 2px rgba(0,0,0,.06);
+}
+
+::deep .planning-grid .e-groupcaptionrow{
+  overflow:hidden;
+}
+
+/* Sticky header korekcija Planning gridam */
+
+/* ====== 1) SAŠAURINĀM GROUPING JOSLU ("Kategorija ↑ x") ====== */
+::deep .planning-grid .e-groupdroparea{
+  padding: 2px 6px !important;
+  min-height: 28px !important;
+  height: 28px !important;
+}
+
+/* pašu "chip" (Kategorija ↑ x) */
+::deep .planning-grid .e-groupdroparea .e-group-elem{
+  padding: 2px 8px !important;
+  height: 22px !important;
+  line-height: 18px !important;
+}
+
+/* ikonas chip iekšā (↑ un x) */
+::deep .planning-grid .e-groupdroparea .e-group-elem .e-icons{
+  line-height: 18px !important;
+}
+
+/* === SAŠAURINĀM KOLONU HEADERUS === */
+::deep .planning-grid .e-gridheader .e-headercell{
+  padding: 0 !important;
+}
+
+::deep .planning-grid .e-gridheader .e-headercell .e-headercelldiv{
+  padding: 1px 6px !important;   /* BIJA: 2px 8px */
+  height: 22px !important;      /* BIJA: 26px */
+  line-height: 18px !important; /* BIJA: 22px */
+  display: flex !important;
+  align-items: center !important;
+}
+
+::deep .planning-grid .e-gridheader .e-headertext{
+  font-size: 12px !important;   /* BIJA default ~14px */
+  font-weight: 600 !important;
+}
+
+.planning-content {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 12px;
+    height: 100%;
+}
+
+.planning-left {
+    min-width: 0;
+}
+
+.planning-right {
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 12px;
+    padding: 12px;
+}
+
+.batch-items {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.batch-item-row {
+    display: grid;
+    grid-template-columns: 90px 1fr 60px 1.5fr;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 13px;
+    align-items: center;
+}
+
+.batch-item-row .cell {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.batch-item-row .comment {
+    white-space: normal;
+}
+
+.planning-container {
+    height: calc(100vh - 120px);
+    overflow: auto;
+    border-radius: 12px;
+}
+
+/* ierobežo PlanningTable platumu kā Products */
+.planning-container {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+

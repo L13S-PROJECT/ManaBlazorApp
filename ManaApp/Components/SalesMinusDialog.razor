@@ -1,0 +1,86 @@
+@using ManaApp.Models
+
+<div class="modal-backdrop">
+    <div class="modal-window">
+
+        <h3>Noņemt no noliktavas</h3>
+
+        <div style="margin-bottom:10px;">
+            <b>@ProductName</b>
+            @if (!string.IsNullOrWhiteSpace(VersionName))
+            {
+                <span> (@VersionName)</span>
+            }
+        </div>
+
+        <label class="panel-label">Daudzums *</label>
+            <input type="number"
+                class="panel-input"
+                min="1"
+                max="@MaxQty"
+                value="@Qty"
+                @oninput="OnQtyChanged" />
+
+
+
+        <div class="modal-actions">
+            <button class="panel-btn" @onclick="Cancel">
+                Atcelt
+            </button>
+
+            <button class="panel-btn danger"
+                    disabled="@(Qty <= 0 || (MaxQty > 0 && Qty > MaxQty))"
+                    @onclick="Confirm">
+                Apstiprināt
+            </button>
+        </div>
+
+    </div>
+</div>
+
+@code {
+
+        [Parameter] public string ProductName { get; set; } = "";
+        [Parameter] public string? VersionName { get; set; }
+
+        [Parameter] public int MaxQty { get; set; }
+        [Parameter] public int InitialQty { get; set; }   // ✅ ŠIS TRŪKA
+
+        [Parameter] public EventCallback<int> OnConfirm { get; set; }
+        [Parameter] public EventCallback OnCancel { get; set; }
+
+
+    private int Qty;
+
+
+    private async Task Confirm()
+    {
+        await OnConfirm.InvokeAsync(Qty);
+    }
+
+    private async Task Cancel()
+    {
+        await OnCancel.InvokeAsync();
+    }
+
+
+    private void OnQtyChanged(ChangeEventArgs e)
+{
+    if (!int.TryParse(e.Value?.ToString(), out var v))
+        return;
+
+    if (v < 1)
+        Qty = 1;
+    else if (MaxQty > 0 && v > MaxQty)
+        Qty = MaxQty;
+    else
+        Qty = v;
+}
+
+protected override void OnParametersSet()
+{
+    Qty = InitialQty > 0 ? InitialQty : 1;
+}
+
+
+}

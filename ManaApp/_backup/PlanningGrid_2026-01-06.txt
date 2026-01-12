@@ -1,0 +1,255 @@
+@using ManaApp.Models
+@using Syncfusion.Blazor.Grids
+
+<SfGrid TValue="ProductGroupRow"
+        DataSource="@Rows"
+        Width="100%"
+        Height="calc(100vh - 220px)"
+        AllowSelection="true"
+        RowSelected="OnRowSelectedInternal"
+        GridLines="GridLine.Both"
+        AllowSorting="true"
+        AllowExcelExport="true"
+        EnableStickyHeader="true"
+        AllowFiltering="false"
+        CssClass="planning-grid lvl0">
+
+    <!-- Group settings OBLIGĀTI šeit (nevis iekš GridColumns) -->
+    <GridGroupSettings Columns="@(new[] { nameof(ProductGroupRow.CategoryName) })" />
+
+    <GridSelectionSettings Type="SelectionType.Single"></GridSelectionSettings>
+
+    <GridColumns>
+
+        <GridColumn HeaderText="Nosaukums" Width="300">
+            <Template Context="rowObj">
+                @{
+                    var row = rowObj as ProductGroupRow;
+                    <span>@(row?.ProductName ?? "")</span>
+                }
+            </Template>
+        </GridColumn>
+
+        <GridColumn HeaderText="InStock" Width="100">
+            <Template>
+                @{
+                    var v = ((context as ProductGroupRow)?.InStock ?? 0);
+                }
+                <div class="cell-fill @(v > 0 ? "bg-neutral" : "")">@v</div>
+            </Template>
+            <HeaderTemplate>
+                <div style="padding:4px">InStock</div>
+            </HeaderTemplate>
+        </GridColumn>
+
+        <GridColumn HeaderText="Planned" Width="120">
+            <Template>
+                @{
+                    var row = (context as ProductGroupRow);
+                    var v = row?.Planned ?? 0;
+                }
+
+                <div class="planned-box @(v > 0 ? "bg-planned" : "")">
+                    <span class="planned-value">@v</span>
+
+                    <button type="button"
+                            class="planned-plus"
+                            title="Pievienot"
+                            aria-label="Pievienot"
+                            @onclick:stopPropagation="true">
+                        +
+                    </button>
+                </div>
+            </Template>
+            <HeaderTemplate>
+                <div class="hdr hdr-planned">Planned</div>
+            </HeaderTemplate>
+        </GridColumn>
+
+        <GridColumn HeaderText="DetailedInProgress" Width="100">
+            <Template>
+                @{
+                    var v = ((context as ProductGroupRow)?.DetailedInProgress ?? 0);
+                }
+                <div class="cell-fill @(v > 0 ? "bg-progress" : "")">@v</div>
+            </Template>
+            <HeaderTemplate>
+                <div style="padding:4px">DetailedInProgress</div>
+            </HeaderTemplate>
+        </GridColumn>
+
+        <GridColumn HeaderText="DetailedFinish" Width="100">
+            <Template>
+                @{
+                    var v = ((context as ProductGroupRow)?.DetailedFinish ?? 0);
+                }
+                <div class="cell-fill @(v > 0 ? "bg-done" : "")">@v</div>
+            </Template>
+            <HeaderTemplate>
+                <div style="padding:4px">DetailedFinish</div>
+            </HeaderTemplate>
+        </GridColumn>
+
+        <GridColumn HeaderText="AssemblyINProgress" Width="100">
+            <Template>
+                @{
+                    var v = ((context as ProductGroupRow)?.AssemblyINProgress ?? 0);
+                }
+                <div class="cell-fill @(v > 0 ? "bg-progress" : "")">@v</div>
+            </Template>
+            <HeaderTemplate>
+                <div style="padding:4px">AssemblyINProgress</div>
+            </HeaderTemplate>
+        </GridColumn>
+
+        <GridColumn HeaderText="AssemblyFinish" Width="100">
+            <Template>
+                @{
+                    var v = ((context as ProductGroupRow)?.AssemblyFinish ?? 0);
+                }
+                <div class="cell-fill @(v > 0 ? "bg-done" : "")">@v</div>
+            </Template>
+            <HeaderTemplate>
+                <div style="padding:4px">AssemblyFinish</div>
+            </HeaderTemplate>
+        </GridColumn>
+
+        <GridColumn HeaderText="FinishingInProgress" Width="100">
+            <Template>
+                @{
+                    var v = ((context as ProductGroupRow)?.FinishingInProgress ?? 0);
+                }
+                <div class="cell-fill @(v > 0 ? "bg-finishing" : "")">@v</div>
+            </Template>
+            <HeaderTemplate>
+                <div style="padding:4px">FinishingInProgress</div>
+            </HeaderTemplate>
+        </GridColumn>
+
+    </GridColumns>
+
+    <GridTemplates>
+        <DetailTemplate Context="grpObj">
+            @{
+                var grp = grpObj as ProductGroupRow;
+                if (grp is null) { return; }
+                var versions = grp.Versions ?? new List<ProductRow>();
+            }
+
+            <div class="detail-wrap">
+                <SfGrid TValue="ProductRow"
+                        DataSource="@versions"
+                        Width="100%"
+                        GridLines="GridLine.Both"
+                        RowHeight="18"
+                        CssClass="grid-detail-compact">
+
+                    <GridEvents TValue="ProductRow"></GridEvents>
+
+                    <GridColumns>
+
+                        <GridColumn HeaderText="Versija" Width="240">
+                            <Template Context="verObj">
+                                @{
+                                    var r = verObj as ProductRow;
+                                    if (r is null) { return; }
+                                }
+                                <span>
+                                    @grp.ProductName
+                                    @if (!string.IsNullOrWhiteSpace(r.versionName))
+                                    {
+                                        <span style="margin-left:6px; opacity:.7;">@r.versionName</span>
+                                    }
+                                </span>
+                            </Template>
+                        </GridColumn>
+
+                        <GridColumn Field=@nameof(ProductRow.productCode) HeaderText="Kods" Width="60"></GridColumn>
+
+                        <GridColumn HeaderText="InStock" Width="100">
+                            <Template Context="verObj">
+                                @{
+                                    var v = (verObj as ProductRow)?.InStock ?? 0;
+                                }
+                                <div class="cell-fill @(v > 0 ? "bg-neutral" : "")">@v</div>
+                            </Template>
+                        </GridColumn>
+
+                        <GridColumn HeaderText="Planned" Width="120">
+                            <Template Context="verObj">
+                                @{
+                                    var row = verObj as ProductRow;
+                                    if (row is null) { return; }
+                                    var v = row.Planned;
+                                }
+                                <div class="planned-box @(v > 0 ? "bg-planned" : "")">
+                                    <span class="planned-value">@v</span>
+                                    <button type="button"
+                                            class="planned-add"
+                                            title="Pievienot"
+                                            aria-label="Pievienot"
+                                            @onclick:stopPropagation="true">
+                                        +
+                                    </button>
+                                </div>
+                            </Template>
+                        </GridColumn>
+
+                        <GridColumn HeaderText="DetailedInProgress" Width="100">
+                            <Template Context="verObj">
+                                @{
+                                    var v = (verObj as ProductRow)?.DetailedInProgress ?? 0;
+                                }
+                                <div class="cell-fill @(v > 0 ? "bg-progress" : "")">@v</div>
+                            </Template>
+                        </GridColumn>
+
+                        <GridColumn HeaderText="DetailedFinish" Width="100">
+                            <Template Context="verObj">
+                                @{
+                                    var v = (verObj as ProductRow)?.DetailedFinish ?? 0;
+                                }
+                                <div class="cell-fill @(v > 0 ? "bg-done" : "")">@v</div>
+                            </Template>
+                        </GridColumn>
+
+                        <GridColumn HeaderText="AssemblyINProgress" Width="100">
+                            <Template Context="verObj">
+                                @{
+                                    var v = (verObj as ProductRow)?.AssemblyINProgress ?? 0;
+                                }
+                                <div class="cell-fill @(v > 0 ? "bg-progress" : "")">@v</div>
+                            </Template>
+                        </GridColumn>
+
+                        <GridColumn HeaderText="AssemblyFinish" Width="100">
+                            <Template Context="verObj">
+                                @{
+                                    var v = (verObj as ProductRow)?.AssemblyFinish ?? 0;
+                                }
+                                <div class="cell-fill @(v > 0 ? "bg-done" : "")">@v</div>
+                            </Template>
+                        </GridColumn>
+
+                        <GridColumn HeaderText="FinishingInProgress" Width="100">
+                            <Template Context="verObj">
+                                @{
+                                    var v = (verObj as ProductRow)?.FinishingInProgress ?? 0;
+                                }
+                                <div class="cell-fill @(v > 0 ? "bg-finishing" : "")">@v</div>
+                            </Template>
+                        </GridColumn>
+
+                    </GridColumns>
+                </SfGrid>
+            </div>
+        </DetailTemplate>
+    </GridTemplates>
+
+</SfGrid>
+
+@code {
+    [Parameter] public List<ProductGroupRow> Rows { get; set; } = new();
+
+    private void OnRowSelectedInternal(RowSelectEventArgs<ProductGroupRow> args) { }
+}

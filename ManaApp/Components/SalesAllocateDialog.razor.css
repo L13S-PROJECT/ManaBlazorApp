@@ -1,0 +1,16 @@
+.popup-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+}
+
+.popup-table th,
+.popup-table td {
+    border-bottom: 1px solid #ddd;
+    padding: 6px 8px;
+    text-align: center;
+}
+
+.qty-input {
+    width: 60px;
+}

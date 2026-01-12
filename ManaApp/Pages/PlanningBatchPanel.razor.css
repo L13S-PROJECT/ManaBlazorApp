@@ -1,0 +1,25 @@
+.batch-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.batch-tab {
+    padding: 6px 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px; /* ne pārāk apaļš */
+    background: #f8fafc;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.batch-tab.active {
+    background: #4ade80;
+    border-color: #22c55e;
+}
+
+.draft-title {
+    background-color: #f3f4f6;   /* gaiši pelēks */
+    color: #4b5563;              /* tumši pelēks teksts */
+    cursor: not-allowed;
+}

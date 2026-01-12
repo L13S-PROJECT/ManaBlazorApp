@@ -1,0 +1,2002 @@
+@page "/products"
+@using System.Net.Http.Json
+@using System.Linq
+@using ManaApp.Models
+@using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Popups
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Inputs
+@using Microsoft.JSInterop
+@using ManaApp.Shared
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+       
+<PageHeader Title="Produkts" />
+
+<div class="products-main">
+
+        <!-- vidējā zona: pa kreisi saraksts, pa labi 3 bloki -->
+        <div class="products-content">
+
+            <!-- KREISĀ PUSE: filtri + grida saraksts -->
+            <div class="products-left">
+
+                <div @key="filterResetKey">
+<div class="filters-row">
+
+    <!-- KREISĀ PUSE: filtri -->
+    <div class="toolbar-left">
+
+       <div class="filters-row">
+
+    <div class="filters-left">
+        <div class="root-filter">
+            <button type="button"
+                    class="root-pill @(string.IsNullOrWhiteSpace(selectedRoot) ? "active" : "")"
+                    @onclick='@(() => SetRootFilter(""))'>
+                Visi
+            </button>
+
+            <button type="button"
+                    class="root-pill @(selectedRoot == "KAUSS" ? "active" : "")"
+                    @onclick='@(() => SetRootFilter("KAUSS"))'>
+                Kausi
+            </button>
+
+            <button type="button"
+                    class="root-pill @(selectedRoot == "ADAPTERIS" ? "active" : "")"
+                    @onclick='@(() => SetRootFilter("ADAPTERIS"))'>
+                Adapteri
+            </button>
+        </div>
+
+        <select class="filter-select" @onchange="OnCategoryFilterChanged">
+            <option value="">-- Visi --</option>
+            @foreach (var parent in filteredCategories)
+            {
+                <option value="@parent">@parent</option>
+            }
+        </select>
+
+        <button type="button"
+                class="clear-filter-btn"
+                title="Notīrīt filtrus"
+                @onclick="ClearFilters"
+                disabled="@(!HasAnyFilters)">
+            ↺
+        </button>
+    </div>
+
+    <div class="filters-actions">
+        <button type="button"
+                class="action-btn"
+                @onclick="OpenDialog">
+            Jauns
+        </button>
+
+        <button type="button"
+                class="action-btn"
+                @onclick="OpenEditDialog"
+                disabled="@(selected is null || selectedDetails is null)">
+            Labot
+        </button>
+
+        <button type="button"
+                class="action-btn"
+                @onclick="SoftDeleteSelected"
+                disabled="@(selected is null)">
+            Dzēst
+        </button>
+    </div>
+
+</div>
+
+</div>
+</div>
+
+    <input type="text"
+       class="search-input"
+       placeholder="Meklēt..."
+       @oninput="OnSearchInput" />
+
+
+                </div>
+
+                    <div class="left-grid-box" style="flex:1; min-height:0; overflow:auto;">
+                    <SfGrid CssClass="productsGrid"
+        TValue="ProductRow"
+        DataSource="@rows"
+        Width="100%"
+        Height="100%"
+        AllowSelection="true"
+        GridLines="GridLine.Both">
+
+                        <GridSelectionSettings Type="SelectionType.Single"></GridSelectionSettings>
+                        <GridEvents TValue="ProductRow" RowSelected="Grid_RowSelected"></GridEvents>
+
+                        <GridColumns>
+                            <GridColumn Field=@nameof(ProductRow.categoryName) HeaderText="Kategorija" Width="150"></GridColumn>
+                            <GridColumn Field=@nameof(ProductRow.productName)  HeaderText="Nosaukums"  Width="220"></GridColumn>
+                            <GridColumn Field=@nameof(ProductRow.productCode)  HeaderText="Kods"       Width="120"></GridColumn>
+                            <GridColumn Field=@nameof(ProductRow.versionName)   HeaderText="Versija"    Width="120"></GridColumn>
+                            <GridColumn Field=@nameof(ProductRow.versionDate)   HeaderText="Datums"     Width="140"
+                                        Type="ColumnType.Date" Format="dd.MM.yyyy" TextAlign="TextAlign.Center"></GridColumn>
+                        </GridColumns>
+                    </SfGrid>
+                </div>
+            </div>
+
+            <!-- LABĀ PUSE: Preces saturs + Tehnoloģija -->
+            <div class="products-right">
+
+                <!-- Preces saturs -->
+                <div class="product-content-box">
+
+                  <div class="panel-title">Preces saturs</div>
+      
+
+                    @if (selected is null)
+                    {
+                        <div style="opacity:.7">Izvēlies rindu kreisajā pusē.</div>
+                    }
+                    else if (loadingDetails)
+                    {
+                        <div style="opacity:.7">Ielādēju...</div>
+                    }
+                    else if (selectedDetails is null)
+                    {
+                        <div style="color:#b00">Neizdevās ielādēt datus.</div>
+                        <div><b>Nosaukums:</b> @selected.productName</div>
+                        <div><b>Kods:</b> @selected.productCode</div>
+                    }
+                    else
+                    {
+  <div class="pc-card">
+    <div class="pc-grid">
+        <div class="pc-field pc-span-2">
+            <div class="pc-label">Kategorija</div>
+            <div class="pc-value">@selectedDetails.CategoryName</div>
+        </div>
+
+        <div class="pc-field pc-span-2">
+            <div class="pc-label">Nosaukums</div>
+            <div class="pc-value">@selectedDetails.ProductName</div>
+        </div>
+
+        <div class="pc-field">
+            <div class="pc-label">Kods</div>
+            <div class="pc-value">@selectedDetails.ProductCode</div>
+        </div>
+
+        <div class="pc-field">
+            <div class="pc-label">Rasējums</div>
+            <div class="pc-value">@((selectedDetails.VersionRasejums ?? ""))</div>
+        </div>
+
+        <div class="pc-field">
+            <div class="pc-label">Versija</div>
+            <div class="pc-value">@selectedDetails.VersionName</div>
+        </div>
+
+        <div class="pc-field">
+            <div class="pc-label">Datums</div>
+            <div class="pc-value">@selectedDetails.VersionDate.ToString("dd.MM.yyyy")</div>
+        </div>
+
+        <div class="pc-field pc-span-2">
+            <div class="pc-label">Komentārs</div>
+            <div class="pc-value pc-multiline">@((selectedDetails.VersionComment ?? ""))</div>
+        </div>
+    </div>
+</div>
+
+                    }
+                </div>
+
+                <!-- Tehnoloģija -->
+                <div class="technology-box">
+
+    <div class="technology-header">
+        <div class="panel-title">Tehnoloģija</div>
+
+        <div class="technology-actions">
+            <button type="button"
+        class="action-btn action-btn-sm"
+        disabled="@(selected is null)"
+        @onclick="() =>
+        {
+            newPart = new NewPartVm { TopPartId = null, QtyPerProduct = 1 };
+            newPartSteps = new List<PartStepDto>();
+            isNewPartDialogVisible = true;
+        }">
+    + pievienot jaunu detaļu
+</button>
+
+        </div>
+    </div>
+
+
+
+                    @if (selected is null)
+                    {
+                        <div style="opacity:.7">Izvēlies rindu kreisajā pusē.</div>
+                    }
+                    else if (loadingPartDetails || loadingWorks)
+                    {
+                        <div style="opacity:.7">Ielādēju…</div>
+                    }
+                    else if ((worksByParts is null || worksByParts.Count == 0) && (selectedPartDetails is null || selectedPartDetails.Count == 0))
+                    {
+                        <div style="opacity:.7">Nav detaļu.</div>
+                    }
+                    else
+                    {
+                        @foreach (var part in (worksByParts ?? new List<WorksByPartDto>()))
+                        {
+                            var isOpen = openParts.Contains(part.TopPartCode ?? "");
+                            <div class="tech-item">
+                                <div class="tech-head" @onclick="() => TogglePart(part.TopPartCode)">
+                                    <span class="tech-toggle">@((isOpen ? "−" : "+"))</span>
+                                    <span class="tech-code">@part.TopPartCode</span>
+                                    <span class="tech-name">— @part.TopPartName</span>
+                                    <span class="tech-qty">
+                                        @{
+                                            var qty = selectedPartDetails?.FirstOrDefault(x => x.TopPartCode == part.TopPartCode)?.Quantity ?? 0;
+                                        }
+                                        @(qty > 0 ? $"x{qty}" : "")
+                                    </span>
+                                    <button type="button"
+        class="action-btn action-btn-steps"
+        @onclick="(e) => OpenStepsForPart(part.TopPartCode)"
+        @onclick:stopPropagation="true">
+    + Soļi
+</button>
+
+
+ <button type="button"
+        class="tech-delete-btn"
+        title="Dzēst detaļu"
+        aria-label="Dzēst detaļu"
+        @onclick="(e) => DeletePartByCode(part.TopPartCode)"
+        @onclick:stopPropagation="true">
+    🗑
+</button>
+
+
+
+
+                                </div>
+                                @if (isOpen && (part.Steps?.Any() == true))
+                                {
+                                    <ul class="tech-steps">
+  @foreach (var s in part.Steps!)
+  {
+    <li class="tech-step">
+      <span class="tech-step-arrow">➜</span>
+      <span class="tech-step-name">@s.StepName</span>
+     
+    </li>
+  }
+</ul>
+
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+<!-- === PRECES dialogs (JAUNS/LABOT) === -->
+<SfDialog
+    Width="620px"
+    ShowCloseIcon="true"
+    IsModal="true"
+    ZIndex="10000"
+    Header="@(isEdit ? "Labot preci" : "Jauna prece")"
+    @bind-Visible="isDialogVisible">
+
+    <DialogTemplates>
+        <Content>
+        
+            <div style="display:grid; gap:.75rem; padding:.5rem;">
+                <!-- Vecākkategorija -->
+                <div>
+                    <label style="font-weight:600; display:block; margin-bottom:.25rem;">Kategorija (vecāka)</label>
+                    <SfDropDownList TValue="int?" TItem="CategoryDto"
+                                    Placeholder="-- izvēlies vecāk-kategoriju --"
+                                    @bind-Value="selectedParentId"
+                                    DataSource="parentOptions"
+                                    AllowFiltering="true"
+                                    FloatLabelType="FloatLabelType.Never"
+                                    Width="100%"
+                                    Enabled="@( !isEdit )">
+                        <DropDownListFieldSettings Text="CategoryName" Value="Id"></DropDownListFieldSettings>
+                    </SfDropDownList>
+                    @if (showValidation && !isEdit && selectedParentId is null)
+                    {
+                        <div style="color:#b91c1c; font-size:.9em;">Obligāti jāizvēlas.</div>
+                    }
+                </div>
+
+                <!-- Bērnkategorija -->
+                <div>
+                    <label style="font-weight:600; display:block; margin-bottom:.25rem;">Kategorija (bērna)</label>
+                    <SfDropDownList TValue="int?" TItem="CategoryDto"
+                                    Placeholder="-- izvēlies bērn-kategoriju --"
+                                    @bind-Value="selectedChildId"
+                                    DataSource="childOptions"
+                                    Enabled="@(selectedParentId is not null && !isEdit)"
+                                    AllowFiltering="true"
+                                    Width="100%">
+                        <DropDownListFieldSettings Text="CategoryName" Value="Id"></DropDownListFieldSettings>
+                    </SfDropDownList>
+                    @if (showValidation && selectedChildId is null)
+                    {
+                        <div style="color:#b91c1c; font-size:.9em;">Obligāti jāizvēlas.</div>
+                    }
+                </div>
+
+                <!-- Nosaukums -->
+                <div>
+                    <label style="font-weight:600; display:block; margin-bottom:.25rem;">Nosaukums</label>
+                    <SfTextBox @bind-Value="newName" Placeholder="Preces nosaukums" Width="100%"></SfTextBox>
+                    @if (showValidation && string.IsNullOrWhiteSpace(newName))
+                    {
+                        <div style="color:#b91c1c; font-size:.9em;">Obligāts lauks.</div>
+                    }
+                </div>
+
+                <!-- Kods -->
+                <div>
+                    <label style="font-weight:600; display:block; margin-bottom:.25rem;">Kods</label>
+                    <SfTextBox @bind-Value="newCode" Placeholder="Preces kods" Width="100%"></SfTextBox>
+                    @if (showValidation && string.IsNullOrWhiteSpace(newCode))
+                    {
+                        <div style="color:#b91c1c; font-size:.9em;">Obligāts lauks.</div>
+                    }
+                </div>
+
+                @if (isEdit)
+@if (isEdit)
+{
+  <div class="form-check my-2" style="margin-top:.25rem;">
+    <input class="form-check-input" type="checkbox" id="chkNewVersion" @bind="createNewVersion" />
+    <label class="form-check-label" for="chkNewVersion">
+      Izveidot jaunu versiju
+    </label>
+  </div>
+
+  @if (createNewVersion)
+  {
+    <div class="form-check my-2" style="margin-left:1.25rem;">
+      <input class="form-check-input"
+             type="checkbox"
+             id="chkCopySteps"
+             @bind="copyTechnologySteps" />
+      <label class="form-check-label" for="chkCopySteps">
+        Kopēt tehnoloģijas soļus
+      </label>
+    </div>
+  }
+}
+
+
+                <!-- Versija (obligāts) -->
+                <div>
+                    <label style="font-weight:600; display:block; margin-bottom:.25rem;">Versija</label>
+                    <SfTextBox @bind-Value="newVersionName"
+                               Placeholder="Versijas nosaukums"
+                               Width="100%"
+                               Enabled="@( !(isEdit && !createNewVersion) )"></SfTextBox>
+                    @if (isEdit && !createNewVersion)
+                    {
+                        <div style="font-size:.85em; opacity:.75;">Aktīvās versijas nosaukumu nevar mainīt. Atzīmē “Izveidot jaunu versiju”, lai ievadītu jaunu.</div>
+                    }
+                    @if (showValidation && ( !isEdit || createNewVersion ) && string.IsNullOrWhiteSpace(newVersionName))
+                    {
+                        <div style="color:#b91c1c; font-size:.9em;">Obligāts lauks.</div>
+                    }
+                </div>
+
+                <!-- Rasējums (neobligāts) -->
+                <div>
+                    <label style="font-weight:600; display:block; margin-bottom:.25rem;">Rasējums</label>
+                    <SfTextBox @bind-Value="newVersionRasejums" Placeholder="Rasējuma identifikators/saite" Width="100%"></SfTextBox>
+                </div>
+
+                <!-- Datums (obligāts "Jauns" vai "Jauna versija") -->
+                <div>
+                    <label style="font-weight:600; display:block; margin-bottom:.25rem;">Datums</label>
+                    <InputDate TValue="DateOnly?" @bind-Value="newVersionDate" class="form-control"
+                               disabled="@(isEdit && !createNewVersion)" />
+                    @if (isEdit && !createNewVersion)
+                    {
+                        <div style="font-size:.85em; opacity:.75;">Aktīvās versijas datumu nevar mainīt. Ja vajag jaunu datumu — izveido jaunu versiju.</div>
+                    }
+                    @if (showValidation && ( !isEdit || createNewVersion ) && newVersionDate is null)
+                    {
+                        <div style="color:#b91c1c; font-size:.9em;">Obligāts lauks.</div>
+                    }
+                </div>
+
+                <!-- Komentārs (neobligāts) -->
+                <div>
+                    <label style="font-weight:600; display:block; margin-bottom:.25rem;">Komentārs</label>
+                    <SfTextArea @bind-Value="newVersionComment" Placeholder="Komentārs" Width="100%" Rows="3"></SfTextArea>
+                </div>
+            </div>
+        </Content>
+
+        <FooterTemplate>
+            <div style="display:flex; gap:.5rem; justify-content:flex-end; padding:.25rem .75rem .75rem;">
+                <button type="button" @onclick="SaveAsync" style="padding:.4rem .9rem;">Saglabāt</button>
+                <button type="button" @onclick="CloseDialog" style="padding:.4rem .9rem;">Atcelt</button>
+            </div>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+<!-- === TEHNOLOĢIJAS SOĻI dialogs === -->
+<SfDialog Width="720px"
+          ShowCloseIcon="true"
+          IsModal="true"
+          ZIndex="10050"
+          Header="Tehnoloģijas soļi"
+          @bind-Visible="isStepsDialogVisible">
+  <DialogTemplates>
+
+    <Content>
+
+<div class="steps-dialog-actions">
+    <button type="button"
+            class="action-btn action-btn-sm"
+            title="Pārvaldīt tehnoloģijas soļu tipus"
+            @onclick="OpenStepTypeDialogAsync">
+        ⚙ Soļu tipi
+    </button>
+
+    <button type="button"
+            class="action-btn action-btn-sm"
+            title="Pārvaldīt darba centrus"
+            @onclick="OpenWorkCenterDialogAsync">
+        🏭 Darba centri
+    </button>
+</div>
+
+
+@if (!string.IsNullOrWhiteSpace(stepsError))
+{
+    <div class="alert alert-danger" role="alert" style="margin-bottom:10px;">
+        @stepsError
+    </div>
+}
+
+
+      @if (editingSteps is null || editingSteps.Count == 0)
+      {
+          <div style="opacity:.7">Šai detaļai soļu nav.</div>
+      }
+      else
+      {
+          <table class="steps-table">
+
+            <thead>
+  <tr class="steps-table-head">
+    <th class="steps-th steps-th-order">Secība</th>
+    <th class="steps-th">Nosaukums</th>
+  <th class="steps-th steps-th-steptype">Step Type</th>
+<th class="steps-th steps-th-workcenter">Darba centrs</th>
+
+
+    <th class="steps-th steps-th-flags">Statuss</th>
+
+    <th class="steps-th">Komentārs</th>
+    <th class="steps-th steps-th-actions"></th>
+  </tr>
+</thead>
+
+            <tbody>
+              @foreach (var s in editingSteps)
+              {
+                <tr class="steps-tr">
+
+                  <td class="steps-order-cell">
+  <button type="button"
+          class="steps-order-btn up"
+          title="Pārvietot augšup"
+          @onclick="() => MoveUp(s)">
+  </button>
+
+  <button type="button"
+          class="steps-order-btn down"
+          title="Pārvietot lejup"
+          @onclick="() => MoveDown(s)">
+  </button>
+</td>
+
+                  
+<td><input class="steps-input steps-input-pill" type="text" @bind="s.StepName" @bind:event="oninput" /></td>
+
+
+<td>
+    <SfDropDownList TValue="int" TItem="StepTypeDto"
+                CssClass="steps-ddl"
+                PopupCssClass="steps-ddl-popup-small"
+                DataSource="@stepTypes"
+                @bind-Value="s.StepType"
+                Width="100%">
+    <DropDownListFieldSettings Text="StepTypeName" Value="Id"></DropDownListFieldSettings>
+</SfDropDownList>
+
+</td>
+
+<td>
+    <SfDropDownList TValue="int" TItem="WorkCenter"
+                CssClass="steps-ddl"
+                PopupCssClass="steps-ddl-popup-small"
+                DataSource="@workCenters"
+                @bind-Value="s.WorkCentrId"
+                Width="100%">
+    <DropDownListFieldSettings Text="WorkCentr_Name" Value="Id"></DropDownListFieldSettings>
+</SfDropDownList>
+
+</td>
+
+
+<td class="steps-flags-cell">
+  <label class="steps-flag" title="Paralēls solis">
+    <input type="checkbox" @bind="s.IsParallel" />
+    <span class="flag-icon parallel"></span>
+  </label>
+
+  <label class="steps-flag" title="Pēdējais (Final) solis">
+    <input type="checkbox"
+       checked="@s.IsFinal"
+       disabled="@( !IsLastStep(s) )"
+       @onchange="() => SetFinalStep(s)" />
+
+    <span class="flag-icon final"></span>
+  </label>
+
+  <label class="steps-flag" title="Obligāts solis">
+    <input type="checkbox" @bind="s.IsMandatory" />
+    <span class="flag-icon mandatory"></span>
+  </label>
+</td>
+
+<td><input class="steps-input steps-input-pill" type="text" value="@s.Comments" @onchange="e => s.Comments = e.Value?.ToString()" /></td>
+
+
+                  <td class="steps-td-right">
+                    <button type="button" class="steps-btn" @onclick="() => DeleteStepAsync(s)" title="Dzēst">🗑</button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+      }
+    </Content>
+<FooterTemplate>
+  <div class="steps-footer">
+    <button type="button"
+        class="action-btn action-btn-sm"
+        title="Pievieno jaunu tehnoloģijas soli šai detaļai"
+        @onclick="AddStep">
+    + Pievienot soli
+</button>
+
+<button type="button"
+        class="action-btn action-btn-sm action-btn-primary"
+        title="Saglabāt"
+        @onclick="SaveStepsAsync">
+    Saglabāt
+</button>
+
+<button type="button"
+        class="action-btn action-btn-sm"
+        title="Aizvērt logu"
+        @onclick="CloseStepsDialog">
+    Aizvērt
+</button>
+
+  </div>
+</FooterTemplate>
+
+  </DialogTemplates>
+
+  <SfDialog Width="520px"
+          ShowCloseIcon="true"
+          IsModal="true"
+          ZIndex="10060"
+          Header="Soļu tipu vārdnīca"
+          @bind-Visible="isStepTypeDialogVisible">
+  <DialogTemplates>
+    <Content>
+   <div class="manage-toolbar">
+    <input class="manage-input-small"
+           type="text"
+           placeholder="Jauns nosaukums"
+           @bind="newStepTypeName" />
+
+    <button type="button"
+            class="action-btn action-btn-sm"
+            title="Pievienot jaunu soļa tipu"
+            @onclick="AddStepTypeAsync">
+        Pievienot
+    </button>
+</div>
+
+
+
+      <table class="steps-table">
+
+        <thead>
+          <tr><th style="text-align:left;">Nosaukums</th><th style="text-align:left; width:120px;"></th></tr>
+        </thead>
+        <tbody>
+         @foreach (var t in manageStepTypes)
+{
+    <tr style="border-bottom:1px solid #eee;">
+        <td>
+            @if (editStepTypeId == t.Id)
+{
+    <input class="manage-input-small"
+           type="text"
+           @bind="editStepTypeName" />
+}
+else
+{
+    @t.Name
+}
+
+        </td>
+<td class="manage-actions">
+    @if (editStepTypeId == t.Id)
+    {
+        <button type="button"
+                class="action-btn action-btn-xs"
+                title="Saglabāt izmaiņas"
+                @onclick="SaveEditStepTypeAsync">
+            Saglabāt
+        </button>
+
+        <button type="button"
+                class="action-btn action-btn-xs"
+                title="Atcelt rediģēšanu"
+                @onclick="CancelEditStepType">
+            Atcelt
+        </button>
+    }
+    else
+    {
+        <button type="button"
+                class="action-btn action-btn-xs"
+                title="Labot soļa tipu"
+                @onclick="() => BeginEditStepType(t.Id, t.Name)">
+            Labot
+        </button>
+
+        @if (t.IsActive)
+        {
+            <button type="button"
+                    class="icon-btn"
+                    title="Dzēst soļa tipu"
+                    aria-label="Dzēst soļa tipu"
+                    @onclick="() => DeleteStepTypeAsync(t.Id)">
+                🗑
+            </button>
+        }
+    }
+</td>
+
+    </tr>
+}
+
+        </tbody>
+      </table>
+
+      
+    </Content>
+  </DialogTemplates>
+</SfDialog>
+
+<SfDialog Width="520px"
+          ShowCloseIcon="true"
+          IsModal="true"
+          ZIndex="10070"
+          Header="Darba centri"
+          @bind-Visible="isWorkCenterDialogVisible">
+  <DialogTemplates>
+    <Content>
+
+  <div class="manage-toolbar">
+
+    <input class="manage-input-small"
+           type="text"
+           placeholder="Jauns nosaukums"
+           @bind="newWorkCenterName" />
+
+    <button type="button"
+            class="action-btn action-btn-sm"
+            title="Pievienot darba centru"
+            @onclick="AddWorkCenterAsync">
+      Pievienot
+    </button>
+  </div>
+
+  <table class="manage-table">
+    <thead>
+      <tr>
+        <th>Nosaukums</th>
+        <th style="width:120px;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      @foreach (var it in manageWorkCenters)
+      {
+        <tr>
+          <td>
+            @if (editWorkCenterId == it.Id)
+            {
+              <input class="manage-input-small"
+                     type="text"
+                     @bind="editWorkCenterName" />
+            }
+            else
+            {
+              @it.WorkCentr_Name
+            }
+          </td>
+
+          <td class="manage-actions">
+            @if (editWorkCenterId == it.Id)
+            {
+              <button type="button"
+                      class="action-btn action-btn-xs"
+                      title="Saglabāt"
+                      @onclick="SaveEditWorkCenterAsync">
+                Saglabāt
+              </button>
+
+              <button type="button"
+                      class="action-btn action-btn-xs"
+                      title="Atcelt"
+                      @onclick="CancelEditWorkCenter">
+                Atcelt
+              </button>
+            }
+            else
+            {
+              <button type="button"
+                      class="action-btn action-btn-xs"
+                      title="Labot darba centru"
+                      @onclick="() => BeginEditWorkCenter(it.Id, it.WorkCentr_Name)">
+                Labot
+              </button>
+
+              @if (it.IsActive)
+              {
+                <button type="button"
+                        class="icon-btn"
+                        title="Dzēst darba centru"
+                        aria-label="Dzēst darba centru"
+                        @onclick="() => DeleteWorkCenterAsync(it.Id)">
+                  🗑
+                </button>
+              }
+            }
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+
+</Content>
+
+  </DialogTemplates>
+</SfDialog>
+
+</SfDialog>
+
+<!-- === JAUNA DETAĻA dialogs === -->
+<SfDialog
+    Width="520px"
+    ShowCloseIcon="true"
+    IsModal="true"
+    ZIndex="10060"
+    CssClass="newPartDialog"
+    @bind-Visible="isNewPartDialogVisible">
+
+  <DialogTemplates>
+    <Header>Jauna detaļa – @SelectedProductLabel</Header>
+    <Content>
+  <div class="newpart-form">
+    <label class="newpart-label newpart-label-strong">Detaļas veids</label>
+
+    <div class="newpart-field">
+      <SfDropDownList TValue="int?" TItem="TopPartDto"
+                CssClass="newpart-ddl"
+                DataSource="topParts"
+                Placeholder="-- izvēlies detaļu --"
+                @bind-Value="newPart.TopPartId"
+                AllowFiltering="true"
+                Width="100%">
+  <DropDownListFieldSettings Text="Display" Value="Id"></DropDownListFieldSettings>
+</SfDropDownList>
+
+    </div>
+
+    <label class="newpart-label newpart-label-strong">Daudzums uz izstrādājumu</label>
+    <div class="newpart-field">
+      <SfNumericTextBox TValue="int"
+      IncrementTitle="Palielināt"
+    DecrementTitle="Samazināt"
+                  CssClass="newpart-num"
+                  @bind-Value="newPart.QtyPerProduct"
+                  Min="1"
+                  Step="1"
+                  Width="140px">
+</SfNumericTextBox>
+
+
+    </div>
+  </div>
+</Content>
+
+   <FooterTemplate>
+  <div class="newpart-footer">
+    <button type="button"
+            @onclick="SaveNewPart"
+            disabled="@NewPartInvalid"
+            class="action-btn action-btn-sm action-btn-primary">
+      Saglabāt
+    </button>
+
+    <button type="button"
+            @onclick="CloseNewPartDialog"
+            class="action-btn action-btn-sm">
+      Aizvērt
+    </button>
+  </div>
+</FooterTemplate>
+
+  </DialogTemplates>
+</SfDialog>
+
+
+@code {
+    // ===== Palīg-īpašības izvēlētajai PRECEI (no 'selected') =====
+    private int? SelectedProductId => selected?.id;
+    private string SelectedProductLabel =>
+        selected is null ? string.Empty : $"{selected.productName} ({selected.productCode})";
+
+    // ===== Modeļi (UI pusē) =====
+    public class ProductRow
+    {
+        public int id { get; set; }
+        public string productCode { get; set; } = "";
+        public string productName { get; set; } = "";
+        public string categoryName { get; set; } = "";
+        public string rootName { get; set; } = "";
+        public string versionName { get; set; } = "";
+        public DateOnly? versionDate { get; set; }
+        public int? VersionId { get; set; }
+    }
+
+    public class ProductContentDto
+    {
+        public int VersionId { get; set; }
+        public string? CategoryName { get; set; }
+        public string? ProductName { get; set; }
+        public string? ProductCode { get; set; }
+        public string? VersionName { get; set; }
+        public string? VersionRasejums { get; set; }
+        public DateOnly VersionDate { get; set; }
+        public string? VersionComment { get; set; }
+    }
+
+    public class ProductDetailDto
+    {
+        public string? TopPartName { get; set; }
+        public string? TopPartCode { get; set; }
+        public int Quantity { get; set; }
+        public int ProductToPartId { get; set; }
+    }
+
+    public class CategoryDto
+    {
+        public int Id { get; set; }
+        public string CategoryName { get; set; } = "";
+        public int? ParentId { get; set; }
+        public bool IsActive { get; set; }
+    }
+
+    public class WorkCenter
+    {
+        public int Id { get; set; }
+        public string WorkCentr_Name { get; set; } = "";
+    }
+
+    // — DTO soļiem (kā API atnāk) —
+    public class PartStepDto
+    {
+        public int Id { get; set; }
+        public int ProductToPartId { get; set; }
+        public int StepOrder { get; set; }
+        public string StepName { get; set; } = "";
+        public int StepType { get; set; }
+        public int WorkCentrId { get; set; }
+        public int ParallelGroup { get; set; }
+        public bool IsMandatory { get; set; }
+        public bool IsFinal { get; set; }
+        public string? Comments { get; set; }
+
+        public bool IsParallel
+        {
+            get => ParallelGroup > 0;
+            set => ParallelGroup = value ? 1 : 0;
+        }
+    }
+
+    // ===== Stāvoklis =====
+    private List<ProductRow> allRows = new();
+    private List<ProductRow> rows = new();
+    private List<string> parentCategories = new();
+    private string selectedRoot = "";
+    private string selectedCategory = "";
+    private string searchText = "";
+    private int filterResetKey = 0;
+
+    private ProductRow? selected;
+
+    private ProductContentDto? selectedDetails;
+    private bool loadingDetails = false;
+    private HashSet<string> openParts = new();
+
+    private bool isDialogVisible;
+
+    // Režīmi dialogam
+    bool isEdit = false;
+    private bool _createNewVersion = false;
+
+private bool createNewVersion
+{
+    get => _createNewVersion;
+    set
+    {
+        _createNewVersion = value;
+
+        // ja noņem “Izveidot jaunu versiju”, tad automātiski noņem arī “Kopēt soļus”
+        if (!_createNewVersion)
+            copyTechnologySteps = false;
+    }
+}
+
+
+    // --- Versijas lauki ---
+    private string? newVersionName;
+    private string? newVersionRasejums;
+    private DateOnly? newVersionDate;
+    private string? newVersionComment;
+
+    private List<ProductDetailDto>? selectedPartDetails;
+    private bool loadingPartDetails = false;
+
+    private List<WorksByPartDto>? worksByParts;
+    private bool loadingWorks = false;
+
+    private List<WorkCenter> workCenters = new();
+
+    // ===== Jaunas preces dialogs =====
+    private List<CategoryDto> categories = new();
+    private List<CategoryDto> parentOptions => categories.Where(c => c.ParentId == null && c.IsActive).OrderBy(c => c.CategoryName).ToList();
+    private List<CategoryDto> childOptions  => categories.Where(c => c.ParentId == selectedParentId && c.IsActive).OrderBy(c => c.CategoryName).ToList();
+
+    private int? selectedParentId;
+    private int? selectedChildId;
+    private string newName = "";
+    private string newCode = "";
+    private bool showValidation = false;
+
+    // ===== Palīg-funkcijas =====
+    private void TogglePart(string? code)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return;
+        if (!openParts.Add(code))
+            openParts.Remove(code);
+        StateHasChanged();
+    }
+
+    // ===== Datu ielāde =====
+    protected override async Task OnInitializedAsync()
+{
+    try
+    {
+        // 1) ielādē preces sarakstu (minimāli nepieciešamais)
+        rows = await Http.GetFromJsonAsync<List<ProductRow>>("http://localhost:5270/api/products/list") 
+               ?? new();
+        allRows = new List<ProductRow>(rows);
+
+        // 2) ielādē darba centrus (ja 404/500 — turpinām bez tiem)
+        try
+        {
+            workCenters = await Http.GetFromJsonAsync<List<WorkCenter>>("http://localhost:5270/api/workcenters")
+                          ?? new();
+        }
+        catch { workCenters = new List<WorkCenter>(); }
+
+            // 2b) ielādē soļu tipus (ja 404/500 — turpinām bez tiem)
+try
+{
+    stepTypes = await Http.GetFromJsonAsync<List<StepTypeDto>>("http://localhost:5270/api/steptypes")
+               ?? new();
+}
+catch { stepTypes = new List<StepTypeDto>(); }
+
+
+        // 3) ielādē kategorijas (ja 404/500 — turpinām bez tām)
+        try
+        {
+            categories = await Http.GetFromJsonAsync<List<CategoryDto>>("http://localhost:5270/api/categories")
+                         ?? new();
+        }
+        catch { categories = new List<CategoryDto>(); }
+
+        // 4) ielādē detaļu (TopPart) izvēlnei (ja 404/500 — turpinām bez tās)
+        try
+        {
+            topParts = await Http.GetFromJsonAsync<List<TopPartDto>>("http://localhost:5270/api/topparts")
+                       ?? new();
+        }
+        catch { topParts = new List<TopPartDto>(); }
+
+        // 5) atjauno filtru skatu
+        parentCategories = rows
+            .Select(r => r.categoryName)
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Distinct()
+            .ToList();
+
+        ApplyFilters(); // lokāla filtrēšana; neuzsāk jaunus HTTP
+    }
+    catch (Exception ex)
+    {
+        // nepieļaujam “mūžīgu Loading”
+        Console.WriteLine("OnInitializedAsync error: " + ex);
+        await JS.InvokeVoidAsync("alert", "Kļūda ielādējot datus: " + ex.Message);
+        rows = new(); allRows = new(); // ļaujam lapai atvērties tukšai
+    }
+}
+ 
+
+    private IEnumerable<string> filteredCategories =>
+        string.IsNullOrWhiteSpace(selectedRoot)
+            ? allRows.Select(r => r.categoryName).Where(n => !string.IsNullOrWhiteSpace(n)).Distinct()
+            : allRows.Where(r =>
+                {
+                    var stem = selectedRoot.Length > 1 ? selectedRoot[..^1] : selectedRoot;
+                    return (r.rootName ?? "").StartsWith(stem, StringComparison.OrdinalIgnoreCase);
+                })
+                .Select(r => r.categoryName)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Distinct();
+
+    private void OnCategoryFilterChanged(ChangeEventArgs e)
+    {
+        selectedCategory = e.Value?.ToString() ?? "";
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        IEnumerable<ProductRow> q = allRows;
+
+        if (!string.IsNullOrWhiteSpace(selectedRoot))
+        {
+            var stem = selectedRoot.Length > 1 ? selectedRoot[..^1] : selectedRoot;
+            q = q.Where(r => (r.rootName ?? "").StartsWith(stem, StringComparison.OrdinalIgnoreCase));
+        }
+        if (!string.IsNullOrWhiteSpace(selectedCategory))
+            q = q.Where(r => r.categoryName?.Equals(selectedCategory, StringComparison.OrdinalIgnoreCase) == true);
+
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            var term = searchText.Trim();
+            q = q.Where(r =>
+                (r.productName?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (r.productCode?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (r.categoryName?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false));
+        }
+        rows = q.ToList();
+    }
+
+    private void ClearFilters()
+    {
+        selectedRoot = "";
+        selectedCategory = "";
+        searchText = "";
+        filterResetKey++;
+        ApplyFilters();
+    }
+
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        searchText = e.Value?.ToString() ?? "";
+        ApplyFilters();
+    }
+
+    // ===== Preces dialogs =====
+    private void OpenDialog()
+    {
+        isEdit = false;
+        createNewVersion = false;
+
+        selectedParentId = null;
+        selectedChildId  = null;
+        newName = "";
+        newCode = "";
+        showValidation = false;
+
+        newVersionName = null;
+        newVersionRasejums = null;
+        newVersionDate = null;
+        newVersionComment = null;
+
+        isDialogVisible = true;
+    }
+
+    
+
+    private void OpenEditDialog()
+{
+    if (selected is null || selectedDetails is null) return;
+
+    isEdit = true;
+    createNewVersion = false;
+    copyTechnologySteps = false;   // ✅ ŠO TU PIEVIENO
+
+    selectedChildId = categories
+        .FirstOrDefault(c => c.CategoryName.Equals(selected.categoryName ?? "", StringComparison.OrdinalIgnoreCase))?.Id;
+
+    selectedParentId = (selectedChildId is int childId)
+        ? categories.FirstOrDefault(c => c.Id == childId)?.ParentId
+        : null;
+
+    newName = selected.productName ?? "";
+    newCode = selected.productCode ?? "";
+
+    newVersionName     = selectedDetails.VersionName ?? "";
+    newVersionRasejums = selectedDetails.VersionRasejums ?? "";
+    newVersionComment  = selectedDetails.VersionComment ?? "";
+    newVersionDate     = selectedDetails.VersionDate;
+
+    showValidation = false;
+    isDialogVisible = true;
+}
+
+private void CloseDialog()
+{
+    isDialogVisible = false;
+    isEdit = false;
+    createNewVersion = false;
+    copyTechnologySteps = false; // ✅ PIEVIENO ŠO
+}
+
+
+    private async Task SaveAsync()
+    {
+        showValidation = true;
+
+        var isCreate = !isEdit;
+
+        if (isCreate)
+        {
+            if (selectedParentId is null || selectedChildId is null ||
+                string.IsNullOrWhiteSpace(newName) || string.IsNullOrWhiteSpace(newCode))
+                return;
+        }
+        else
+        {
+            if (selectedChildId is null ||
+                string.IsNullOrWhiteSpace(newName) || string.IsNullOrWhiteSpace(newCode))
+                return;
+        }
+
+        if ((isCreate || createNewVersion) &&
+            (string.IsNullOrWhiteSpace(newVersionName) || newVersionDate is null))
+            return;
+
+        try
+        {
+            if (isCreate)
+            {
+                var payload = new
+                {
+                    productName = newName,
+                    productCode = newCode,
+                    categoryId  = selectedChildId!.Value,
+                    versionName     = newVersionName,
+                    versionRasejums = newVersionRasejums,
+                    versionDate     = newVersionDate?.ToString("yyyy-MM-dd"),
+                    versionComment  = newVersionComment
+                };
+
+                var resp = await Http.PostAsJsonAsync("http://localhost:5270/api/products/create", payload);
+                resp.EnsureSuccessStatusCode();
+            }
+            else
+            {
+                var payload = new
+{
+    productId   = selected!.id,
+    productName = newName,
+    productCode = newCode,
+    categoryId  = selectedChildId!.Value,
+
+    versionId = selectedDetails?.VersionId,
+    versionName     = newVersionName,
+    versionRasejums = newVersionRasejums,
+    versionDate     = newVersionDate?.ToString("yyyy-MM-dd"),
+    versionComment  = newVersionComment,
+
+    createNewVersion = createNewVersion,
+    copyTechnologySteps = createNewVersion && copyTechnologySteps
+};
+
+
+                var resp = await Http.PutAsJsonAsync("http://localhost:5270/api/products/update", payload);
+                resp.EnsureSuccessStatusCode();
+            }
+
+            rows = await Http.GetFromJsonAsync<List<ProductRow>>("http://localhost:5270/api/products/list") ?? new();
+            allRows = new List<ProductRow>(rows);
+
+            if (selected is not null)
+            {
+                await OnRowClicked(selected);
+            }
+
+            CloseDialog();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Save error: " + ex.Message);
+        }
+    }
+
+    // ===== Rindu atlase kreisajā gridā =====
+    private async Task Grid_RowSelected(RowSelectEventArgs<ProductRow> args)
+    {
+        if (args?.Data is not null)
+            await OnRowClicked(args.Data);
+    }
+
+private async Task LoadActiveWorkCentersAsync()
+{
+    workCenters = await Http.GetFromJsonAsync<List<WorkCenter>>(
+        "http://localhost:5270/api/workcenters") ?? new();
+}
+
+    private async Task DeletePartAsync(int productToPartId)
+{
+    var yes = await JS.InvokeAsync<bool>("confirm", "Vai tiešām vēlies dzēst šo detaļu?");
+    if (!yes) return;
+
+    var resp = await Http.DeleteAsync($"http://localhost:5270/api/products/delete-part/{productToPartId}");
+    if (!resp.IsSuccessStatusCode)
+    {
+        var b = await resp.Content.ReadAsStringAsync();
+        await JS.InvokeVoidAsync("alert", $"Dzēšana neizdevās: {b}");
+        return;
+    }
+
+    // atjauno sarakstu
+    selectedPartDetails = await Http.GetFromJsonAsync<List<ProductDetailDto>>(
+        $"http://localhost:5270/api/products/details-by-product?id={selected!.id}");
+    worksByParts = await Http.GetFromJsonAsync<List<WorksByPartDto>>(
+        $"http://localhost:5270/api/products/works-by-product?id={selected!.id}");
+
+    openParts.Clear(); // ✅ aizver visus atvērtos pēc soļu saglabāšanas/dzēšanas
+StateHasChanged();
+
+}
+
+    private async Task OnRowClicked(ProductRow row)
+    {
+        selected = row;
+
+        openParts.Clear();
+
+        selectedDetails = null;
+        selectedPartDetails = null;
+        worksByParts = null;
+
+        loadingDetails = true;
+        loadingPartDetails = true;
+        loadingWorks = true;
+
+        try
+        {
+            selectedDetails = await Http.GetFromJsonAsync<ProductContentDto>(
+                $"http://localhost:5270/api/products/content?id={row.id}");
+
+            selectedPartDetails = await Http.GetFromJsonAsync<List<ProductDetailDto>>(
+                $"http://localhost:5270/api/products/details-by-product?id={row.id}");
+
+            worksByParts = await Http.GetFromJsonAsync<List<WorksByPartDto>>(
+                $"http://localhost:5270/api/products/works-by-product?id={row.id}");
+        }
+        finally
+        {
+            loadingDetails = false;
+            loadingPartDetails = false;
+            loadingWorks = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SoftDeleteSelected()
+    {
+        if (selected is null) return;
+
+        var yes = await JS.InvokeAsync<bool>("confirm",
+            $"Vai tiešām vēlies dzēst preci '{selected.productName}'?");
+
+        if (!yes) return;
+
+        try
+        {
+            var resp = await Http.DeleteAsync($"http://localhost:5270/api/products/delete?id={selected.id}");
+            resp.EnsureSuccessStatusCode();
+
+            rows = await Http.GetFromJsonAsync<List<ProductRow>>("http://localhost:5270/api/products/list") ?? new();
+            allRows = new List<ProductRow>(rows);
+
+            selected = null;
+            selectedDetails = null;
+            selectedPartDetails = null;
+            worksByParts = null;
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Delete error: " + ex.Message);
+        }
+    }
+
+    // ===== Soļi (dialogs) =====
+    private bool isStepsDialogVisible = false;
+    private List<PartStepDto> editingSteps = new();
+
+    private string? stepsError;
+
+    private bool HasInvalidSteps =>
+    editingSteps == null || editingSteps.Any(s =>
+        string.IsNullOrWhiteSpace(s.StepName)
+        || s.StepType <= 0
+        || s.WorkCentrId <= 0);
+
+    private int currentStepsPartId;
+
+    private async Task<List<PartStepDto>> LoadStepsAsync(int productToPartId)
+    {
+        var url = $"http://localhost:5270/api/products/steps-by-part?productToPartId={productToPartId}";
+        return await Http.GetFromJsonAsync<List<PartStepDto>>(url) ?? new();
+    }
+
+    private async Task OpenStepsForPart(string? topPartCode)
+    {
+        stepsError = null;
+        
+        if (string.IsNullOrWhiteSpace(topPartCode) || selectedPartDetails is null) return;
+
+        var detail = selectedPartDetails.FirstOrDefault(x => x.TopPartCode == topPartCode);
+        if (detail is null) return;
+
+        currentStepsPartId = detail.ProductToPartId;
+editingSteps = await LoadStepsAsync(detail.ProductToPartId);
+
+// ielādē dropdown avotus katru reizi atverot
+await LoadActiveWorkCentersAsync();
+await LoadActiveStepTypesAsync();
+
+isStepsDialogVisible = true;
+StateHasChanged();
+
+        StateHasChanged();
+    }
+
+    private async void CloseStepsDialog()
+{
+    stepsError = null;
+    
+    isStepsDialogVisible = false;
+
+    // Pēc soļu rediģēšanas/dzēšanas atsvaidzini labo pusi (“Tehnoloģija” sarakstu)
+    if (selected is not null)
+    {
+        selectedPartDetails = await Http.GetFromJsonAsync<List<ProductDetailDto>>(
+            $"http://localhost:5270/api/products/details-by-product?id={selected.id}") ?? new();
+
+        worksByParts = await Http.GetFromJsonAsync<List<WorksByPartDto>>(
+            $"http://localhost:5270/api/products/works-by-product?id={selected.id}") ?? new();
+    }
+
+    StateHasChanged();
+}
+
+    private void AddStep()
+    {
+        if (currentStepsPartId == 0) return;
+        editingSteps ??= new();
+
+        var nextOrder = editingSteps.Count > 0 ? editingSteps.Max(x => x.StepOrder) + 1 : 1;
+
+        // paņem noklusētos no ielādētajiem sarakstiem (ja ir)
+var defaultStepTypeId = stepTypes?.FirstOrDefault()?.Id ?? 0;
+var defaultWcId       = workCenters?.FirstOrDefault()?.Id ?? 0;
+
+editingSteps.Add(new PartStepDto
+{
+    Id = 0,
+    ProductToPartId = currentStepsPartId,
+    StepOrder = nextOrder,
+    StepName = "",
+    StepType = defaultStepTypeId, // ← vairs nav 0
+    WorkCentrId = defaultWcId,    // ← vairs nav 0
+    ParallelGroup = 0,
+    IsMandatory = false,
+    IsFinal = false,
+    Comments = ""
+});
+
+    }
+
+    private void MoveUp(PartStepDto s)
+    {
+        var idx = editingSteps.IndexOf(s);
+        if (idx <= 0) return;
+        (editingSteps[idx - 1], editingSteps[idx]) = (editingSteps[idx], editingSteps[idx - 1]);
+        RecalcOrders();
+    }
+
+    private void MoveDown(PartStepDto s)
+    {
+        var idx = editingSteps.IndexOf(s);
+        if (idx < 0 || idx >= editingSteps.Count - 1) return;
+        (editingSteps[idx + 1], editingSteps[idx]) = (editingSteps[idx], editingSteps[idx + 1]);
+        RecalcOrders();
+    }
+
+private void RecalcOrders()
+{
+    for (int i = 0; i < editingSteps.Count; i++)
+    {
+        editingSteps[i].StepOrder = (i + 1) * 10;
+    }
+
+    // ❗ NEUZSPIEŽAM Final automātiski
+    // Final ir lietotāja atbildība
+
+    StateHasChanged();
+}
+
+
+    private async Task DeleteStepAsync(PartStepDto s)
+    {
+        var yes = await JS.InvokeAsync<bool>("confirm", $"Dzēst soli “{s.StepName}”?");
+        if (!yes) return;
+
+        if (s.Id == 0)
+        {
+            editingSteps.Remove(s);
+            RecalcOrders();
+            return;
+        }
+
+        var resp = await Http.DeleteAsync($"http://localhost:5270/api/products/step/{s.Id}");
+        if (resp.IsSuccessStatusCode)
+        {
+            editingSteps.Remove(s);
+            RecalcOrders();
+        }
+        else
+        {
+            var body = await resp.Content.ReadAsStringAsync();
+            await JS.InvokeVoidAsync("alert", $"Dzēšana neizdevās: {body}");
+        }
+    }
+
+    private bool ValidateFinalRule()
+    {
+        if (editingSteps is null || editingSteps.Count == 0) return false;
+
+        var finals = editingSteps.Where(s => s.IsFinal).ToList();
+        if (finals.Count != 1) return false;
+
+        var final = finals[0];
+        var maxOrder = editingSteps.Max(s => s.StepOrder);
+        return final.StepOrder == maxOrder;
+    }
+
+    private async Task SaveStepsAsync()
+    {
+        // === GUARD: pārbaude pirms saglabāšanas ===
+var invalid = editingSteps
+    .Select((s, i) => new { s, i })
+    .FirstOrDefault(x => string.IsNullOrWhiteSpace(x.s.StepName)
+                      || x.s.StepType <= 0
+                      || x.s.WorkCentrId <= 0);
+
+if (invalid != null)
+{
+    var field = string.IsNullOrWhiteSpace(invalid.s.StepName) ? "nosaukums"
+             : (invalid.s.StepType <= 0 ? "soļa tips"
+             : "darba centrs");
+
+    stepsError = $"Izlabo soli #{invalid.i + 1}: nav aizpildīts {field}.";
+StateHasChanged();
+return;
+
+}
+// === /GUARD ===
+
+        RecalcOrders();
+
+        if (!ValidateFinalRule())
+        {
+            await JS.InvokeVoidAsync("alert",
+                "Noteikums: jābūt TIEŠI vienam 'Final' un tam jābūt pēdējam solim. Lūdzu izlabo pirms saglabāšanas.");
+            return;
+        }
+
+        int tmpOrder = 1000;
+        foreach (var step in editingSteps.Where(s => s.Id > 0))
+        {
+            var prePayload = new
+            {
+                Id = step.Id,
+                StepOrder = tmpOrder,
+                StepName = step.StepName,
+                StepType = step.StepType > 0 ? step.StepType : 1,
+                WorkCentrId = step.WorkCentrId,
+                ParallelGroup = step.IsParallel ? 1 : 0,
+                IsMandatory = step.IsMandatory,
+                IsFinal = step.IsFinal,
+                Comments = step.Comments
+            };
+            tmpOrder += 10;
+
+            var preResp = await Http.PutAsJsonAsync("http://localhost:5270/api/products/step", prePayload);
+            if (!preResp.IsSuccessStatusCode)
+            {
+                var b = await preResp.Content.ReadAsStringAsync();
+                await JS.InvokeVoidAsync("alert", $"Pre-PUT kļūda: {b}");
+                return;
+            }
+        }
+
+        RecalcOrders();
+
+        foreach (var step in editingSteps.Where(s => s.Id == 0))
+        {
+            var payload = new
+            {
+                ProductToPartId = step.ProductToPartId,
+                StepOrder = step.StepOrder,
+                StepName = step.StepName,
+                StepType = step.StepType > 0 ? step.StepType : 1,
+                WorkCentrId = step.WorkCentrId,
+                ParallelGroup = step.IsParallel ? 1 : 0,
+                IsMandatory = step.IsMandatory,
+                IsFinal = step.IsFinal,
+                Comments = step.Comments
+            };
+
+            var resp = await Http.PostAsJsonAsync("http://localhost:5270/api/products/step", payload);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var b = await resp.Content.ReadAsStringAsync();
+                await JS.InvokeVoidAsync("alert", $"POST kļūda: {b}");
+                return;
+            }
+        }
+
+        foreach (var step in editingSteps.Where(s => s.Id > 0))
+        {
+            var payload = new
+            {
+                Id = step.Id,
+                StepOrder = step.StepOrder,
+                StepName = step.StepName,
+                StepType = step.StepType > 0 ? step.StepType : 1,
+                WorkCentrId = step.WorkCentrId,
+                ParallelGroup = step.IsParallel ? 1 : 0,
+                IsMandatory = step.IsMandatory,
+                IsFinal = step.IsFinal,
+                Comments = step.Comments
+            };
+
+            var resp = await Http.PutAsJsonAsync("http://localhost:5270/api/products/step", payload);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var b = await resp.Content.ReadAsStringAsync();
+                await JS.InvokeVoidAsync("alert", $"PUT kļūda: {b}");
+                return;
+            }
+        }
+
+        CloseStepsDialog();
+    }
+
+    // ===== Jaunas detaļas dialogs =====
+    private bool isNewPartDialogVisible = false;
+
+private class NewPartVm
+{
+    public int? TopPartId { get; set; }
+    public int QtyPerProduct { get; set; } = 1;
+}
+
+    private NewPartVm newPart = new();
+    private List<PartStepDto> newPartSteps = new();
+
+    
+
+    private void CloseNewPartDialog() => isNewPartDialogVisible = false;
+
+private async Task SaveNewPart()
+{
+    if (selectedDetails is null || newPart is null || newPart.TopPartId is null) return;
+
+    
+ var payload = new
+{
+    productId     = selected!.id,              // ← API gaida productId
+    topPartId     = newPart.TopPartId!.Value,  // ← API gaida topPartId
+    qtyPerProduct = newPart.QtyPerProduct      // ← API gaida qtyPerProduct (>=1)
+};
+
+    var resp = await Http.PostAsJsonAsync("http://localhost:5270/api/products/add-part", payload);
+    if (!resp.IsSuccessStatusCode)
+    {
+        var b = await resp.Content.ReadAsStringAsync();
+        await JS.InvokeVoidAsync("alert", $"Neizdevās saglabāt detaļu: {b}");
+        return;
+    }
+
+    // atjauno sarakstus (gan detaļas, gan “Tehnoloģiju”)
+selectedPartDetails = await Http.GetFromJsonAsync<List<ProductDetailDto>>(
+    $"http://localhost:5270/api/products/details-by-product?id={selected!.id}") ?? new();
+
+worksByParts = await Http.GetFromJsonAsync<List<WorksByPartDto>>(
+    $"http://localhost:5270/api/products/works-by-product?id={selected!.id}") ?? new();
+
+isNewPartDialogVisible = false;
+
+openParts.Clear(); // ✅ aizver visus atvērtos pēc soļu saglabāšanas/dzēšanas
+StateHasChanged();
+}
+
+
+
+    private class TopPartDto
+{
+    public int Id { get; set; }
+    public string TopPartName { get; set; } = "";
+    public string TopPartCode { get; set; } = "";
+    public string Display => $"{TopPartCode} — {TopPartName}";
+}
+
+private List<TopPartDto> topParts = new();
+
+private async Task DeletePartByCode(string? topPartCode)
+{
+    if (string.IsNullOrWhiteSpace(topPartCode))
+        return;
+
+    var detail = selectedPartDetails?.FirstOrDefault(x => x.TopPartCode == topPartCode);
+    if (detail is null)
+    {
+        await JS.InvokeVoidAsync("alert", "Neatradu šai detaļai ProductToPartId.");
+        return;
+    }
+
+    await DeletePartAsync(detail.ProductToPartId);
+}
+
+private class StepTypeDto
+{
+    public int Id { get; set; }
+    public string StepTypeName { get; set; } = "";
+    public bool IsActive { get; set; }
+}
+
+private List<StepTypeDto> stepTypes = new();
+
+// pārvaldības dialogs
+private bool isStepTypeDialogVisible = false;
+
+private string newStepTypeName = "";
+
+private class StepTypeRow
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public bool IsActive { get; set; }
+}
+private List<StepTypeRow> manageStepTypes = new();
+
+private int? editStepTypeId = null;
+private string editStepTypeName = "";
+
+private async Task OpenStepTypeDialogAsync()
+{
+    // dropdowns (aktīvie)
+    stepTypes = await Http.GetFromJsonAsync<List<StepTypeDto>>("http://localhost:5270/api/steptypes") ?? new();
+
+    // pārvaldībai – ielādējam un atfiltrējam tikai aktīvos
+    var manage = await Http.GetFromJsonAsync<List<StepTypeDto>>("http://localhost:5270/api/steptypes/manage") ?? new();
+    manageStepTypes = manage
+        .Where(x => x.IsActive)
+        .OrderBy(x => x.StepTypeName)
+        .Select(x => new StepTypeRow { Id = x.Id, Name = x.StepTypeName, IsActive = x.IsActive })
+        .ToList();
+
+    // notīrām jebkuru iepriekšējo rediģēšanas stāvokli
+    editStepTypeId = null;
+    editStepTypeName = "";
+
+    isStepTypeDialogVisible = true;
+    StateHasChanged();
+}
+
+private async Task RefreshStepTypesAsync()
+{
+    // dropdownam
+    stepTypes = await Http.GetFromJsonAsync<List<StepTypeDto>>("http://localhost:5270/api/steptypes") ?? new();
+
+    // pārvaldībai (tikai aktīvie)
+    var manage = await Http.GetFromJsonAsync<List<StepTypeDto>>("http://localhost:5270/api/steptypes/manage") ?? new();
+    manageStepTypes = manage
+        .Where(x => x.IsActive)
+        .OrderBy(x => x.StepTypeName)
+        .Select(x => new StepTypeRow { Id = x.Id, Name = x.StepTypeName, IsActive = x.IsActive })
+        .ToList();
+}
+
+
+// CRUD darbības pārvaldības dialogā
+private async Task AddStepTypeAsync()
+{
+    var name = (newStepTypeName ?? "").Trim();
+    if (string.IsNullOrWhiteSpace(name)) { await JS.InvokeVoidAsync("alert","Ievadi nosaukumu."); return; }
+    var resp = await Http.PostAsJsonAsync("http://localhost:5270/api/steptypes", new { Name = name });
+    if (!resp.IsSuccessStatusCode) { await JS.InvokeVoidAsync("alert", await resp.Content.ReadAsStringAsync()); return; }
+    newStepTypeName = "";
+    await OpenStepTypeDialogAsync(); // refrešs
+    // refrešo dropdown datus
+    stepTypes = await Http.GetFromJsonAsync<List<StepTypeDto>>("http://localhost:5270/api/steptypes") ?? new();
+    StateHasChanged();
+}
+
+private void BeginEditStepType(int id, string current)
+{
+    editStepTypeId = id;
+    editStepTypeName = current;
+}
+
+private void CancelEditStepType()
+{
+    editStepTypeId = null;
+    editStepTypeName = "";
+}
+
+private async Task SaveEditStepTypeAsync()
+{
+    if (editStepTypeId is null) return;
+    var name = (editStepTypeName ?? "").Trim();
+    if (string.IsNullOrWhiteSpace(name))
+    {
+        await JS.InvokeVoidAsync("alert", "Ievadi nosaukumu.");
+        return;
+    }
+
+    var resp = await Http.PutAsJsonAsync("http://localhost:5270/api/steptypes",
+        new { Id = editStepTypeId.Value, Name = name });
+
+    if (!resp.IsSuccessStatusCode)
+    {
+        await JS.InvokeVoidAsync("alert", await resp.Content.ReadAsStringAsync());
+        return;
+    }
+
+    editStepTypeId = null;
+    editStepTypeName = "";
+    await RefreshStepTypesAsync(); // pārlādē gan pārvaldības sarakstu, gan dropdown
+}
+
+
+
+private async Task DeleteStepTypeAsync(int id)
+{
+    var ok = await JS.InvokeAsync<bool>("confirm", "Dzēst soļa tipu? (soft delete)");
+    if (!ok) return;
+    var resp = await Http.DeleteAsync($"http://localhost:5270/api/steptypes/{id}");
+    if (!resp.IsSuccessStatusCode) { await JS.InvokeVoidAsync("alert", await resp.Content.ReadAsStringAsync()); return; }
+    await OpenStepTypeDialogAsync();
+    stepTypes = await Http.GetFromJsonAsync<List<StepTypeDto>>("http://localhost:5270/api/steptypes") ?? new();
+    StateHasChanged();
+}
+
+// dropdown atsvaidzināšanai
+
+private bool isWorkCenterDialogVisible = false;
+private List<WorkCenterManageDto> manageWorkCenters = new();
+
+private class WorkCenterManageDto
+{
+    public int Id { get; set; }
+    public string WorkCentr_Name { get; set; } = "";
+    public bool IsActive { get; set; }
+}
+
+private async Task OpenWorkCenterDialogAsync()
+{
+    manageWorkCenters = (await Http.GetFromJsonAsync<List<WorkCenterManageDto>>(
+    "http://localhost:5270/api/workcenters/manage") ?? new())
+    .Where(x => x.IsActive)                   // ← slēpjam neaktīvos
+    .ToList();
+isWorkCenterDialogVisible = true;
+StateHasChanged();
+
+}
+
+private string newWorkCenterName = "";
+private int? editWorkCenterId = null;
+private string editWorkCenterName = "";
+
+private async Task RefreshWorkCentersAsync()
+{
+    manageWorkCenters = (await Http.GetFromJsonAsync<List<WorkCenterManageDto>>(
+    "http://localhost:5270/api/workcenters/manage") ?? new())
+    .Where(x => x.IsActive)                   // ← slēpjam neaktīvos
+    .ToList();
+
+}
+
+private async Task AddWorkCenterAsync()
+{
+    var name = (newWorkCenterName ?? "").Trim();
+    if (string.IsNullOrWhiteSpace(name)) { await JS.InvokeVoidAsync("alert","Ievadi nosaukumu."); return; }
+
+// ģenerējam kodu (bez atstarpēm, lielie burti; ja gribi citu formātu — pasaki)
+var code = (name ?? "").Trim().ToUpper().Replace(" ", "_");
+
+var resp = await Http.PostAsJsonAsync("http://localhost:5270/api/workcenters/add",
+    new { WorkCentr_Name = name, WorkCentr_Code = code });
+    
+
+    if (!resp.IsSuccessStatusCode)
+    {
+        await JS.InvokeVoidAsync("alert", await resp.Content.ReadAsStringAsync());
+        return;
+    }
+    newWorkCenterName = "";
+    await RefreshWorkCentersAsync();
+    await LoadActiveWorkCentersAsync();
+
+}
+
+private void BeginEditWorkCenter(int id, string current)
+{
+    editWorkCenterId = id; editWorkCenterName = current;
+}
+
+private void CancelEditWorkCenter()
+{
+    editWorkCenterId = null; editWorkCenterName = "";
+}
+
+private async Task SaveEditWorkCenterAsync()
+{
+    if (editWorkCenterId is null) return;
+    var name = (editWorkCenterName ?? "").Trim();
+    if (string.IsNullOrWhiteSpace(name)) { await JS.InvokeVoidAsync("alert","Ievadi nosaukumu."); return; }
+
+    // ģenerējam kodu no nosaukuma (bez atstarpēm, lielie burti)
+var code = (name ?? "").Trim().ToUpper().Replace(" ", "_");
+
+var resp = await Http.PutAsJsonAsync("http://localhost:5270/api/workcenters/update",
+    new { Id = editWorkCenterId!.Value, WorkCentr_Name = name, WorkCentr_Code = code });
+
+
+    if (!resp.IsSuccessStatusCode)
+    {
+        await JS.InvokeVoidAsync("alert", await resp.Content.ReadAsStringAsync());
+        return;
+    }
+    editWorkCenterId = null; editWorkCenterName = "";
+    await RefreshWorkCentersAsync();
+    await LoadActiveWorkCentersAsync();
+
+}
+
+private async Task DeleteWorkCenterAsync(int id)
+{
+    var ok = await JS.InvokeAsync<bool>("confirm", "Dzēst darba centru? (soft delete)");
+    if (!ok) return;
+
+    var resp = await Http.DeleteAsync($"http://localhost:5270/api/workcenters/{id}");
+    if (!resp.IsSuccessStatusCode)
+    {
+        await JS.InvokeVoidAsync("alert", await resp.Content.ReadAsStringAsync());
+        return;
+    }
+    await RefreshWorkCentersAsync();
+    await LoadActiveWorkCentersAsync();
+
+}
+
+private bool NewPartExistsAlready
+{
+    get
+    {
+        if (newPart?.TopPartId is not int id) return false;
+        var sel = topParts.FirstOrDefault(t => t.Id == id);
+        return sel != null && (selectedPartDetails?.Any(d => d.TopPartCode == sel.TopPartCode) ?? false);
+    }
+}
+
+private bool NewPartInvalid =>
+    newPart is null
+    || newPart.TopPartId is null
+    || newPart.QtyPerProduct < 1
+    || NewPartExistsAlready;
+
+private void SetRootFilter(string value)
+{
+    selectedRoot = value ?? "";
+    ApplyFilters();
+}
+
+private bool HasAnyFilters =>
+    !string.IsNullOrWhiteSpace(selectedRoot)
+    || !string.IsNullOrWhiteSpace(selectedCategory)
+    || !string.IsNullOrWhiteSpace(searchText);
+
+private bool IsLastStep(PartStepDto s)
+{
+    if (editingSteps is null || editingSteps.Count == 0)
+        return false;
+
+    var maxOrder = editingSteps.Max(x => x.StepOrder);
+    return s.StepOrder == maxOrder;
+}
+
+private void SetFinalStep(PartStepDto step)
+{
+    if (!IsLastStep(step))
+        return;
+
+    foreach (var s in editingSteps)
+        s.IsFinal = false;
+
+    step.IsFinal = true;
+
+    StateHasChanged();
+}
+
+private async Task LoadActiveStepTypesAsync()
+{
+    stepTypes = await Http.GetFromJsonAsync<List<StepTypeDto>>(
+        "http://localhost:5270/api/steptypes") ?? new();
+}
+private bool copyTechnologySteps = false;
+
+}

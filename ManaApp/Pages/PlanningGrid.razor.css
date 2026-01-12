@@ -1,0 +1,22 @@
+::deep .planning-grid{
+  width: 100%;
+  max-width: 100%;
+}
+
+::deep .planning-grid .e-gridcontent table{
+  table-layout: fixed;
+}
+
+::deep .planning-grid td{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.excel-category-row {
+    font-weight: 600;
+    background: #e5e5e5;
+    padding: 4px 8px;
+    margin-left: -8px;
+    margin-right: -1000px; /* izstiep visu rindu */
+}

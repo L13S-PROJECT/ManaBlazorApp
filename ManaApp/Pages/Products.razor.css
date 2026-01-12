@@ -1,0 +1,1121 @@
+.products-main{
+  display:grid;
+  grid-template-rows:auto 1fr;
+  gap:8px;
+
+  height:100%;
+  min-height:0;
+}
+
+.products-content{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+
+  min-height:0;
+}
+
+
+.products-left{
+  background:#ffffff;
+  border:1px solid #d1d5db;              /* mazliet tumšāks border */
+  border-radius:8px;
+
+  box-shadow:0 1px 2px rgba(0,0,0,.08);  /* viegla ERP ēna */
+
+  padding:8px;
+  display:flex;
+  flex-direction:column;
+
+  height:100%;
+  min-height:0;
+  box-sizing:border-box;
+}
+
+/* Syncfusion grid iekšējie elementi — jāliek ar :global, jo CSS isolation */
+.left-grid-box :global(.e-gridheader table caption){
+  display:none !important;
+}
+
+.left-grid-box :global(.e-gridcontent){
+  height:calc(100% - 48px);
+  overflow:auto;
+  box-sizing:border-box;
+}
+
+.left-grid-box :global(.e-grid){
+  height:100% !important;
+}
+
+.left-grid-box :global(.e-grid .e-rowcell){
+  border-bottom:1px solid #e5e7eb;
+}
+
+.left-grid-box :global(.e-grid .e-rowcell + .e-rowcell){
+  border-left:1px solid #f0f0f0;
+}
+
+.left-grid-box :global(.e-grid .e-headercell){
+  border-bottom:1px solid #e5e7eb;
+}
+
+.left-grid-box :global(.e-grid .e-content .e-table tbody tr.e-row.e-selectionbackground td.e-rowcell),
+.left-grid-box :global(.e-grid .e-content .e-table tbody tr.e-row.e-active td.e-rowcell){
+  background-color:#2563eb !important;
+  color:#ffffff !important;
+}
+
+.left-grid-box :global(.e-grid .e-content .e-table tbody tr.e-row.e-selectionbackground:hover td.e-rowcell){
+  background-color:#2563eb !important;
+}
+
+.left-grid-box :global(.e-grid .e-content .e-table tbody tr.e-row:not(.e-selectionbackground):hover td.e-rowcell){
+  background-color:#f5f5f5;
+}
+
+/* ===== Preces saturs: virsraksts ===== */
+/* ===== Preces saturs (kompakts, sakārtots) ===== */
+.product-content-box{
+  background:#ffffff;
+  border:1px solid #d1d5db;
+  border-radius:12px;
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+
+  padding:6px;              /* kompaktāk */
+  color:#444;
+}
+
+.product-content-box > b{
+  display:block;
+  margin:0 0 10px 0;
+  font-size:18px;            /* lielāks virsraksts */
+  font-weight:700;
+  color:#444;
+}
+
+/* Grid saturs */
+.pc-grid{
+  display:grid;                 /* ← TRŪKA */
+  grid-template-columns: 1fr 1fr;
+  gap:4px 8px;                 /* tikai samazināts */
+}
+
+.pc-span-2{ grid-column: 1 / -1; }
+
+.pc-field{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+
+.pc-label{
+  font-size:11px;          /* ↓ JAUNS */
+  font-weight:600;         /* ↓ */
+  margin-bottom:0px;       /* ↓ JAUNS */
+  color:#374151;
+}
+
+
+/* vērtību “pill” */
+.pc-value{
+  display:flex;                 /* ← TRŪKA */
+  align-items:center;
+
+  min-height:26px;              /* ↓ bija 38 */
+  padding:0 8px;               /* ↓ bija 14 */
+
+  border:1px solid #cbd5e1;     /* ← TRŪKA */
+  border-radius:14px;           /* ATGRIEŽAM, ne 12 */
+  background:#fff;              /* ← TRŪKA */
+
+  color:#111827;
+  font-size:12px;               /* vienīgais samazinājums */
+  box-sizing:border-box;
+}
+
+
+
+/* komentārs */
+.pc-value.pc-multiline{
+  align-items:flex-start;
+  padding:6px 8px;             /* mazliet mazāk */
+  min-height:52px;              /* ne 60, lai neizskatās salauzts */
+  font-size:12px;
+  white-space:pre-wrap;
+}
+
+
+/* Tehnoloģija (detaļas un soļi) */
+.tech-item{
+  border-bottom:1px solid #e5e7eb;
+  padding:.35rem 0;
+
+  color:#111827;        /* ← TĀDS PATS kā Preces */
+  font-size:12px;       /* ← saskaņots ar pc-value */
+}
+
+
+.tech-head{
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+  cursor:pointer;
+  user-select:none;
+}
+
+.tech-code{
+  font-weight:600;      /* ne 700 – kā citur */
+  color:#111827;        /* ← tumšs */
+}
+
+
+.tech-name{
+  opacity:1;            /* ← NOŅEMAM */
+  color:#374151;        /* ← kā labeliem */
+}
+
+
+.tech-qty{
+  margin-left:auto;
+  font-size:11px;
+  color:#6b7280;        /* kluss, bet salasāms */
+}
+
+
+
+.tech-toggle{
+  width:1.25rem;
+  text-align:center;
+  border:1px solid #ccc;
+  border-radius:4px;
+  font-weight:700;
+}
+
+/* Labā puse: Preces saturs + Tehnoloģija */
+.products-right{
+  display:grid;
+  grid-template-rows:auto 1fr;
+  gap:8px;
+}
+
+
+/* Tehnoloģija – labā apakšējā kaste */
+.technology-box{
+  background:#ffffff;                    /* ← balts fons */
+  border:1px solid #d1d5db;              /* tāds pats kā citur */
+  border-radius:12px;                    /* noapaļoti stūri */
+  box-shadow:0 1px 2px rgba(0,0,0,.08);  /* viegla ERP ēna */
+
+  padding:8px;                           /* saskaņots ar pārējiem */
+  overflow:auto;
+}
+
+.technology-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:6px;
+}
+
+.technology-header .panel-title{
+  margin:0;                 /* lai nepieskaita liekas atstarpes */
+  color:#444;               /* tāpat kā citur */
+  opacity:1 !important;     /* ja kaut kur nāk blāvums no globālajiem stiliem */
+}
+
+/* Pogu pamata util-klases */
+.btn{
+  padding:.4rem .9rem;
+  border:1px solid #999;
+  background:#f3f4f6;
+  cursor:pointer;
+}
+
+.btn:hover{
+  background:#e5e7eb;
+}
+
+.btn-sm{
+  padding:.3rem .6rem;
+  font-size:.9em;
+}
+
+.btn-xs{
+  padding:.15rem .4rem;
+  font-size:.85em;
+  margin-left:.75rem;
+}
+
+.tech-delete-btn{
+  width:28px;
+  height:28px;
+
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+
+  border:1px solid #d1d5db;
+  border-radius:8px;
+  background:#fff;
+
+  color:#6b7280;            /* kluss */
+  font-size:14px;
+  cursor:pointer;
+
+  box-shadow:0 1px 1px rgba(0,0,0,.06);
+}
+
+.tech-delete-btn:hover{
+  color:#b91c1c;            /* sarkans TIKAI hover */
+  border-color:#b91c1c;
+  background:#fff;
+}
+
+.tech-delete-btn:active{
+  transform:translateY(1px);
+}
+
+
+/* Technology – action row spacing */
+.technology-actions{
+  margin:.35rem 0 .5rem 0;
+}
+
+/* Steps dialog – top action buttons */
+.steps-dialog-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:.5rem;
+  margin-bottom:.5rem;
+}
+
+/* Steps dialog – table */
+.steps-table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:12px;
+  }
+
+
+.steps-table-head{
+  border-bottom:1px solid #ddd;
+}
+
+.steps-th{
+  text-align:left;
+}
+
+.steps-th-order{
+  width:90px;
+}
+
+.steps-th-actions{
+  width:56px;
+}
+
+.steps-tr{
+  border-bottom:1px solid #f0f0f0;
+}
+
+.steps-td-center{
+  text-align:center;
+}
+
+.steps-td-right{
+  text-align:right;
+}
+
+
+.root-filter{
+  display:flex;
+  align-items:center;
+  gap:0;
+  border:1px solid #9ca3af;
+  border-radius:10px;
+  overflow:hidden;
+  background:#fff;
+}
+
+.root-pill{
+  border:0;
+  background:transparent;
+  padding:6px 12px;
+  cursor:pointer;
+  font-weight:600;
+  color:#111827;
+}
+
+.root-pill + .root-pill{
+  border-left:1px solid #e5e7eb;
+}
+
+.root-pill.active{
+  background:#16e662;   /* zaļš */
+  color:#fff;
+}
+/* category dropdown vizuāli kā pill (vienīgā .filter-select definīcija) */
+.filter-select{
+  height:38px;
+  min-width:160px;
+  padding:0 44px 0 12px;           /* vieta bultiņai */
+  border:1px solid #9ca3af;
+  border-radius:10px;
+  background:#fff;
+  color:#111827;
+  font-weight:600;
+  outline:none;
+
+  appearance:none;
+  -webkit-appearance:none;
+  -moz-appearance:none;
+
+  /* bultiņa labajā pusē */
+  background-image:
+    linear-gradient(45deg, transparent 50%, #374151 50%),
+    linear-gradient(135deg, #374151 50%, transparent 50%);
+  background-position:
+    calc(100% - 20px) 16px,
+    calc(100% - 14px) 16px;
+  background-size:6px 6px, 6px 6px;
+  background-repeat:no-repeat;
+
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+}
+
+.filter-select:hover{
+  border-color:#6b7280;
+}
+
+.filter-select:focus{
+  border-color:#22c55e;
+  box-shadow:0 0 0 3px rgba(34,197,94,.18);
+}
+
+.filter-clear-btn{
+  height:32px;
+  width:32px;
+
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+
+  border:1px solid #9ca3af;
+  border-radius:8px;
+  background:#fff;
+
+  font-weight:700;
+  font-size:14px;
+  line-height:1;
+  color:#374151;
+
+  box-shadow:0 1px 1px rgba(0,0,0,.06);
+  cursor:pointer;
+}
+
+.filter-clear-btn:hover{
+  border-color:#6b7280;
+  background:#f3f4f6;
+}
+
+.filter-clear-btn:focus{
+  outline:none;
+  border-color:#22c55e;
+  box-shadow:0 0 0 2px rgba(34,197,94,.2);
+}
+
+.filters-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between; /* <<< galvenais */
+  gap:12px;
+  padding-top:6px;
+  margin-bottom:6px;
+}
+
+/* mazā “notīrīt” poga blakus dropdown */
+.clear-filter-btn{
+  width:34px;
+  height:34px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+
+  border:1px solid #9ca3af;
+  border-radius:10px;
+  background:#fff;
+  color:#111827;
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+
+  cursor:pointer;
+}
+
+.clear-filter-btn:hover{
+  border-color:#6b7280;
+}
+
+.clear-filter-btn:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+  box-shadow:none;
+}
+
+.products-toolbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:6px;
+}
+
+.toolbar-left{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+}
+
+.toolbar-right{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+/* mazā “notīrīt” ikonas poga — lai nav pielipusi līnijai */
+.clear-icon-btn{
+  height:38px;
+  width:38px;
+  border-radius:10px;
+  border:1px solid #9ca3af;
+  background:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+  cursor:pointer;
+}
+
+.clear-icon-btn:hover{
+  border-color:#6b7280;
+}
+
+.clear-icon-btn:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
+
+.filters-left{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+}
+
+.filters-actions{
+  margin-left:auto;              /* drošībai */
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.action-btn{
+  height:38px;
+  padding:0 14px;
+  border:1px solid #9ca3af;
+  border-radius:10px;            /* noapaļoti */
+  background:#fff;               /* bez krāsainiem */
+  color:#111827;
+  font-weight:600;
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+  cursor:pointer;
+}
+
+.action-btn-steps{
+  padding: 2px 8px;
+  height: 24px;
+  line-height: 1;
+  font-size: 10px;   /* ← mazāks teksts */
+  font-weight: 500; /* lai paliek lasāms */
+}
+
+
+/* alternatīva – spilgtāks */
+.action-btn:hover{
+  border-color:#16a34a;
+  background:#dcfce7;
+}
+
+
+.action-btn:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+  box-shadow:none;
+}
+
+/* Meklēšanas lauks – tāds pats “pill” kā filtri */
+/* Meklēšanas lauks – “pill” + spilgti zaļš focus */
+.search-input{
+  height:40px;
+  width:100%;
+  padding:0 14px;
+  margin-bottom:6px;
+
+  border:1px solid #9ca3af;
+  border-radius:18px;                 /* apaļāki stūri */
+  background:#fff;
+  color:#111827;
+  font-weight:600;
+
+  outline:none !important;            /* lai bootstrap neieliek zilo */
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+  box-sizing:border-box;
+}
+
+.search-input:hover{
+  border-color:#6b7280;
+}
+
+.search-input:focus{
+  border-color:#22c55e !important;    /* spilgti zaļš */
+  box-shadow:0 0 0 4px rgba(34,197,94,.35) !important;
+}
+
+.search-input::placeholder{
+  color:#6b7280;
+  font-weight:500;
+}
+
+.panel-title{
+  font-size:14px;          /* ↓ bija 18 */
+  font-weight:600;         /* ↓ mazāk trekni */
+  margin-bottom:4px;       /* ↓ bija 10 */
+}
+
+/* ===== Steps dialog – text inputs ===== */
+.steps-input-pill{
+  height:28px;              /* ↓ bija 32 */
+  padding:0 8px;            /* ↓ bija 10 */
+  border:1px solid #9ca3af;
+  border-radius:10px;
+  background:#fff;
+  color:#111827;
+  font-size:11px;           /* ↓ bija 12 */
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+  box-sizing:border-box;
+}
+
+.steps-input-pill:focus{
+  outline:none;
+  border-color:#22c55e;
+  box-shadow:0 0 0 3px rgba(34,197,94,.25);
+}
+
+
+ /*secība Step soļiem 23.12.2025 */
+ .steps-order-cell{
+  display:flex;
+  gap:4px;
+}
+
+/*Ikonu pogas (ERP / pill stils)*/
+.steps-order-btn{
+  width:26px;
+  height:26px;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  border:1px solid #9ca3af;
+  border-radius:8px;
+  background:#fff;
+
+  cursor:pointer;
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+  padding:0;
+}
+
+.steps-order-btn:hover{
+  background:#f3f4f6;
+  border-color:#6b7280;
+}
+
+.steps-order-btn:active{
+  transform:translateY(1px);
+}
+
+/*Ikonas (CSS, nevis teksts)*/
+.steps-order-btn::before{
+  content:"";
+  width:0;
+  height:0;
+  border-left:5px solid transparent;
+  border-right:5px solid transparent;
+}
+
+.steps-order-btn.up::before{
+  border-bottom:7px solid #374151;   /* ▲ */
+}
+
+.steps-order-btn.down::before{
+  border-top:7px solid #374151;      /* ▼ */
+}
+
+/* Kolonnas izkārtojums */
+
+.steps-th-flags{
+  width:110px;
+  text-align:center;
+}
+
+.steps-flags-cell{
+  display:flex;
+  gap:8px;
+  justify-content:center;
+  align-items:center;   /* ← SVARĪGAIS */
+}
+
+
+/*Custom checkbox – ZAĻŠ, ne zils*/
+
+.steps-flag{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  gap:4px;
+  font-size:11px;
+  font-weight:600;
+  color:#374151;
+  }
+
+/*Paslēpjam default checkbox*/
+.steps-flag input{
+  appearance:none;
+  -webkit-appearance:none;
+  width:16px;
+  height:16px;
+  border:1.5px solid #22c55e;
+  border-radius:4px;
+  background:#fff;
+  cursor:pointer;
+  position:absolute;
+  opacity:0;
+}
+
+
+/*Checked stāvoklis – SPILGTI ZAĻŠ (kā citur)*/
+
+.steps-flag input:checked{
+  background:#22c55e;
+  border-color:#22c55e;
+}
+
+.steps-flag input:checked::after{
+  content:"";
+  position:absolute;
+  left:4px;
+  top:1px;
+  width:4px;
+  height:8px;
+  border:solid #fff;
+  border-width:0 2px 2px 0;
+  transform:rotate(45deg);
+}
+
+/*Hover / focus – saskaņots ar pill laukiem*/
+.steps-flag input:hover{
+  box-shadow:0 0 0 2px rgba(34,197,94,.25);
+}
+
+/*Ikonas (estētiski, ERP stilā)*/
+
+.flag-icon{
+  width:22px;
+  height:22px;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  border:1px solid #9ca3af;
+  border-radius:8px;
+  background:#fff;
+
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+  color:#374151;
+  font-size:13px;
+}
+
+/* Paralēls (⧉) */
+
+.flag-icon.parallel::before{
+  content:"⧉";
+}
+
+/* Mandatory (!) */
+
+.flag-icon.mandatory::before{
+  content:"!";
+  font-weight:700;
+}
+
+/* Final (✓) – AR IZCELŠANU */
+
+.flag-icon.final::before{
+  content:"✓";
+  font-weight:700;
+}
+
+/* Checked → zaļš (VISIEM) */
+.steps-flag input:checked + .flag-icon{
+  background:#22c55e;
+  border-color:#22c55e;
+  color:#fff;
+}
+
+/* FINAL – papildus vizuāls akcents */
+.steps-flag input:checked + .flag-icon.final{
+  box-shadow:0 0 0 3px rgba(34,197,94,.35);
+}
+
+/* Disabled Final – vizuāli skaidrs */
+.steps-flag input:disabled + .flag-icon{
+  opacity:.35;
+  cursor:not-allowed;
+  box-shadow:none;
+}
+
+/* Pēdējā soļa rindas izcelšana (smalka) */
+
+.steps-tr:last-child{
+  background:rgba(34,197,94,.06);
+}
+
+/* ???? */
+
+.steps-save-btn{
+  height:34px;
+  padding:0 14px;
+  border:1px solid #9ca3af;
+  border-radius:10px;
+  background:#fff;
+  color:#111827;
+  font-weight:600;
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+  cursor:pointer;
+}
+
+.steps-save-btn:hover{
+  border-color:#6b7280;
+  background:#f3f4f6;
+}
+
+/* Ja ir invalid — poga joprojām klikojama, bet rāda “brīdinājumu” stilā */
+.steps-save-btn.is-warning{
+  border-color:#22c55e;                 /* tavs spilgti zaļais */
+  box-shadow:0 0 0 3px rgba(34,197,94,.18);
+}
+
+.steps-th-steptype{
+  width:120px;
+}
+
+.steps-th-workcenter{
+  width:140px;
+}
+
+/* Tikai 3. un 4. kolonna (Step Type, Darba centrs) */
+.steps-table th:nth-child(3),
+.steps-table td:nth-child(3){
+  width:160px;
+}
+
+.steps-table th:nth-child(4),
+.steps-table td:nth-child(4){
+  width:190px;
+}
+
+
+/* lai viss rindā ir vertikāli pa vidu */
+.steps-table td{
+  vertical-align: middle;
+}
+
+/* ===== Steps dialog footer pogas — tādas kā citur, tikai kompaktākas ===== */
+.steps-footer{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  padding-top:6px;
+}
+
+/* Kompaktais variants (šaurāk/zemāk par esošo .action-btn) */
+.action-btn-sm{
+  height:32px;           /* kompaktāk nekā 38px */
+  padding:0 10px;        /* šaurāk */
+  border-radius:10px;    /* noapaļoti kā citur */
+  font-size:12px;
+}
+
+/* “Saglabāt” – tikai viegli izcelts, NE sarkans */
+.action-btn-primary{
+  font-weight:700;
+  border-color:#6b7280;  /* ne zaļš, ne sarkans */
+}
+
+/* Dzēšanas poga soļu tabulā — vienkārši tādā pašā stilā, bez sarkanā */
+.steps-btn{
+  width:32px;
+  height:32px;
+  border:1px solid #9ca3af;
+  border-radius:10px;
+  background:#fff;
+  color:#111827;         /* NE sarkans */
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+  cursor:pointer;
+}
+
+.steps-btn:hover{
+  border-color:#6b7280;
+  background:#f3f4f6;
+}
+/* ===== Step Type + Darba centrs: MAZĀKS FONTS (tikai 3. un 4. kolonna) ===== */
+/* ===== Manage dialogs (Soļu tipi / Darba centri) — kompaktas, vienā stilā ===== */
+
+.manage-toolbar{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:10px;
+}
+
+/* šaurāks input kā pill */
+.manage-input-small{
+  width:100%;
+  height:32px;
+  padding:0 12px;
+
+  border:1px solid #9ca3af;
+  border-radius:18px;          /* <-- OVĀLS */
+  background:#fff;
+  color:#111827;
+
+  font-size:12px;              /* šauri/kompakti burti */
+  font-weight:600;
+
+  outline:none;
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+  box-sizing:border-box;
+}
+
+.manage-input-small:focus{
+  border-color:#22c55e;
+  box-shadow:0 0 0 3px rgba(34,197,94,.25);
+}
+
+
+/* tabula kompaktāka */
+.manage-table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:12px;
+}
+
+.manage-table th,
+.manage-table td{
+  padding:6px 6px;
+  border-bottom:1px solid #eee;
+  vertical-align:middle;
+}
+
+.manage-actions{
+  text-align:right;
+  white-space:nowrap;
+  width:160px;
+}
+
+/* extra mazas pogas */
+.action-btn-xs{
+  height:28px;
+  padding:0 10px;
+  border-radius:16px;
+  font-size:12px;
+}
+
+/* Dzēst ikonas poga — tā pati kā detaļām/soļiem (NE sarkana) */
+.icon-btn{
+  width:32px;
+  height:32px;
+
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+
+  border:1px solid #9ca3af;
+  border-radius:10px;
+  background:#fff;
+
+  color:#374151;               /* ne sarkans */
+  box-shadow:0 1px 2px rgba(0,0,0,.08);
+
+  cursor:pointer;
+  padding:0;
+}
+
+.icon-btn:hover{
+  border-color:#6b7280;
+  background:#f3f4f6;
+  color:#111827;
+}
+
+.icon-btn:active{
+  transform:translateY(1px);
+}
+
+/* 2 rindas, 2 kolonnas: label + field */
+.newpart-form{
+  display:grid;
+  grid-template-columns: 140px 1fr;
+  gap:10px 14px;
+  align-items:center;
+}
+
+/* label */
+.newpart-label{
+  font-size:12px;
+  color:#374151;
+  margin:0;
+}
+.newpart-label-strong{
+  font-weight:600;
+  color:#111827;
+}
+
+/* field wrapper */
+.newpart-field{
+  min-width:0;
+}
+
+/* Footer kā citur */
+.newpart-footer{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  padding: 8px 14px 12px 14px;
+}
+
+/* =========================================================
+   STEPS dialog: Syncfusion DropDownList vienots "ERP pill"
+   + ZAĻŠ focus
+   + mazāks fonts popup sarakstā
+   ========================================================= */
+
+:global(.steps-ddl.e-control-wrapper.e-ddl),
+:global(.steps-ddl.e-control-wrapper.e-dropdownlist),
+:global(.steps-ddl.e-control-wrapper .e-input-group){
+  border:1px solid #9ca3af !important;
+  border-radius:18px !important; /* ← bija 10px */
+  background:#fff !important;
+  box-shadow:0 1px 2px rgba(0,0,0,.08) !important;
+}
+
+
+/* 2) Iekšējais input teksts (tas, ko redzi laukā) */
+:global(.steps-ddl input.e-input){
+  font-size:10px !important;
+  font-weight:600;
+  color:#111827;
+  outline:none !important;
+}
+
+/* 3) ZAĻŠ focus (noņem zilo) */
+:global(.steps-ddl.e-control-wrapper.e-input-focus),
+:global(.steps-ddl.e-control-wrapper:focus-within),
+:global(.steps-ddl .e-input-group.e-input-focus),
+:global(.steps-ddl .e-input-group:focus-within){
+  border-color:#22c55e !important;
+  box-shadow:0 0 0 3px rgba(34,197,94,.25) !important;
+  outline:none !important; /* ← PIEVIENO ŠO */
+}
+
+/* 4) Ikonas zona (bultiņa) - lai nav “dubult stils” un arī saskaņots */
+:global(.steps-ddl .e-input-group-icon),
+:global(.steps-ddl .e-ddl-icon){
+  border-left:1px solid #e5e7eb !important;
+  border-radius:0 18px 18px 0 !important; /* ← bija 0 10px 10px 0 */
+}
+
+
+/* 5) POPUP saraksts: mazāki burti + kompaktāks augstums */
+:global(.steps-ddl-popup-small .e-dropdownbase .e-list-item){
+  font-size:9px !important;
+  line-height:16px !important;
+  padding:4px 10px !important;
+}
+
+/* 6) POPUP: selected/hover lai neizskatās kā “cits komponents” */
+:global(.steps-ddl-popup-small .e-dropdownbase .e-list-item.e-active),
+:global(.steps-ddl-popup-small .e-dropdownbase .e-list-item:hover){
+  background:rgba(34,197,94,.12) !important;
+}
+
+/* 1) ļauj labajai kolonnai sarukt un dot vietu overflow */
+.products-right{
+  min-height: 0;
+}
+
+/* 2) svarīgākais: 2. rindai (Tehnoloģija) atļauj sarukt un skrolloties */
+.technology-box{
+  min-height: 0;
+  overflow: auto; /* tev jau ir, atstāj */
+}
+
+.tech-steps{
+  list-style:none;
+  margin:6px 0 0 8px;
+  padding:0;
+}
+
+.tech-step{
+  display:grid;
+  grid-template-columns: 16px auto 1fr;
+  column-gap:6px;
+  align-items:start;
+
+  font-size:11px;          /* mazāks fonts */
+  line-height:1.35;
+}
+
+
+.tech-step-arrow{
+  color:#13f466;      /* zaļā bultiņa */
+  font-weight:500;
+  justify-self:center;
+  margin-top:1px;
+}
+
+.tech-step-name{
+  font-weight:600;
+  white-space:nowrap;
+}
+
+/* NEW PART dialog: zaļš + noapaļots + noņem zilo */
+.newPartDialog :global(.e-dialog){
+  border-radius:16px !important;
+  border:2px solid #22c55e !important;
+  overflow:hidden !important;
+}
+
+.newPartDialog :global(.e-dlg-header-content){
+  border-bottom:1px solid #e5e7eb !important;
+}
+
+.newPartDialog :global(.e-control-wrapper.e-input-focus),
+.newPartDialog :global(.e-control-wrapper:focus-within),
+.newPartDialog :global(.e-input-group.e-input-focus),
+.newPartDialog :global(.e-input-group:focus-within){
+  border-color:#22c55e !important;
+  box-shadow:0 0 0 4px rgba(34,197,94,.35) !important;
+  outline:none !important;
+}

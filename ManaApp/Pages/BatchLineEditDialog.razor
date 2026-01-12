@@ -1,0 +1,197 @@
+@using ManaApp.Pages
+@inject IJSRuntime JS
+
+@if (!IsOpen)
+{
+    @* neko nerādām *@
+}
+else
+{
+    <!-- Pārklājums -->
+    <div style="
+        position:fixed;
+        inset:0;
+        background:rgba(0,0,0,0.4);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        z-index:9999;">
+
+        <!-- Dialoga saturs -->
+        <div style="
+            background:white;
+            padding:16px;
+            border-radius:6px;
+            min-width:340px;
+            max-width:420px;
+            box-shadow:0 0 10px rgba(0,0,0,0.35);">
+
+            <h3>
+                @(IsAddMode ? "Pievienot preci" : "Labot pievienoto preci")
+                @if (Line is not null)
+                {
+                    <span> (@Line.BatchCode)</span>
+                }
+            </h3>
+
+
+
+            @if (Line is null)
+            {
+                <div style="color:red;">Dati nav ielādēti.</div>
+            }
+            else
+            {
+                <div style="margin-bottom:8px;">
+                    <b>Plānots (gab.):</b><br />
+                    <input type="number"
+                           min="0"
+                           style="width:120px; text-align:right;"
+                           @bind="_planned"
+                           disabled="@(!_canEditQty)" />
+                </div>
+
+                <div style="margin-bottom:12px;">
+                    <b>Komentārs:</b><br />
+                    <textarea rows="3"
+                              style="width:100%;"
+                              @bind="_comment">
+                    </textarea>
+                </div>
+            }
+
+                    <div style="text-align:right;">
+                        <button class="e-btn e-flat"
+                                style="margin-right:8px;"
+                                @onclick="Close">
+                            Atcelt
+                        </button>
+
+                        <button class="e-btn e-primary" @onclick="SaveClicked">
+                            @(IsAddMode ? "Pievienot" : "OK")
+                        </button>
+                    </div>
+
+        </div>
+    </div>
+}
+
+@code {
+    // Vai dialogs ir atvērts
+    [Parameter] public bool IsOpen { get; set; }
+
+    // Lai vecāks var sinhronizēt IsOpen
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+
+    // Rinda, ko labo (no ProductionTasks BatchLine)
+    [Parameter] public ProductionTasks.BatchLine? Line { get; set; }
+
+    // Notikums, kad saglabāts
+    [Parameter] public EventCallback<ProductionTasks.BatchLine> OnSaved { get; set; }
+
+    // Lokālie lauki editēšanai
+    private int _planned;
+    private string? _comment;
+    private bool _canEditQty = true;
+
+    protected override void OnParametersSet()
+    {
+        if (Line is not null)
+        {
+            _planned = Line.Planned;
+            _comment = Line.Comment;
+
+            // Loģika:
+            // - ja statuss = 5 (VISIS) → var mainīt qty
+            // - citādi qty nedrīkst mainīt, ja ir StartedAt
+            if (Line.BatchStatus == 5)
+            {
+                _canEditQty = true;
+            }
+            else
+            {
+                _canEditQty = (Line.StartedAt == null);
+            }
+        }
+    }
+
+   private async Task Close()
+{
+    if (IsOpenChanged.HasDelegate)
+        await IsOpenChanged.InvokeAsync(false);
+}
+
+
+    // vecā “Save” metode – ja neizmanto, var droši izdzēst
+    private async Task Save()
+    {
+        if (Line is null)
+        {
+            await Close();
+
+            return;
+        }
+
+        Line.Planned = _planned;
+        Line.Comment = _comment;
+
+        if (OnSaved.HasDelegate)
+            await OnSaved.InvokeAsync(Line);
+
+        await Close();
+
+    }
+
+    private async Task SaveClicked()
+    {
+        if (Line is null)
+            return;
+
+        var qtyChanged     = _planned != Line.Planned;
+        var commentChanged = _comment != Line.Comment;
+
+        // Ja nekas nav mainīts – vienkārši aizveram
+        if (!qtyChanged && !commentChanged)
+        {
+            if (OnSaved.HasDelegate)
+                await OnSaved.InvokeAsync(Line);
+
+            await Close();
+
+            return;
+        }
+
+        // Ja daudzums mainās un drīkst labot – paprasi apstiprinājumu
+        // ❗ apstiprinājumu prasa TIKAI labojot, nevis pievienojot
+if (!IsAddMode && qtyChanged && _canEditQty)
+{
+    var ok = await JS.InvokeAsync<bool>("confirm", "Vai labot apjomu?");
+    if (!ok)
+        return;
+}
+
+        // Sagatavojam atjaunoto rindu
+        var updated = new ProductionTasks.BatchLine
+        {
+            BatchId        = Line.BatchId,
+            BatchCode      = Line.BatchCode,
+            BatchProductId = Line.BatchProductId,
+            VersionId      = Line.VersionId,
+            Planned        = _planned,
+            Detailed       = Line.Detailed,
+            Assembly       = Line.Assembly,
+            Done           = Line.Done,
+            Comment        = _comment,
+            StartedAt      = Line.StartedAt,
+            BatchStatus    = Line.BatchStatus
+        };
+
+        if (OnSaved.HasDelegate)
+            await OnSaved.InvokeAsync(updated);
+
+        await Close();
+
+    }
+[Parameter] public bool IsAddMode { get; set; } = false;
+
+}

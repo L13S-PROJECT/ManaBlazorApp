@@ -1,0 +1,826 @@
+@* @page "/planning" *@
+
+@page "/planning"
+@inject HttpClient Http
+@using System.Net.Http.Json
+@using System.Linq
+@using System.Text.Json.Serialization
+@using Syncfusion.Blazor.Grids
+@inject IJSRuntime JS
+@using ManaApp.Shared
+@using ManaApp.Pages
+
+
+
+<PageHeader Title="Plānošana" />
+
+  <div class="planning-header-card">  
+
+    <div class="planning-content">
+                           <!-- Šeit sākas preču saraksts -->
+        <div class="planning-main">
+            <div class="planning-panel">
+
+<PlanningToolbar
+    SearchText="@searchText"
+    SearchTextChanged="(v) => searchText = v"
+    OnDownloadExcel="DownloadPlanningExcel" />
+
+
+<SfGrid TValue="ProductGroupRow"
+        DataSource="@groupedRows"
+        Width="100%"
+        Height="calc(100vh - 220px)"
+        AllowSelection="true"
+        RowSelected="OnRowSelected"
+        GridLines="GridLine.Both"
+        AllowGrouping="true"
+        AllowSorting="true"
+        AllowExcelExport="true"
+        EnableStickyHeader="true"
+        CssClass="planning-grid lvl0">
+
+
+<GridEvents TValue="ProductGroupRow"></GridEvents>
+
+     <GridGroupSettings Columns="@(new string[] { nameof(ProductGroupRow.CategoryName) })"></GridGroupSettings>
+    
+    <GridSelectionSettings Type="SelectionType.Single"></GridSelectionSettings>
+
+
+    <GridColumns>
+        
+    <GridColumn Field=@nameof(ProductGroupRow.CategoryName) HeaderText="Kategorija" Width="120">
+
+    <Template>
+        @{
+    var row = context as ProductGroupRow;
+    var text = row?.CategoryName ?? "";
+}
+
+        <div>@text</div>
+    </Template>
+</GridColumn>
+<GridColumn HeaderText="Nosaukums" Width="240">
+    <Template Context="rowObj">
+        @{
+            var row = rowObj as ProductGroupRow;
+            if (row is null) { return; }
+
+            var versionsCount = row.Versions?.Count ?? 0;
+        }
+
+        <span>
+            @row.ProductName
+
+            @if (versionsCount > 1)
+            {
+                <span style="margin-left:6px; opacity:.65;">
+                    (+@versionsCount versijas)
+                </span>
+            }
+        </span>
+    </Template>
+</GridColumn>
+        
+        <GridColumn HeaderText="InStock" Width="100">
+            <Template>
+                @{
+                    var v = ((context as ProductGroupRow)?.InStock ?? 0);
+                    
+                }
+                <div class="cell-fill @(v > 0 ? "bg-neutral" : "")">@v</div>
+
+            </Template>
+            <HeaderTemplate>
+                <div style="padding:4px">InStock</div>
+            </HeaderTemplate>
+        </GridColumn>
+
+        <GridColumn HeaderText="Planned" Width="120">
+            <Template>
+             @{
+    var row = (context as ProductGroupRow);
+    var v = row?.Planned ?? 0;
+}
+
+<div class="planned-box @(v > 0 ? "bg-planned" : "")">
+    <span class="planned-value">@v</span>
+
+<button type="button"
+        class="planned-plus"
+        title="Pievienot"
+        aria-label="Pievienot"
+      @onclick:stopPropagation="true"
+
+>
+    +
+</button>
+
+</div>
+
+
+            </Template>
+            <HeaderTemplate>
+              <div class="hdr hdr-planned">Planned</div>
+            </HeaderTemplate>
+        </GridColumn>
+
+        <GridColumn HeaderText="DetailedInProgress" Width="100">
+            <Template>
+                @{
+                    var v = ((context as ProductGroupRow)?.DetailedInProgress ?? 0);
+                    
+                }
+                 <div class="cell-fill @(v > 0 ? "bg-progress" : "")">@v</div>
+
+            </Template>
+            <HeaderTemplate>
+                <div style="padding:4px">DetailedInProgress</div>
+            </HeaderTemplate>
+        </GridColumn>
+
+        <GridColumn HeaderText="DetailedFinish" Width="100">
+            <Template>
+                @{
+                    var v = ((context as ProductGroupRow)?.DetailedFinish ?? 0);
+                    
+                }
+               <div class="cell-fill @(v > 0 ? "bg-done" : "")">@v</div>
+
+            </Template>
+            <HeaderTemplate>
+                <div style="padding:4px">DetailedFinish</div>
+            </HeaderTemplate>
+        </GridColumn>
+
+        <GridColumn HeaderText="AssemblyINProgress" Width="100">
+            <Template>
+                @{
+                    var v = ((context as ProductGroupRow)?.AssemblyINProgress ?? 0);
+                    
+                }
+                <div class="cell-fill @(v > 0 ? "bg-progress" : "")">@v</div>
+
+            </Template>
+            <HeaderTemplate>
+                <div style="padding:4px">AssemblyINProgress</div>
+            </HeaderTemplate>
+        </GridColumn>
+
+        <GridColumn HeaderText="AssemblyFinish" Width="100">
+            <Template>
+                @{
+                    var v = ((context as ProductGroupRow)?.AssemblyFinish ?? 0);
+                     
+                }
+                <div class="cell-fill @(v > 0 ? "bg-done" : "")">@v</div>
+
+            </Template>
+            <HeaderTemplate>
+                <div style="padding:4px">AssemblyFinish</div>
+            </HeaderTemplate>
+        </GridColumn>
+
+        <GridColumn HeaderText="FinishingInProgress" Width="100">
+            <Template>
+                @{
+                    var v = ((context as ProductGroupRow)?.FinishingInProgress ?? 0);
+                    
+                }
+                <div class="cell-fill @(v > 0 ? "bg-finishing" : "")">@v</div>
+
+            </Template>
+            <HeaderTemplate>
+                <div style="padding:4px">FinishingInProgress</div>
+            </HeaderTemplate>
+        </GridColumn>
+
+        
+    </GridColumns>
+
+    <GridTemplates>
+    <DetailTemplate Context="grpObj">
+        @{
+            var grp = grpObj as ProductGroupRow;
+            if (grp is null) { return; }
+
+            var versions = grp.Versions ?? new List<ProductRow>();
+        }
+<div class="detail-wrap">
+    <SfGrid TValue="ProductRow"
+            DataSource="@versions"
+            Width="100%"
+            GridLines="GridLine.Both"
+            RowHeight="18"
+            CssClass="grid-detail-compact">
+
+<GridEvents TValue="ProductRow"></GridEvents>
+
+
+                <GridColumns>
+
+                    <GridColumn HeaderText="Versija" Width="240">
+                        <Template Context="verObj">
+                            @{
+                                var r = verObj as ProductRow;
+                                if (r is null) { return; }
+                            }
+                            <span>
+                                @grp.ProductName
+                                @if (!string.IsNullOrWhiteSpace(r.versionName))
+                                {
+                                    <span style="margin-left:6px; opacity:.7;">@r.versionName</span>
+                                }
+                            </span>
+                        </Template>
+                    </GridColumn>
+
+                    <GridColumn Field=@nameof(ProductRow.productCode) HeaderText="Kods" Width="60"></GridColumn>
+
+                    <GridColumn HeaderText="InStock" Width="100">
+                        <Template Context="verObj">
+                            @{
+                                var v = (verObj as ProductRow)?.InStock ?? 0;
+                                
+                            }
+                            <div class="cell-fill @(v > 0 ? "bg-neutral" : "")">@v</div>
+
+                        </Template>
+                    </GridColumn>
+
+                    <GridColumn HeaderText="Planned" Width="120">
+                        <Template Context="verObj">
+                            @{
+                                var row = verObj as ProductRow;
+                                if (row is null) { return; }
+
+                                var v = row.Planned;
+                                
+                            }
+
+                            <div class="planned-box @(v > 0 ? "bg-planned" : "")">
+    <span class="planned-value">@v</span>
+
+  <button type="button"
+        class="planned-add"
+        title="Pievienot"
+        aria-label="Pievienot"
+@onclick:stopPropagation="true"
+
+>
+    +
+</button>
+
+</div>
+
+                        </Template>
+                    </GridColumn>
+
+                    <GridColumn HeaderText="DetailedInProgress" Width="100">
+                        <Template Context="verObj">
+                            @{
+                                var v = (verObj as ProductRow)?.DetailedInProgress ?? 0;
+                                
+                            }
+                           <div class="cell-fill @(v > 0 ? "bg-progress" : "")">@v</div>
+
+                        </Template>
+                    </GridColumn>
+
+                    <GridColumn HeaderText="DetailedFinish" Width="100">
+                        <Template Context="verObj">
+                            @{
+                                var v = (verObj as ProductRow)?.DetailedFinish ?? 0;
+                                
+                            }
+                           <div class="cell-fill @(v > 0 ? "bg-done" : "")">@v</div>
+
+                        </Template>
+                    </GridColumn>
+
+                    <GridColumn HeaderText="AssemblyINProgress" Width="100">
+                        <Template Context="verObj">
+                            @{
+                                var v = (verObj as ProductRow)?.AssemblyINProgress ?? 0;
+                                
+                            }
+                            <div class="cell-fill @(v > 0 ? "bg-progress" : "")">@v</div>
+
+                        </Template>
+                    </GridColumn>
+
+                    <GridColumn HeaderText="AssemblyFinish" Width="100">
+                        <Template Context="verObj">
+                            @{
+                                var v = (verObj as ProductRow)?.AssemblyFinish ?? 0;
+                                
+                            }
+                           <div class="cell-fill @(v > 0 ? "bg-done" : "")">@v</div>
+
+
+                        </Template>
+                    </GridColumn>
+
+                    <GridColumn HeaderText="FinishingInProgress" Width="100">
+                        <Template Context="verObj">
+                            @{
+                                var v = (verObj as ProductRow)?.FinishingInProgress ?? 0;
+                                
+                            }
+                            <div class="cell-fill @(v > 0 ? "bg-finishing" : "")">@v</div>
+
+                        </Template>
+                    </GridColumn>
+
+                </GridColumns>
+            </SfGrid>
+        </div>
+    </DetailTemplate>
+</GridTemplates>
+
+</SfGrid>
+
+
+           @if (selected is not null && Summary is not null)
+           {
+               <div style="margin-top:8px;">
+                   <b>@selected.categoryName • @selected.productName (@selected.productCode)</b>
+                   <div style="display:grid;grid-template-columns:200px repeat(7,110px);margin-top:6px;">
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center"><b>VersionId</b></div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center"><b>Planned</b></div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center"><b>Detailed</b></div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center"><b>Assembly</b></div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center"><b>Finishing</b></div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center"><b>Stock</b></div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center"><b>Scrap</b></div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center"><b>Out</b></div>
+
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center">@selected.VersionId</div>
+                       
+                       @{
+                           var planned = selected.Planned;
+                           var bg = planned > 0 ? "#00ff00" : "transparent";
+                       }
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center; background:@bg">
+                           @planned
+                       </div>
+
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center; background:#f9b115">@Summary.Detailed</div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center; background:#f9b115">@Summary.Assembly</div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center; background:#ffe873">@Summary.Finishing</div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center; background:#efefef">@Summary.Stock</div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center; background:#efefef">@Summary.Scrap</div>
+                       <div style="min-width:110px;padding:6px 10px;border:1px solid #ccc;text-align:center; background:#efefef">@Summary.Out</div>
+                   </div>
+               </div>
+           }
+
+        </div>
+        </div>
+        <!-- LABĀ PUSE: jaunais Batch panelis -->
+    
+</div>
+</div>
+
+@code {
+    public class ProductRow
+    {
+        public int id { get; set; }
+        public string productCode { get; set; } = "";
+        public string productName { get; set; } = "";
+        public string categoryName { get; set; } = "";
+        public string rootName { get; set; } = "";
+        public string versionName { get; set; } = "";
+        public string versionDate { get; set; } = "";   // bija DateOnly?
+        
+        [JsonPropertyName("Version_Id")]
+public int? VersionId { get; set; }  // jaunais versijas kods 05.11.2025
+        public int InStock { get; set; }
+        public int Planned { get; set; }   // jaunā kolonna
+        public int DetailedInProgress { get; set; }
+        public int DetailedFinish { get; set; }        
+        public int AssemblyINProgress { get; set; }
+        public int AssemblyFinish { get; set; }        
+        public int FinishingInProgress { get; set; }
+        public int FinishingAllocated { get; set; }   // status 2 + 3
+
+    }
+
+public sealed class CategoryRow
+{
+    public string CategoryName { get; set; } = "";
+}
+
+    private List<ProductRow> rows = new();
+    private List<ProductRow> allRows = new();
+private List<CategoryRow> categories = new();
+
+private List<CategoryRow> categoriesFiltered = new();
+
+    protected override async Task OnInitializedAsync()
+{
+    await ReloadPlanningDataAsync();
+}
+
+    private async Task LoadSummariesForRows(IEnumerable<ProductRow> targetRows)
+    {
+        foreach (var r in targetRows)
+        {
+            var eligible = targetRows.Count(r => r.VersionId.HasValue && r.VersionId > 0);
+
+            if (r.VersionId is null || r.VersionId <= 0)
+{
+    var c = await Http.GetFromJsonAsync<ProductContentDto>(
+        $"http://localhost:5270/api/products/content?id={r.id}");
+    r.VersionId = c?.VersionId;
+    if (!string.IsNullOrWhiteSpace(c?.VersionName))
+    r.versionName = c!.VersionName!;
+
+    if (r.VersionId is null || r.VersionId <= 0) continue;
+}
+
+            var sum = await Http.GetFromJsonAsync<StockSummary>(
+    $"http://localhost:5270/api/stockmovements/summary?versionId={r.VersionId}");
+
+            if (sum is null) continue;
+            
+           r.InStock = sum.Stock;
+
+// AssemblyINProgress / AssemblyFinish vairs NEMAINĀM šeit,
+// tie tagad nāk no /api/batches/list
+// r.AssemblyINProgress  = ...
+// r.AssemblyFinish      = ...
+
+r.FinishingInProgress = sum.Finishing;
+r.InStock            = sum.Stock;
+
+var finAlloc = await Http.GetFromJsonAsync<FinAllocatedDto>(
+    $"http://localhost:5270/api/tasks/finishing-allocated-by-version?versionId={r.VersionId}");
+
+r.FinishingAllocated = finAlloc?.FinishingAllocated ?? 0;
+
+        }
+
+        // tikai vienreiz pēc cikla
+        StateHasChanged();
+    }
+
+private void BuildCategoriesFromRows(IEnumerable<ProductRow> source)
+{
+    categories = source
+        .Where(r => !string.IsNullOrWhiteSpace(r.categoryName))
+        .Select(r => (r.categoryName ?? "").Trim())
+        .Where(name => !string.IsNullOrWhiteSpace(name))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(name => name)
+        .Select(name => new CategoryRow { CategoryName = name })
+        .ToList();
+        // 0. līmeņa datu avots tree-view gridam
+    categoriesFiltered = categories;
+}
+
+    public class ProductSimpleRow
+    {
+        public int Id { get; set; }
+        public string ProductCode { get; set; } = "";
+        public string ProductName { get; set; } = "";
+        public string CategoryName { get; set; } = "";
+
+         }
+
+         public class ProductContentDto
+{
+    public int VersionId { get; set; }
+    public string? VersionName { get; set; }
+    public string ProductName { get; set; } = string.Empty;
+    public string ProductCode { get; set; } = string.Empty;
+}
+
+    private List<ProductSimpleRow> simpleRows = new();
+    private string searchText = "";
+
+private IEnumerable<ProductRow> FilteredRows =>
+    string.IsNullOrWhiteSpace(searchText)
+        ? (rows ?? Enumerable.Empty<ProductRow>())
+        : (rows ?? Enumerable.Empty<ProductRow>())
+            .Where(r =>
+                (r.productName?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (r.productCode?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (r.categoryName?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)
+            );
+
+    private int VersionId = 1;
+
+    private StockSummary? Summary;
+    private string? Raw;        
+    private string? Error;      
+
+   private async Task Load()
+{
+    Error = null;
+    Summary = null;
+    Raw = null;
+
+    if (selected is null || !(selected.VersionId.HasValue && selected.VersionId > 0))
+{
+    Error = "Nav izvēlēta rinda vai nav VersionId.";
+    return;
+}
+
+    try
+    {
+        var url = $"http://localhost:5270/api/stockmovements/summary?versionId={selected.VersionId}";
+        Console.WriteLine($"CLICK Load -> {url}");
+        
+        Raw = await Http.GetStringAsync(url);
+        Console.WriteLine($"RAW LEN = {Raw?.Length}");
+
+        if (string.IsNullOrWhiteSpace(Raw)) { Error = "Empty response"; return; }
+        Summary = System.Text.Json.JsonSerializer.Deserialize<StockSummary>(Raw)!;
+
+        Console.WriteLine($"Parsed Finishing = {Summary?.Finishing}");
+    }
+    catch (Exception ex)
+    {
+        Error = ex.ToString();
+        Console.WriteLine(Error);
+    }
+}
+
+    public sealed class StockSummary
+{
+    [JsonPropertyName("detailed")]        public int Detailed        { get; set; }
+    [JsonPropertyName("detailedFinish")]  public int DetailedFinish  { get; set; }
+    [JsonPropertyName("assembly")]        public int Assembly        { get; set; }
+    [JsonPropertyName("assemblyFinish")]  public int AssemblyFinish  { get; set; }
+    [JsonPropertyName("finishing")]       public int Finishing       { get; set; }
+    [JsonPropertyName("stock")]           public int Stock           { get; set; }
+    [JsonPropertyName("scrap")]           public int Scrap           { get; set; }
+    [JsonPropertyName("out")]             public int Out             { get; set; }
+    [JsonPropertyName("planned")]         public int Planned         { get; set; }
+}
+
+
+    private ProductRow? selected;
+
+    private async Task OnRowSelected(RowSelectEventArgs<ProductRow> args)
+{
+    selected = args.Data;
+    VersionId = selected?.VersionId ?? 0; // var paturēt tikai info dēļ
+    await Load();                         // vienmēr lādējam pēc BatchProduct_ID
+}
+
+private async Task ReloadAfterCreate()
+{
+    await ReloadPlanningDataAsync();
+}
+
+public sealed class BatchPlannedRow
+{
+    [JsonPropertyName("versionId")]
+    public int VersionId { get; set; }
+
+    [JsonPropertyName("productName")]
+    public string ProductName { get; set; } = "";
+
+    [JsonPropertyName("productCode")]
+    public string ProductCode { get; set; } = "";
+
+    [JsonPropertyName("planned")]
+    public int Planned { get; set; }
+
+    [JsonPropertyName("detailedInProgress")]
+    public int DetailedInProgress { get; set; }
+
+    [JsonPropertyName("detailedFinish")]
+    public int DetailedFinish { get; set; }
+
+    // Assembly no JSON "assembly" (Assembly IN PROGRESS)
+    [JsonPropertyName("assembly")]
+    public int AssemblyInProgress { get; set; }
+
+    // Done no JSON "done" (Assembly FINISH)
+    [JsonPropertyName("done")]
+    public int AssemblyFinish { get; set; }
+}
+
+
+private IEnumerable<ProductRow> GetRowsForCategory(object catObj)
+{
+    var cat = catObj as CategoryRow;
+    if (cat is null) return Enumerable.Empty<ProductRow>();
+
+    var key = (cat.CategoryName ?? "").Trim();
+
+    // Pamatā – tikai šīs kategorijas preces
+    var query = rows.Where(r =>
+        string.Equals((r.categoryName ?? "").Trim(), key, StringComparison.OrdinalIgnoreCase)
+    );
+
+    // Ja nav meklēšanas teksta – atdod visus šīs kategorijas produktus
+    if (string.IsNullOrWhiteSpace(searchText))
+        return query;
+
+    // Ja ir meklēšana – filtrē šīs kategorijas iekšienē
+    return query.Where(r =>
+        (r.productName?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+        (r.productCode?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+        (r.categoryName?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)
+    );
+}
+
+private async Task ReloadPlanningDataAsync()
+{
+    // 1) Produkti
+    rows = await Http.GetFromJsonAsync<List<ProductRow>>(
+    "http://localhost:5270/api/products/planning-list")
+    ?? new();
+
+    allRows = new List<ProductRow>(rows);
+
+    // 2) Stock + FinishingInProgress
+    await LoadSummariesForRows(rows);
+
+    // 3) Batch dati (Planned / Detailed / Assembly)
+    var plannedList = await Http.GetFromJsonAsync<List<BatchPlannedRow>>(
+        "http://localhost:5270/api/batches/list?batch_type=1")
+        ?? new();
+
+    var plannedByVersion = plannedList
+        .GroupBy(x => x.VersionId)
+        .ToDictionary(g => g.Key, g => g.Sum(x => x.Planned));
+
+    var detailedInProgressByVersion = plannedList
+        .GroupBy(x => x.VersionId)
+        .ToDictionary(g => g.Key, g => g.Sum(x => x.DetailedInProgress));
+
+    var detailedFinishByVersion = plannedList
+        .GroupBy(x => x.VersionId)
+        .ToDictionary(g => g.Key, g => g.Sum(x => x.DetailedFinish));
+
+    var assemblyInProgressByVersion = plannedList
+        .GroupBy(x => x.VersionId)
+        .ToDictionary(g => g.Key, g => g.Sum(x => x.AssemblyInProgress));
+
+    var assemblyFinishByVersion = plannedList
+        .GroupBy(x => x.VersionId)
+        .ToDictionary(g => g.Key, g => g.Sum(x => x.AssemblyFinish));
+
+    // 4) Aizpildām rindas
+    foreach (var r in rows)
+    {
+        if (!r.VersionId.HasValue)
+        {
+            r.Planned = 0;
+            r.DetailedInProgress = 0;
+            r.DetailedFinish = 0;
+            r.AssemblyINProgress = 0;
+            r.AssemblyFinish = 0;
+            continue;
+        }
+
+        var vid = r.VersionId.Value;
+
+        r.Planned = plannedByVersion.TryGetValue(vid, out var p) ? p : 0;
+        r.DetailedInProgress = detailedInProgressByVersion.TryGetValue(vid, out var d) ? d : 0;
+        r.DetailedFinish = detailedFinishByVersion.TryGetValue(vid, out var df) ? df : 0;
+        r.AssemblyINProgress = assemblyInProgressByVersion.TryGetValue(vid, out var ap) ? ap : 0;
+        r.AssemblyFinish = assemblyFinishByVersion.TryGetValue(vid, out var af) ? af : 0;
+    }
+
+    // 5) Sakārtojam
+    rows = allRows
+        .OrderBy(r => r.categoryName)
+        .ThenBy(r => r.productName)
+        .ToList();
+
+    // 6) UI KOREKCIJA:
+    // AssemblyFinish -= FinishingInProgress
+    foreach (var r in rows)
+{
+    if (r.AssemblyFinish > 0 && r.FinishingAllocated > 0)
+    {
+        var corrected = r.AssemblyFinish - r.FinishingAllocated;
+        r.AssemblyFinish = corrected > 0 ? corrected : 0;
+    }
+}
+
+// Uztaisām "viena rinda uz produktu" + bērni = versijas
+groupedRows = rows
+    .GroupBy(r =>
+        $"{(r.categoryName ?? "").Trim()}||{(r.productCode ?? "").Trim()}",
+        StringComparer.OrdinalIgnoreCase)
+    .Select(g =>
+    {
+        var parts = g.Key.Split("||", 2);
+        var cat  = parts.Length > 0 ? parts[0] : "";
+        var code = parts.Length > 1 ? parts[1] : "";
+
+        var first = g.First();
+
+        return new ProductGroupRow
+        {
+            CategoryName = cat,
+            ProductCode  = code,
+            ProductName  = first.productName ?? "",
+
+            InStock = g.Sum(x => x.InStock),
+            Planned = g.Sum(x => x.Planned),
+            DetailedInProgress = g.Sum(x => x.DetailedInProgress),
+            DetailedFinish     = g.Sum(x => x.DetailedFinish),
+            AssemblyINProgress = g.Sum(x => x.AssemblyINProgress),
+            AssemblyFinish     = g.Sum(x => x.AssemblyFinish),
+            FinishingInProgress= g.Sum(x => x.FinishingInProgress),
+            FinishingAllocated = g.Sum(x => x.FinishingAllocated),
+
+            Versions = g
+                .OrderByDescending(x => x.VersionId ?? 0) // jaunākā augšā
+                .ToList()
+        };
+    })
+    .OrderBy(x => x.CategoryName)
+    .ThenBy(x => x.ProductName)
+    .ToList();
+
+
+    BuildLatestVersionByCode();
+    await InvokeAsync(StateHasChanged);
+}
+
+public sealed class FinProgressDto
+{
+    [JsonPropertyName("finishingInProgress")]
+    public int FinishingInProgress { get; set; }
+}
+
+private sealed class FinAllocatedDto
+{
+    [JsonPropertyName("finishingAllocated")]
+    public int FinishingAllocated { get; set; }
+}
+
+private async Task DownloadPlanningExcel()
+{
+    // atver jaunu tabu un lejupielādē failu no API
+    await JS.InvokeVoidAsync("open", "http://localhost:5270/api/reports/planning-excel", "_blank");
+}
+
+// productCode -> latest VersionId
+private readonly Dictionary<string, int> _latestVersionByCode = new(StringComparer.OrdinalIgnoreCase);
+
+private void BuildLatestVersionByCode()
+{
+    _latestVersionByCode.Clear();
+
+    foreach (var g in rows
+        .Where(r => !string.IsNullOrWhiteSpace(r.productCode) && r.VersionId is > 0)
+        .GroupBy(r => r.productCode.Trim(), StringComparer.OrdinalIgnoreCase))
+    {
+        _latestVersionByCode[g.Key] = g.Max(x => x.VersionId!.Value);
+    }
+}
+private bool IsLatestVersion(ProductRow r)
+{
+    if (r is null) return false;
+    if (string.IsNullOrWhiteSpace(r.productCode)) return true; // ja nav koda, lai netraucē
+    if (r.VersionId is not int v || v <= 0) return false;
+
+    return _latestVersionByCode.TryGetValue(r.productCode.Trim(), out var latest) && v == latest;
+}
+
+private List<ProductGroupRow> groupedRows = new();
+
+private IEnumerable<ProductGroupRow> FilteredGroupedRows =>
+    string.IsNullOrWhiteSpace(searchText)
+        ? (groupedRows ?? Enumerable.Empty<ProductGroupRow>())
+        : (groupedRows ?? Enumerable.Empty<ProductGroupRow>())
+            .Where(r =>
+                (r.ProductName?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (r.ProductCode?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (r.CategoryName?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)
+            );
+
+public sealed class ProductGroupRow
+{
+    public string CategoryName { get; set; } = "";
+    public string ProductCode  { get; set; } = "";
+    public string ProductName  { get; set; } = "";
+
+    // kopsummas (tas, ko rādīs galvenā rinda)
+    public int InStock { get; set; }
+    public int Planned { get; set; }
+    public int DetailedInProgress { get; set; }
+    public int DetailedFinish { get; set; }
+    public int AssemblyINProgress { get; set; }
+    public int AssemblyFinish { get; set; }
+    public int FinishingInProgress { get; set; }
+    public int FinishingAllocated { get; set; }
+
+    // bērni (versijas)
+    public List<ProductRow> Versions { get; set; } = new();
+}
+
+private PlanningBatchPanel? batchPanelRef;
+
+}

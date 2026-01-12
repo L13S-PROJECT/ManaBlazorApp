@@ -1,0 +1,307 @@
+@page "/employeetasks"
+@using System.Net.Http.Json
+@using System.Linq
+@inject HttpClient Http
+
+
+<h3>Darbinieka uzdevumi</h3>
+
+<div style="margin:8px 0">
+  <label>Darbinieka ID: </label>
+  <input type="number" min="1" style="width:80px" @bind="empId" />
+  <button @onclick="LoadTasks">Ielādēt</button>
+</div>
+
+@if (_activeTask is null)
+{
+    <div style="margin:12px 0; padding:8px; border:1px dashed #ccc; border-radius:4px; color:#666;">
+        Aktīvs uzdevums nav izvēlēts.
+    </div>
+}
+else
+{
+    <div style="margin:12px 0; padding:10px; border:1px solid #ccc; border-radius:4px; background:#fffbe6;">
+        <h4 style="margin-top:0;">Aktīvais uzdevums</h4>
+        <div><b>Batch:</b> @_activeTask.BatchCode</div>
+        <div><b>Detaļa:</b> @_activeTask.PartName</div>
+        <div><b>Solis:</b> @_activeTask.StepName</div>
+        <div><b>Statuss:</b> @StatusText(_activeTask.Status)</div>
+        @if (_activeTask.StepType == 3)
+{
+    <div><b>Apjoms (Finishing):</b> @_activeTask.Done</div>
+}
+else
+{
+    <div><b>Planned / Done:</b> @_activeTask.Planned / @_activeTask.Done</div>
+}
+
+
+        <div style="text-align:right; margin-top:10px;">
+            <button class="btn btn-success"
+                @onclick="async () => await FinishTask(_activeTask)">
+                Pabeigts
+            </button>
+
+        </div>
+    </div>
+}  
+
+
+@if (!tasks.Any())
+{
+    <p>Nav nākamo uzdevumu.</p>
+}
+else
+{
+    var orderedTasks = tasks
+        .OrderBy(t => t.BatchCode)
+        .ThenBy(t => t.PartName)
+        .ThenBy(t => t.StepOrder)      // soļu secība produktā/partijai
+        .ThenBy(t => t.Status)         // 1 → 2 → 3
+        .ThenByDescending(t => t.Priority);
+
+    <table class="table table-striped">
+       <thead>
+    <tr>
+        <th>Batch</th>
+        <th>Detaļa</th>
+        <th>Solis</th>
+        <th>Prioritāte</th>
+        <th>Statuss</th>
+        <th>Planned</th>
+        <th>Finishing qty</th>
+        <th>Done</th>
+        <th>Komentārs</th>
+        <th></th>
+    </tr>
+</thead>
+
+        <tbody>
+    @foreach (var t in orderedTasks)
+{
+    <tr class="@(t.Status == 2 ? "table-warning" : (t.Status == 3 ? "table-success" : ""))">
+        <td>@t.BatchCode</td>
+<td>@t.PartName</td>
+<td>@t.StepName</td>
+<td>@t.Priority</td>
+<td>@StatusText(t.Status)</td>
+
+<!-- Planned: tikai ne-Finishing soļiem -->
+<td>
+    @if (t.StepType == 3)
+    {
+        @("")   <!-- vai "-" ja gribi -->
+    }
+    else
+    {
+        @t.Planned
+    }
+</td>
+
+<td>@t.Done</td>
+
+<!-- komentārs no ProductionTasks Finishing popupa -->
+        <td>@t.Comment</td>
+
+
+<!-- Finishing qty: tikai Finishing soļiem -->
+<td>
+    @if (t.StepType == 3)
+    {
+        @t.Planned
+    }
+</td>
+
+<td>
+    <button type="button"
+            class="btn btn-primary"
+            disabled="@(t.Status == 1 && !CanStart(t))"
+            @onclick="() => OpenTaskDialog(t)">
+        Atvērt
+    </button>
+</td>
+
+    </tr>
+}
+
+        </tbody>
+    </table>
+}
+
+@if (_isDialogOpen && _selectedTask is not null)
+{
+    <div style="
+        position:fixed;
+        top:0; left:0;
+        width:100vw; height:100vh;
+        background:rgba(0,0,0,0.4);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        z-index:9999;">
+
+        <div style="
+            background:white;
+            padding:20px;
+            border-radius:8px;
+            min-width:320px;
+            box-shadow:0 0 10px rgba(0,0,0,0.4);">
+
+            <h4 style="margin-top:0;">
+                @(_selectedTask.BatchCode) – @_selectedTask.PartName – @_selectedTask.StepName
+            </h4>
+
+            <p>Statuss: @StatusText(_selectedTask.Status)</p>
+
+         <div style="text-align:right; margin-top:16px;">
+    <button class="btn btn-secondary"
+            style="margin-right:8px;"
+            @onclick="CloseTaskDialog">
+        Aizvērt
+    </button>
+
+ <button class="btn btn-primary"
+        disabled="@(_selectedTask is null || _selectedTask.Status != 1 || !CanStart(_selectedTask))"
+        @onclick="async () => await ClaimTask(_selectedTask!.TaskId)">
+    Sākt
+</button>
+
+
+</div>
+
+        </div>
+    </div>
+}
+
+@code {
+    private List<TaskRow> tasks = new();
+
+    protected override async Task OnInitializedAsync() => await LoadTasks();
+
+public sealed class TaskRow
+{
+    public int TaskId { get; set; }
+    public byte Priority { get; set; }
+    public int Status { get; set; }
+    public DateTime? StartedAt { get; set; }
+    public DateTime? FinishedAt { get; set; }
+    public string? PartName { get; set; }
+    public string? StepName { get; set; }
+    public string? BatchCode { get; set; }
+    public int Planned { get; set; }
+    public int Done { get; set; }
+    public int StepOrder { get; set; }
+
+    public int StepType { get; set; }        // 1 = Detailed, 2 = Assembly, 3 = Finishing
+    public int BatchId { get; set; }         // batches.ID
+    public int VersionId { get; set; }       // versions.ID
+    public int BatchProductId { get; set; }  // batches_products.ID
+
+    public string? Comment { get; set; }     // 🔸 komentārs (īpaši Finishing)
+}
+    private string StatusText(int s) => s switch
+{
+    1 => "Nav iesākts",
+    2 => "Procesā",
+    3 => "Pabeigts",
+    4 => "Atcelts",
+    _ => "?"
+};
+
+private async Task ClaimTask(int taskId)
+{
+    var body = new { taskId, empId };
+    var resp = await Http.PostAsJsonAsync("http://localhost:5270/api/tasks/claim", body);
+
+    if (resp.IsSuccessStatusCode)
+    {
+        await LoadTasks();
+        CloseTaskDialog();
+    }
+    else
+    {
+        Console.WriteLine($"Claim failed: {resp.StatusCode} - {await resp.Content.ReadAsStringAsync()}");
+    }
+}
+
+
+
+int empId = 1;
+
+private async Task LoadTasks()
+{
+    tasks = await Http.GetFromJsonAsync<List<TaskRow>>(
+        $"http://localhost:5270/api/tasks/for-employee?empId={empId}"
+    ) ?? new();
+
+    // Meklējam aktīvo uzdevumu (Tasks_Status = 2)
+    _activeTask = tasks.FirstOrDefault(t => t.Status == 2);
+}
+
+
+private async Task FinishTask(TaskRow task)
+{
+    if (task is null) return;
+
+    // cik vēl nav padarīts šim uzdevumam
+    var remaining = task.Planned - task.Done;
+    if (remaining < 0) remaining = 0;
+
+    var body = new
+    {
+        taskId = task.TaskId,
+        qtyDoneAdd = remaining > 0 ? remaining : (int?)null
+    };
+
+    // pabeidzam tasku API pusē
+    var resp = await Http.PostAsJsonAsync("http://localhost:5270/api/tasks/finish", body);
+    if (!resp.IsSuccessStatusCode)
+    {
+        Console.WriteLine($"Finish failed: {resp.StatusCode} - {await resp.Content.ReadAsStringAsync()}");
+        return;
+    }
+
+    // pārlādējam uzdevumus
+    await LoadTasks();
+}
+
+private bool _isDialogOpen = false;
+private TaskRow? _selectedTask;
+
+private void OpenTaskDialog(TaskRow t)
+{
+    _selectedTask = t;
+    _isDialogOpen = true;
+}
+
+private void CloseTaskDialog()
+{
+    _isDialogOpen = false;
+    _selectedTask = null;
+}
+
+private TaskRow? _activeTask;
+
+    // Pārbaudām, vai ir kāds iepriekšējais solis šai pašai partijai + detaļai,
+    // kas joprojām ir sarakstā (t.i., nav pabeigts).
+    private bool CanStart(TaskRow t)
+{
+    // 1. solis vienmēr drīkst (secības ziņā)
+    if (t.StepOrder <= 1)
+        return true;
+
+    // vai ir kāds iepriekšējais solis šai pašai partijai + detaļai,
+    // kurš NAV pabeigts (Status != 3)?
+    var hasPrevNotFinished = tasks.Any(other =>
+        other.BatchCode == t.BatchCode &&
+        other.PartName == t.PartName &&
+        other.StepOrder < t.StepOrder &&
+        other.Status != 3);
+
+    // ja priekšā ir nepabeigti soļi -> šo sākt nedrīkst
+    return !hasPrevNotFinished;
+}
+
+}
+
+

@@ -1,0 +1,32 @@
+@page "/"
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<h3>Kategorijas</h3>
+
+@if (items is null)
+{
+    <p>Ielādēju...</p>
+}
+else
+{
+    <ul>
+        @foreach (var c in items)
+        {
+            <li>@c.id — @c.categoryName (@(c.isActive ? "aktīva" : "neaktīva"))</li>
+        }
+    </ul>
+}
+
+@code {
+    List<CategoryDto>? items;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // API adrese
+        items = await Http.GetFromJsonAsync<List<CategoryDto>>(
+    "http://localhost:5270/api/categories");
+    }
+
+    public record CategoryDto(int id, string categoryName, int? parentId, bool isActive);
+}

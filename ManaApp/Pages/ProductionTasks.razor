@@ -1,0 +1,2745 @@
+@page "/productiontasks"
+@inject HttpClient Http
+@inject IJSRuntime JS
+@using Microsoft.JSInterop
+@using System.Net.Http.Json
+@using System.Text.Json.Serialization
+@using Syncfusion.Blazor.Grids
+
+
+<div class="productiontasks-layout">
+
+  <!-- Kreisā josla -->
+<div class="productiontasks-sidebar">
+  Izvēles logs
+</div>
+
+
+  <!-- CENTRĀLAIS BLOKS: viss koks -->
+  <div class="productiontasks-center">
+
+   <h2 class="productiontasks-title">Ražošanas plāni</h2>
+
+   <div class="productiontasks-toolbar">
+
+    <label style="display:flex; gap:6px; align-items:center;">
+        <input type="checkbox" @bind="_showCompleted" @bind:after="() => { RebuildCategories(); StateHasChanged(); }" />
+        Rādīt pabeigtos
+    </label>
+
+    @if (_showCompleted)
+    {
+        <label style="display:flex; gap:6px; align-items:center;">
+            Pēdējie:
+            <input type="number" min="5" max="500" style="width:90px;"
+                   @bind="_completedTake" />
+        </label>
+
+        <label style="display:flex; gap:6px; align-items:center;">
+            Dienas:
+            <input type="number" min="1" max="365" style="width:90px;"
+                   @bind="_completedDays" />
+        </label>
+
+        <label style="display:flex; gap:6px; align-items:center;">
+            Meklēt:
+            <input type="text" style="width:220px;"
+                   placeholder="Batch kods / komentārs"
+                   @bind="_completedSearch" />
+        </label>
+    }
+</div>
+
+
+    <!-- 0. līmenis: Kategorijas -->
+    <SfGrid 
+        TValue="CategoryRow" 
+       DataSource="@categoriesFiltered"
+        Width="100%" 
+        GridLines="GridLine.Both" 
+        CssClass="lvl0">
+
+      <GridColumns>
+        <GridColumn Field=@nameof(CategoryRow.CategoryName) HeaderText="Kategorija" Width="280" />
+      </GridColumns>
+
+      <GridTemplates>
+        <DetailTemplate Context="cat">
+          <!-- 1. līmenis: produkti konkrētajā kategorijā -->
+          <SfGrid TValue="ProductGroupRow"
+                  DataSource="@GetRowsForCategory(cat)"
+                  Width="100%"
+                  GridLines="GridLine.Both"
+                  CssClass="lvl1"
+                  DetailDataBound="OnDetailDataBound"
+                  RowSelected="OnProductRowSelected">
+
+            <!-- 1. līmeņa kolonnas -->
+           <GridColumns>
+    <GridColumn Field=@nameof(ProductRow.ProductName)
+                HeaderText="Nosaukums"
+                Width="150" />
+
+    <GridColumn Field=@nameof(ProductRow.ProductCode)
+                HeaderText="Kods"
+                Width="80"
+                TextAlign="TextAlign.Center" />
+
+    <!-- Plānotais kopējais daudzums (no /api/batches/list) -->
+    <GridColumn Field=@nameof(ProductRow.Planned)
+                HeaderText="Planned"
+                Width="100"
+                TextAlign="TextAlign.Center" />
+
+    <!-- Cik šobrīd ir procesā (Detailed + Assembly + Finishing no stock_movements) -->
+    <GridColumn Field=@nameof(ProductRow.InProgress)
+                HeaderText="In progress"
+                Width="100"
+                TextAlign="TextAlign.Center" />
+</GridColumns>
+
+
+            <!-- 2. līmenis: batch kodi -->
+            <GridTemplates>
+              <DetailTemplate Context="prod">
+                <SfGrid TValue="BatchLine"
+        DataSource="@GetBatches(prod)"
+        Width="100%"
+        GridLines="GridLine.Both"
+        CssClass="lvl2">
+
+    <GridEvents TValue="BatchLine" 
+            RowSelecting="OnBatchSelecting"
+            RowSelected="OnBatchSelected">
+</GridEvents>
+
+    <GridColumns>
+   <GridColumn HeaderText="Ražošanas kods" Width="200">
+    <Template>
+        @{
+            var b = (BatchLine)context;
+        }
+        <span>
+            @b.BatchCode
+
+            @if (!string.IsNullOrWhiteSpace(b.VersionName))
+            {
+                <span style="margin-left:6px; opacity:.7;">
+                    (@b.VersionName)
+                </span>
+            }
+
+            @if (IsLatestVersionBatch(b))
+            {
+                <span style="margin-left:6px; font-weight:700; color:#16a34a;">★</span>
+            }
+        </span>
+    </Template>
+</GridColumn>
+
+
+<GridColumn Field=@nameof(BatchLine.Planned)    HeaderText="Planned"   Width="100" TextAlign="TextAlign.Center" />
+<GridColumn Field=@nameof(BatchLine.Detailed)   HeaderText="Detailed"  Width="100" TextAlign="TextAlign.Center" />
+<GridColumn Field=@nameof(BatchLine.Assembly)   HeaderText="Assembly"  Width="100" TextAlign="TextAlign.Center" />
+<GridColumn Field=@nameof(BatchLine.Finishing)  HeaderText="Finishing" Width="100" TextAlign="TextAlign.Center" />
+<GridColumn Field=@nameof(BatchLine.Done)       HeaderText="Done"      Width="90"  TextAlign="TextAlign.Center" />
+
+
+    <GridColumn Field=@nameof(BatchLine.Comment)
+                HeaderText="Komentārs"
+                Width="220">
+        <Template>
+            @{
+                var b = (BatchLine)context;
+            }
+            @b.Comment
+        </Template>
+    </GridColumn>
+
+    <!-- Poga "Labot" -->
+    <GridColumn HeaderText="" Width="90" TextAlign="TextAlign.Center">
+        <Template>
+            @{
+                var b = (BatchLine)context;
+            }
+            <button class="e-btn e-small"
+                    @onclick="@(() => OpenBatchEditDialog(b))">
+                Labot
+            </button>
+        </Template>
+    </GridColumn>
+</GridColumns>
+
+
+</SfGrid>
+
+              </DetailTemplate>
+            </GridTemplates>
+
+          </SfGrid>
+        </DetailTemplate>
+      </GridTemplates>
+
+    </SfGrid>
+  </div>
+
+  <!-- LABAIS BLOKS: Detailed / Assembly / Finishing -->
+  <div class="productiontasks-right">
+
+    <h3 class="productiontasks-subtitle">Detalizēta informācija</h3>
+
+   <div class="productiontasks-right-grid">
+
+
+
+      <!-- Detailed (75%) ar 3. līmeņa detaļām -->
+      <div class="productiontasks-card">
+
+        <h4 style="margin:0 0 4px 0;">Detailed</h4>
+
+      @if (_activeBatch is null)
+  {
+      <div style="opacity:0.5;">Izvēlies ražošanas partiju 2. līmeņa sarakstā.</div>
+  }
+  else
+  {
+      <div style="font-weight:600; margin-bottom:4px;">
+          @GetActiveBatchCaption()
+      </div>
+
+      <SfGrid TValue="PartLine"
+        DataSource="@GetDetailedPartsForActiveBatch()"
+        Width="100%"
+        GridLines="GridLine.Both"
+        CssClass="lvl3">
+
+        <GridColumns>
+
+    <!-- Ikona (pelēks/zaļš aplis) -->
+    <GridColumn HeaderText="" Width="45" TextAlign="TextAlign.Center">
+        <Template>
+            @{
+                var part = (context as PartLine)!;
+                var key = GetPartSelectionKey(part);
+                var isLocked = _lockedPartKeys.Contains(key);
+            }
+
+            @if (isLocked)
+            {
+                <span style="font-size:18px; color:green;">●</span>
+            }
+            else
+            {
+                <span style="font-size:18px; color:#aaa; cursor:pointer;"
+                      @onclick="() => OnIconClicked(part)">
+                    ○
+                </span>
+            }
+        </Template>
+    </GridColumn>
+
+    <!-- Poga Tasks -->
+    <GridColumn HeaderText="" Width="90" TextAlign="TextAlign.Center">
+        <Template>
+            @{
+                var part = (context as PartLine)!;
+            }
+
+            <button class="e-btn e-small"
+                    disabled="@(!IsPartSelected(part))"
+                    @onclick="() => OnDetailedRowButtonClick(part)">
+                Tasks
+            </button>
+        </Template>
+    </GridColumn>
+
+    <!-- Detaļas nosaukums -->
+    <GridColumn Field=@nameof(PartLine.TopPartName) HeaderText="Detaļa" Width="220" />
+
+    <!-- JAUNA kolonna: Sākts/Pabeigts -->
+    <GridColumn HeaderText="Sākts" Width="140" TextAlign="TextAlign.Center">
+        <Template>
+            @{
+                var part = (context as PartLine)!;
+var key = GetSummaryKey(part);
+
+
+                DateTime? started = null;
+                if (!string.IsNullOrEmpty(key) &&
+                    _detailedSummaryByKey.TryGetValue(key, out var s))
+                {
+                    started = s.StartedAt;
+                }
+            }
+            @((started.HasValue) ? started.Value.ToString("dd.MM.yyyy HH:mm") : string.Empty)
+        </Template>
+    </GridColumn>
+
+    <GridColumn HeaderText="Pabeigts" Width="140" TextAlign="TextAlign.Center">
+        <Template>
+            @{
+                var part = (context as PartLine)!;
+var key = GetSummaryKey(part);
+
+
+                DateTime? finished = null;
+                if (!string.IsNullOrEmpty(key) &&
+                    _detailedSummaryByKey.TryGetValue(key, out var s))
+                {
+                    finished = s.FinishedAt;
+                }
+            }
+            @((finished.HasValue) ? finished.Value.ToString("dd.MM.yyyy HH:mm") : string.Empty)
+        </Template>
+    </GridColumn>
+
+</GridColumns>
+
+
+      </SfGrid>
+  }
+
+      </div>
+
+      <!-- Assembly (10%) -->
+
+<div class="productiontasks-card">
+
+    <h4 style="margin:0;">Assembly</h4>
+
+    @if (_activeBatch is null)
+    {
+        <div style="opacity:0.5;">Nav izvēlēta partija.</div>
+    }
+    else
+    {
+        <SfGrid TValue="PartLine"
+                DataSource="@GetAssemblyPartsForActiveBatch()"
+                Width="100%"
+                GridLines="GridLine.Both"
+                CssClass="lvl3">
+
+           <GridColumns>
+
+    <!-- Ikona -->
+    <GridColumn HeaderText="" Width="45" TextAlign="TextAlign.Center">
+        <Template>
+            @{
+                var part = (context as PartLine)!;
+                var key = GetPartSelectionKey(part);
+                var isLocked = _lockedPartKeys.Contains(key);
+            }
+
+            @if (isLocked)
+            {
+                <span style="font-size:18px; color:green;">●</span>
+            }
+            else
+            {
+                <span style="font-size:18px; color:#aaa; cursor:pointer;"
+                      @onclick="() => OnIconClicked(part)">
+                    ○
+                </span>
+            }
+        </Template>
+    </GridColumn>
+
+    <!-- Poga Tasks -->
+    <GridColumn HeaderText="" Width="90" TextAlign="TextAlign.Center">
+        <Template>
+            @{
+                var part = (context as PartLine)!;
+            }
+
+            <button class="e-btn e-small"
+                    disabled="@(!IsPartSelected(part))"
+                    @onclick="() => OnDetailedRowButtonClick(part)">
+                Tasks
+            </button>
+        </Template>
+    </GridColumn>
+
+    <!-- Detaļas nosaukums -->
+    <GridColumn Field=@nameof(PartLine.TopPartName) HeaderText="Detaļa" Width="220" />
+
+    <!-- Sākts -->
+    <GridColumn HeaderText="Sākts" Width="140" TextAlign="TextAlign.Center">
+        <Template>
+            @{
+                var part = (context as PartLine)!;
+                var key = GetSummaryKey(part);
+
+                DateTime? started = null;
+                if (!string.IsNullOrEmpty(key) &&
+                    _assemblySummaryByKey.TryGetValue(key, out var s))
+                {
+                    started = s.StartedAt;
+                }
+            }
+            @((started.HasValue) ? started.Value.ToString("dd.MM.yyyy HH:mm") : string.Empty)
+        </Template>
+    </GridColumn>
+
+    <!-- Pabeigts -->
+    <GridColumn HeaderText="Pabeigts" Width="140" TextAlign="TextAlign.Center">
+        <Template>
+            @{
+                var part = (context as PartLine)!;
+                var key = GetSummaryKey(part);
+
+                DateTime? finished = null;
+                if (!string.IsNullOrEmpty(key) &&
+                    _assemblySummaryByKey.TryGetValue(key, out var s))
+                {
+                    finished = s.FinishedAt;
+                }
+            }
+            @((finished.HasValue) ? finished.Value.ToString("dd.MM.yyyy HH:mm") : string.Empty)
+        </Template>
+    </GridColumn>
+
+</GridColumns>
+
+        </SfGrid>
+    }
+</div>
+
+
+           <!-- Finishing (15%) -->
+<div class="productiontasks-card">
+
+    <h4 style="margin:0;">Finishing</h4>
+
+    @if (_activeBatch is null)
+    {
+        <div style="opacity:0.5;">Nav izvēlēta partija.</div>
+    }
+    else
+    {
+        <SfGrid TValue="FinishingWaveRow"
+                DataSource="@GetFinishingRowsForActiveBatch()"
+                Width="100%"
+                GridLines="GridLine.Both"
+                CssClass="lvl3">
+
+            <GridColumns>
+
+                <!-- Tasks poga -->
+                <GridColumn HeaderText="" Width="90" TextAlign="TextAlign.Center">
+                    <Template>
+                        @{
+    var row = (FinishingWaveRow)context;
+
+    var disabled =
+        row.Status == 3
+        || row.StartedAt.HasValue;   // ja ir "Sākts" datums -> vairs nevar
+}
+
+
+                        <button class="e-btn e-small"
+                                disabled="@disabled"
+                                @onclick="() => OnFinishingEditClickWave(row)">
+                            Tasks
+                        </button>
+                    </Template>
+                </GridColumn>
+
+                <!-- Detaļa -->
+                <GridColumn Field="@nameof(FinishingWaveRow.PartName)"
+                            HeaderText="Detaļa"
+                            Width="220" />
+
+                <!-- Planned -->
+                <GridColumn HeaderText="Planned" Width="90" TextAlign="TextAlign.Center">
+                    <Template>
+                        @{
+                            var row = (FinishingWaveRow)context;
+                        }
+                        @row.Planned
+                    </Template>
+                </GridColumn>
+
+                <!-- Finishing (Done) -->
+          <GridColumn HeaderText="Finishing" Width="90" TextAlign="TextAlign.Center">
+    <Template>
+        @{
+            var row = (FinishingWaveRow)context;
+        }
+        @((row.Status == 5) ? 0 : row.FinishingQty)
+    </Template>
+</GridColumn>
+
+
+
+
+                <!-- Sākts -->
+                <GridColumn HeaderText="Sākts" Width="140" TextAlign="TextAlign.Center">
+                    <Template>
+                        @{
+                            var row = (FinishingWaveRow)context;
+                        }
+                        @(row.StartedAt.HasValue
+                            ? row.StartedAt.Value.ToString("dd.MM.yyyy HH:mm")
+                            : "")
+                    </Template>
+                </GridColumn>
+
+                <!-- Pabeigts -->
+                <GridColumn HeaderText="Pabeigts" Width="140" TextAlign="TextAlign.Center">
+                    <Template>
+                        @{
+                            var row = (FinishingWaveRow)context;
+                        }
+                        @(row.FinishedAt.HasValue
+                            ? row.FinishedAt.Value.ToString("dd.MM.yyyy HH:mm")
+                            : "")
+                    </Template>
+                </GridColumn>
+
+                <!-- Komentārs -->
+                <GridColumn HeaderText="Komentārs" Width="220">
+                    <Template>
+                        @{
+                            var row = (FinishingWaveRow)context;
+                        }
+                        @(row.Comment ?? "")
+                    </Template>
+                </GridColumn>
+
+            </GridColumns>
+        </SfGrid>
+    }
+</div>
+
+    </div>
+  </div>
+</div>
+
+<PartStepsDialog
+    IsOpen="_isTaskDialogVisible && _selectedPartForTasks is not null"
+    PartName="@(_selectedPartForTasks?.TopPartName ?? string.Empty)"
+    PartCode="@(_selectedPartForTasks?.TopPartCode ?? string.Empty)"
+    Steps="@GetStepRowsForDialog()"
+    OnClose="CloseTaskDialog"
+    OnSave="OnStepsDialogSave" />
+
+@if (_isFinishingDialogOpen && _finishingWave is not null)
+
+{
+    <!-- Pārklājums fonam -->
+    <div class="productiontasks-modal-overlay">
+
+
+        <!-- Pats dialoga “kārbiņš” -->
+        <div class="productiontasks-modal">
+
+
+            <h3 style="margin-top:0; margin-bottom:8px;">
+                Finishing – @_finishingWave.PartName
+
+            </h3>
+
+            <div style="margin-bottom:8px;">
+                <b>Planned (max):</b>
+                @_finishingDialogPlannedQty
+            </div>
+
+            <div style="margin-bottom:8px;">
+                <label>
+                   <span>Qty uz Finishing (šajā reizē):</span><br />
+
+                    <input type="number"
+                           min="0"
+                           max="@_finishingDialogPlannedQty"
+                           style="width:120px; text-align:right;"
+                           @bind="_finishingDialogQty"
+                           @bind:after="OnFinishingDialogQtyChanged" />
+                </label>
+            </div>
+
+            <div style="margin-bottom:12px;">
+                <label>
+                    <span>Komantārs (darbiniekam):</span><br />
+                    <textarea rows="3"
+          style="width:100%;"
+          @bind="_finishingDialogComment"></textarea>
+
+                </label>
+            </div>
+
+            <div style="text-align:right;">
+          <button type="button"
+        class="e-btn e-flat"
+        style="margin-right:8px;"
+        @onclick:stopPropagation="true"
+        @onclick:preventDefault="true"
+        @onclick="OnFinishingDialogCancel">
+    Atcelt
+</button>
+
+
+      <button type="button"
+        class="e-btn e-primary"
+        @onclick:stopPropagation="true"
+        @onclick:preventDefault="true"
+        @onclick="OnFinishingDialogSave">
+    Saglabāt
+</button>
+
+
+            </div>
+
+        </div>
+    </div>
+}
+
+<BatchLineEditDialog
+    @bind-IsOpen="_isBatchEditOpen"
+    Line="_batchEditDraft"
+    OnSaved="OnBatchEditSaved" />
+
+@code {
+    
+    // 1) 1. līmeņa rindu modelis (pa precēm)
+
+public sealed class CategoryRow
+{
+    public string CategoryName { get; set; } = "";
+
+    // Produkti, kas pieder šai kategorijai (viens un tas pats saraksts visiem renderiem)
+    public List<ProductGroupRow> Products { get; set; } = new();
+
+}
+
+public sealed class ProductRow
+{
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+
+    [JsonPropertyName("productName")]
+    public string ProductName { get; set; } = "";
+
+    [JsonPropertyName("productCode")]
+    public string ProductCode { get; set; } = "";
+
+    [JsonPropertyName("categoryName")]
+    public string CategoryName { get; set; } = "";
+
+    [JsonPropertyName("Version_Id")]
+    public int? VersionId { get; set; }
+
+    [JsonPropertyName("versionName")]
+public string? VersionName { get; set; }
+
+    public int InStock { get; set; }
+
+    // ŠIS PALIEK kā plānotais daudzums
+    public int Planned { get; set; }
+
+    // JAUNA kolonna 1. līmenim
+    public int InProgress { get; set; }
+
+    // Šos var atstāt – tos vairs nerādīsim 1. līmenī,
+    // bet var noderēt vēlāk, ja vajag detalizētu sadalījumu.
+    public int DetailedInProgress { get; set; }
+    public int AssemblyINProgress { get; set; }
+    public int FinishingInProgress { get; set; }
+}
+
+    // 2) 2. līmeņa (pa batches) rindu modelis
+public sealed class BatchLine
+{
+    [JsonPropertyName("BatchId")]        public int BatchId { get; set; }
+    [JsonPropertyName("BatchCode")]      public string BatchCode { get; set; } = "";
+    [JsonPropertyName("BatchProductId")] public int BatchProductId { get; set; }
+    [JsonPropertyName("Version_Id")]     public int VersionId { get; set; }
+
+    public string? VersionName { get; set; }
+
+    [JsonPropertyName("Planned")]        public int Planned { get; set; }
+    [JsonPropertyName("Detailed")]       public int Detailed { get; set; }
+    [JsonPropertyName("Assembly")]       public int Assembly { get; set; }
+    [JsonPropertyName("Finishing")]      public int Finishing { get; set; } // <- šis tev trūkst
+    [JsonPropertyName("Done")]           public int Done { get; set; }      // <- Done = STOCK
+    [JsonPropertyName("Stock")]          public int Stock { get; set; }
+    [JsonPropertyName("Comment")]        public string? Comment { get; set; }
+    [JsonPropertyName("StartedAt")]      public DateTime? StartedAt { get; set; }
+    [JsonPropertyName("BatchStatus")]    public int BatchStatus { get; set; }
+}
+
+
+    // 3) Summary modelis (Detailed/Assembly/Finishing)
+   
+    private List<ProductRow> rows = new();
+
+        // pie jaunā filtra j=koda:
+private bool _showCompleted = false;
+private int _completedTake = 30;     // pēdējie N
+private int _completedDays = 30;     // pēdējās X dienas
+private string _completedSearch = "";
+
+
+    // atmiņa 2. līmeņa rindām pa VersionId
+    private readonly Dictionary<int, List<BatchLine>> _byVersion = new();
+        
+    // batchId -> versionId kartējums
+private readonly Dictionary<int, int> _versionByBatchId = new();
+
+   protected override async Task OnInitializedAsync()
+{
+    // 1) Produkti no /api/products/list
+    rows = await Http.GetFromJsonAsync<List<ProductRow>>(
+    "http://localhost:5270/api/products/planning-list"
+) ?? new();
+
+
+    // 2) Aizpildām VersionId, ja trūkst (no /api/products/content?id=...)
+    foreach (var r in rows)
+    {
+        if (r.VersionId is null || r.VersionId <= 0)
+        {
+            try
+            {
+                var c = await Http.GetFromJsonAsync<ProductContentDto>(
+    $"http://localhost:5270/api/products/content?id={r.Id}");
+
+if (c is not null)
+{
+    if (c.VersionId > 0)
+        r.VersionId = c.VersionId;
+
+    if (!string.IsNullOrWhiteSpace(c.VersionName))
+        r.VersionName = c.VersionName;
+}
+
+            }
+            catch { }
+        }
+    }
+BuildVersionNameIndex();
+
+BuildLatestVersionByCode();
+
+// 3) Kopsavilkums no /api/batches/list pa VersionId
+var plannedList = await Http.GetFromJsonAsync<List<BatchPlannedRow>>(
+    "http://localhost:5270/api/batches/list?batch_type=1"
+) ?? new List<BatchPlannedRow>();
+
+// Versijas, kurām ir vismaz viena aktīva partija
+var versionsWithBatches = plannedList
+    .Select(x => x.VersionId)
+    .Distinct()
+    .ToHashSet();
+
+// Aggregācija: Planned + InProgress no /api/batches/list
+var aggByVersion = plannedList
+    .GroupBy(x => x.VersionId)
+    .ToDictionary(
+        g => g.Key,
+        g => new
+        {
+            Planned   = g.Sum(x => x.Planned),
+
+            // In progress: viss, kas NAV “tikai plānots”
+            // DetailedInProgress + DetailedFinish + Assembly + Done
+            InProgress = g.Sum(x =>
+                x.DetailedInProgress +
+                x.DetailedFinish +
+                x.Assembly +
+                x.Done)
+        }
+    );
+
+foreach (var r in rows)
+{
+    if (r.VersionId.HasValue && aggByVersion.TryGetValue(r.VersionId.Value, out var agg))
+    {
+        r.Planned    = agg.Planned;
+        r.InProgress = agg.InProgress;
+
+        var stockDto = await Http.GetFromJsonAsync<StockActiveDto>(
+    $"http://localhost:5270/api/stockmovements/stock-by-version-active?versionId={r.VersionId}");
+
+var stock = stockDto?.Stock ?? 0;
+
+// InProgress - viss kas jau ir STOCK (neatlec atpakaļ)
+r.InProgress = Math.Max(r.InProgress - stock, 0);
+
+    }
+    else
+    {
+        r.Planned    = 0;
+        r.InProgress = 0;
+    }
+
+    // Šos varam paturēt informatīviem mērķiem, bet 1. līmenī tos nerādām
+    r.DetailedInProgress  = 0;
+    r.AssemblyINProgress  = 0;
+    r.FinishingInProgress = 0;
+}
+
+
+// 4) Faktiskais sadalījums pa Detailed / Assembly / Finishing no stock_movements
+foreach (var r in rows)
+{
+    if (r.VersionId is int v && v > 0)
+    {
+        try
+        {
+            var url = $"http://localhost:5270/api/stockmovements/summary?versionId={v}";
+            var sum = await Http.GetFromJsonAsync<StockSummaryDto>(url);
+
+            if (sum is not null)
+            {
+                // InProgress = viss, kas šobrīd ir procesā (Detailed + Assembly + Finishing)
+                // r.InProgress = sum.Detailed + sum.Assembly + sum.Finishing;(izdzēsts)
+
+                // Ja gribi, var saglabāt arī detaļās, lai vēlāk parādītu citur:
+                r.DetailedInProgress  = sum.Detailed;
+                r.AssemblyINProgress  = sum.Assembly;
+                r.FinishingInProgress = sum.Finishing;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[OnInitializedAsync][StockSummary] versionId={v} ERROR: {ex.Message}");
+        }
+    }
+}
+
+    // 4) PRELOAD: ielādē batch sarakstus visām versijām, kurām ir aktīvas partijas
+foreach (var r in rows.Where(x => x.VersionId is > 0 &&
+                                  versionsWithBatches.Contains(x.VersionId!.Value)))
+    {
+        var v = r.VersionId!.Value;
+        try
+        {
+            if (!_byVersion.ContainsKey(v))
+            {
+                var url = $"http://localhost:5270/api/batches/by-version?versionId={v}&batch_type=1";
+                Console.WriteLine($"[PRELOAD] GET {url}  (Product: {r.ProductCode} - {r.ProductName})");
+
+                var list = await Http.GetFromJsonAsync<List<BatchLine>>(url) ?? new();
+                Console.WriteLine($"[PRELOAD] versionId={v} -> batches: {list.Count}");
+                _byVersion[v] = list;
+
+                // piešuj VersionId katram batch ierakstam
+                foreach (var b in list)
+                    b.VersionId = v;
+
+                    AttachVersionNameToBatches(v, list);
+
+                // sasaisti batchId → versionId (vajadzīgs 3. līmenim)
+                foreach (var b in list)
+                    _versionByBatchId[b.BatchId] = v;
+            }
+            else
+            {
+                Console.WriteLine($"[PRELOAD] versionId={v} -> jau ielādēts ({_byVersion[v].Count})");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[PRELOAD][ERROR] versionId={v}: {ex.Message}");
+        }
+    }
+
+    // 5) PRELOAD: ielādē parts (detaļas) visām precēm ar Planned > 0
+    foreach (var r in rows.Where(x => x.VersionId is > 0 && x.Planned > 0))
+    {
+        var v = r.VersionId!.Value;
+        if (!_partsByVersion.ContainsKey(v))
+        {
+            var url2 = $"http://localhost:5270/api/products/details?versionId={v}";
+            _partsByVersion[v] = await Http.GetFromJsonAsync<List<PartLine>>(url2) ?? new();
+        }
+    }
+
+    // 6) PRELOAD: ielādē steps (soļus) visām detaļām
+    foreach (var parts in _partsByVersion.Values)
+    {
+        foreach (var part in parts)
+        {
+            if (!_stepsByPart.ContainsKey(part.ProductToPartId))
+            {
+                var url3 = $"http://localhost:5270/api/products/steps-by-part?productToPartId={part.ProductToPartId}";
+                try
+                {
+                    _stepsByPart[part.ProductToPartId] =
+                        await Http.GetFromJsonAsync<List<StepLine>>(url3) ?? new();
+                }
+                catch
+                {
+                    _stepsByPart[part.ProductToPartId] = new();
+                }
+            }
+        }
+    }
+
+// 7) Kategorijas 0. līmenim – rādam visus produktus,
+// kuriem ir vismaz viena aktuāla partija (_byVersion[VersionId] nav tukšs)
+// 7) Kategorijas 0. līmenim – būvējam no BATCHIEM, nevis no products/list
+var productByVersion = rows
+    .Where(r => r.VersionId is > 0)
+    .GroupBy(r => r.VersionId!.Value)
+    .ToDictionary(g => g.Key, g => g.First());
+
+var visibleVersionIds = _byVersion
+    .Where(kvp => kvp.Key > 0 && kvp.Value != null)
+    .Where(kvp => kvp.Value.Any(b => _showCompleted ? IsBatchCompleted(b) : !IsBatchCompleted(b)))
+    .Select(kvp => kvp.Key)
+    .ToList();
+
+var visibleProducts = new List<ProductRow>();
+
+foreach (var v in visibleVersionIds)
+{
+    if (productByVersion.TryGetValue(v, out var prod))
+        visibleProducts.Add(prod);
+    else
+    {
+        // JA nav products/list ieraksta šai VersionId (veca versija) — NEIZMETAM ārā,
+        // bet ieliekam "placeholder" (lai vismaz batchi redzami)
+        visibleProducts.Add(new ProductRow
+        {
+            Id = 0,
+            VersionId = v,
+            ProductName = $"(Versija #{v})",
+            ProductCode = "",
+            CategoryName = "(Nav kategorijas)",
+            Planned = 0,
+            InProgress = 0
+        });
+    }
+}
+
+categoriesFiltered = visibleProducts
+    .Where(r => !string.IsNullOrWhiteSpace(r.CategoryName))
+    .GroupBy(r => (r.CategoryName ?? "").Trim(), StringComparer.OrdinalIgnoreCase)
+    .OrderBy(g => g.Key)
+    .Select(g => new CategoryRow
+{
+    CategoryName = g.Key,
+    Products = g
+        .GroupBy(x => (x.ProductCode ?? "").Trim(), StringComparer.OrdinalIgnoreCase)
+        .Select(pg => new ProductGroupRow
+        {
+            ProductCode = pg.First().ProductCode,
+            ProductName = pg.First().ProductName,
+            CategoryName = pg.First().CategoryName,
+            Planned = pg.Sum(x => x.Planned),
+            InProgress = pg.Sum(x => x.InProgress),
+            VersionIds = pg.Where(x => x.VersionId is > 0).Select(x => x.VersionId!.Value).Distinct().ToList()
+        })
+        .OrderBy(x => x.ProductName)
+        .ToList()
+})
+
+    .ToList();
+
+
+
+    await InvokeAsync(StateHasChanged);
+}
+
+// palīgmodeļi (ja nav jau failā)
+public class ProductContentDto
+{
+    public int VersionId { get; set; }
+    public string? VersionName { get; set; }
+}
+
+
+    // Palīgs: paņem 2. līmeņa rindas konkrētai versijai
+private IEnumerable<BatchLine> GetBatches(object prodObj)
+{
+    var prod = prodObj as ProductGroupRow;
+    if (prod?.VersionIds == null || prod.VersionIds.Count == 0)
+        return Enumerable.Empty<BatchLine>();
+
+    var all = new List<BatchLine>();
+
+    foreach (var v in prod.VersionIds)
+    {
+        if (_byVersion.TryGetValue(v, out var list) && list != null)
+        {
+            foreach (var b in list)
+                b.VersionId = v; // drošībai
+
+            all.AddRange(list);
+        }
+    }
+
+    if (_showCompleted)
+        return ApplyCompletedFilters(all);
+
+    return all.Where(b => !IsBatchCompleted(b))
+              .OrderByDescending(b => b.BatchId);
+}
+
+
+private async Task OnDetailDataBound(DetailDataBoundEventArgs<ProductRow> args)
+{
+    var row = args.Data;
+    if (row?.VersionId is not int v || v <= 0)
+        return;
+
+    // 1) Batches
+    if (!_byVersion.TryGetValue(v, out var batches) || batches is null)
+    {
+        var url = $"http://localhost:5270/api/batches/by-version?versionId={v}&batch_type=1";
+        Console.WriteLine($"[DETAIL] GET {url}  (Product: {row.ProductCode} - {row.ProductName})");
+        batches = await Http.GetFromJsonAsync<List<BatchLine>>(url) ?? new();
+        Console.WriteLine($"[DETAIL] versionId={v} -> batches: {batches.Count}");
+        _byVersion[v] = batches;
+    }
+    else
+    {
+        Console.WriteLine($"[DETAIL] versionId={v} -> jau bija ielādēts ({batches.Count})");
+    }
+
+    // ✅ Sasaistām katru batch ar tā parent VersionId
+    foreach (var b in batches)
+        _versionByBatchId[b.BatchId] = v;
+
+    // 2) Parts
+    if (!_partsByVersion.ContainsKey(v))
+    {
+        var url2 = $"http://localhost:5270/api/products/details?versionId={v}";
+        Console.WriteLine($"[DETAIL] GET {url2}  (parts)");
+        var plist = await Http.GetFromJsonAsync<List<PartLine>>(url2) ?? new();
+        _partsByVersion[v] = plist;
+        Console.WriteLine($"[DETAIL] versionId={v} -> parts: {plist.Count}");
+    }
+
+    // 3) Steps
+    if (_partsByVersion.TryGetValue(v, out var parts))
+    {
+        foreach (var part in parts)
+        {
+            if (!_stepsByPart.ContainsKey(part.ProductToPartId))
+            {
+                var url3 = $"http://localhost:5270/api/products/steps-by-part?productToPartId={part.ProductToPartId}";
+                Console.WriteLine($"[DETAIL] GET {url3}  (steps for partId={part.ProductToPartId})");
+                _stepsByPart[part.ProductToPartId] =
+                    await Http.GetFromJsonAsync<List<StepLine>>(url3) ?? new();
+                Console.WriteLine($"[DETAIL] partId={part.ProductToPartId} -> steps: {_stepsByPart[part.ProductToPartId].Count}");
+            }
+        }
+    }
+
+    await InvokeAsync(StateHasChanged);
+}
+
+public sealed class PartLine
+{
+    [JsonPropertyName("topPartName")]  public string TopPartName { get; set; } = "";
+    [JsonPropertyName("topPartCode")]  public string TopPartCode { get; set; } = "";
+    [JsonPropertyName("quantity")]     public int Quantity { get; set; }
+    [JsonPropertyName("productToPartId")] public int ProductToPartId { get; set; }
+
+    // UI-only lauki Finishing režģim
+    public int? FinishingPlannedOverride { get; set; }
+    public bool IsExtraFinishingRow { get; set; }
+}
+
+
+private sealed class StockSummaryDto
+{
+    [JsonPropertyName("planned")]   public int Planned   { get; set; }
+    [JsonPropertyName("detailed")]  public int Detailed  { get; set; }
+    [JsonPropertyName("assembly")]  public int Assembly  { get; set; }
+    [JsonPropertyName("finishing")] public int Finishing { get; set; }
+
+    // pārējie lauki ir, ja kādreiz noder:
+    [JsonPropertyName("stock")]     public int Stock     { get; set; }
+    [JsonPropertyName("scrap")]     public int Scrap     { get; set; }
+    [JsonPropertyName("out")]       public int Out       { get; set; }
+}
+
+
+private readonly Dictionary<int, List<PartLine>> _partsByVersion = new();
+private IEnumerable<PartLine> GetParts(object prodObj)
+{
+    var prod = prodObj as ProductRow;
+    if (prod?.VersionId is int v && v > 0)
+        return _partsByVersion.TryGetValue(v, out var list) ? list : Enumerable.Empty<PartLine>();
+
+    return Enumerable.Empty<PartLine>();
+}
+
+private IEnumerable<PartLine> GetPartsForBatch(object batObj)
+{
+    var bat = batObj as BatchLine;
+    if (bat is null) return Enumerable.Empty<PartLine>();
+
+    return _partsByVersion.TryGetValue(bat.VersionId, out var list)
+        ? list
+        : Enumerable.Empty<PartLine>();
+}
+
+public sealed class StepLine
+{
+    public int Id { get; set; }
+    public int ProductToPartId { get; set; }
+    public int StepOrder { get; set; }
+    public string StepName { get; set; } = "";
+    public int StepType { get; set; }
+    public string StepTypeName { get; set; } = "";
+    public int WorkCentrId { get; set; }
+    public string WorkCenterName { get; set; } = "";
+    public int? ParallelGroup { get; set; }
+    public bool IsMandatory { get; set; }
+    public bool IsFinal { get; set; }
+    public string? Comments { get; set; }
+
+    // ▼ JAUNIE LAUKI – pa tiešo ar DB nosaukumiem
+    public int TaskId { get; set; }            // ← būtiski!
+    public bool? Tasks_Priority { get; set; }
+    public int? Assigned_To { get; set; }
+
+    // Datumi tikai informatīvi (no tasks tabulas)
+    public DateTime? StartedAt { get; set; }
+    public DateTime? FinishedAt { get; set; }
+}
+
+private readonly Dictionary<int, List<StepLine>> _stepsByPart = new();
+private IEnumerable<StepLine> GetSteps(object partObj)
+{
+    var part = partObj as PartLine;
+    if (part is null) return Enumerable.Empty<StepLine>();
+    return _stepsByPart.TryGetValue(part.ProductToPartId, out var list) ? list : Enumerable.Empty<StepLine>();
+}
+
+private IEnumerable<ProductGroupRow> GetRowsForCategory(object catObj)
+{
+    var cat = catObj as CategoryRow;
+    if (cat?.Products is { Count: > 0 })
+        return cat.Products;
+
+    return Enumerable.Empty<ProductGroupRow>();
+}
+
+public sealed class ProductGroupRow
+{
+    public string ProductName { get; set; } = "";
+    public string ProductCode { get; set; } = "";
+    public string CategoryName { get; set; } = "";
+
+    public int Planned { get; set; }
+    public int InProgress { get; set; }
+
+    // visas versijas, kas pieder šim produktam
+    public List<int> VersionIds { get; set; } = new();
+}
+
+
+private List<CategoryRow> categoriesFiltered = new(); // tikai ar Planned > 0
+
+private async Task OnProductRowSelected(RowSelectEventArgs<ProductRow> args)
+{
+    Console.WriteLine("[OnProductRowSelected] >>> SAŅĒMU EVENTU");
+    var row = args.Data;
+    if (row?.VersionId is not int v || v <= 0)
+        return;
+
+    // ✅ pārslēdzoties uz citu produktu, aizmirstam iepriekšējo batch
+    _activeBatch = null;
+
+    // 1) Batches (Plānots) – ja nav, ielādē
+    if (!_byVersion.ContainsKey(v))
+    {
+        var url = $"http://localhost:5270/api/batches/by-version?versionId={v}&batch_type=1";
+        try
+        {
+            var list = await Http.GetFromJsonAsync<List<BatchLine>>(url) ?? new();
+            _byVersion[v] = list;
+
+            foreach (var b in list)
+                _versionByBatchId[b.BatchId] = v;
+        }
+        catch { _byVersion[v] = new(); }
+    }
+
+    // 2) Parts – ja nav, ielādē
+    if (!_partsByVersion.ContainsKey(v))
+    {
+        var url2 = $"http://localhost:5270/api/products/details?versionId={v}";
+        try
+        {
+            _partsByVersion[v] = await Http.GetFromJsonAsync<List<PartLine>>(url2) ?? new();
+        }
+        catch { _partsByVersion[v] = new(); }
+    }
+
+    // 3) Steps – katrai part (ja nav, ielādē)
+    if (_partsByVersion.TryGetValue(v, out var parts))
+    {
+        foreach (var part in parts)
+        {
+            if (!_stepsByPart.ContainsKey(part.ProductToPartId))
+            {
+                var url3 = $"http://localhost:5270/api/products/steps-by-part?productToPartId={part.ProductToPartId}";
+                try
+                {
+                    _stepsByPart[part.ProductToPartId] =
+                        await Http.GetFromJsonAsync<List<StepLine>>(url3) ?? new();
+                }
+                catch { _stepsByPart[part.ProductToPartId] = new(); }
+            }
+        }
+    }
+
+    await InvokeAsync(StateHasChanged);
+}
+
+private BatchLine? _activeBatch;
+
+private async Task OnBatchSelected(RowSelectEventArgs<BatchLine> args)
+{
+    Console.WriteLine("[OnBatchSelected] >>> SAŅĒMU EVENTU");
+    _activeBatch = args.Data;
+    if (_activeBatch is null)
+        return;
+
+    Console.WriteLine($"[OnBatchSelected] BatchId={_activeBatch.BatchId}, VersionId={_activeBatch.VersionId}, BatchProductId={_activeBatch.BatchProductId}");
+
+    // --- 1) Noskaidrojam VersionId ---
+    var v = _activeBatch.VersionId;
+    if (v <= 0 && _versionByBatchId.TryGetValue(_activeBatch.BatchId, out var mappedV))
+        v = mappedV;
+
+    if (v <= 0)
+    {
+        Console.WriteLine("[OnBatchSelected] VersionId nav atrasts.");
+        return;
+    }
+
+    // --- 2) Parts (ja nav, ielādējam) ---
+    if (!_partsByVersion.ContainsKey(v))
+    {
+        var url2 = $"http://localhost:5270/api/products/details?versionId={v}";
+        Console.WriteLine($"[OnBatchSelected] GET {url2}");
+        try
+        {
+            _partsByVersion[v] = await Http.GetFromJsonAsync<List<PartLine>>(url2) ?? new();
+            Console.WriteLine($"[OnBatchSelected] Loaded parts: {_partsByVersion[v].Count}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[OnBatchSelected][ERROR] {ex.Message}");
+            _partsByVersion[v] = new();
+        }
+    }
+
+    // --- 3) STEPS (TE IR GALVENAIS LABOJUMS) ---
+    if (_partsByVersion.TryGetValue(v, out var partsForVersion))
+    {
+        foreach (var part in partsForVersion)
+        {
+            if (!_stepsByPart.ContainsKey(part.ProductToPartId))
+            {
+                var url3 = $"http://localhost:5270/api/products/steps-by-part?productToPartId={part.ProductToPartId}";
+                Console.WriteLine($"[OnBatchSelected] GET {url3} (steps for partId={part.ProductToPartId})");
+
+                try
+                {
+                    _stepsByPart[part.ProductToPartId] =
+                        await Http.GetFromJsonAsync<List<StepLine>>(url3) ?? new();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[OnBatchSelected][STEPS ERROR] {ex.Message}");
+                    _stepsByPart[part.ProductToPartId] = new();
+                }
+            }
+        }
+    }
+
+    // --- 4) Notīrām vecos ķeksus šai partijai ---
+    var batchPrefix = _activeBatch.BatchId.ToString() + ":";
+    _selectedPartKeys.RemoveWhere(k => k.StartsWith(batchPrefix));
+
+    // --- 5) Ielasām aktīvās detaļas šai partijai ---
+    try
+    {
+        var urlActive = $"http://localhost:5270/api/tasks/active-parts?batchId={_activeBatch.BatchId}";
+        Console.WriteLine($"[OnBatchSelected] GET {urlActive} (active parts)");
+        var activePartIds = await Http.GetFromJsonAsync<List<int>>(urlActive) ?? new List<int>();
+
+        foreach (var ptpId in activePartIds)
+        {
+            var key = $"{_activeBatch.BatchId}:{ptpId}";
+            _selectedPartKeys.Add(key);
+            _lockedPartKeys.Add(key);
+        }
+
+        Console.WriteLine($"[OnBatchSelected] active parts count = {activePartIds.Count}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[OnBatchSelected][ACTIVE PARTS ERROR] {ex.Message}");
+    }
+
+    // --- 6) Finishing daudzumi ---
+    await LoadFinishingForActiveBatchAsync();
+
+    // --- 7) Detailed start/finish datu ielāde ---
+    Console.WriteLine("[OnBatchSelected] → saucu LoadDetailedSummaryForActiveBatchAsync()");
+    await LoadDetailedSummaryForActiveBatchAsync();
+    await LoadFinishingWavesForActiveBatchAsync();
+
+
+    // --- 8) DEBUG: kādi StepType ir katrai detaļai ---
+    if (_activeBatch is not null)
+    {
+        Console.WriteLine("=== STEPS DEBUG ===");
+        foreach (var part in GetPartsForActiveBatch())
+        {
+            if (_stepsByPart.TryGetValue(part.ProductToPartId, out var steps) && steps.Any())
+            {
+                var types = string.Join(",", steps.Select(s => s.StepType));
+                Console.WriteLine($"Part {part.TopPartName} ({part.ProductToPartId}) -> StepTypes: {types}");
+            }
+            else
+            {
+                Console.WriteLine($"Part {part.TopPartName} ({part.ProductToPartId}) -> NO STEPS");
+            }
+        }
+    }
+
+    await InvokeAsync(StateHasChanged);
+}
+
+private IEnumerable<PartLine> GetPartsForActiveBatch()
+{
+    if (_activeBatch is null)
+        return Enumerable.Empty<PartLine>();
+
+    var v = _activeBatch.VersionId;
+
+    if (v <= 0 && _versionByBatchId.TryGetValue(_activeBatch.BatchId, out var mappedV))
+        v = mappedV;
+
+    if (v <= 0)
+        return Enumerable.Empty<PartLine>();
+
+    return _partsByVersion.TryGetValue(v, out var list)
+        ? list
+        : Enumerable.Empty<PartLine>();
+}
+
+// Detailed = detaļas, kurām NAV Assembly un NAV Finishing soļu
+private IEnumerable<PartLine> GetDetailedPartsForActiveBatch()
+{
+    var all = GetPartsForActiveBatch().ToList();
+    if (all.Count == 0)
+        return all;
+
+    // Detailed = detaļas, kurām nav Assembly/Finishing soļu
+    return all.Where(p =>
+    {
+        if (!_stepsByPart.TryGetValue(p.ProductToPartId, out var steps) || steps.Count == 0)
+            return true; // ja nav soļu, skaitām pie Detailed
+
+        var hasAssemblyOrFinishing = steps.Any(s =>
+            s.StepType == 2 ||  // Assembly
+            s.StepType == 3     // Finishing
+        );
+
+        return !hasAssemblyOrFinishing;
+    });
+}
+
+
+// Assembly = ir Assembly, bet nav Finishing
+private IEnumerable<PartLine> GetAssemblyPartsForActiveBatch()
+{
+    var all = GetPartsForActiveBatch().ToList();
+    if (all.Count == 0)
+        return all;
+
+    return all.Where(p =>
+    {
+        if (!_stepsByPart.TryGetValue(p.ProductToPartId, out var steps) || steps.Count == 0)
+            return false;
+
+        var hasAssembly  = steps.Any(s => s.StepType == 2);
+        var hasFinishing = steps.Any(s => s.StepType == 3);
+
+        // ja ir Assembly, bet nav Finishing – skaitām pie Assembly
+        return hasAssembly && !hasFinishing;
+    });
+}
+
+// Finishing = ir vismaz viens Finishing
+// Finishing = ir vismaz viens Finishing solis (StepType = 3),
+// + automātiski pievienojam “nākamo vilni”, ja Assembly > Finished.
+private IEnumerable<PartLine> GetFinishingPartsForActiveBatch()
+{
+    if (_activeBatch is null)
+        return Enumerable.Empty<PartLine>();
+
+    var all = GetPartsForActiveBatch().ToList();
+    if (all.Count == 0)
+        return all;
+
+    // 1) Atlasām tikai detaļas, kurām ir vismaz viens Finishing solis
+    var finishingParts = all.Where(p =>
+    {
+        if (!_stepsByPart.TryGetValue(p.ProductToPartId, out var steps) || steps.Count == 0)
+            return false;
+
+        return steps.Any(s => s.StepType == 3);
+    }).ToList();
+
+    var result = new List<PartLine>();
+
+    foreach (var part in finishingParts)
+    {
+        var key = GetPartSelectionKey(part);
+
+        // Plāns produktos: izmantojam Assembly, ja tas ir > 0, citādi Planned
+        var plannedProducts = _activeBatch.Assembly > 0
+            ? _activeBatch.Assembly
+            : _activeBatch.Planned;
+
+       
+       // DB pusē jau nosūtītais uz Finishing (produktos)
+int finishedProducts = 0;
+if (_finishingTotalByBatchId.TryGetValue(_activeBatch.BatchId, out var sentDb))
+    finishedProducts = sentDb;
+
+// NEKĀDU UI max te vairs nav!
+if (finishedProducts > plannedProducts)
+    finishedProducts = plannedProducts;
+
+        
+        // 2) Pamat-rinda (esošais vilnis)
+        part.FinishingPlannedOverride = null;
+        part.IsExtraFinishingRow = false;
+        result.Add(part);
+
+        // 3) Atliekums – nākamais vilnis (Statuss = 5 konceptuāli)
+        var remainingProducts = plannedProducts - finishedProducts;
+
+       if (finishedProducts > 0 && finishedProducts < plannedProducts)
+
+        {
+            var extra = new PartLine
+            {
+                TopPartName = part.TopPartName,
+                TopPartCode = part.TopPartCode,
+                Quantity = part.Quantity,
+                ProductToPartId = part.ProductToPartId,
+
+                // Planned tieši priekš šīs papildrindas
+                FinishingPlannedOverride = remainingProducts * part.Quantity,
+                IsExtraFinishingRow = true
+            };
+
+            result.Add(extra);
+        }
+    }
+
+    return result;
+}
+
+private string GetActiveBatchCaption()
+{
+    if (_activeBatch is null) 
+        return string.Empty;
+
+    var prod = rows.FirstOrDefault(r => r.VersionId == _activeBatch.VersionId);
+
+    var productName = prod?.ProductName ?? "";
+    var productCode = prod?.ProductCode ?? "";
+
+    // cik paredzēts (no paša batch)
+    var planned = _activeBatch.Planned;
+
+    return $"{productName} ({productCode}) — Batch: {_activeBatch.BatchCode} — Planned: {planned}";
+}
+
+
+private void OnBatchSelecting(RowSelectingEventArgs<BatchLine> args)
+{
+    Console.WriteLine("[OnBatchSelecting] >>> Event received");
+}
+
+private int GetPlannedQuantity(PartLine part)
+{
+    if (part is null || _activeBatch is null)
+        return 0;
+
+    // JA Assembly ir pabeigts (>0), Finishing drīkst ņemt TIKAI no Assembly
+    var baseQty = _activeBatch.Assembly > 0
+        ? _activeBatch.Assembly
+        : _activeBatch.Planned;
+
+    return part.Quantity * baseQty;
+}
+
+
+
+/// atzīmētās detaļas Detailed sarakstā (pēc BatchId + ProductToPartId)
+private readonly HashSet<string> _selectedPartKeys = new();
+// ↓ pievieno šo:
+private readonly HashSet<string> _lockedPartKeys = new(); 
+
+private string GetPartSelectionKey(PartLine part)
+{
+    if (part is null || _activeBatch is null)
+        return string.Empty;
+
+    // unikāla atslēga konkrētajai partijai + detaļai
+    return $"{_activeBatch.BatchId}:{part.ProductToPartId}";
+}
+
+
+private bool IsPartSelected(PartLine part)
+{
+    if (part is null || _activeBatch is null)
+        return false;
+
+    var key = GetPartSelectionKey(part);
+    return _lockedPartKeys.Contains(key);
+}
+
+private async Task OnIconClicked(PartLine part)
+{
+    if (part is null || _activeBatch is null)
+        return;
+
+    var key = GetPartSelectionKey(part);
+    if (string.IsNullOrEmpty(key))
+        return;
+
+    // ja jau ir fiksēts (zaļš) – neko nedaram
+    if (_lockedPartKeys.Contains(key))
+        return;
+
+    // Jautājuma logs
+    var ok = await JS.InvokeAsync<bool>("confirm", "Gatavs?");
+    if (!ok)
+        return;
+
+    // API izsaukums uz /api/tasks/activate-part
+    var dto = new ActivatePartDto
+    {
+        BatchId = _activeBatch.BatchId,
+        ProductToPartId = part.ProductToPartId
+    };
+
+    try
+    {
+        var resp = await Http.PostAsJsonAsync(
+            "http://localhost:5270/api/tasks/activate-part",
+            dto);
+
+        if (resp.IsSuccessStatusCode)
+        {
+            // atzīmējam kā aktivētu – gan vizuāli (ikona), gan Tasks pogai
+            _selectedPartKeys.Add(key);
+            _lockedPartKeys.Add(key);
+        }
+        else
+        {
+            Console.WriteLine("[OnIconClicked] API error: " + resp.StatusCode);
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("[OnIconClicked] exception: " + ex.Message);
+    }
+
+    await InvokeAsync(StateHasChanged);
+}
+
+private async Task OnDetailCheckboxChanged(PartLine part, ChangeEventArgs e)
+{
+    if (part is null || _activeBatch is null)
+        return;
+
+    var isChecked =
+        e.Value is bool b
+            ? b
+            : bool.TryParse(e.Value?.ToString(), out var parsed) && parsed;
+
+    var key = GetPartSelectionKey(part);
+    if (string.IsNullOrEmpty(key))
+        return;
+
+    var wasSelected = _selectedPartKeys.Contains(key);
+
+    // 1) Ja mēģina noņemt ķeksi jau aktivētai detaļai -> neatļaujam, atlēcam atpakaļ
+    if (!isChecked && wasSelected)
+    {
+        await InvokeAsync(StateHasChanged);
+        return;
+    }
+
+    // 2) Ja mēģina ielikt ķeksi (nebija atzīmēts)
+    if (isChecked && !wasSelected)
+    {
+        var ok = await JS.InvokeAsync<bool>("confirm", "Gatavs?");
+        if (!ok)
+        {
+            // lietotājs nospieda Cancel/No -> atgriežam ķeksi atpakaļ “neatzīmēts”
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        // Apstiprināja -> sūtām uz API /activate-part
+        var dto = new ActivatePartDto
+        {
+            BatchId = _activeBatch.BatchId,
+            ProductToPartId = part.ProductToPartId
+        };
+
+        try
+        {
+            var resp = await Http.PostAsJsonAsync(
+                "http://localhost:5270/api/tasks/activate-part",
+                dto);
+
+            if (resp.IsSuccessStatusCode)
+            {
+                // no šī brīža šī batch+detaļa ir “fiksēta”
+                _selectedPartKeys.Add(key);
+            }
+            else
+            {
+                Console.WriteLine("[OnDetailCheckboxChanged] API error: " + resp.StatusCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("[OnDetailCheckboxChanged] exception: " + ex.Message);
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+}
+
+
+// Popup stāvoklis
+private bool _isTaskDialogVisible = false;
+
+// Kura detaļa šobrīd ir izvēlēta Tasks popupam
+private PartLine? _selectedPartForTasks;
+
+// Soļi izvēlētajai detaļai (lasām no _stepsByPart)
+private IEnumerable<StepLine> GetStepsForSelectedPart()
+{
+    if (_selectedPartForTasks is null)
+        return Enumerable.Empty<StepLine>();
+
+    return _stepsByPart.TryGetValue(_selectedPartForTasks.ProductToPartId, out var list)
+        ? list
+        : Enumerable.Empty<StepLine>();
+}
+
+// JĀBŪT:
+private IEnumerable<StepLine> GetStepRowsForDialog()
+{
+    return GetStepsForSelectedPart();
+}
+
+private async void OnDetailedRowButtonClick(PartLine part)
+{
+    if (part is null || _activeBatch is null)
+        return;
+
+    _selectedPartForTasks = part;
+    _isTaskDialogVisible = true;
+
+    Console.WriteLine($"[OnDetailedRowButtonClick] Batch={_activeBatch.BatchCode}, Part={part.TopPartCode} ({part.ProductToPartId})");
+
+    await InvokeAsync(StateHasChanged);
+}
+
+private void CloseTaskDialog()
+{
+    _isTaskDialogVisible = false;
+}
+
+private async Task OnStepsDialogSave(IEnumerable<StepLine> steps)
+{
+    // Šeit NĀKAMAJĀ solī liksim API izsaukumu uz /api/tasks/update-steps
+    // pagaidām tikai debug izdrukai:
+    foreach (var s in steps)
+    {
+        Console.WriteLine($"[OnStepsDialogSave] StepId={s.Id}, Priority={s.Tasks_Priority}, Assigned_To={s.Assigned_To}");
+    }
+
+    await InvokeAsync(StateHasChanged);
+}
+
+private async Task OnStepsDialogSave(List<StepLine> updatedSteps)
+{
+    if (updatedSteps == null || updatedSteps.Count == 0)
+        return;
+
+    // sagatavo DTO sarakstu API pieprasījumam
+    var dtoList = updatedSteps
+        .Select(s => new UpdateStepDto
+        {
+            TaskId = s.TaskId,
+            Tasks_Priority = s.Tasks_Priority,
+            Assigned_To = s.Assigned_To
+            
+        })
+        .ToList();
+
+    try
+    {
+        var response = await Http.PostAsJsonAsync(
+            "http://localhost:5270/api/tasks/update-steps",
+            dtoList
+        );
+
+if (response.IsSuccessStatusCode && _activeBatch is not null)
+{
+    // 🔥 PĀRLĀDĒJAM AKTĪVO BATCH NO DB
+    var list = await Http.GetFromJsonAsync<List<BatchLine>>(
+        $"http://localhost:5270/api/batches/by-version?versionId={_activeBatch.VersionId}&batch_type=1"
+    ) ?? new();
+
+    var fresh = list.FirstOrDefault(b => b.BatchProductId == _activeBatch.BatchProductId);
+    if (fresh is not null)
+    {
+        _activeBatch.Assembly = fresh.Assembly;
+        _activeBatch.Detailed = fresh.Detailed;
+        _activeBatch.Done     = fresh.Done;
+        _activeBatch.Planned  = fresh.Planned;
+    }
+
+    // 🔥 TAGAD jau Assembly > 0 → Finishing Planned parādīsies
+    await RefreshActiveBatchAsync();
+}
+
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("[OnStepsDialogSave] exception: " + ex.Message);
+    }
+
+    // aizver popupu
+    CloseTaskDialog();
+}
+
+private async Task RefreshActiveBatchAsync()
+{
+    if (_activeBatch is null)
+        return;
+
+    await ReloadActiveBatchFromServerAsync(); // ✅ šis salabo “0” pēc Assembly finish
+
+// 0) pārlādējam aktīvās partijas rindu (Assembly/Done u.c.) no /api/batches/by-version
+var v = _activeBatch.VersionId;
+var url = $"http://localhost:5270/api/batches/by-version?versionId={v}&batch_type=1";
+var list = await Http.GetFromJsonAsync<List<BatchLine>>(url) ?? new();
+
+_byVersion[v] = list;
+
+// atjaunojam pašu _activeBatch no BatchProductId
+var updated = list.FirstOrDefault(x => x.BatchProductId == _activeBatch.BatchProductId);
+if (updated is not null)
+    _activeBatch = updated;
+
+
+    await LoadFinishingForActiveBatchAsync();
+    await LoadDetailedSummaryForActiveBatchAsync();   
+    await LoadFinishingWavesForActiveBatchAsync();
+
+    await InvokeAsync(StateHasChanged);
+}
+
+
+
+
+public sealed class UpdateStepDto
+{
+    public int TaskId { get; set; }
+    public bool? Tasks_Priority { get; set; }
+    public int? Assigned_To { get; set; }
+}
+
+public sealed class ActivatePartDto
+{
+    public int BatchId { get; set; }
+    public int ProductToPartId { get; set; }
+}
+
+// Finishing daudzumi pa Batch + Part
+private readonly Dictionary<string, int> _finishingQtyByKey = new();
+
+// Kopsumma: cik produktu jau nosūtīts uz Finishing konkrētajai partijai (BatchId)
+private readonly Dictionary<int, int> _finishingTotalByBatchId = new();
+
+// DTO atbilst backend /api/stockmovements/finishing-summary-by-batch
+private sealed class FinishingSummaryDto
+{
+    public int BatchProductId { get; set; }
+    public int Planned { get; set; }
+    public int SentToFinishing { get; set; }
+    public int Remaining { get; set; }
+}
+
+// Ielasa no DB kopējo Finishing apjomu šai partijai
+private async Task LoadFinishingForActiveBatchAsync()
+{
+    if (_activeBatch is null)
+        return;
+
+    var batchId = _activeBatch.BatchId;
+
+    try
+    {
+        var url = $"http://localhost:5270/api/stockmovements/finishing-summary-by-batch?batchId={batchId}";
+        var list = await Http.GetFromJsonAsync<List<FinishingSummaryDto>>(url)
+                   ?? new List<FinishingSummaryDto>();
+
+        // cik produktu kopā jau ir aizsūtīts uz Finishing šai partijai
+        var totalProducts = list.Sum(x => x.SentToFinishing);
+
+        _finishingTotalByBatchId[batchId] = totalProducts;
+
+        Console.WriteLine($"[LoadFinishingForActiveBatchAsync] BatchId={batchId}, SentProducts={totalProducts}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine("[LoadFinishingForActiveBatchAsync] ERROR: " + ex.Message);
+    }
+}
+
+
+// Cik daudz DRĪKST aiziet uz Finishing šai detaļai.
+// Pagaidām piemēram – tas pats, kas Planned (ja tev ir reāls Assembly daudzums - vari aizvietot loģiku).
+private int GetAssemblyQtyForPart(PartLine part)
+{
+    return GetPlannedQuantity(part);  // vai te ieliec savu Assembly loģiku
+}
+
+// Paņem pašreizējo Finishing ievadīto daudzumu
+private int GetFinishingQty(PartLine part)
+{
+    var key = GetPartSelectionKey(part);
+    return !string.IsNullOrEmpty(key) && _finishingQtyByKey.TryGetValue(key, out var val)
+        ? val
+        : 0;
+}
+
+// Apstrādā izmaiņas ievades laukā
+private async Task OnFinishingQtyChanged(PartLine part, ChangeEventArgs e)
+{
+    if (part is null || _activeBatch is null)
+        return;
+
+    var key = GetPartSelectionKey(part);
+    if (string.IsNullOrEmpty(key))
+        return;
+
+    if (!int.TryParse(e.Value?.ToString(), out var newValue))
+        newValue = 0;
+
+    var max = GetAssemblyQtyForPart(part);
+
+    if (newValue > max)
+        newValue = max;
+    if (newValue < 0)
+        newValue = 0;
+
+    _finishingQtyByKey[key] = newValue;
+
+    Console.WriteLine($"[FinishingQty] Batch={_activeBatch.BatchId}, Part={part.ProductToPartId}, Qty={newValue}");
+
+    await InvokeAsync(StateHasChanged);
+}
+
+private async Task OnFinishingEditClick(PartLine part)
+{
+    if (part is null || _activeBatch is null)
+        return;
+
+    _finishingPart = part;
+
+    var batchId         = _activeBatch.BatchId;
+    var plannedProducts = _activeBatch.Planned;
+
+    // cik produktu jau ir aizsūtīts uz Finishing (no DB kopsavilkuma)
+    var alreadySentProducts = 0;
+    if (_finishingTotalByBatchId.TryGetValue(batchId, out var sent))
+        alreadySentProducts = sent;
+
+    // Info laukam – kopējais plāns (produktos)
+    _finishingDialogPlannedQty = plannedProducts;
+
+    // Ievades laukā piedāvājam atlikušo daudzumu
+    var remainingProducts = plannedProducts - alreadySentProducts;
+    if (remainingProducts < 0) remainingProducts = 0;
+    _finishingDialogQty = remainingProducts;
+
+    // komentārs – kā līdz šim (glabājam pa BatchId:ProductToPartId)
+    var key = GetFinishingSelectionKey(part.ProductToPartId);
+
+    if (!string.IsNullOrEmpty(key) && _finishingCommentByKey.TryGetValue(key, out var existingComment))
+        _finishingDialogComment = existingComment;
+    else
+        _finishingDialogComment = string.Empty;
+
+    _isFinishingDialogOpen = true;
+
+    Console.WriteLine($"[Finishing Edit] Batch={batchId}, Part={part.ProductToPartId}, PlannedProducts={plannedProducts}, AlreadySent={alreadySentProducts}");
+
+    await InvokeAsync(StateHasChanged);
+}
+
+
+
+// Finishing “Labot” popup stāvoklis
+private bool _isFinishingDialogOpen = false;
+private PartLine? _finishingPart;
+
+// Popup laukiem
+private int _finishingDialogPlannedQty;
+private int _finishingDialogQty;
+private string _finishingDialogComment = "";
+
+// Glabājam Finishing qty un komentārus pa (BatchId:ProductToPartId)
+
+private readonly Dictionary<string, string> _finishingCommentByKey = new();
+
+
+private void OnFinishingDialogQtyChanged()
+{
+    // drošībai noturam robežās 0..Planned
+    if (_finishingDialogQty < 0)
+        _finishingDialogQty = 0;
+    if (_finishingDialogQty > _finishingDialogPlannedQty)
+        _finishingDialogQty = _finishingDialogPlannedQty;
+}
+
+private void OnFinishingDialogCancel()
+{
+    _isFinishingDialogOpen = false;
+    _finishingPart = null;
+}
+
+private async Task OnFinishingDialogSave()
+{
+    Console.WriteLine(">>> FINISHING SAVE CLICK");
+
+    
+    if (_finishingPart is null || _activeBatch is null)
+        return;
+
+    var part = _finishingPart;
+    var wave = _finishingWave;
+
+    // 0) vai drīkstam labot jau esošu vilni
+    var canUpdateExisting =
+        wave is not null &&
+        wave.TaskId > 0 &&
+        !wave.StartedAt.HasValue &&
+        wave.Status == 1;
+
+    // 1) MAX = “kopējā bāze” (oriģinālais apjoms) = Assembly + Finishing + Done
+var maxTotal = (_activeBatch.Assembly + _activeBatch.Finishing + _activeBatch.Done) > 0
+    ? (_activeBatch.Assembly + _activeBatch.Finishing + _activeBatch.Done)
+    : _activeBatch.Planned;
+
+
+    // 2) Cik jau aizņem citi viļņi
+    var wavesKey = GetFinishingKey(_activeBatch.BatchProductId, part.ProductToPartId);
+
+    var alreadyOtherWaves = 0;
+    if (_finishingWavesByKey.TryGetValue(wavesKey, out var waves) && waves is not null)
+    {
+        alreadyOtherWaves = waves
+            .Where(x => x.Status != 5)
+            .Where(x => wave is null || x.TaskId != wave.TaskId)
+            .Sum(x => x.FinishingQty);
+    }
+
+    var allowedForThisWave = maxTotal - alreadyOtherWaves;
+    if (allowedForThisWave < 0) allowedForThisWave = 0;
+
+    var newQty = _finishingDialogQty;
+    if (newQty < 0) newQty = 0;
+    if (newQty > allowedForThisWave) newQty = allowedForThisWave;
+
+    // 3) Ja qty sanāk 0:
+    // - esošam vilnim ļaujam saglabāt komentāru (Qty=0 ir atļauts update-finishing-qty pusē)
+    // - jaunam vilnim neko neveidojam (open-finishing nepieņem Qty<=0)
+    if (newQty <= 0)
+    {
+        if (canUpdateExisting)
+        {
+            var upd0 = new UpdateFinishingQtyDto
+            {
+                TaskId  = wave!.TaskId,
+                Qty     = 0,
+                Comment = _finishingDialogComment
+            };
+
+            await Http.PostAsJsonAsync(
+                "http://localhost:5270/api/tasks/update-finishing-qty",
+                upd0);
+        }
+
+        _isFinishingDialogOpen = false;
+        _finishingPart = null;
+        _finishingWave = null;
+        await InvokeAsync(StateHasChanged);
+        return;
+    }
+
+    // 4) EXISTING vilnis → UPDATE
+    if (canUpdateExisting)
+    {
+        var upd = new UpdateFinishingQtyDto
+        {
+            TaskId  = wave!.TaskId,
+            Qty     = newQty,
+            Comment = _finishingDialogComment
+        };
+
+        await Http.PostAsJsonAsync(
+            "http://localhost:5270/api/tasks/update-finishing-qty",
+            upd);
+    }
+    else
+    {
+        // 5) JAUNS vilnis → OPEN
+        var openDto = new OpenFinishingDto
+        {
+            BatchProductId  = _activeBatch.BatchProductId,
+            ProductToPartId = part.ProductToPartId,
+            Qty             = newQty,
+            Comment         = _finishingDialogComment
+        };
+
+        await Http.PostAsJsonAsync(
+            "http://localhost:5270/api/tasks/open-finishing",
+            openDto);
+    }
+
+    // 6) AIZVERAM + REFRESH
+    _isFinishingDialogOpen = false;
+
+    await LoadFinishingForActiveBatchAsync();
+    await LoadFinishingWavesForActiveBatchAsync();
+
+    _finishingPart = null;
+    _finishingWave = null;
+
+    await InvokeAsync(StateHasChanged);
+}
+
+
+
+// Blazor DTO → /api/tasks/open-finishing
+private sealed class OpenFinishingDto
+{
+    // Vairs ne BatchId, bet BatchProductId
+    public int BatchProductId { get; set; }
+    public int ProductToPartId { get; set; }
+
+    // Cik PRODUKTU gab. šajā vilnī sūtām uz Finishing
+    public int Qty { get; set; }
+
+    // Komentārs darbiniekam – ja vajag
+    public string? Comment { get; set; }
+}
+
+
+// Ko sagaidām atpakaļ
+private sealed class OpenFinishingResultDto
+{
+    public int TaskId { get; set; }
+}
+
+
+
+// DTO tikai Blazor → API /api/stockmovements/move
+// Lauku nosaukumi tādi paši kā API MoveRequest modelī.
+private sealed class MoveRequestDto
+{
+    public int Version_ID { get; set; }
+    public string From { get; set; } = string.Empty;
+    public string To { get; set; } = string.Empty;
+    public int Qty { get; set; }
+    public int? Task_ID { get; set; }
+    public DateTime? Created_At { get; set; }
+
+    // JAUNS LAUKS – tas pats, kas dto.Batch_Id API pusē
+    public int? Batch_Id { get; set; }
+}
+
+public sealed class BatchPlannedRow
+{
+    [JsonPropertyName("versionId")]
+    public int VersionId { get; set; }
+
+    [JsonPropertyName("productName")]
+    public string ProductName { get; set; } = "";
+
+    [JsonPropertyName("productCode")]
+    public string ProductCode { get; set; } = "";
+
+    [JsonPropertyName("planned")]
+    public int Planned { get; set; }
+
+    [JsonPropertyName("detailedInProgress")]
+    public int DetailedInProgress { get; set; }
+
+    // 🔹 JAUNS LAUKS – DetailedFinish no /api/batches/list
+    [JsonPropertyName("detailedFinish")]
+    public int DetailedFinish { get; set; }
+
+    // Assembly IN PROGRESS
+    [JsonPropertyName("assembly")]
+    public int Assembly { get; set; }
+
+    // Assembly FINISH (Done)
+    [JsonPropertyName("done")]
+    public int Done { get; set; }
+}
+
+
+// Detailed informācijas kopsavilkums pa (BatchId:ProductToPartId)
+// Detailed informācijas kopsavilkums pa (BatchProductId:ProductToPartId)
+private sealed class DetailedPartSummaryDto
+{
+    [JsonPropertyName("productToPartId")]
+    public int ProductToPartId { get; set; }
+
+    // tas pats, ko sūta API (1 = Detailed, 2 = Assembly, 3 = Finishing)
+    [JsonPropertyName("stepType")]
+    public int StepType { get; set; }
+
+    [JsonPropertyName("startedAt")]
+    public DateTime? StartedAt { get; set; }
+
+    [JsonPropertyName("finishedAt")]
+    public DateTime? FinishedAt { get; set; }
+}
+
+private readonly Dictionary<string, DetailedPartSummaryDto> _detailedSummaryByKey = new();
+
+private readonly Dictionary<string, DetailedPartSummaryDto> _assemblySummaryByKey = new();
+
+private readonly Dictionary<string, DetailedPartSummaryDto> _finishingSummaryByKey = new();
+
+
+private async Task LoadDetailedSummaryForActiveBatchAsync()
+{
+    if (_activeBatch is null)
+    {
+        Console.WriteLine("[LoadDetailedSummary] _activeBatch == null → STOP");
+        return;
+    }
+
+    if (_activeBatch.BatchProductId <= 0)
+    {
+        Console.WriteLine("[LoadDetailedSummary] BatchProductId <= 0 → STOP");
+        return;
+    }
+
+    var bpId = _activeBatch.BatchProductId;
+    Console.WriteLine($"[LoadDetailedSummary] START, BatchProductId={bpId}");
+
+    try
+    {
+        var url = $"http://localhost:5270/api/tasks/detailed-summary-by-batchproduct?batchProductId={bpId}";
+        Console.WriteLine($"[LoadDetailedSummary] GET {url}");
+
+        var list = await Http.GetFromJsonAsync<List<DetailedPartSummaryDto>>(url)
+                   ?? new List<DetailedPartSummaryDto>();
+
+// Notīram visus trīs
+_detailedSummaryByKey.Clear();
+_assemblySummaryByKey.Clear();
+_finishingSummaryByKey.Clear();
+
+foreach (var item in list)
+{
+    var key = $"{bpId}:{item.ProductToPartId}";
+
+    switch (item.StepType)
+    {
+        case 1: // Detailed
+            _detailedSummaryByKey[key] = item;
+            break;
+
+        case 2: // Assembly
+            _assemblySummaryByKey[key] = item;
+            break;
+
+        case 3: // Finishing
+            _finishingSummaryByKey[key] = item;
+            break;
+    }
+}
+
+
+        // DEBUG: izdrukā visas atslēgas, ko ielādējām
+        Console.WriteLine("=== DetailedSummary dictionary ===");
+        foreach (var kvp in _detailedSummaryByKey)
+        {
+            Console.WriteLine(
+                $"[DETAILED] KEY={kvp.Key} -> ProductToPartId={kvp.Value.ProductToPartId}, " +
+                $"Started={kvp.Value.StartedAt}, Finished={kvp.Value.FinishedAt}");
+        }
+
+        Console.WriteLine("=== AssemblySummary dictionary ===");
+        foreach (var kvp in _assemblySummaryByKey)
+        {
+            Console.WriteLine(
+                $"[ASSEMBLY] KEY={kvp.Key} -> ProductToPartId={kvp.Value.ProductToPartId}, " +
+                $"Started={kvp.Value.StartedAt}, Finished={kvp.Value.FinishedAt}");
+        }
+    }
+
+    catch (Exception ex)
+    {
+        Console.WriteLine("[LoadDetailedSummary] ERROR: " + ex.Message);
+    }
+}
+
+
+private string GetSummaryKey(PartLine part)
+{
+    if (part is null || _activeBatch is null)
+        return string.Empty;
+
+    // Detailed summary ir pa BatchProductId
+    return $"{_activeBatch.BatchProductId}:{part.ProductToPartId}";
+}
+
+// Batch labošana no ProductionTasks
+// Batch labošana no ProductionTasks
+private bool _isBatchEditOpen = false;
+private BatchLine? _batchEditDraft;
+
+private void OpenBatchEditDialog(BatchLine line)
+{
+    // veidojam “draftu”, ko padodam dialogam
+    _batchEditDraft = new BatchLine
+    {
+        BatchId        = line.BatchId,
+        BatchCode      = line.BatchCode,
+        BatchProductId = line.BatchProductId,
+        VersionId      = line.VersionId,
+        Planned        = line.Planned,
+        Detailed       = line.Detailed,
+        Assembly       = line.Assembly,
+        Done           = line.Done,
+        Comment        = line.Comment,
+
+        // JAUNUMS: lai popup zinātu, vai drīkst labot daudzumu
+        StartedAt      = line.StartedAt,
+        BatchStatus    = line.BatchStatus
+    };
+
+    _isBatchEditOpen = true;
+}
+
+
+private async Task OnBatchEditSaved(BatchLine updated)
+{
+    if (updated is null)
+        return;
+
+    // 1) Saglabājam DB
+    var dto = new UpdateBatchProductDto
+    {
+        BatchProductId = updated.BatchProductId,
+        PlannedQty     = updated.Planned,
+        Comment        = updated.Comment
+    };
+
+    try
+    {
+        var resp = await Http.PostAsJsonAsync(
+            "http://localhost:5270/api/batches/update-batchproduct",
+            dto);
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            var txt = await resp.Content.ReadAsStringAsync();
+            await JS.InvokeVoidAsync("alert",
+                $"Neizdevās saglabāt partijas datus ({(int)resp.StatusCode}).\n{txt}");
+            return; // nelabojam UI, ja DB neizdevās
+        }
+    }
+    catch (Exception ex)
+    {
+        await JS.InvokeVoidAsync("alert",
+            $"Kļūda saglabājot partijas datus.\n{ex.Message}");
+        return;
+    }
+
+    // 2) 2. līmenis – lokāli atjaunojam konkrēto batch rindu
+    if (_byVersion.TryGetValue(updated.VersionId, out var list))
+    {
+        var original = list.FirstOrDefault(b => b.BatchProductId == updated.BatchProductId);
+        if (original is not null)
+        {
+            original.Planned     = updated.Planned;
+            original.Comment     = updated.Comment;
+            original.StartedAt   = updated.StartedAt;
+            original.BatchStatus = updated.BatchStatus;
+        }
+    }
+
+    // 3) 1. līmenis – pārrēķinam PLANNED kopsummu šai versijai
+    var v = updated.VersionId;
+    if (v > 0 && _byVersion.TryGetValue(v, out var batchesForVersion))
+    {
+        var newPlanned = batchesForVersion.Sum(b => b.Planned);
+
+        var prodRow = rows.FirstOrDefault(r => r.VersionId == v);
+        if (prodRow is not null)
+            prodRow.Planned = newPlanned;
+    }
+
+    _isBatchEditOpen = false;
+    _batchEditDraft  = null;
+
+    await InvokeAsync(StateHasChanged);
+}
+
+private sealed class UpdateBatchProductDto
+{
+    public int BatchProductId { get; set; }
+    public int PlannedQty { get; set; }
+    public string? Comment { get; set; }
+}
+
+public sealed class FinishingWaveRow
+{
+    public int TaskId { get; set; }
+    public int Status { get; set; }
+    public int Planned { get; set; }
+    public int FinishingQty { get; set; }
+    public DateTime? StartedAt { get; set; }
+    public DateTime? FinishedAt { get; set; }
+
+    [JsonPropertyName("comment")]
+    public string? Comment { get; set; }
+    public int ProductToPartId { get; set; }
+    public string PartName { get; set; } = "";
+}
+
+
+private readonly Dictionary<string, List<FinishingWaveRow>> _finishingWavesByKey = new();
+
+private string GetFinishingKey(int batchProductId, int productToPartId)
+    => $"{batchProductId}:{productToPartId}";
+
+private async Task LoadFinishingWavesAsync(PartLine part)
+{
+    if (_activeBatch is null) return;
+
+    var bpId = _activeBatch.BatchProductId;
+    var key = GetFinishingKey(bpId, part.ProductToPartId);
+
+    var url =
+        $"http://localhost:5270/api/tasks/finishing-waves?batchProductId={bpId}&productToPartId={part.ProductToPartId}";
+    var rows = await Http.GetFromJsonAsync<List<FinishingWaveRow>>(url) ?? new();
+
+    // 1) piesienam UI laukus + Finishing kolonnai vienmēr rādam Planned (Qty_Done) visiem DB viļņiem
+    foreach (var r in rows)
+    {
+        r.ProductToPartId = part.ProductToPartId;
+        r.PartName = part.TopPartName;
+
+        // ✅ rādam uzreiz arī status=1 (pēc "Saglabāt")
+        // Planned šeit ir taska Qty_Done (vilņa apjoms)
+        r.FinishingQty = r.Planned;
+    }
+
+    // 2) noņemam vecu "atlikuma" rindu (ja gadās)
+    rows.RemoveAll(x => x.Status == 5);
+
+    // 3) cik jau ir sadalīts viļņos (status 1/2/3)
+    var doneTotal = rows
+        .Where(x => x.Status == 1 || x.Status == 2 || x.Status == 3)
+        .Sum(x => x.Planned);
+
+    // 4) MAX: ņemam “kopējo bāzi” = Assembly + Finishing + Done (tas ir oriģinālais apjoms)
+var maxTotal = (_activeBatch.Assembly + _activeBatch.Finishing + _activeBatch.Done) > 0
+    ? (_activeBatch.Assembly + _activeBatch.Finishing + _activeBatch.Done)
+    : _activeBatch.Planned;
+
+    var remainingQty = maxTotal - doneTotal;
+    if (remainingQty < 0) remainingQty = 0;
+
+    // 5) atlikuma rinda tikai ja tiešām ir atlikums
+    if (remainingQty > 0)
+    {
+        rows.Add(new FinishingWaveRow
+        {
+            TaskId = 0,
+            Status = 5,
+            ProductToPartId = part.ProductToPartId,
+            PartName = part.TopPartName,
+            Planned = remainingQty,
+            FinishingQty = 0
+        });
+    }
+
+    _finishingWavesByKey[key] = rows;
+}
+
+
+private IEnumerable<FinishingWaveRow> GetFinishingRowsForActiveBatch()
+{
+    if (_activeBatch is null) return Enumerable.Empty<FinishingWaveRow>();
+
+    var parts = GetFinishingPartsForActiveBatch()
+    .Where(p => !p.IsExtraFinishingRow)
+    .ToList();  // tikai lai zinātu, kurām detaļām ir finishing solis
+    var allRows = new List<FinishingWaveRow>();
+
+    foreach (var part in parts)
+    {
+        var key = GetFinishingKey(_activeBatch.BatchProductId, part.ProductToPartId);
+
+        if (_finishingWavesByKey.TryGetValue(key, out var waves))
+        {
+            // rādam tieši DB “vilņus” (status 1/2/3/5)
+            allRows.AddRange(waves);
+        }
+   else
+{
+    allRows.Add(new FinishingWaveRow
+    {
+        TaskId = 0,
+        Status = 5,
+        ProductToPartId = part.ProductToPartId,
+        PartName = part.TopPartName,
+
+        Planned = (_activeBatch.Assembly > 0)
+            ? _activeBatch.Assembly
+            : _activeBatch.Planned,
+
+        FinishingQty = 0,
+        StartedAt = null,
+        FinishedAt = null,
+        Comment = null
+    });
+}
+
+    }
+
+    return allRows;
+}
+
+private FinishingWaveRow? _finishingWave;
+
+
+private async Task OnFinishingEditClickWave(FinishingWaveRow row)
+{
+    if (_activeBatch is null) return;
+
+    _finishingWave = row;
+
+    _finishingPart = GetPartsForActiveBatch()
+        .FirstOrDefault(p => p.ProductToPartId == row.ProductToPartId);
+
+   // MAX = Assembly, ja ir; citādi Planned (tāpat kā OnFinishingDialogSave())
+var maxAllowed = (_activeBatch.Assembly + _activeBatch.Finishing + _activeBatch.Done) > 0
+    ? (_activeBatch.Assembly + _activeBatch.Finishing + _activeBatch.Done)
+    : _activeBatch.Planned;
+
+
+    // Ja klikšķis ir uz "atlikuma" rindu (Status=5) -> tās Planned ir remaining
+    // Ja klikšķis ir uz DB vilni, kur Planned var būt 0 (jo Qty_Done vēl 0) -> lietojam maxAllowed
+    int plannedForDialog;
+
+    if (row.Status == 5)
+        plannedForDialog = row.Planned;             // remaining
+    else
+        plannedForDialog = row.Planned > 0 ? row.Planned : maxAllowed;   // fallback
+
+
+    // galīgais max popupā
+    _finishingDialogPlannedQty = Math.Min(plannedForDialog, maxAllowed);
+
+    // default ievade
+    _finishingDialogQty = _finishingDialogPlannedQty;
+
+    _finishingDialogComment = row.Comment ?? string.Empty;
+
+    _isFinishingDialogOpen = true;
+    await InvokeAsync(StateHasChanged);
+}
+
+private async Task LoadFinishingWavesForActiveBatchAsync()
+{
+    if (_activeBatch is null) return;
+
+    await ReloadActiveBatchFromServerAsync(); // ✅ ŠIS IR LABOJUMS (obligāts)
+
+    _finishingWavesByKey.Clear();
+
+    var parts = GetFinishingPartsForActiveBatch()
+        .Where(p => !p.IsExtraFinishingRow)
+        .ToList();
+
+    foreach (var part in parts)
+    {
+        await LoadFinishingWavesAsync(part);
+
+        var key = GetFinishingKey(_activeBatch.BatchProductId, part.ProductToPartId);
+
+        if (!_finishingWavesByKey.ContainsKey(key)
+            && _activeBatch.Assembly > 0)
+        {
+            _finishingWavesByKey[key] = new List<FinishingWaveRow>
+            {
+                new FinishingWaveRow
+                {
+                    TaskId = 0,
+                    Status = 5,
+                    ProductToPartId = part.ProductToPartId,
+                    PartName = part.TopPartName,
+                   Planned = (_activeBatch.Assembly + _activeBatch.Finishing + _activeBatch.Done) > 0
+                    ? (_activeBatch.Assembly + _activeBatch.Finishing + _activeBatch.Done)
+                    : _activeBatch.Planned,
+                    FinishingQty = 0,
+                    StartedAt = null,
+                    FinishedAt = null,
+                    Comment = null
+                }
+            };
+        }
+    }
+
+    await InvokeAsync(StateHasChanged);
+}
+
+
+[Parameter] public EventCallback OnTasksFinished { get; set; }
+
+private async Task ReloadActiveBatchFromServerAsync()
+{
+    if (_activeBatch is null) return;
+
+    var v = _activeBatch.VersionId;
+    if (v <= 0 && _versionByBatchId.TryGetValue(_activeBatch.BatchId, out var mappedV))
+        v = mappedV;
+
+    if (v <= 0) return;
+
+    var url = $"http://localhost:5270/api/batches/by-version?versionId={v}&batch_type=1";
+    var list = await Http.GetFromJsonAsync<List<BatchLine>>(url) ?? new();
+
+    foreach (var b in list)
+        _versionByBatchId[b.BatchId] = v;
+
+    _byVersion[v] = list;
+
+    // svarīgākais: paņemam svaigo rindu tieši šim BatchProductId
+    var fresh = list.FirstOrDefault(x => x.BatchProductId == _activeBatch.BatchProductId);
+    if (fresh is not null)
+        _activeBatch = fresh;
+}
+
+private string GetFinishingSelectionKey(int productToPartId)
+{
+    if (_activeBatch is null) return string.Empty;
+    return $"{_activeBatch.BatchProductId}:{productToPartId}";
+}
+
+private sealed class UpdateFinishingQtyDto
+{
+    public int TaskId { get; set; }
+    public int Qty { get; set; }
+    public string? Comment { get; set; }
+}
+
+private sealed class StockActiveDto
+{
+    [JsonPropertyName("stock")]
+    public int Stock { get; set; }
+}
+
+
+private static bool IsBatchCompleted(BatchLine b)
+{
+    if (b is null) return false;
+
+    var completedByQty = b.Planned > 0 && b.Done >= b.Planned;
+
+    // “bija process” = kaut kas bija procesā vai vismaz startedAt
+    var hadProcess =
+        b.StartedAt.HasValue ||
+        b.Detailed > 0 ||
+        b.Assembly > 0 ||
+        b.Finishing > 0;
+
+    return completedByQty && hadProcess;
+}
+
+
+private IEnumerable<BatchLine> ApplyCompletedFilters(IEnumerable<BatchLine> list)
+{
+    if (list is null) return Enumerable.Empty<BatchLine>();
+
+    var q = list.AsEnumerable();
+
+    // tikai pabeigtie
+    q = q.Where(IsBatchCompleted);
+
+    // pēdējās X dienas (balstāmies uz StartedAt, ja tāds ir; ja nav — atstājam)
+    if (_completedDays > 0)
+    {
+        var cutoff = DateTime.Now.AddDays(-_completedDays);
+        q = q.Where(b => !b.StartedAt.HasValue || b.StartedAt.Value >= cutoff);
+    }
+
+    // meklēt pēc batch koda / komentāra
+    if (!string.IsNullOrWhiteSpace(_completedSearch))
+    {
+        var s = _completedSearch.Trim();
+        q = q.Where(b =>
+            (!string.IsNullOrEmpty(b.BatchCode) && b.BatchCode.Contains(s, StringComparison.OrdinalIgnoreCase)) ||
+            (!string.IsNullOrEmpty(b.Comment) && b.Comment.Contains(s, StringComparison.OrdinalIgnoreCase))
+        );
+    }
+
+    // pēdējie N (sakārto pēc BatchId desc)
+    q = q.OrderByDescending(b => b.BatchId).Take(Math.Max(_completedTake, 5));
+
+    return q;
+}
+
+private void RebuildCategories()
+{
+    // ņemam tikai tās versijas, kurām pēc izvēlētā režīma (pabeigtie / nepabeigtie) ir vismaz 1 batch
+    var visibleVersionIds = _byVersion
+        .Where(kvp => kvp.Key > 0 && kvp.Value != null)
+        .Where(kvp =>
+            kvp.Value.Any(b => _showCompleted ? IsBatchCompleted(b) : !IsBatchCompleted(b)))
+        .Select(kvp => kvp.Key)
+        .Distinct()
+        .ToList();
+
+    // atrast produkta info pa VersionId (no products/list)
+    var productByVersion = rows
+        .Where(r => r.VersionId is > 0)
+        .GroupBy(r => r.VersionId!.Value)
+        .ToDictionary(g => g.Key, g => g.First());
+
+    var visibleProducts = new List<ProductRow>();
+
+    foreach (var v in visibleVersionIds)
+    {
+        if (productByVersion.TryGetValue(v, out var prod))
+            visibleProducts.Add(prod);
+        else
+        {
+            // ja veca versija nav products/list – ieliekam placeholder
+            visibleProducts.Add(new ProductRow
+            {
+                Id = 0,
+                VersionId = v,
+                ProductName = $"(Versija #{v})",
+                ProductCode = "",
+                CategoryName = "(Nav kategorijas)",
+                Planned = 0,
+                InProgress = 0
+            });
+        }
+    }
+
+    categoriesFiltered = visibleProducts
+        .Where(r => !string.IsNullOrWhiteSpace(r.CategoryName))
+        .GroupBy(r => (r.CategoryName ?? "").Trim(), StringComparer.OrdinalIgnoreCase)
+        .OrderBy(g => g.Key)
+        .Select(g => new CategoryRow
+        {
+            CategoryName = g.Key,
+            Products = g
+                .GroupBy(x => (x.ProductCode ?? "").Trim(), StringComparer.OrdinalIgnoreCase)
+                .Select(pg => new ProductGroupRow
+                {
+                    ProductCode = pg.First().ProductCode,
+                    ProductName = pg.First().ProductName,
+                    CategoryName = pg.First().CategoryName,
+                    Planned = pg.Sum(x => x.Planned),
+                    InProgress = pg.Sum(x => x.InProgress),
+                    VersionIds = pg.Where(x => x.VersionId is > 0)
+                                   .Select(x => x.VersionId!.Value)
+                                   .Distinct()
+                                   .ToList()
+                })
+                .OrderBy(x => x.ProductName)
+                .ToList()
+        })
+        .ToList();
+}
+
+// productCode -> latest VersionId
+private readonly Dictionary<string, int> _latestVersionByCode = new(StringComparer.OrdinalIgnoreCase);
+
+private void BuildLatestVersionByCode()
+{
+    _latestVersionByCode.Clear();
+
+    foreach (var g in rows
+        .Where(r => !string.IsNullOrWhiteSpace(r.ProductCode) && r.VersionId is > 0)
+        .GroupBy(r => r.ProductCode.Trim(), StringComparer.OrdinalIgnoreCase))
+    {
+        _latestVersionByCode[g.Key] = g.Max(x => x.VersionId!.Value);
+    }
+}
+
+// VersionId -> VersionName (ātrai piesaistei batchiem)
+private readonly Dictionary<int, string> _versionNameById = new();
+
+private void BuildVersionNameIndex()
+{
+    _versionNameById.Clear();
+
+    foreach (var r in rows)
+    {
+        if (r.VersionId is > 0 && !string.IsNullOrWhiteSpace(r.VersionName))
+            _versionNameById[r.VersionId!.Value] = r.VersionName!;
+    }
+}
+
+private bool IsLatestVersionBatch(BatchLine b)
+{
+    // atrod productCode šim batch (ņemam no rows pēc VersionId)
+    var prodCode = rows.FirstOrDefault(r => r.VersionId == b.VersionId)?.ProductCode;
+    if (string.IsNullOrWhiteSpace(prodCode)) return true; // ja nevar noteikt — neatzīmējam kā vecu
+
+    return _latestVersionByCode.TryGetValue(prodCode.Trim(), out var latest)
+        && b.VersionId == latest;
+}
+
+private void AttachVersionNameToBatches(int versionId, List<BatchLine> list)
+{
+    if (list is null || list.Count == 0) return;
+
+    var vName = rows
+        .FirstOrDefault(r => r.VersionId == versionId)
+        ?.VersionName;
+
+    if (string.IsNullOrWhiteSpace(vName)) return;
+
+    foreach (var b in list)
+        b.VersionName = vName;
+}
+
+   
+}
+
+
+

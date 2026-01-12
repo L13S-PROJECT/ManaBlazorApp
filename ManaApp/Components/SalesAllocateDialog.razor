@@ -1,0 +1,148 @@
+@using ManaApp.Models
+
+<div class="modal-backdrop">
+    <div class="modal-window">
+
+        <h3>Pārdot</h3>
+            
+        <div style="margin-bottom:12px;">
+            <b>@ProductName</b>
+            @if (!string.IsNullOrWhiteSpace(VersionName))
+            {
+                <span> (@VersionName)</span>
+            }
+        </div>
+
+       <div>
+        <table class="popup-table">
+    <thead>
+        <tr>
+            <th>Batch</th>
+            <th>Gatavi (STOCK)</th>
+            <th>Pārdot (STOCK)</th>
+            <th>Sakompl. (ASSEMBLY)</th>
+            <th>Pārdot (ASSEMBLY)</th>
+        </tr>
+    </thead>
+    <tbody>
+@foreach (var b in Batches)
+{
+    <tr>
+        <td>@b.BatchCode</td>
+
+        <td>@b.StockQty</td>
+        <td>
+            <input type="number"
+                   min="0"
+                   max="@b.StockQty"
+                   @bind="b.SellFromStock"
+                   class="qty-input" />
+        </td>
+
+        <td>@b.AssemblyQty</td>
+        <td>
+            <input type="number"
+                   min="0"
+                   max="@b.AssemblyQty"
+                   @bind="b.SellFromAssembly"
+                   class="qty-input" />
+        </td>
+    </tr>
+}
+</tbody>
+
+</table>
+</div>
+
+        <div style="margin-top:16px;">
+            <!-- Šeit nākamajos soļos būs batch tabula -->
+        </div>
+
+        <button class="panel-btn"
+                @onclick="Cancel">
+            Atcelt
+        </button>
+
+
+
+        <button class="panel-btn primary"
+                disabled="@( !HasAnyQty )"
+                @onclick="OnOk">
+            OK
+        </button>
+
+        </div>
+
+    </div>
+
+@code {
+    [Parameter] public string ProductName { get; set; } = "";
+    [Parameter] public string? VersionName { get; set; }
+    [Parameter] public int ProductId { get; set; }
+
+[Parameter]
+public List<BatchRow> Batches { get; set; } = new();
+
+public sealed class BatchRow
+
+{
+    public string BatchCode { get; set; } = "";
+    public int StockQty { get; set; }
+    public int AssemblyQty { get; set; }
+
+    public int SellFromStock { get; set; }
+    public int SellFromAssembly { get; set; }
+}
+
+private bool HasAnyQty =>
+    Batches.Any(b => b.SellFromStock > 0 || b.SellFromAssembly > 0);
+
+private async Task Cancel()
+{
+    foreach (var b in Batches)
+    {
+        b.SellFromStock = 0;
+        b.SellFromAssembly = 0;
+    }
+
+    if (OnCancel.HasDelegate)
+        await OnCancel.InvokeAsync();
+}
+
+
+public class SellSelection
+{
+    public string BatchCode { get; set; } = "";
+    public int FromStock { get; set; }
+    public int FromAssembly { get; set; }
+}
+
+private List<SellSelection> result = new();
+
+[Parameter] public EventCallback OnCancel { get; set; }
+
+public sealed class BatchQty
+{
+    public int BatchProductId { get; set; }
+    public int Qty { get; set; }
+}
+
+[Parameter]
+public EventCallback<SalesAllocateResult> OnConfirm { get; set; }
+
+
+private async Task OnOk()
+{
+    var result = new SalesAllocateResult
+    {
+        ProductId = ProductId,
+        ProductName = ProductName,
+        StockTotal = Batches.Sum(b => b.SellFromStock),
+        AssemblyTotal = Batches.Sum(b => b.SellFromAssembly)
+    };
+
+    await OnConfirm.InvokeAsync(result);
+}
+
+
+}

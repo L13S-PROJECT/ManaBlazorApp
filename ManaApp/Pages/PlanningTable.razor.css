@@ -1,0 +1,401 @@
+.excel-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.excel-table th,
+.excel-table td {
+    border: 1px solid #dcdcdc;
+    padding: 4px 6px;
+    text-align: center;
+    color: #000;          /* melni burti */
+    opacity: 1;           /* noņem pelēcīgumu */
+}
+
+.excel-table th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+
+    background: #4b5563;
+    color: white;
+}
+
+.excel-table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+
+/* KATEGORIJU ATDALĪTĀJS – KLUSS, ŠAURS */
+.excel-category td {
+    padding: 2px 6px;          /* ⬅️ ļoti šaura rinda */
+    height: 20px;
+
+    background: #f1f3f5;       /* ⬅️ ļoti viegls pelēks */
+    color: #374151;            /* tumši pelēks, ne melns */
+    font-weight: 500;          /* nevis 600 */
+
+    text-align: left;
+}
+
+
+.excel-row td:first-child {
+    text-align: left;
+}
+
+.planned-btn {
+    width: 22px;
+    height: 22px;
+    border: 1px solid #444;
+    background: #fff;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.planned-btn:hover {
+    background: #e5e7eb;
+}
+
+.excel-detail {
+    background: #fafafa;
+    font-size: 12px;
+}
+
+.detail-name {
+    padding-left: 0px;     /* iespiesta iekšā zem vecāka */
+    
+    align-items: center;
+    gap: 6px;
+    box-sizing: border-box; /* SVARĪGI */
+}
+
+.detail-version {
+    opacity: 0.7;
+    margin-left: 6px;
+}
+
+.planned-btn.minus {
+    border-color: #991b1b;
+    color: #991b1b;
+}
+
+.planned-btn:focus,
+.planned-btn:focus-visible {
+    outline: none;
+    box-shadow: none;
+}
+
+.planned-btn.minus:focus,
+.planned-btn.minus:focus-visible {
+    outline: none;
+    box-shadow: none;
+}
+
+
+.planned-value {
+    position: static;
+}
+
+.name-cell.expandable {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+
+.chevron {
+    width: 14px;
+    text-align: center;
+    font-size: 12px;
+    color: #333;
+}
+
+.product-name {
+    color: #000;
+}
+
+.instock-cell {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+
+    white-space: nowrap;
+}
+
+.instock-value {
+    min-width: 24px;
+    text-align: right;
+}
+
+.instock-btn.minus {
+    width: 22px;
+    height: 22px;
+    border: 1px solid #999;
+    background: #fff;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.instock-btn.minus:hover {
+    background: #f2f2f2;
+}
+
+.planned-cell {
+    background: transparent;
+    border: none;              /* noņem pelēko rāmi */
+    padding: 4px 6px;
+    white-space: nowrap;
+}
+
+.planned-wrap {
+    display: inline-flex;      /* ← ŠEIT flex, nevis uz td */
+    align-items: center;
+    gap: 6px;
+}
+
+.planned-value {
+    min-width: 20px;
+    text-align: right;
+    font-weight: 500;
+    color: #000;
+}
+
+/* KOMPAKTAS parastās rindas */
+.excel-row td {
+    padding-top: 2px;
+    padding-bottom: 2px;
+    height: 26px;
+}
+
+/* KOMPAKTAS detail (versiju) rindas */
+.excel-detail td {
+    padding-top: 0;
+    padding-bottom: 0;
+
+    font-size: 11px;
+    line-height: 14px;        /* ⬅️ šeit rodas “šaurāka rinda” */
+
+    vertical-align: middle;
+}
+
+/* === ATVĒRTA GALVENĀ RINDA === */
+.excel-row.is-open {
+    background: #e9f7ef;   /* viegli spilgti zaļš */
+}
+
+/* hover tikai ja atvērta */
+.excel-row.is-open:hover {
+    background: #dff3ea;
+}
+
+/* bultiņa atvērtam stāvoklim */
+.excel-row.is-open .chevron {
+    color: #166534;        /* tumši zaļš */
+    font-weight: bold;
+}
+
+/* 1. AKTĪVĀ (ATVĒRTĀ) GALVENĀ RINDA */
+.excel-row.is-expanded {
+    background: #ecfdf3;        /* gaiši zaļš */
+    font-weight: 600;
+}
+
+/* 2. DETAIL / VERSIJU RINDAS */
+.excel-detail {
+    background: #f9fafb;
+}
+
+
+.excel-detail .detail-name {
+    padding-left: 36px;
+    position: relative;
+}
+
+.detail-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-left: 10px;   /* tikai vizuāla indentācija */
+    position: relative;
+}
+
+/* detail rindas bultiņa – pie kreisās malas */
+.excel-detail .detail-name::before {
+    content: "↳";
+    position: absolute;
+    left: 6px;              /* ⬅️ pie pašas malas */
+    top: 50%;
+    transform: translateY(-50%);
+
+    color: #0b4b23;
+    font-size: 13px;
+}
+
+/* teksts paliek turpat */
+.detail-wrap {
+    padding-left: 10px;     /* nemainām */
+}
+
+
+/* pievienots plus kolonna */
+.col-plus,
+.plus-cell {
+    width: 26px;
+    min-width: 26px;
+    max-width: 26px;
+
+    padding: 0;
+    text-align: center;
+    vertical-align: middle;
+
+    cursor: pointer;
+}
+
+/* ŠŪNA kā poga */
+.plus-cell {
+    background: #ffffff;
+    border: 2px solid #27b05c;              /* spilgti zaļš */
+    border-radius: 6px;
+
+    box-shadow: 0 1px 3px rgba(46, 210, 109, 0.35);
+
+    transition: background 0.15s ease,
+                box-shadow 0.15s ease,
+                transform 0.05s ease;
+}
+
+/* hover uz VISAS šūnas */
+.plus-cell:hover {
+    background: #26c663;
+    box-shadow: 0 3px 6px rgba(22, 101, 52, 0.45);
+}
+
+/* nospiesta sajūta */
+.plus-cell:active {
+    transform: translateY(1px);
+}
+
+/* + simbols iekšā */
+.plus-cell .planned-btn {
+    all: unset;                /* noņem “pogas” izskatu */
+    font-weight: 700;
+    font-size: 14px;
+    color: #166534;
+    cursor: pointer;
+}
+
+/* + kļūst balts hover laikā */
+.plus-cell:hover .planned-btn {
+    color: #ffffff;
+}
+
+/* detail rindās + kolonna nav redzama */
+.excel-detail .plus-cell {
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    cursor: default;
+}
+
+/* detail rindā – kompakta, smalka mīnusa darbība */
+.excel-detail .minus-cell {
+    background: #edf7f3;
+    border: 1px solid #1dda16;          /* plānāks, blāvs */
+    border-radius: 5px;
+    padding: 0;                 /* ⬅️ svarīgākais */
+    line-height: 1;             /* ⬅️ noņem lieko augstumu */
+
+    box-shadow: 0 1px 2px rgba(64, 183, 80, 0.25);
+    cursor: pointer;
+
+    transition: background 0.15s ease,
+                box-shadow 0.15s ease,
+                transform 0.05s ease;
+}
+
+.excel-detail .minus-cell:hover {
+    background: #f2bcbc;                /* ļoti maigs hover */
+    box-shadow: 0 2px 4px rgba(23, 151, 55, 0.35);
+}
+
+.excel-detail .minus-cell:active {
+    transform: translateY(1px);
+}
+
+/* pats “–” simbols – mazāks un vieglāks */
+.minus-cell .instock-btn.minus {
+    all: unset;
+    font-weight: 600;
+    font-size: 12px;                    /* ⬅️ mazāks */
+    line-height: 1;
+    color: #a12a2a;                     /* mierīgāks sarkans */
+    cursor: pointer;
+}
+
+.excel-detail .minus-cell:hover .instock-btn.minus {
+    color: #7f1d1d;
+}
+
+
+/* GALVENAIS PLANNING BOX */
+.planning-container {
+    height: calc(100vh - 120px);   /* pielāgo, ja augšā ir headeris */
+    width: 100%;
+
+    overflow: auto;               /* ⬅️ sānu + vertikālais scroll */
+    
+    border-radius: 12px;          /* ⬅️ noapaļotas malas */
+    border: 1px solid #d1d5db;
+
+    background: #ffffff;
+}
+
+/* atvērta galvenā rinda – viss teksts bold */
+.excel-row.is-open td {
+    font-weight: 600;
+}
+
+/* noņem iekšējos horizontālos borderus starp atvērtām rindām */
+/* VISAI ATVĒRTAJAI GRUPAI – KREISĀ & LABĀ MALA */
+.excel-row.is-open td,
+.excel-detail td {
+    border-left: 2px solid transparent;
+    border-right: 2px solid transparent;
+}
+
+/* kreisā mala */
+.excel-row.is-open td:first-child,
+.excel-detail td:first-child {
+    border-left-color: #22c55e;
+}
+
+/* labā mala */
+.excel-row.is-open td:last-child,
+.excel-detail td:last-child {
+    border-right-color: #22c55e;
+}
+
+/* AUGŠA – tikai galvenajai rindai */
+.excel-row.is-open td {
+    border-top: 2px solid #22c55e;
+}
+
+/* APAKŠA – tikai pēdējai detail rindai */
+.excel-detail.last-detail td {
+    border-bottom: 2px solid #22c55e;
+}
+
+/* NOŅEM IEKŠĒJOS HORIZONTĀLOS BORDERUS */
+.excel-row.is-open td,
+.excel-detail td {
+    border-top-width: 0;
+}
+
+/* RINDAS HOVER – bet NE pogu kolonnas */
+.excel-row:hover td:not(.plus-cell):not(.minus-cell) {
+    background: #e1e5ea; /* tumšāks pelēks */
+}
