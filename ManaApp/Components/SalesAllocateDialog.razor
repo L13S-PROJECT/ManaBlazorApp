@@ -84,12 +84,11 @@
 public List<BatchRow> Batches { get; set; } = new();
 
 public sealed class BatchRow
-
 {
     public string BatchCode { get; set; } = "";
     public int StockQty { get; set; }
     public int AssemblyQty { get; set; }
-
+    public int BatchProductId { get; set; }
     public int SellFromStock { get; set; }
     public int SellFromAssembly { get; set; }
 }
@@ -138,7 +137,16 @@ private async Task OnOk()
         ProductId = ProductId,
         ProductName = ProductName,
         StockTotal = Batches.Sum(b => b.SellFromStock),
-        AssemblyTotal = Batches.Sum(b => b.SellFromAssembly)
+        AssemblyTotal = Batches.Sum(b => b.SellFromAssembly),
+        BatchSelections = Batches
+            .Where(b => b.SellFromStock > 0 || b.SellFromAssembly > 0)
+            .Select(b => new BatchSelection
+            {
+                BatchProductId = b.BatchProductId,
+                FromStock = b.SellFromStock,
+                FromAssembly = b.SellFromAssembly
+            })
+            .ToList()
     };
 
     await OnConfirm.InvokeAsync(result);

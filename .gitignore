@@ -22,3 +22,7 @@ node_modules/
 
 # Secrets
 appsettings.Development.json
+
+# ===== Build =====
+*.dll
+*.exe

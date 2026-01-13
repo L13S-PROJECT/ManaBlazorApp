@@ -5,19 +5,16 @@ namespace ManaApp.Models
         public int ProductId { get; set; }
         public string ProductName { get; set; } = "";
 
-        // kopsummas (rādīsies Sales sheetā)
         public int StockTotal { get; set; }
         public int AssemblyTotal { get; set; }
 
-        // precīzs sadalījums pa batchiem (iekšējai loģikai)
-        public List<SalesBatchQty> StockBatches { get; set; } = new();
-        public List<SalesBatchQty> AssemblyBatches { get; set; } = new();
+        public List<BatchSelection> BatchSelections { get; set; } = new();
     }
 
-    public sealed class SalesBatchQty
+    public sealed class BatchSelection
     {
         public int BatchProductId { get; set; }
-        public string BatchCode { get; set; } = "";
-        public int Qty { get; set; }
+        public int FromStock { get; set; }
+        public int FromAssembly { get; set; }
     }
 }

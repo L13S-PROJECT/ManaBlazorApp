@@ -87,6 +87,13 @@ app.MapGet("/api/categories", async (AppDbContext db)
 
 app.MapControllers();
 
+// minimal api endpoint that returns current server time as json
+app.MapGet("/api/servertime", () =>
+{
+    return new { ServerTime = DateTime.UtcNow };
+});
+
+
 app.Run();
 
 record WeatherForecast(DateTime Date, int TemperatureC, string? Summary)

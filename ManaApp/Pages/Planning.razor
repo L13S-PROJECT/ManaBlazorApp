@@ -907,6 +907,7 @@ private bool isSellPopupOpen = false;
 private int sellProductId;
 private string? sellProductName;
 private string? sellVersionName;
+private int? sellVersionId;
 
 private SalesSummary? pendingSale;
 
@@ -917,6 +918,7 @@ private async Task OpenSellPopup(ProductRow row)
     sellProductId = row.id;
     sellProductName = row.productName ?? "";
     sellVersionName = row.versionName;
+    sellVersionId = row.VersionId;
 
     sellBatches.Clear();
 
@@ -929,6 +931,7 @@ private async Task OpenSellPopup(ProductRow row)
             .GroupBy(x => new { x.BatchProductId, x.BatchCode })
             .Select(g => new SalesAllocateDialog.BatchRow
             {
+                BatchProductId = g.Key.BatchProductId,
                 BatchCode = g.Key.BatchCode,
                 StockQty = g.Where(x => x.MoveType == "STOCK").Sum(x => x.AvailableQty),
                 AssemblyQty = g.Where(x => x.MoveType == "ASSEMBLY").Sum(x => x.AvailableQty)
@@ -952,6 +955,7 @@ private sealed class ApiBatchRow
 private void CloseSellPopup()
 {
     isSellPopupOpen = false;
+    sellVersionId = null;
 }
 
 // pārdošana Ok apstirpināšanai
@@ -966,14 +970,63 @@ public sealed class StockMoveDto
 
 private async Task OnSellPopupConfirmed(SalesAllocateResult result)
 {
-    Console.WriteLine(
-        $"OK: {result.ProductName} " +
-        $"S:{result.StockTotal} A:{result.AssemblyTotal}"
-    );
+    var versionId = sellVersionId ?? 0;
+    var selections = result.BatchSelections ?? new List<BatchSelection>();
+
+    salesItems.RemoveAll(it => it.VersionId == versionId);
+
+    var stockBatches = selections
+        .Where(s => s.FromStock > 0)
+        .Select(s => new SalesBatchItem
+        {
+            BatchProductId = s.BatchProductId,
+            Qty = s.FromStock
+        })
+        .ToList();
+
+    if (stockBatches.Count > 0)
+    {
+        salesItems.Add(new SalesCartItem
+        {
+            VersionId = versionId,
+            ProductName = result.ProductName,
+            VersionName = sellVersionName,
+            Qty = stockBatches.Sum(b => b.Qty),
+            InStock = result.StockTotal,
+            IsAssembly = false,
+            Batches = stockBatches
+        });
+    }
+
+    var assemblyBatches = selections
+        .Where(s => s.FromAssembly > 0)
+        .Select(s => new SalesBatchItem
+        {
+            BatchProductId = s.BatchProductId,
+            Qty = s.FromAssembly
+        })
+        .ToList();
+
+    if (assemblyBatches.Count > 0)
+    {
+        salesItems.Add(new SalesCartItem
+        {
+            VersionId = versionId,
+            ProductName = result.ProductName,
+            VersionName = sellVersionName,
+            Qty = assemblyBatches.Sum(b => b.Qty),
+            InStock = result.AssemblyTotal,
+            IsAssembly = true,
+            Batches = assemblyBatches
+        });
+    }
 
     isSellPopupOpen = false;
-    StateHasChanged();
+    sellVersionId = null;
+    batchPanelRef?.Refresh();
+    await InvokeAsync(StateHasChanged);
 }
+
 
 
 }
