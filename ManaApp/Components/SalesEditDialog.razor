@@ -1,0 +1,133 @@
+<div class="modal">
+    <div class="modal-window">
+
+        <div class="modal-header">
+            <h3>Labot pārdošanai pievienotās preces</h3>
+        </div>
+
+        <div class="modal-body">
+
+            @foreach (var item in Items)
+            {
+                <div class="product-block">
+
+                    <!-- PRODUCT HEADER -->
+                    <div class="product-header">
+                        <h4>
+                            @item.ProductName
+                            @if (!string.IsNullOrWhiteSpace(item.VersionName))
+                            {
+                                <span> (@item.VersionName)</span>
+                            }
+                        </h4>
+                    </div>
+
+                    <!-- SUMMARY ROW (PLACEHOLDERS ONLY) -->
+                    <div class="summary-row">
+                        <div class="summary-box">
+                            <span class="label">Kopā (STOCK)</span>
+                            <span class="value">—</span>
+                        </div>
+
+                        <div class="summary-box">
+                            <span class="label">Kopā (ASSEMBLY)</span>
+                            <span class="value">—</span>
+                        </div>
+                    </div>
+
+                    <!-- BATCH TABLE -->
+                    <table class="sales-edit-table">
+                        <thead>
+                            <tr>
+                                <th>Batch</th>
+                                <th>Pieejams (STOCK)</th>
+                                <th>Pārdot (STOCK)</th>
+                                <th>Pieejams (ASSEMBLY)</th>
+                                <th>Pārdot (ASSEMBLY)</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+@foreach (var group in Items.GroupBy(i => i.VersionId))
+{
+    var first = group.First();
+
+    <div class="product-block">
+
+        <h4>
+            @first.ProductName
+            @if (!string.IsNullOrWhiteSpace(first.VersionName))
+            {
+                <span> (@first.VersionName)</span>
+            }
+        </h4>
+
+        <div class="summary-row">
+            <div>Kopā (STOCK): —</div>
+            <div>Kopā (ASSEMBLY): —</div>
+        </div>
+
+        <table class="sales-edit-table">
+            <thead>
+                <tr>
+                    <th>Batch</th>
+                    <th>Pieejams (STOCK)</th>
+                    <th>Pārdot (STOCK)</th>
+                    <th>Pieejams (ASSEMBLY)</th>
+                    <th>Pārdot (ASSEMBLY)</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @foreach (var cartItem in group)
+                {
+                    @foreach (var batch in cartItem.Batches)
+                    {
+                        <tr>
+                            <td>@batch.BatchCode</td>
+
+                            <td>
+                                @(cartItem.IsAssembly ? "-" : cartItem.InStock.ToString())
+                            </td>
+
+                            <td>
+                                <input type="number"
+                                       value="@batch.Qty"
+                                       disabled="@cartItem.IsAssembly" />
+                            </td>
+
+                            <td>
+                                @(cartItem.IsAssembly ? cartItem.InStock.ToString() : "-")
+                            </td>
+
+                            <td>
+                                <input type="number"
+                                       value="@batch.Qty"
+                                       disabled="@(!cartItem.IsAssembly)" />
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+
+    </div>
+}
+                     </tbody>
+                </table>
+
+             </div>
+        }   
+    </div>
+</div>
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<SalesCartItem> Items { get; set; }
+        = Array.Empty<SalesCartItem>();
+
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+}

@@ -140,9 +140,18 @@ private async Task OnOk()
         AssemblyTotal = Batches.Sum(b => b.SellFromAssembly),
         BatchSelections = Batches
             .Where(b => b.SellFromStock > 0 || b.SellFromAssembly > 0)
+
+// STRICT UI DATA PASS-THROUGH
+// BatchSelection has BatchCode property
+// Copy BatchCode from b.BatchCode
+// Do NOT change any existing logic or calculations
+// Do NOT rename properties or variables
+
+
             .Select(b => new BatchSelection
             {
                 BatchProductId = b.BatchProductId,
+                BatchCode = b.BatchCode,
                 FromStock = b.SellFromStock,
                 FromAssembly = b.SellFromAssembly
             })

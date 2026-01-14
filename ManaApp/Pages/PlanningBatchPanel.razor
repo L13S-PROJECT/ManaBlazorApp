@@ -132,9 +132,13 @@ else
             @onclick="OnSoldClicked">
         Pārdots
     </button>
-</div>
 
-    
+
+            <button @onclick="() => EditSalesRequested.InvokeAsync()">
+                Labot
+            </button>
+        </div>
+
     <h4 class="panel-subtitle">Pievienotās preces</h4>
 
     @if (SalesItems.Count == 0)
@@ -226,6 +230,8 @@ public IReadOnlyList<BatchCartItem> Items { get; set; }
 
 [Parameter] public EventCallback<BatchCartItem> OnEdit { get; set; }
 [Parameter] public EventCallback<BatchCartItem> OnDelete { get; set; }
+
+[Parameter] public EventCallback EditSalesRequested { get; set; }
 
 private string? createPlanError;
 

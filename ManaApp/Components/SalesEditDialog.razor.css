@@ -1,0 +1,45 @@
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 9999;
+
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 80px;
+}
+
+.modal-window {
+    background: #fff;
+    width: 900px;
+    max-width: 95vw;
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+    overflow: hidden;
+}
+
+.modal-window {
+    background: #ffffff;
+    color: #111827; /* ← tumšs, lasāms */
+}
+
+.modal-window h3 {
+    color: #111827;
+    font-weight: 600;
+}
+
+.modal-window table th {
+    color: #374151;
+    font-weight: 600;
+    text-align: left;
+}
+.modal-window table td {
+    color: #111827;
+}
+
+.sales-edit-table th:nth-child(2),
+.sales-edit-table td:nth-child(2) {
+    width: 140px;
+    white-space: nowrap;
+}

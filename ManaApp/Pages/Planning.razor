@@ -84,10 +84,10 @@
     SalesItems="salesItems"
     BatchId="draftBatchId"
     OnSold="OnSalesSold"
+    EditSalesRequested="OpenEditSalesPopup"
     @ref="batchPanelRef"
     OnCreateConfirmed="CreatePlanAsync"
     OnDeleteDraft="DeleteDraftAsync" />
-
 
 </div>
     
@@ -124,6 +124,14 @@
 
 }
 
+@if (isEditSalesPopupOpen)
+{
+    <SalesEditDialog
+        Items="editSalesItems"
+        OnClose="CloseEditSalesPopup" />
+}
+
+
 @code {
    
     private List<ProductRow> rows = new();
@@ -134,6 +142,7 @@ private List<CategoryRow> categoriesFiltered = new();
 
 private List<SalesAllocateDialog.BatchRow> sellBatches = new();
    
+
 
     private int? draftBatchId = null;
 private bool isCreatingDraft = false;
@@ -849,6 +858,11 @@ private void OnMinusConfirmed(int qty)
 
 private List<SalesCartItem> salesItems = new();
 
+// popup rediģējamā kopija (Edit-Copy pattern)
+private List<SalesCartItem> editSalesItems = new();
+
+
+
 // pievienots pārdošanas console
 
 private async Task OnSalesSold()
@@ -938,6 +952,7 @@ private async Task OpenSellPopup(ProductRow row)
             })
             .ToList();
     }
+    
 
     isSellPopupOpen = true;
     StateHasChanged();
@@ -975,11 +990,19 @@ private async Task OnSellPopupConfirmed(SalesAllocateResult result)
 
     salesItems.RemoveAll(it => it.VersionId == versionId);
 
+// STRICT DATA COMPLETION
+// SalesBatchItem already has BatchCode property
+// Copy BatchCode directly from selection (s.BatchCode)
+// Do NOT change existing logic, filters, or structure
+// Do NOT add fallbacks or new logic
+
+
     var stockBatches = selections
         .Where(s => s.FromStock > 0)
         .Select(s => new SalesBatchItem
         {
             BatchProductId = s.BatchProductId,
+            BatchCode = s.BatchCode,    
             Qty = s.FromStock
         })
         .ToList();
@@ -998,14 +1021,16 @@ private async Task OnSellPopupConfirmed(SalesAllocateResult result)
         });
     }
 
-    var assemblyBatches = selections
-        .Where(s => s.FromAssembly > 0)
-        .Select(s => new SalesBatchItem
-        {
-            BatchProductId = s.BatchProductId,
-            Qty = s.FromAssembly
-        })
-        .ToList();
+var assemblyBatches = selections
+    .Where(s => s.FromAssembly > 0)
+    .Select(s => new SalesBatchItem
+    {
+        BatchProductId = s.BatchProductId,
+        BatchCode      = s.BatchCode,
+        Qty            = s.FromAssembly
+    })
+    .ToList();
+
 
     if (assemblyBatches.Count > 0)
     {
@@ -1027,6 +1052,47 @@ private async Task OnSellPopupConfirmed(SalesAllocateResult result)
     await InvokeAsync(StateHasChanged);
 }
 
+private void OpenEditSalesPopup()
+{
+    // Izveidojam dziļu salesItems kopiju popup rediģēšanai
+    editSalesItems = salesItems
+
+    // STRICT COPY FIX
+// This is a deep copy for edit popup
+// Copy ALL existing SalesBatchItem properties AS-IS
+// Do NOT rename properties
+// Do NOT add logic
+// Do NOT change structure
+
+        .Select(item => new SalesCartItem
+        {
+            VersionId   = item.VersionId,
+            ProductName = item.ProductName,
+            VersionName = item.VersionName,
+            Qty         = item.Qty,
+            InStock     = item.InStock,
+            IsAssembly  = item.IsAssembly,
+
+            Batches = item.Batches
+                .Select(b => new SalesBatchItem
+                {
+                    BatchProductId = b.BatchProductId,
+                    BatchCode      = b.BatchCode,
+                    Qty            = b.Qty
+                })
+                .ToList()
+        })
+        .ToList();
+
+    isEditSalesPopupOpen = true;
+}
+      
+private bool isEditSalesPopupOpen = false;
+
+private void CloseEditSalesPopup()
+{
+    isEditSalesPopupOpen = false;
+}
 
 
 }

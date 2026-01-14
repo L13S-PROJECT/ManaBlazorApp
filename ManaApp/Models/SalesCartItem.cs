@@ -18,9 +18,18 @@ namespace ManaApp.Shared
         public List<SalesBatchItem> Batches { get; set; } = new();
     }
 
-    public sealed class SalesBatchItem
-    {
-        public int BatchProductId { get; set; }
-        public int Qty { get; set; }
-    }
+// Add UI-friendly BatchCode to SalesBatchItem.
+// This value comes from SalesAllocateDialog API result.
+// Used only for displaying batch info in Edit Sales popup.
+// No business logic changes.
+    
+
+    public class SalesBatchItem
+{
+    public int BatchProductId { get; set; }
+    public string BatchCode { get; set; } = ""; // JAUNaiS
+    public int Qty { get; set; }
+}
+
+
 }
