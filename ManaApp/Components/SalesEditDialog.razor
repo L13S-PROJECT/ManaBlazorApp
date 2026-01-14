@@ -7,120 +7,115 @@
 
         <div class="modal-body">
 
-            @foreach (var item in Items)
+            @foreach (var group in Items.GroupBy(i => i.VersionId))
             {
+                var first = group.First();
+
                 <div class="product-block">
 
-                    <!-- PRODUCT HEADER -->
-                    <div class="product-header">
+                    <!-- HEADER + SUMMARY IN ONE ROW -->
+                    <div class="product-header-row">
                         <h4>
-                            @item.ProductName
-                            @if (!string.IsNullOrWhiteSpace(item.VersionName))
+                            @first.ProductName
+                            @if (!string.IsNullOrWhiteSpace(first.VersionName))
                             {
-                                <span> (@item.VersionName)</span>
+                                <span> (@first.VersionName)</span>
                             }
                         </h4>
-                    </div>
 
-                    <!-- SUMMARY ROW (PLACEHOLDERS ONLY) -->
-                    <div class="summary-row">
-                        <div class="summary-box">
-                            <span class="label">Kopā (STOCK)</span>
-                            <span class="value">—</span>
-                        </div>
+                        <div class="summary-inline">
+                                <span>
+                                    Kopā (STOCK):
+                                    @(
+                                        group
+                                            .Where(i => !i.IsAssembly)
+                                            .SelectMany(i => i.Batches)
+                                            .Sum(b => b.Qty)
+                                    )
+                                </span>
 
-                        <div class="summary-box">
-                            <span class="label">Kopā (ASSEMBLY)</span>
-                            <span class="value">—</span>
+                                <span>
+                                    Kopā (ASSEMBLY):
+                                    @(
+                                        group
+                                            .Where(i => i.IsAssembly)
+                                            .SelectMany(i => i.Batches)
+                                            .Sum(b => b.Qty)
+                                    )
+                                </span>
                         </div>
                     </div>
 
                     <!-- BATCH TABLE -->
                     <table class="sales-edit-table">
-                        <thead>
-                            <tr>
-                                <th>Batch</th>
-                                <th>Pieejams (STOCK)</th>
-                                <th>Pārdot (STOCK)</th>
-                                <th>Pieejams (ASSEMBLY)</th>
-                                <th>Pārdot (ASSEMBLY)</th>
-                                <th></th>
-                            </tr>
-                        </thead>
+                                <thead>
+                                    <tr>
+                                        <th>Batch</th>
+                                        <th>Pieejams (STOCK)</th>
+                                        <th>Pārdot (STOCK)</th>
+                                        <th>Pieejams (ASSEMBLY)</th>
+                                        <th>Pārdot (ASSEMBLY)</th>
+                                        <th></th> <!-- delete column -->
+                                    </tr>
+                                </thead>
+
 
                         <tbody>
-@foreach (var group in Items.GroupBy(i => i.VersionId))
+                            @foreach (var item in group)
+                            {
+@for (int batchIndex = 0; batchIndex < item.Batches.Count; batchIndex++)
 {
-    var first = group.First();
+    var batch = item.Batches[batchIndex];
 
-    <div class="product-block">
+   <tr @key="@($"{item.VersionId}-{item.IsAssembly}-{batch.BatchCode}")">
 
-        <h4>
-            @first.ProductName
-            @if (!string.IsNullOrWhiteSpace(first.VersionName))
-            {
-                <span> (@first.VersionName)</span>
+
+        <td>@batch.BatchCode</td>
+
+        <td>@(item.IsAssembly ? "-" : item.InStock.ToString())</td>
+
+        <td>
+            <input type="number"
+                   value="@batch.Qty"
+                   disabled="@item.IsAssembly"
+                   @oninput="e => batch.Qty = int.TryParse(e.Value?.ToString(), out var v) ? v : 0" />
+        </td>
+
+        <td>@(item.IsAssembly ? item.InStock.ToString() : "-")</td>
+
+        <td>
+            <input type="number"
+                   value="@batch.Qty"
+                   disabled="@(!item.IsAssembly)"
+                   @oninput="e => batch.Qty = int.TryParse(e.Value?.ToString(), out var v) ? v : 0" />
+        </td>
+        <td>
+            <button type="button"
+        @onclick="() => RemoveBatch(item, batch.BatchCode)">
+    ✖
+</button>
+        
+        </td>
+    </tr>
+}
+
+                            }
+                            </tbody>
+
+                    </table>
+
+                </div>
             }
-        </h4>
 
-        <div class="summary-row">
-            <div>Kopā (STOCK): —</div>
-            <div>Kopā (ASSEMBLY): —</div>
         </div>
 
-        <table class="sales-edit-table">
-            <thead>
-                <tr>
-                    <th>Batch</th>
-                    <th>Pieejams (STOCK)</th>
-                    <th>Pārdot (STOCK)</th>
-                    <th>Pieejams (ASSEMBLY)</th>
-                    <th>Pārdot (ASSEMBLY)</th>
-                </tr>
-            </thead>
-
-            <tbody>
-                @foreach (var cartItem in group)
-                {
-                    @foreach (var batch in cartItem.Batches)
-                    {
-                        <tr>
-                            <td>@batch.BatchCode</td>
-
-                            <td>
-                                @(cartItem.IsAssembly ? "-" : cartItem.InStock.ToString())
-                            </td>
-
-                            <td>
-                                <input type="number"
-                                       value="@batch.Qty"
-                                       disabled="@cartItem.IsAssembly" />
-                            </td>
-
-                            <td>
-                                @(cartItem.IsAssembly ? cartItem.InStock.ToString() : "-")
-                            </td>
-
-                            <td>
-                                <input type="number"
-                                       value="@batch.Qty"
-                                       disabled="@(!cartItem.IsAssembly)" />
-                            </td>
-                        </tr>
-                    }
-                }
-            </tbody>
-        </table>
+        <!-- FOOTER BUTTONS (RESTORED) -->
+        <div class="modal-footer">
+            <button @onclick="OnSave">ATJAUNOT</button>
+            <button @onclick="OnCancel">ATCELT</button>
+        </div>
 
     </div>
-}
-                     </tbody>
-                </table>
-
-             </div>
-        }   
-    </div>
-</div>
 </div>
 
 @code {
@@ -130,4 +125,17 @@
     [Parameter] public EventCallback OnCancel { get; set; }
     [Parameter] public EventCallback OnSave { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
+
+
+void RemoveBatch(SalesCartItem item, string batchCode)
+{
+    var batch = item.Batches.FirstOrDefault(b => b.BatchCode == batchCode);
+    if (batch != null)
+    {
+        item.Batches.Remove(batch);
+        StateHasChanged();
+    }
+}
+
+
 }

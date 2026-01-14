@@ -43,3 +43,32 @@
     width: 140px;
     white-space: nowrap;
 }
+
+.modal {
+    pointer-events: auto;
+}
+
+.modal-window {
+    pointer-events: auto;
+}
+
+.sales-edit-table td {
+    position: relative;
+}
+
+.sales-edit-table button {
+    position: relative;
+    z-index: 2;
+    pointer-events: auto;
+}
+.modal-window {
+    overflow: visible;
+}
+
+.sales-edit-table td:last-child {
+    pointer-events: auto;
+}
+
+.sales-edit-table button {
+    cursor: pointer;
+}
