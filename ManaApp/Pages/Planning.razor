@@ -150,11 +150,13 @@ private bool isCreatingDraft = false;
 
 private string? createPlanError;
 
- protected override async Task OnInitializedAsync()
+protected override async Task OnInitializedAsync()
 {
     await ReloadPlanningDataAsync();
-    await LoadDraftAsync(); // ⬅️ ŠIS IR JAUNAIS
+    await LoadDraftAsync();       // batch draft
+    await LoadSalesDraftAsync();  // ⬅️ SALES DRAFT
 }
+
 
 // "-" popup stāvoklis
 private bool isMinusOpen = false;
@@ -1065,6 +1067,8 @@ var assemblyBatches = selections
     sellVersionId = null;
     batchPanelRef?.Refresh();
     await InvokeAsync(StateHasChanged);
+    await SaveSalesDraftAsync();
+
 }
 
 private void OpenEditSalesPopup()
@@ -1143,5 +1147,88 @@ private Task OnEditSalesSaved(List<SalesCartItem> updatedItems)
 
     return Task.CompletedTask;
 }
+
+private async Task SaveSalesDraftAsync()
+{
+    var dto = new
+    {
+        Items = salesItems.Select(it => new
+        {
+            VersionId  = it.VersionId,
+            Qty        = it.Qty,
+            IsAssembly = it.IsAssembly
+        }).ToList()
+    };
+
+    await Http.PostAsJsonAsync(
+        "http://localhost:5270/api/sales-drafts/autosave",
+        dto
+    );
+}
+
+private async Task LoadSalesDraftAsync()
+{
+    var resp = await Http.GetAsync(
+        "http://localhost:5270/api/sales-drafts/last"
+    );
+
+    if (!resp.IsSuccessStatusCode || resp.Content.Headers.ContentLength == 0)
+        return;
+
+    var draft = await resp.Content.ReadFromJsonAsync<SalesDraftDto>();
+    if (draft == null)
+        return;
+
+    salesItems.Clear();
+
+    foreach (var it in draft.Items)
+    {
+        var row = rows.FirstOrDefault(r => r.VersionId == it.VersionId);
+var apiRows = await Http.GetFromJsonAsync<List<ApiBatchRow>>(
+    $"http://localhost:5270/api/stockmovements/available-by-batch?versionId={it.VersionId}");
+
+var batches = apiRows?
+    .Where(x => it.IsAssembly
+        ? x.MoveType == "ASSEMBLY"
+        : x.MoveType == "STOCK")
+    .Select(x => new SalesBatchItem
+    {
+        BatchProductId = x.BatchProductId,
+        BatchCode      = x.BatchCode,
+        Qty            = 0,                 // ⬅️ sākumā 0, LABOT popupā lietotājs saliek
+        AvailableQty   = x.AvailableQty
+    })
+    .ToList()
+    ?? new();
+
+salesItems.Add(new SalesCartItem
+{
+    VersionId   = it.VersionId,
+    ProductName = row?.productName ?? "",
+    VersionName = row?.versionName,
+    Qty         = it.Qty,
+    InStock     = row?.InStock ?? 0,
+    IsAssembly  = it.IsAssembly,
+    Batches     = batches
+});
+
+    }
+
+    batchPanelRef?.Refresh();
+}
+
+private sealed class SalesDraftDto
+{
+    public int DraftId { get; set; }
+    public List<SalesDraftItemDto> Items { get; set; } = new();
+}
+
+private sealed class SalesDraftItemDto
+{
+    public int VersionId { get; set; }
+    public int Qty { get; set; }
+    public bool IsAssembly { get; set; }
+}
+
 
 }
