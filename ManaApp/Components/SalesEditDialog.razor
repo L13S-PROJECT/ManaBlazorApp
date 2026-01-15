@@ -139,7 +139,10 @@
 
         <!-- FOOTER BUTTONS (RESTORED) -->
         <div class="modal-footer">
-            <button @onclick="OnSave">ATJAUNOT</button>
+   
+   <button @onclick="ConfirmUpdate">ATJAUNOT</button>
+
+
 @*
 /// Hook the ATCELT button to invoke the OnClose EventCallback.
 /// Do not change business logic or method names.
@@ -157,7 +160,8 @@
         = Array.Empty<SalesCartItem>();
 
     [Parameter] public EventCallback OnCancel { get; set; }
-    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public EventCallback<List<SalesCartItem>> OnSave { get; set; }
+
     [Parameter] public EventCallback OnClose { get; set; }
 
 
@@ -169,6 +173,21 @@ void RemoveBatch(SalesCartItem item, string batchCode)
         item.Batches.Remove(batch);
         StateHasChanged();
     }
+}
+
+[Inject] private IJSRuntime JS { get; set; } = default!;
+
+private async Task ConfirmUpdate()
+{
+    var ok = await JS.InvokeAsync<bool>(
+        "confirm",
+        "Vai atjaunot datus?"
+    );
+
+    if (!ok)
+        return; // paliek popupā, nekas nemainās
+
+    await OnSave.InvokeAsync(Items.ToList());
 }
 
 

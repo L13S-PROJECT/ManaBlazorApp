@@ -23,3 +23,58 @@
     color: #4b5563;              /* tumši pelēks teksts */
     cursor: not-allowed;
 }
+
+.sales-info-row {
+    width: 100%;
+    white-space: nowrap;        /* nekad nelauž rindā */
+    color: #374151;             /* tumšāks pelēks */
+    font-size: 14px;
+}
+
+.sales-info-row {
+    width: 100%;
+    display: flex;              /* izpleš pa visu rindu */
+    justify-content: space-between;
+    align-items: center;
+    white-space: nowrap;
+    font-size: 14px;
+}
+
+.sales-name {
+    font-weight: 600;           /* bold */
+    color: #111827;             /* tumšāks */
+}
+
+.sales-type {
+    font-weight: 400;
+    color: #7a7f89;
+    text-transform: uppercase;
+    font-size: 12px;      /* mazāks par nosaukumu */
+}
+
+
+.sales-qty {
+    font-weight: 600;           /* bold */
+    color: #111827;             /* tumšāks */
+}
+
+.sales-info-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* izpleš pa visu rindu */
+    gap: 16px;                      /* drošības atstarpe */
+    padding: 6px 0;                 /* elpa vertikāli */
+    white-space: nowrap;
+    font-size: 14px;
+}
+.sales-row {
+    width: 100%;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.sales-version {
+    margin-left: 10px;      /* atsarpe starp nosaukumu un versiju */
+    font-weight: 500;
+    color: #374151;
+}

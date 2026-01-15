@@ -126,11 +126,12 @@
 
 @if (isEditSalesPopupOpen)
 {
-        <SalesEditDialog
-        Items="editSalesItems"
-        OnClose="CloseEditSalesPopup" />
-}
+    <SalesEditDialog
+    Items="editSalesItems"
+    OnClose="CloseEditSalesPopup"
+    OnSave="OnEditSalesSaved" />
 
+}
 
 @code {
    
@@ -1108,6 +1109,39 @@ private void CloseEditSalesPopup()
 {
     isEditSalesPopupOpen = false;
 }
+private Task OnEditSalesSaved(List<SalesCartItem> updatedItems)
+{
+    foreach (var updated in updatedItems)
+    {
+        // 1) pārrēķinam summu no batchiem
+        updated.Qty = updated.Batches.Sum(b => b.Qty);
 
+        // 2) ja šim (VersionId + IsAssembly) nav ko pārdot → izņemam rindu
+        if (updated.Qty <= 0)
+        {
+            salesItems.RemoveAll(x =>
+                x.VersionId == updated.VersionId &&
+                x.IsAssembly == updated.IsAssembly);
+            continue;
+        }
+
+        // 3) citādi – parasts update
+        var idx = salesItems.FindIndex(x =>
+            x.VersionId == updated.VersionId &&
+            x.IsAssembly == updated.IsAssembly);
+
+        if (idx >= 0)
+            salesItems[idx] = updated;
+        else
+            salesItems.Add(updated);
+    }
+
+    // 4) aizveram popup un atjaunojam UI
+    isEditSalesPopupOpen = false;
+    batchPanelRef?.Refresh();
+    StateHasChanged();
+
+    return Task.CompletedTask;
+}
 
 }

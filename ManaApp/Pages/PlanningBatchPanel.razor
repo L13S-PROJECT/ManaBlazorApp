@@ -2,8 +2,6 @@
 @using ManaApp.Components
 @using ManaApp.Models
 
-
-
 <div class="planning-batch-panel">
 
     <div class="batch-tabs">
@@ -126,18 +124,19 @@ else
 {
     // pievienotā poga Pārdošanai
 
-    <div class="panel-actions" style="margin-bottom:12px;">
-    <button class="panel-btn primary"
+<div class="panel-actions" style="margin-bottom:12px;">
+    <button class="action-btn"
             disabled="@(SalesItems.Count == 0)"
             @onclick="OnSoldClicked">
-        Pārdots
+        PĀRDOT
     </button>
 
+    <button class="action-btn"
+            @onclick="() => EditSalesRequested.InvokeAsync()">
+        LABOT
+    </button>
+</div>
 
-            <button @onclick="() => EditSalesRequested.InvokeAsync()">
-                Labot
-            </button>
-        </div>
 
     <h4 class="panel-subtitle">Pievienotās preces</h4>
 
@@ -152,42 +151,21 @@ else
         <div style="margin-top:12px;">
             @foreach (var it in SalesItems)
             {
-                <div style="display:grid;
-                            grid-template-columns:1fr 80px 40px 40px;
-                            gap:8px;
-                            align-items:center;
-                            padding:6px 0;
-                            border-bottom:1px solid #e5e7eb;">
-
-                    <div>
-                        <b>@it.ProductName</b>
-                        @if (!string.IsNullOrWhiteSpace(it.VersionName))
-                        {
-                            <span> (@it.VersionName)</span>
-                        }
-                    </div>
-
-                    <div>@it.Qty</div>
-
-                        <button class="icon-btn"
-                                title="Labot"
-                                @onclick="() => EditSalesItem(it)">
-                            ✏️
-                        </button>
-
-                        <button class="icon-btn danger"
-                        title="Dzēst"
-                        @onclick="() => DeleteSalesItem(it)">
-                            🗑️
-                        </button>
-
+                <div class="sales-row">
+                <div class="sales-info-row">
+    <span class="sales-name">
+    @it.ProductName
+    <span class="sales-version">@it.VersionName</span>
+</span>
+    <span class="sales-type">@(it.IsAssembly ? "ASSEMBLY" : "STOCK")</span>
+    <span class="sales-qty">@it.Qty GB</span>
+</div>
+                       
                 </div>
             }
         </div>
     }
 }
-
-
 
     </div>
 
@@ -595,7 +573,26 @@ private async Task OnSoldClicked()
 // pievienot pogu Pārdošanas panelī pardošanas rindai
 private void EditSalesItem(SalesCartItem item)
 {
-    editingSalesItem = item;
+    editingSalesItem = new SalesCartItem
+{
+    VersionId   = item.VersionId,
+    ProductName = item.ProductName,
+    VersionName = item.VersionName,
+    Qty         = item.Qty,
+    InStock     = item.InStock,
+    IsAssembly  = item.IsAssembly,
+
+    Batches = item.Batches
+        .Select(b => new SalesBatchItem
+        {
+            BatchProductId = b.BatchProductId,
+            BatchCode      = b.BatchCode,
+            Qty            = b.Qty,
+            AvailableQty   = b.AvailableQty
+        })
+        .ToList()
+};
+
     isEditSalesOpen = true;
     StateHasChanged();
 }
@@ -612,9 +609,10 @@ private void CloseEditSalesDialog()
 private void OnEditSalesConfirmed(int qty)
 {
     if (editingSalesItem != null)
-    {
-        editingSalesItem.Qty = qty;   // ✅ MAINĀM RINDU
-    }
+{
+    // Qty vienmēr rēķinām no batchiem
+    editingSalesItem.Qty = editingSalesItem.Batches.Sum(b => b.Qty);
+}
 
     CloseEditSalesDialog();
     StateHasChanged();
