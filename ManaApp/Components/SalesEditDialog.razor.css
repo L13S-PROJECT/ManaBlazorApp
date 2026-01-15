@@ -72,3 +72,160 @@
 .sales-edit-table button {
     cursor: pointer;
 }
+/*Ensure that the SalesEditDialog modal window and its buttons
+are fully clickable.
+Fix z-index or pointer-events issues if the dialog is covered
+by another overlay.
+Do not change layout or business logic.
+*/
+.modal {
+    z-index: 10000;
+
+    pointer-events: auto;
+}       
+
+.product-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.product-title {
+    font-size: 16px;
+}
+
+.product-title .version {
+    font-weight: normal;
+    color: #6b7280;
+    margin-left: 4px;
+}
+
+.product-totals {
+    display: flex;
+    gap: 20px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #111827;
+    white-space: nowrap;
+}
+
+.total-type {
+    font-size: 12px;
+    font-weight: normal;
+    color: #9ca3af; /* gaiši pelēks */
+}
+
+.batch-block {
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid #e5e7eb;   /* gaiši pelēks rāmis */
+    border-radius: 6px;
+    background: #f9fafb;        /* ļoti viegls fons */
+}
+
+.sales-edit-table th {
+    font-size: 12px;
+    font-weight: 500;
+    color: #6b7280;          /* pelēkāks */
+    text-align: left;
+    padding-bottom: 4px;
+}
+.sales-edit-table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.sales-edit-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+}
+
+/* Kolonnu platumi */
+.col-batch {
+    width: 80px;
+}
+
+.col-available,
+.col-sell {
+    width: 110px;
+}
+
+.col-delete {
+    width: 60px;
+    text-align: center;
+}
+
+/* Grupas vizuālais atdalījums */
+.group-stock {
+    border-right: 2px solid #e5e7eb;
+    text-align: center;
+}
+
+.group-assembly {
+    padding-left: 8px;
+    text-align: center;
+}
+
+/* Mazāki, klusāki virsraksti */
+.sales-edit-table thead th {
+    font-size: 12px;
+    font-weight: 500;
+    color: #6b7280;
+    text-align: center;
+}
+
+/* BODY – lai dati līdzinās ar headeriem */
+.sales-edit-table tbody td {
+    text-align: center;
+    padding: 3px 3px;
+}
+
+.delete-btn {
+    width: 32px;
+    height: 32px;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    cursor: pointer;
+}
+
+/* Grupas virsraksti STOCK / ASSEMBLY */
+.sales-edit-table thead th[colspan="2"] {
+    text-align: center;
+    padding-bottom: 2px;
+}
+
+/* FORCE equal width for STOCK and ASSEMBLY groups */
+.group-stock,
+.group-assembly {
+    width: 220px;          /* 2 × 110px kolonnas */
+    text-align: center;
+}
+
+.qty-input {
+    width: 70px;          /* loģisks skaits */
+    height: 24px;
+    padding: 1px 4px;
+    text-align: center;
+    font-size: 13px;
+    border-radius: 4px;   /* viegli noapaļoti stūri */  
+    border: 1px solid #d1d5db;  /* gaiši pelēks rāmis */    
+}
+
+.delete-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+
+    font-size: 18px;
+    line-height: 1;
+}
+
+.sales-edit-table td.batch-code {
+    font-weight: 700;
+    font-size: 16px;
+}
+

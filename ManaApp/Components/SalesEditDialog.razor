@@ -2,7 +2,7 @@
     <div class="modal-window">
 
         <div class="modal-header">
-            <h3>Labot pārdošanai pievienotās preces</h3>
+            <h3>LABOT PIEVIENOTĀS PRECES</h3>
         </div>
 
         <div class="modal-body">
@@ -12,53 +12,45 @@
                 var first = group.First();
 
                 <div class="product-block">
-
+                 
                     <!-- HEADER + SUMMARY IN ONE ROW -->
+
                     <div class="product-header-row">
-                        <h4>
-                            @first.ProductName
-                            @if (!string.IsNullOrWhiteSpace(first.VersionName))
-                            {
-                                <span> (@first.VersionName)</span>
-                            }
-                        </h4>
+    <div class="product-title">
+        <strong>@first.ProductName</strong>
+        @if (!string.IsNullOrWhiteSpace(first.VersionName))
+        {
+            <span class="version">(@first.VersionName)</span>
+        }
+    </div>
 
-                        <div class="summary-inline">
-                                <span>
-                                    Kopā (STOCK):
-                                    @(
-                                        group
-                                            .Where(i => !i.IsAssembly)
-                                            .SelectMany(i => i.Batches)
-                                            .Sum(b => b.Qty)
-                                    )
-                                </span>
+    <div class="product-totals">
+        <span>KOPĀ <span class="total-type">(STOCK)</span>: @group.Where(i => !i.IsAssembly).SelectMany(i => i.Batches).Sum(b => b.Qty)</span>
+<span>KOPĀ <span class="total-type">(ASSEMBLY)</span>: @group.Where(i => i.IsAssembly).SelectMany(i => i.Batches).Sum(b => b.Qty)</span>
 
-                                <span>
-                                    Kopā (ASSEMBLY):
-                                    @(
-                                        group
-                                            .Where(i => i.IsAssembly)
-                                            .SelectMany(i => i.Batches)
-                                            .Sum(b => b.Qty)
-                                    )
-                                </span>
-                        </div>
-                    </div>
+    </div>
+</div>
 
                     <!-- BATCH TABLE -->
+ <div class="batch-block">                   
                     <table class="sales-edit-table">
-                                <thead>
-                                    <tr>
-                                        <th>Batch</th>
-                                        <th>Pieejams (STOCK)</th>
-                                        <th>Pārdot (STOCK)</th>
-                                        <th>Pieejams (ASSEMBLY)</th>
-                                        <th>Pārdot (ASSEMBLY)</th>
-                                        <th></th> <!-- delete column -->
-                                    </tr>
-                                </thead>
+<thead>
+    <tr>
+        <th rowspan="2" class="col-batch">Batch</th>
 
+        <th colspan="2" class="group-stock">STOCK</th>
+        <th colspan="2" class="group-assembly">ASSEMBLY</th>
+
+        <th rowspan="2" class="col-delete">Dzēst</th>
+    </tr>
+    <tr>
+        <th class="col-available">Pieejams</th>
+        <th class="col-sell">Pārdot</th>
+
+        <th class="col-available">Pieejams</th>
+        <th class="col-sell">Pārdot</th>
+    </tr>
+</thead>
 
                         <tbody>
                             @foreach (var item in group)
@@ -70,32 +62,68 @@
    <tr @key="@($"{item.VersionId}-{item.IsAssembly}-{batch.BatchCode}")">
 
 
-        <td>@batch.BatchCode</td>
+        <td class="batch-code">@batch.BatchCode</td>
 
-        <td>@(item.IsAssembly ? "-" : item.InStock.ToString())</td>
+        <td>@(item.IsAssembly ? "-" : batch.AvailableQty.ToString())</td>
 
-        <td>
-            <input type="number"
-                   value="@batch.Qty"
-                   disabled="@item.IsAssembly"
-                   @oninput="e => batch.Qty = int.TryParse(e.Value?.ToString(), out var v) ? v : 0" />
-        </td>
+<td>
+    @if (!item.IsAssembly && item.InStock > 0)
+    {
+        <input type="number"
+       class="qty-input"
+       value="@batch.Qty"
+       min="0"
+       max="@batch.AvailableQty"
+       @oninput="e =>
+       {
+           if (int.TryParse(e.Value?.ToString(), out var v))
+               batch.Qty = Math.Min(v, batch.AvailableQty);
+           else
+               batch.Qty = 0;
+       }" />
 
-        <td>@(item.IsAssembly ? item.InStock.ToString() : "-")</td>
+    }
+    else if (!item.IsAssembly)
+    {
+        <span>-</span>
+    }
+</td>
 
-        <td>
-            <input type="number"
-                   value="@batch.Qty"
-                   disabled="@(!item.IsAssembly)"
-                   @oninput="e => batch.Qty = int.TryParse(e.Value?.ToString(), out var v) ? v : 0" />
-        </td>
-        <td>
-            <button type="button"
+<td>@(item.IsAssembly ? batch.AvailableQty.ToString() : "-")</td>
+
+<td>
+    @if (item.IsAssembly && item.InStock > 0)
+    {
+        <input type="number"
+       class="qty-input"
+       value="@batch.Qty"
+       min="0"
+       max="@batch.AvailableQty"
+       @oninput="e =>
+       {
+           if (int.TryParse(e.Value?.ToString(), out var v))
+               batch.Qty = Math.Min(v, batch.AvailableQty);
+           else
+               batch.Qty = 0;
+       }" />
+
+    }
+    else if (item.IsAssembly)
+    {
+        <span>-</span>
+    }
+</td>
+
+<td class="col-delete">
+    <button type="button"
+        class="delete-btn"
+        title="Dzēst rindu"
         @onclick="() => RemoveBatch(item, batch.BatchCode)">
-    ✖
+    🗑️
 </button>
-        
-        </td>
+
+</td>
+
     </tr>
 }
 
@@ -103,7 +131,7 @@
                             </tbody>
 
                     </table>
-
+</div>
                 </div>
             }
 
@@ -112,7 +140,13 @@
         <!-- FOOTER BUTTONS (RESTORED) -->
         <div class="modal-footer">
             <button @onclick="OnSave">ATJAUNOT</button>
-            <button @onclick="OnCancel">ATCELT</button>
+@*
+/// Hook the ATCELT button to invoke the OnClose EventCallback.
+/// Do not change business logic or method names.
+/// The button must close the dialog.
+*@
+            <button @onclick="() => OnClose.InvokeAsync()">ATCELT</button>
+
         </div>
 
     </div>

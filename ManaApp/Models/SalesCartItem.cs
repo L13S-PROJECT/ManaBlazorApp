@@ -22,14 +22,13 @@ namespace ManaApp.Shared
 // This value comes from SalesAllocateDialog API result.
 // Used only for displaying batch info in Edit Sales popup.
 // No business logic changes.
-    
-
+  
     public class SalesBatchItem
 {
     public int BatchProductId { get; set; }
-    public string BatchCode { get; set; } = ""; // JAUNaiS
+    public string BatchCode { get; set; } = "";
     public int Qty { get; set; }
+    public int AvailableQty { get; set; }   // ⬅️ reālais pieejamais apjoms
 }
-
 
 }

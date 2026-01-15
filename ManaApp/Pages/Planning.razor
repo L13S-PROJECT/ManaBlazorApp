@@ -126,7 +126,7 @@
 
 @if (isEditSalesPopupOpen)
 {
-    <SalesEditDialog
+        <SalesEditDialog
         Items="editSalesItems"
         OnClose="CloseEditSalesPopup" />
 }
@@ -996,16 +996,23 @@ private async Task OnSellPopupConfirmed(SalesAllocateResult result)
 // Do NOT change existing logic, filters, or structure
 // Do NOT add fallbacks or new logic
 
+var stockBatches = selections
+    .Where(s => s.FromStock > 0)
+    .Select(s =>
+    {
+        var avail = sellBatches
+            .FirstOrDefault(b => b.BatchProductId == s.BatchProductId);
 
-    var stockBatches = selections
-        .Where(s => s.FromStock > 0)
-        .Select(s => new SalesBatchItem
+        return new SalesBatchItem
         {
             BatchProductId = s.BatchProductId,
-            BatchCode = s.BatchCode,    
-            Qty = s.FromStock
-        })
-        .ToList();
+            BatchCode      = s.BatchCode,
+            Qty            = s.FromStock,
+            AvailableQty   = avail?.StockQty ?? 0
+        };
+    })
+    .ToList();
+
 
     if (stockBatches.Count > 0)
     {
@@ -1023,11 +1030,18 @@ private async Task OnSellPopupConfirmed(SalesAllocateResult result)
 
 var assemblyBatches = selections
     .Where(s => s.FromAssembly > 0)
-    .Select(s => new SalesBatchItem
+    .Select(s =>
     {
-        BatchProductId = s.BatchProductId,
-        BatchCode      = s.BatchCode,
-        Qty            = s.FromAssembly
+        var avail = sellBatches
+            .FirstOrDefault(b => b.BatchProductId == s.BatchProductId);
+
+        return new SalesBatchItem
+        {
+            BatchProductId = s.BatchProductId,
+            BatchCode      = s.BatchCode,
+            Qty            = s.FromAssembly,
+            AvailableQty   = avail?.AssemblyQty ?? 0
+        };
     })
     .ToList();
 
@@ -1074,13 +1088,14 @@ private void OpenEditSalesPopup()
             IsAssembly  = item.IsAssembly,
 
             Batches = item.Batches
-                .Select(b => new SalesBatchItem
-                {
-                    BatchProductId = b.BatchProductId,
-                    BatchCode      = b.BatchCode,
-                    Qty            = b.Qty
-                })
-                .ToList()
+            .Select(b => new SalesBatchItem
+            {
+                BatchProductId = b.BatchProductId,
+                BatchCode      = b.BatchCode,
+                Qty            = b.Qty,
+                AvailableQty   = b.AvailableQty   // ⬅️ Svarīgi, lai parādās apjoms pie popupā
+            })
+            .ToList()
         })
         .ToList();
 
