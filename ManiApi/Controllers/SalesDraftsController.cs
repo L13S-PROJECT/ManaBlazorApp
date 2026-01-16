@@ -47,10 +47,15 @@ LIMIT 1;
             await using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
-SELECT Version_Id, Qty, IsAssembly
-FROM sales_draft_items
-WHERE SalesDraft_Id = @did; 
-";
+                    SELECT
+                        Version_Id,
+                        BatchProduct_Id,
+                        BatchCode,
+                        Qty,
+                        IsAssembly
+                    FROM sales_draft_items
+                    WHERE SalesDraft_Id = @did;
+                    ";
                 var p = cmd.CreateParameter();
                 p.ParameterName = "@did";
                 p.Value = draftId.Value;
@@ -60,12 +65,13 @@ WHERE SalesDraft_Id = @did;
                 while (await r.ReadAsync())
                 {
                     items.Add(new
-                {
-                    VersionId = r.GetInt32(0),
-                    Qty = r.GetInt32(1),
-                    IsAssembly = r.GetBoolean(2)
-                });
-
+                            {
+                                VersionId       = r.GetInt32(0),
+                                BatchProductId  = r.GetInt32(1),
+                                BatchCode       = r.GetString(2),
+                                Qty             = r.GetInt32(3),
+                                IsAssembly      = r.GetBoolean(4)
+                            });
                 }
             }
 
@@ -126,17 +132,20 @@ foreach (var it in dto.Items)
     cmd.Transaction = tx;
 cmd.CommandText = @"
 INSERT INTO sales_draft_items
-    (SalesDraft_Id, Version_Id, IsAssembly, Qty)
+    (SalesDraft_Id, Version_Id, BatchProduct_Id, BatchCode, IsAssembly, Qty)
 VALUES
-    (@did, @vid, @isAsm, @qty)
+    (@did, @vid, @bpid, @bcode, @isAsm, @qty)
 ON DUPLICATE KEY UPDATE
     Qty = VALUES(Qty);
 ";
 
 cmd.Parameters.Add(new MySqlParameter("@did", draftId));
 cmd.Parameters.Add(new MySqlParameter("@vid", it.VersionId));
+cmd.Parameters.Add(new MySqlParameter("@bpid", it.BatchProductId));
+cmd.Parameters.Add(new MySqlParameter("@bcode", it.BatchCode));
 cmd.Parameters.Add(new MySqlParameter("@isAsm", it.IsAssembly ? 1 : 0));
 cmd.Parameters.Add(new MySqlParameter("@qty", it.Qty));
+
 
     await cmd.ExecuteNonQueryAsync();
 }
@@ -179,97 +188,53 @@ LIMIT 1;";
         }
 
         // 2️⃣ nolasa drafta rindas
-        var draftItems = new List<(int VersionId, bool IsAssembly, int Qty)>();
+        var draftItems = new List<(int VersionId, int BatchProductId, bool IsAssembly, int Qty)>();
 
         await using (var cmd = conn.CreateCommand())
         {
             cmd.Transaction = tx;
             cmd.CommandText = @"
-SELECT Version_Id, IsAssembly, Qty
+SELECT Version_Id, BatchProduct_Id, IsAssembly, Qty
 FROM sales_draft_items
-WHERE SalesDraft_Id = @did;";
+WHERE SalesDraft_Id = @did;
+";
             cmd.Parameters.Add(new MySqlParameter("@did", draftId));
 
             await using var r = await cmd.ExecuteReaderAsync();
             while (await r.ReadAsync())
             {
                 draftItems.Add((
-                    r.GetInt32(0),
-                    r.GetBoolean(1),
-                    r.GetInt32(2)
+                    r.GetInt32(0), // VersionId
+                    r.GetInt32(1), // BatchProductId
+                    r.GetBoolean(2),
+                    r.GetInt32(3)
                 ));
+
             }
         }
 
         // 3️⃣ apstrādājam katru rindu
         foreach (var item in draftItems)
         {
-            var remaining = item.Qty;
+    
             var moveType = item.IsAssembly ? "ASSEMBLY" : "STOCK";
 
-            // atrodam batchproductus ar atlikumu (FIFO)
-            var batches = new List<(int BatchProductId, int AvailableQty)>();
-
-            await using (var cmd = conn.CreateCommand())
-            {
-                cmd.Transaction = tx;
-                cmd.CommandText = @"
-SELECT
-    bp.ID,
-    (bp.Planned_Qty - COALESCE(SUM(sm.Stock_Qty),0)) AS AvailableQty
-FROM batches_products bp
-JOIN batches b ON b.ID = bp.Batch_Id
-LEFT JOIN stock_movements sm 
-       ON sm.BatchProduct_ID = bp.ID
-       AND sm.IsActive = 1
-WHERE
-    bp.Version_Id = @vid
-    AND bp.IsActive = 1
-    AND b.IsActive = 1
-GROUP BY bp.ID, bp.Planned_Qty
-HAVING AvailableQty > 0
-ORDER BY bp.ID ASC;";
-
-
-                cmd.Parameters.Add(new MySqlParameter("@vid", item.VersionId));
-                cmd.Parameters.Add(new MySqlParameter("@type", moveType));
-
-                await using var r = await cmd.ExecuteReaderAsync();
-                while (await r.ReadAsync())
-                {
-                    batches.Add((
-                        r.GetInt32(0),
-                        r.GetInt32(1)
-                    ));
-                }
-            }
-
-            foreach (var b in batches)
-            {
-                if (remaining <= 0)
-                    break;
-
-                var take = Math.Min(b.AvailableQty, remaining);
-
-                await using var ins = conn.CreateCommand();
-                ins.Transaction = tx;
-                ins.CommandText = @"
+await using var ins = conn.CreateCommand();
+            ins.Transaction = tx;
+            ins.CommandText = @"
 INSERT INTO stock_movements
-(BatchProduct_ID, Move_Type, Stock_Qty, IsActive)
+(Version_ID, BatchProduct_ID, Move_Type, Stock_Qty, IsActive)
 VALUES
-(@bp, @type, @qty, 1);";
+(@vid, @bp, @type, @qty, 1);
+";
 
-                ins.Parameters.Add(new MySqlParameter("@bp", b.BatchProductId));
-                ins.Parameters.Add(new MySqlParameter("@type", moveType));
-                ins.Parameters.Add(new MySqlParameter("@qty", -take));
+            ins.Parameters.Add(new MySqlParameter("@vid", item.VersionId));
+            ins.Parameters.Add(new MySqlParameter("@bp",  item.BatchProductId));
+            ins.Parameters.Add(new MySqlParameter("@type", moveType));
+            ins.Parameters.Add(new MySqlParameter("@qty", -item.Qty));
 
-                await ins.ExecuteNonQueryAsync();
 
-                remaining -= take;
-            }
-
-            if (remaining > 0)
-                throw new Exception($"Nepietiek atlikuma VersionId={item.VersionId} ({moveType})");
+await ins.ExecuteNonQueryAsync();
         }
 
         // 4️⃣ atzīmējam draftu kā committed
@@ -327,8 +292,11 @@ WHERE Is_Committed = 0;
 public sealed class SalesDraftItemDto
 {
     public int VersionId { get; set; }
+    public int BatchProductId { get; set; }
+    public string BatchCode { get; set; } = "";
     public int Qty { get; set; }
-    public bool IsAssembly { get; set; }   // ← JAUNS
+    public bool IsAssembly { get; set; }
 }
+
 
 }

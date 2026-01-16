@@ -326,6 +326,7 @@ public async Task<IActionResult> GetProductionBatches([FromQuery] int batch_type
     await using var cmd = conn.CreateCommand();
     cmd.CommandText = @"
 SELECT
+    bp.ID                              AS BatchProductId,
     bp.Version_Id                      AS VersionId,
     p.Product_Name                     AS ProductName,
     p.Product_Code                     AS ProductCode,
@@ -452,31 +453,32 @@ SUM(
     -- Assembly FINISH:
     -- ir vismaz viens Assembly ar 3
     -- UN vairs nav neviena Assembly ar 1/2/5
-    SUM(
-        CASE
-            WHEN EXISTS (
-                    SELECT 1
-                    FROM tasks t
-                    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-                    WHERE t.BatchProduct_ID = bp.ID
-                      AND t.IsActive = 1
-                      AND ts.Step_Type = 2
-                      AND t.Tasks_Status = 3
-                )
-                AND NOT EXISTS (
-                    SELECT 1
-                    FROM tasks t
-                    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-                    WHERE t.BatchProduct_ID = bp.ID
-                      AND t.IsActive = 1
-                      AND ts.Step_Type = 2
-                      AND t.Tasks_Status IN (1,2,5)
-                )
-            THEN bp.Planned_Qty
-            ELSE 0
-        END
-    ) AS Done
-    ,
+-- Assembly FINISH:
+SUM(
+    CASE
+        WHEN EXISTS (
+            SELECT 1
+            FROM tasks t
+            JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+            WHERE t.BatchProduct_ID = bp.ID
+              AND t.IsActive = 1
+              AND ts.Step_Type = 2
+              AND t.Tasks_Status = 3
+        )
+        AND NOT EXISTS (
+            SELECT 1
+            FROM tasks t
+            JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+            WHERE t.BatchProduct_ID = bp.ID
+              AND t.IsActive = 1
+              AND ts.Step_Type = 2
+              AND t.Tasks_Status IN (1,2,5)
+        )
+        THEN bp.Planned_Qty
+        ELSE 0
+    END
+) AS Done
+,
 SUM((
     SELECT COALESCE(SUM(t.Qty_Done),0)
     FROM tasks t
@@ -512,17 +514,18 @@ ORDER BY
     await using var r = await cmd.ExecuteReaderAsync();
     while (await r.ReadAsync())
     {
-     list.Add(new
+list.Add(new
 {
-    VersionId          = r.GetInt32(0),
-    ProductName        = r.GetString(1),
-    ProductCode        = r.GetString(2),
-    Planned            = r.GetInt32(3),
-    DetailedInProgress = r.GetInt32(4),
-    DetailedFinish     = r.GetInt32(5),
-    Assembly           = r.GetInt32(6),
-    Done               = r.GetInt32(7),
-    FinishingInProgress = r.GetInt32(8)   // ← JAUNA KOLONNA
+    BatchProductId      = r.GetInt32(0),
+    VersionId           = r.GetInt32(1),
+    ProductName         = r.GetString(2),
+    ProductCode         = r.GetString(3),
+    Planned             = r.GetInt32(4),
+    DetailedInProgress  = r.GetInt32(5),
+    DetailedFinish      = r.GetInt32(6),
+    Assembly            = r.GetInt32(7),
+    Done                = r.GetInt32(8),
+    FinishingInProgress = r.GetInt32(9)
 });
 
     }

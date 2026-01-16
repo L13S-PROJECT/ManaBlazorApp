@@ -6,7 +6,7 @@
 @using Syncfusion.Blazor.Grids
 @inject IJSRuntime JS
 @using ManaApp.Shared
-@using ManaApp.Pages
+
 @using ManaApp.Models
 @using ManaApp.Components
 
@@ -150,13 +150,16 @@ private bool isCreatingDraft = false;
 
 private string? createPlanError;
 
+private bool isInitializing = true;
+
 protected override async Task OnInitializedAsync()
 {
     await ReloadPlanningDataAsync();
-    await LoadDraftAsync();       // batch draft
-    await LoadSalesDraftAsync();  // ⬅️ SALES DRAFT
-}
+    await LoadDraftAsync();
+    await LoadSalesDraftAsync();
 
+    isInitializing = false;
+}
 
 // "-" popup stāvoklis
 private bool isMinusOpen = false;
@@ -315,7 +318,8 @@ private async Task ReloadPlanningDataAsync()
     await LoadSummariesForRows(rows);
 
     // 3) Batch dati (Planned / Detailed / Assembly)
-    var plannedList = await Http.GetFromJsonAsync<List<BatchPlannedRow>>(
+    var plannedList = await Http.GetFromJsonAsync<List<ManaApp.Models.BatchPlannedRow>>(
+
         "http://localhost:5270/api/batches/list?batch_type=1")
         ?? new();
 
@@ -339,6 +343,13 @@ private async Task ReloadPlanningDataAsync()
         .GroupBy(x => x.VersionId)
         .ToDictionary(g => g.Key, g => g.Sum(x => x.AssemblyFinish));
 
+// ⬇ atņemam pārdoto ASSEMBLY no UI (pēc commit)
+    var soldAssemblyByVersion = salesItems
+        .Where(x => x.IsAssembly)
+        .GroupBy(x => x.VersionId)
+        .ToDictionary(g => g.Key, g => g.Sum(x => x.Qty));
+
+
     // 4) Aizpildām rindas
     foreach (var r in rows)
     {
@@ -358,11 +369,17 @@ private async Task ReloadPlanningDataAsync()
         r.DetailedInProgress = detailedInProgressByVersion.TryGetValue(vid, out var d) ? d : 0;
         r.DetailedFinish = detailedFinishByVersion.TryGetValue(vid, out var df) ? df : 0;
         r.AssemblyINProgress = assemblyInProgressByVersion.TryGetValue(vid, out var ap) ? ap : 0;
-        r.AssemblyFinish = assemblyFinishByVersion.TryGetValue(vid, out var af) ? af : 0;
+        r.AssemblyFinish =
+    assemblyFinishByVersion.TryGetValue(vid, out var af) ? af : 0;
+    
+
+            if (r.AssemblyFinish < 0)
+                r.AssemblyFinish = 0;
+
     }
 
     // 5) Sakārtojam
-    rows = allRows
+    rows = rows
         .OrderBy(r => r.categoryName)
         .ThenBy(r => r.productName)
         .ToList();
@@ -378,6 +395,36 @@ private async Task ReloadPlanningDataAsync()
     }
 }
 
+// 6b) UI KOREKCIJA: atņemam pārdoto ASSEMBLY pa BatchProductId (neatkarīgi no versijas)
+var soldAssemblyByBatchProduct = salesItems
+    .Where(x => x.IsAssembly)
+    .SelectMany(x => x.Batches)
+    .GroupBy(b => b.BatchProductId)
+    .ToDictionary(g => g.Key, g => g.Sum(b => b.Qty));
+
+foreach (var r in rows)
+{
+    if (r.VersionId is not int vid || vid <= 0)
+        continue;
+
+    // atrodam VISUS batchus šai versijai
+    var batchProducts = plannedList
+        .Where((ManaApp.Models.BatchPlannedRow p) => p.VersionId == vid)
+        .Select((ManaApp.Models.BatchPlannedRow p) => p.BatchProductId)
+        .Distinct();
+
+    var soldAsm = batchProducts
+        .Where(bpId => soldAssemblyByBatchProduct.ContainsKey(bpId))
+        .Sum(bpId => soldAssemblyByBatchProduct[bpId]);
+
+    if (soldAsm > 0)
+    {
+        r.AssemblyFinish = Math.Max(0, r.AssemblyFinish - soldAsm);
+    }
+}
+
+
+// Uztaisām "viena rinda uz produktu" + bērni = versijas
 // Uztaisām "viena rinda uz produktu" + bērni = versijas
 groupedRows = rows
     .GroupBy(r =>
@@ -391,6 +438,19 @@ groupedRows = rows
 
         var first = g.First();
 
+var soldAsmTotal = salesItems
+    .Where(x => x.IsAssembly)
+    .Sum(x =>
+        g.Any(v => v.VersionId == x.VersionId)
+            ? x.Qty
+            : 0
+    );
+
+var asmFinish = g.Sum(x => x.AssemblyFinish) - soldAsmTotal;
+if (asmFinish < 0)
+    asmFinish = 0;
+
+
         return new ProductGroupRow
         {
             CategoryName = cat,
@@ -402,10 +462,7 @@ groupedRows = rows
             DetailedInProgress = g.Sum(x => x.DetailedInProgress),
             DetailedFinish     = g.Sum(x => x.DetailedFinish),
             AssemblyINProgress = g.Sum(x => x.AssemblyINProgress),
-            AssemblyFinish     = g.Sum(x => x.AssemblyFinish),
-            FinishingInProgress= g.Sum(x => x.FinishingInProgress),
-            FinishingAllocated = g.Sum(x => x.FinishingAllocated),
-
+            AssemblyFinish = asmFinish,
             Versions = g
                 .OrderByDescending(x => x.VersionId ?? 0) // jaunākā augšā
                 .ToList()
@@ -870,39 +927,30 @@ private List<SalesCartItem> editSalesItems = new();
 
 private async Task OnSalesSold()
 {
-    var ok = await JS.InvokeAsync<bool>("confirm", "Apstiprināt pārdošanu?");
-    if (!ok) return;
+    var ok = await JS.InvokeAsync<bool>(
+        "confirm",
+        "Apstiprināt pārdošanu?"
+    );
 
-    foreach (var it in salesItems)
+    if (!ok)
+        return;
+
+    var resp = await Http.PostAsync(
+        "http://localhost:5270/api/sales-drafts/commit",
+        null
+    );
+
+    if (!resp.IsSuccessStatusCode)
     {
-        // ⚠️ pieņemam, ka batch sadalījums jau ir sagatavots
-        foreach (var b in it.Batches)   // List<BatchProductId + Qty>
-        {
-            var dto = new StockMoveDto
-            {
-                Version_ID = it.VersionId,
-                From = it.IsAssembly ? "ASSEMBLY" : "STOCK",
-                Qty = b.Qty,
-                BatchProduct_ID = b.BatchProductId
-            };
-
-            var resp = await Http.PostAsJsonAsync(
-                "http://localhost:5270/api/stockmovements/move",
-                dto
-            );
-
-            if (!resp.IsSuccessStatusCode)
-            {
-                var err = await resp.Content.ReadAsStringAsync();
-                await JS.InvokeVoidAsync("alert", err);
-                return;
-            }
-        }
+        var err = await resp.Content.ReadAsStringAsync();
+        await JS.InvokeVoidAsync("alert", err);
+        return;
     }
 
-    // UI reset + reload
+    // UI RESET pēc commit
     salesItems.Clear();
     await ReloadPlanningDataAsync();
+    batchPanelRef?.Refresh();
     StateHasChanged();
 }
 
@@ -1064,10 +1112,16 @@ var assemblyBatches = selections
     }
 
     isSellPopupOpen = false;
-    sellVersionId = null;
-    batchPanelRef?.Refresh();
-    await InvokeAsync(StateHasChanged);
-    await SaveSalesDraftAsync();
+sellVersionId = null;
+
+await SaveSalesDraftAsync();     // 1️⃣ saglabā draftu
+await LoadSalesDraftAsync();     // 2️⃣ atjauno salesItems no DB
+await ReloadPlanningDataAsync(); // 3️⃣ pārrēķina ASM.F
+
+
+batchPanelRef?.Refresh();
+await SaveSalesDraftAsync();
+
 
 }
 
@@ -1150,14 +1204,22 @@ private Task OnEditSalesSaved(List<SalesCartItem> updatedItems)
 
 private async Task SaveSalesDraftAsync()
 {
+    if (isInitializing)
+        return;
+
     var dto = new
     {
-        Items = salesItems.Select(it => new
-        {
-            VersionId  = it.VersionId,
-            Qty        = it.Qty,
-            IsAssembly = it.IsAssembly
-        }).ToList()
+        Items = salesItems
+            .SelectMany(it => it.Batches.Select(b => new
+            {
+                VersionId      = it.VersionId,
+                BatchProductId = b.BatchProductId,
+                BatchCode      = b.BatchCode,
+                Qty            = b.Qty,
+                IsAssembly     = it.IsAssembly
+            }))
+            .Where(x => x.Qty > 0)
+            .ToList()
     };
 
     await Http.PostAsJsonAsync(
@@ -1168,7 +1230,7 @@ private async Task SaveSalesDraftAsync()
 
 private async Task LoadSalesDraftAsync()
 {
-    var resp = await Http.GetAsync(
+      var resp = await Http.GetAsync(
         "http://localhost:5270/api/sales-drafts/last"
     );
 
@@ -1181,40 +1243,61 @@ private async Task LoadSalesDraftAsync()
 
     salesItems.Clear();
 
-    foreach (var it in draft.Items)
-    {
-        var row = rows.FirstOrDefault(r => r.VersionId == it.VersionId);
-var apiRows = await Http.GetFromJsonAsync<List<ApiBatchRow>>(
-    $"http://localhost:5270/api/stockmovements/available-by-batch?versionId={it.VersionId}");
+var grouped = draft.Items
+    .GroupBy(x => new { x.VersionId, x.IsAssembly });
 
-var batches = apiRows?
-    .Where(x => it.IsAssembly
-        ? x.MoveType == "ASSEMBLY"
-        : x.MoveType == "STOCK")
-    .Select(x => new SalesBatchItem
-    {
-        BatchProductId = x.BatchProductId,
-        BatchCode      = x.BatchCode,
-        Qty            = 0,                 // ⬅️ sākumā 0, LABOT popupā lietotājs saliek
-        AvailableQty   = x.AvailableQty
-    })
-    .ToList()
-    ?? new();
-
-salesItems.Add(new SalesCartItem
+foreach (var g in grouped)
 {
-    VersionId   = it.VersionId,
-    ProductName = row?.productName ?? "",
-    VersionName = row?.versionName,
-    Qty         = it.Qty,
-    InStock     = row?.InStock ?? 0,
-    IsAssembly  = it.IsAssembly,
-    Batches     = batches
-});
+    var row = rows.FirstOrDefault(r => r.VersionId == g.Key.VersionId);
 
+    salesItems.Add(new SalesCartItem
+    {
+        VersionId   = g.Key.VersionId,
+        ProductName = row?.productName ?? "",
+        VersionName = row?.versionName,
+        IsAssembly  = g.Key.IsAssembly,
+
+        // summa no batchiem
+        Qty = g.Sum(x => x.Qty),
+
+        InStock = row?.InStock ?? 0,
+
+        // ⬅️ KRITISKI: batchi nāk NO DRAFTA, nevis no API
+        Batches = g.Select(x => new SalesBatchItem
+        {
+            BatchProductId = x.BatchProductId,
+            BatchCode      = x.BatchCode,
+            Qty            = x.Qty,
+            AvailableQty   = 0   // draft = patiesība
+        }).ToList()
+    });
+}
+
+// 🔹 ielādējam REĀLO pieejamo atlikumu no noliktavas
+foreach (var item in salesItems)
+{
+    var apiRows = await Http.GetFromJsonAsync<List<ApiBatchRow>>(
+        $"http://localhost:5270/api/stockmovements/available-by-batch?versionId={item.VersionId}");
+
+    if (apiRows == null)
+        continue;
+
+    foreach (var b in item.Batches)
+    {
+        var api = apiRows.FirstOrDefault(x =>
+            x.BatchProductId == b.BatchProductId &&
+            (item.IsAssembly
+                ? x.MoveType == "ASSEMBLY"
+                : x.MoveType == "STOCK"));
+
+        if (api != null)
+            b.AvailableQty = api.AvailableQty;
     }
+}
 
-    batchPanelRef?.Refresh();
+batchPanelRef?.Refresh();
+StateHasChanged();
+
 }
 
 private sealed class SalesDraftDto
@@ -1226,9 +1309,10 @@ private sealed class SalesDraftDto
 private sealed class SalesDraftItemDto
 {
     public int VersionId { get; set; }
+    public int BatchProductId { get; set; }   // pievienots 16.01.2026
+    public string BatchCode { get; set; } = ""; // pievienots 16.01.2026
     public int Qty { get; set; }
     public bool IsAssembly { get; set; }
 }
-
 
 }
