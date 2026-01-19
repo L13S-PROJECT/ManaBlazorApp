@@ -5,6 +5,8 @@
 @using System.Net.Http.Json
 @using System.Text.Json.Serialization
 @using Syncfusion.Blazor.Grids
+@using ManaApp.Models
+@using ManaApp.Components
 
 
 <div class="productiontasks-layout">
@@ -743,10 +745,10 @@ var aggByVersion = plannedList
             // In progress: viss, kas NAV “tikai plānots”
             // DetailedInProgress + DetailedFinish + Assembly + Done
             InProgress = g.Sum(x =>
-                x.DetailedInProgress +
-                x.DetailedFinish +
-                x.Assembly +
-                x.Done)
+            x.DetailedInProgress +
+            x.DetailedFinish +
+            x.AssemblyInProgress +
+            x.AssemblyFinish)
         }
     );
 
@@ -2077,40 +2079,6 @@ private sealed class MoveRequestDto
     // JAUNS LAUKS – tas pats, kas dto.Batch_Id API pusē
     public int? Batch_Id { get; set; }
 }
-
-public sealed class BatchPlannedRow
-{
-    [JsonPropertyName("versionId")]
-    public int VersionId { get; set; }
-
-    [JsonPropertyName("batchProductId")]
-    public int BatchProductId { get; set; }
-    
-    [JsonPropertyName("productName")]
-    public string ProductName { get; set; } = "";
-
-    [JsonPropertyName("productCode")]
-    public string ProductCode { get; set; } = "";
-
-    [JsonPropertyName("planned")]
-    public int Planned { get; set; }
-
-    [JsonPropertyName("detailedInProgress")]
-    public int DetailedInProgress { get; set; }
-
-    // 🔹 JAUNS LAUKS – DetailedFinish no /api/batches/list
-    [JsonPropertyName("detailedFinish")]
-    public int DetailedFinish { get; set; }
-
-    // Assembly IN PROGRESS
-    [JsonPropertyName("assembly")]
-    public int Assembly { get; set; }
-
-    // Assembly FINISH (Done)
-    [JsonPropertyName("done")]
-    public int Done { get; set; }
-}
-
 
 // Detailed informācijas kopsavilkums pa (BatchId:ProductToPartId)
 // Detailed informācijas kopsavilkums pa (BatchProductId:ProductToPartId)

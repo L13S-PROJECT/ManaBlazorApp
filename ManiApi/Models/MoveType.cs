@@ -8,6 +8,6 @@ namespace ManiApi.Models
         FINISHING,
         STOCK,
         SCRAP,
-        OUT      // ← JAUNS: pārdošana/izdošana no noliktavas
+        OUT      // ← JAUNS: pārdošana/izdošana no noliktavas -> būs vajadzigs SOLD vai OUT 19.01.2025
     }
 }

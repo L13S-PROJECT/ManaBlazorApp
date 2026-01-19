@@ -362,24 +362,26 @@ SUM(
 -- UN ir vēl kāds Detailed ar 1/2/5 (tātad nav 100% pabeigts)
 SUM(
     CASE
+        -- Detailed ir sācies
         WHEN EXISTS (
-                SELECT 1
-                FROM tasks t
-                JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-                WHERE t.BatchProduct_ID = bp.ID
-                  AND t.IsActive = 1
-                  AND ts.Step_Type = 1
-                  AND t.Tasks_Status IN (2,3)
-            )
-            AND EXISTS (
-                SELECT 1
-                FROM tasks t
-                JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-                WHERE t.BatchProduct_ID = bp.ID
-                  AND t.IsActive = 1
-                  AND ts.Step_Type = 1
-                  AND t.Tasks_Status IN (1,2,5)
-            )
+            SELECT 1
+            FROM tasks t
+            JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+            WHERE t.BatchProduct_ID = bp.ID
+              AND t.IsActive = 1
+              AND ts.Step_Type = 1
+              AND t.Tasks_Status IN (2,3)
+        )
+        -- Bet vēl NAV pilnībā pabeigts
+        AND EXISTS (
+            SELECT 1
+            FROM tasks t
+            JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+            WHERE t.BatchProduct_ID = bp.ID
+              AND t.IsActive = 1
+              AND ts.Step_Type = 1
+              AND t.Tasks_Status <> 3
+        )
         THEN bp.Planned_Qty
         ELSE 0
     END
