@@ -1,0 +1,284 @@
+@media print {
+
+    /* noņemam layout */
+    nav,
+    aside,
+    .sidebar,
+    .top-row,
+    .app-header {
+        display: none !important;
+    }
+
+    /* izplešam galveno saturu */
+    main {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    /* drukājam tikai pavadzīmi */
+    .delivery-note {
+        position: relative;
+        width: 100%;
+    }
+
+    /* pogas drukā neredz */
+    button {
+        display: none !important;
+    }
+}
+
+@page {
+    size: A4;
+    margin: 20mm;
+}
+
+@media print {
+    html, body {
+        background: white;
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}
+
+.screen-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: #f5f5f5;
+    border-bottom: 1px solid #ccc;
+}
+
+.app-name {
+    font-weight: 600;
+}
+
+@media print {
+    .screen-header {
+        display: none;
+    }
+}
+
+.doc-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.doc-header input {
+    width: 300px;
+}
+
+.totals {
+    margin-top: 16px;
+    text-align: right;
+}
+
+.signatures {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 40px;
+}
+
+.sign {
+    width: 45%;
+    text-align: left;
+}
+
+/* EKRĀNAM */
+.screen-wrapper {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 24px;
+}
+
+/* DRUKAI – pilns platums */
+@media print {
+    .screen-wrapper {
+        max-width: none;
+        margin: 0;
+        padding: 0;
+    }
+}
+
+.delivery-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+}
+
+.delivery-table th,
+.delivery-table td {
+    border: 1px solid #ccc;
+    padding: 6px 8px;
+}
+
+.delivery-table th {
+    background: #f2f2f2;
+    font-weight: 600;
+}
+
+/* skaitļi pa labi */
+.delivery-table td:nth-child(4),
+.delivery-table td:nth-child(6),
+.delivery-table td:nth-child(7) {
+    text-align: right;
+}
+
+/* šaurākas tehniskās kolonnas */
+.delivery-table th:nth-child(4),
+.delivery-table td:nth-child(4) {
+    width: 80px; /* Qty */
+}
+
+.delivery-table th:nth-child(6),
+.delivery-table td:nth-child(6),
+.delivery-table th:nth-child(7),
+.delivery-table td:nth-child(7) {
+    width: 100px; /* Cena, Summa */
+}
+
+.print-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.company-left {
+    width: 40%;
+}
+
+.company-right {
+    width: 55%;
+    text-align: right;
+    font-size: 13px;
+}
+
+.logo-placeholder {
+    width: 160px;
+    height: 60px;
+    border: 1px dashed #999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+    font-size: 12px;
+}
+
+.company-logo {
+    max-width: 160px;
+    max-height: 60px;
+    object-fit: contain;
+}
+
+/* Ievades lauki – izskatās kā teksts */
+.delivery-note input {
+    border: none;
+    outline: none;
+    background: transparent;
+    box-shadow: none;
+    padding: 2px 0;
+    border-bottom: 1px dotted #999;
+}
+
+/* Kad lietotājs klikšķina / raksta */
+.delivery-note input:focus {
+    border-bottom: 1px solid #000;
+}
+
+/* Drukā – vispār nekādu līniju */
+@media print {
+    .delivery-note input {
+        border-bottom: none;
+    }
+}
+
+/* Tukši inputi – redzami */
+.delivery-note input {
+    border: none;
+    outline: none;
+    background-color: #f6f6f6;
+    padding: 4px 6px;
+    min-width: 120px;
+}
+
+/* Ievades lauki – dokumenta stils */
+.delivery-note input {
+    border: none;
+    border-bottom: 1px solid #999;
+    background: #ffffff;
+    outline: none;
+    padding: 2px 4px;
+    min-width: 140px;
+    font: inherit;
+}
+
+/* Fokusā – nedaudz skaidrāk */
+.delivery-note input:focus {
+    border-bottom-color: #000;
+}
+
+/* Drukā – bez jebkādām līnijām */
+@media print {
+    .delivery-note input {
+        border-bottom: none;
+    }
+}
+.buyer-block {
+    margin: 12px 0 20px 0;
+    max-width: 420px;
+}
+
+.buyer-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.buyer-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.buyer-row span {
+    width: 90px;
+    font-size: 13px;
+}
+.left-toolbar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 220px; /* tieši kā sidebar */
+    height: 100vh;
+    background: #2f2f2f;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+.left-toolbar .back-btn {
+    width: 100%;
+    padding: 8px 12px;
+}
+
+.buyer-block {
+    margin: 12px 0 20px 0;
+    max-width: 520px;
+}
+
+.buyer-row {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.buyer-row span {
+    font-size: 13px;
+}

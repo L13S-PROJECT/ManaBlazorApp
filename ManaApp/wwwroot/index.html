@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
 <link href="_content/Syncfusion.Blazor.Themes/fluent.css" rel="stylesheet" />
 
-<link rel="stylesheet" href="css/app.css?v=fix41" />
+<link rel="stylesheet" href="css/app.css?v=fix42" />
 
 <link href="ManaApp.styles.css" rel="stylesheet" />
 
@@ -38,3 +38,14 @@
   <script src="_framework/blazor.webassembly.js"></script>
 </body>
 </html>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<script>
+    window.exportToExcel = function (rows) {
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Pavadzime");
+        XLSX.writeFile(wb, "pavadzime.xlsx");
+    };
+</script>

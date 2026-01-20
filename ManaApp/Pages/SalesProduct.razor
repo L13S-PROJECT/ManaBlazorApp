@@ -955,7 +955,8 @@ foreach (var item in salesItems)
                 : x.MoveType == "STOCK"));
 
         if (api != null)
-            b.AvailableQty = api.AvailableQty + b.Qty;
+    b.AvailableQty = api.AvailableQty;
+
 
     }
 }

@@ -6,14 +6,14 @@
 --bg-surface: #0f1a2b;
 
   /* text */
-  --text-main: #e5e7eb;
-  --text-muted: #9ca3af;
+  --text-main: #02060f;
+  --text-muted: #1d1d1d;
 
   /* borders */
   --border-soft: rgba(255,255,255,0.12);
 
   /* accent */
-  --accent: #3b82f6;
+  --accent: #09b941;
 
   /* radius & spacing */
   --radius-sm: 6px;

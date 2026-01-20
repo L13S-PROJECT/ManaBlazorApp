@@ -1,0 +1,306 @@
+@page "/sales-delivery-note"
+
+@inject HttpClient Http
+@inject IJSRuntime JS
+@layout PrintLayout
+@using ManaApp.Shared
+
+
+<div class="left-toolbar">
+    <button class="back-btn" @onclick="GoBack">
+        ← Atpakaļ
+    </button>
+</div>
+
+
+
+<div class="screen-wrapper">
+    <div class="delivery-note">
+
+<div class="print-header">
+    <div class="company-left">
+<img src="/images/logo_pz_1.svg"
+     alt="Uzņēmuma logo"
+     class="company-logo" />
+
+    </div>
+
+    <div class="company-right">
+        <div><b>SIA FMM</b></div>
+        <div>Reģ. Nr.: 4000XXXXXX</div>
+        <div>Adrese: Saldus, Latvija</div>
+        <div>PVN Nr.: LV4000XXXXXX</div>
+    </div>
+</div>
+
+<h2>Pavadzīme</h2>
+
+<div class="doc-header">
+    <div class="buyer-block">
+    <div class="buyer-title">Pircējs:</div>
+
+    <div class="buyer-row">
+        <span>Nosaukums:</span>
+        <input />
+    </div>
+
+    <div class="buyer-row">
+        <span>Reģ. Nr.:</span>
+        <input />
+    </div>
+
+    <div class="buyer-row">
+        <span>PVN Nr.:</span>
+        <input />
+    </div>
+
+    <div class="buyer-row">
+        <span>Adrese:</span>
+        <input />
+    </div>
+</div>
+
+
+    <div class="doc-date">
+        <label>Datums:</label><br />
+        <span>@DocumentDate.ToString("dd.MM.yyyy")</span>
+    </div>
+</div>
+
+<button @onclick="Print">Drukāt</button>
+<button @onclick="ExportExcel">Excel</button>
+
+
+@if (!Items.Any())
+
+{
+    <div>Nav datu</div>
+}
+else
+{
+    <table class="delivery-table">
+        <thead>
+            <tr>
+                <th>Produkts</th>
+                <th>Versija</th>
+                <th>Batch</th>
+                <th>Qty</th>
+                <th>Tips</th>
+                <th>Cena</th>
+                <th>Summa</th>
+
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var it in Items)
+{
+                <tr>
+                    <td>@(string.IsNullOrWhiteSpace(it.ProductName) ? it.VersionId.ToString() : it.ProductName)</td>
+                    <td>@(string.IsNullOrWhiteSpace(it.VersionName) ? it.VersionId.ToString() : it.VersionName)</td>
+                    <td>@string.Join(", ", it.Batches.Select(b => b.BatchCode))</td>
+                    <td>@it.Qty</td>
+                    <td>@(it.IsAssembly ? "Sakomplektēts" : "Krāsots")</td>
+                    <td>
+<input type="text"
+       inputmode="decimal"
+       @bind="PricesText[it]"
+       @onblur="() => NormalizePrice(it)"
+       style="width:80px" />
+
+
+                    </td>
+
+                    <td>
+
+                @((it.Qty * ParsePrice(it)).ToString("0.00"))
+
+                    </td>
+
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+</div>
+
+
+<div class="totals">
+    <div>Kopsumma: @SubTotal.ToString("0.00")</div>
+    <div>PVN (21%): @VatAmount.ToString("0.00")</div>
+    <div><b>Summa ar PVN: @TotalWithVat.ToString("0.00")</b></div>
+</div>
+
+<div class="amount-words">
+    Summa vārdiem: <i>@AmountInWords</i>
+</div>
+
+<div class="signatures">
+    <div class="sign">
+        Izsniedzējs:<br />
+        ____________________________
+    </div>
+
+    <div class="sign">
+        Saņēmējs:<br />
+        ____________________________
+    </div>
+</div>
+
+</div>
+
+@code {
+
+private SalesDraftDto? Draft;
+
+protected override async Task OnInitializedAsync()
+{
+    Draft = await Http.GetFromJsonAsync<SalesDraftDto>(
+        "http://localhost:5270/api/sales-drafts/last"
+    );
+
+    if (Draft != null)
+        Items = Draft.Items;
+}
+
+private sealed class SalesDraftDto
+{
+    public int DraftId { get; set; }
+    public List<SalesCartItem> Items { get; set; } = new();
+}
+
+private Dictionary<SalesCartItem, string> PricesText = new();
+
+private async Task Print()
+{
+    await JS.InvokeVoidAsync("window.print");
+}
+
+private IReadOnlyList<SalesCartItem> Items { get; set; }
+    = Array.Empty<SalesCartItem>();
+
+protected override void OnParametersSet()
+{
+    foreach (var it in Items)
+        if (!PricesText.ContainsKey(it))
+            PricesText[it] = "0.00";
+}
+
+  
+
+private void GoBack()
+{
+    JS.InvokeVoidAsync("history.back");
+}
+
+private string CustomerName = "";
+private DateTime DocumentDate = DateTime.Now;
+
+private decimal ParsePrice(SalesCartItem it)
+
+{
+    if (!PricesText.TryGetValue(it, out var txt))
+        return 0m;
+
+    txt = txt.Replace(',', '.');
+
+    return decimal.TryParse(txt, 
+        System.Globalization.NumberStyles.AllowDecimalPoint,
+        System.Globalization.CultureInfo.InvariantCulture,
+        out var val)
+        ? val
+        : 0m;
+}
+
+private void NormalizePrice(SalesCartItem it)
+{
+    var val = ParsePrice(it);
+    PricesText[it] = val.ToString("0.00");
+}
+
+private decimal SubTotal =>
+    Items.Sum(it => it.Qty * ParsePrice(it));
+
+
+private decimal VatAmount =>
+    SubTotal * 0.21m;
+
+private decimal TotalWithVat =>
+    SubTotal + VatAmount;
+
+private string AmountInWords
+{
+    get
+    {
+        var total = TotalWithVat;
+        var euros = (int)total;
+        var cents = (int)((total - euros) * 100);
+
+        return $"{NumberToWordsLv(euros)} eiro un {cents:00} centi";
+    }
+}
+
+private string NumberToWordsLv(int number)
+{
+    if (number == 0)
+        return "nulle";
+
+    string[] units =
+    {
+        "", "viens", "divi", "trīs", "četri", "pieci",
+        "seši", "septiņi", "astoņi", "deviņi"
+    };
+
+    string[] teens =
+    {
+        "desmit", "vienpadsmit", "divpadsmit", "trīspadsmit",
+        "četrpadsmit", "piecpadsmit", "sešpadsmit",
+        "septiņpadsmit", "astoņpadsmit", "deviņpadsmit"
+    };
+
+    string[] tens =
+    {
+        "", "", "divdesmit", "trīsdesmit", "četrdesmit",
+        "piecdesmit", "sešdesmit", "septiņdesmit",
+        "astoņdesmit", "deviņdesmit"
+    };
+
+    if (number < 10)
+        return units[number];
+
+    if (number < 20)
+        return teens[number - 10];
+
+    if (number < 100)
+        return tens[number / 10] +
+               (number % 10 > 0 ? " " + units[number % 10] : "");
+
+    if (number < 1000)
+        return units[number / 100] + " simti" +
+               (number % 100 > 0 ? " " + NumberToWordsLv(number % 100) : "");
+
+    if (number < 1_000_000)
+        return NumberToWordsLv(number / 1000) + " tūkstoši" +
+               (number % 1000 > 0 ? " " + NumberToWordsLv(number % 1000) : "");
+
+    return number.ToString();
+}
+
+private async Task ExportExcel()
+{
+var rows = Items.Select(it => new
+{
+    Produkts = it.ProductName,
+    Versija  = it.VersionName,
+    Batch    = string.Join(", ", it.Batches.Select(b => b.BatchCode)),
+    Qty      = it.Qty,
+    Tips     = it.IsAssembly ? "Sakomplektēts" : "Krāsots",
+    Cena     = ParsePrice(it).ToString("0.00"),
+    Summa    = (it.Qty * ParsePrice(it)).ToString("0.00")
+}).ToList();
+
+
+    await JS.InvokeVoidAsync("exportToExcel", rows);
+}
+
+}

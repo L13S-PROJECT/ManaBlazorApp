@@ -1,6 +1,7 @@
 @using ManaApp.Shared
 @using ManaApp.Components
 @using ManaApp.Models
+@inject NavigationManager Nav
 
 
 
@@ -8,6 +9,28 @@
 {
     
     <h4 class="panel-subtitle">Pievienotās preces</h4>
+
+    <div class="sales-actions">
+    <button class="action-btn"
+            @onclick="EditSalesRequested"
+            disabled="@(!SalesItems.Any())">
+        LABOT
+    </button>
+
+    <button class="action-btn"
+            @onclick="OnSold"
+            disabled="@(!SalesItems.Any())">
+        PĀRDOT
+    </button>
+
+    <button class="action-btn"
+        @onclick="OpenDeliveryNote"
+        disabled="@(!SalesItems.Any())">
+    RĒĶINS
+</button>
+
+</div>
+
 
     @if (SalesItems.Count == 0)
     {
@@ -18,25 +41,13 @@
     else
     {
         <div style="margin-top:12px;">
+
             @foreach (var it in SalesItems)
             {
                 <div class="sales-row">
                 <div class="sales-info-row">
 
     <div style="display:flex; gap:6px;">
-
-<button class="btn btn-sm"
-        @onclick:stopPropagation="true"
-        @onclick="EditSalesRequested">
-    Labot
-</button>
-
-
-    <button class="btn btn-sm btn-primary"
-            @onclick:stopPropagation="true"
-            @onclick="OnSoldClicked">
-        Pārdot
-    </button>
 </div>
 
     <span class="sales-name">
@@ -525,5 +536,11 @@ private async Task DeleteSalesItem(SalesCartItem item)
 
     StateHasChanged();
 }
+
+private void OpenDeliveryNote()
+{
+    Nav.NavigateTo("/sales-delivery-note", true);
+}
+
 
 }
