@@ -124,7 +124,19 @@ SELECT LAST_INSERT_ID();
                 }
             }
 
- 
+//  Dzēšam visas rindas, kas vairs nav UI draftā
+await using (var del = conn.CreateCommand())
+{
+    del.Transaction = tx;
+    del.CommandText = @"
+DELETE FROM sales_draft_items
+WHERE SalesDraft_Id = @did;
+";
+    del.Parameters.Add(new MySqlParameter("@did", draftId));
+    await del.ExecuteNonQueryAsync();
+}
+
+
             // 3️⃣ ieliekam jaunas rindas
 foreach (var it in dto.Items)
 {
@@ -136,7 +148,10 @@ INSERT INTO sales_draft_items
 VALUES
     (@did, @vid, @bpid, @bcode, @isAsm, @qty)
 ON DUPLICATE KEY UPDATE
-    Qty = VALUES(Qty);
+    Qty        = VALUES(Qty),
+    IsAssembly = VALUES(IsAssembly),
+    BatchCode  = VALUES(BatchCode);
+
 ";
 
 cmd.Parameters.Add(new MySqlParameter("@did", draftId));

@@ -1,0 +1,133 @@
+@using ManaApp.Models
+
+<div class="planning-container">
+<table class="excel-table">
+
+<thead>
+    <tr>
+        <th class="col-name">Nosaukums</th>
+        <th class="col-minus"></th>
+        <th>Stock</th>
+        <th>Plan</th>
+        <th>Det.IP</th>
+        <th>Det.F</th>
+        <th>Asm.IP</th>
+        <th>Asm.F</th>
+        <th>Fin.IP</th>
+    </tr>
+</thead>
+
+
+    <tbody>
+    @foreach (var cat in Groups.GroupBy(g => g.CategoryName))
+    {
+        <tr class="excel-category">
+            <td colspan="10">@cat.Key</td>
+        </tr>
+
+        @foreach (var grp in cat)
+{
+    <tr class="excel-row @(grp.IsExpanded ? "is-open" : "")"
+        @key="grp">
+
+
+                <td class="name-cell expandable">
+                    <span class="chevron"
+                        @onclick="() => grp.IsExpanded = !grp.IsExpanded">
+                        @(grp.IsExpanded ? "▾" : "▸")
+                    </span>
+
+                    <span class="product-name">
+                        @grp.ProductName
+                    </span>
+                </td>
+
+                <td class="minus-cell"></td>
+
+                <td>@grp.InStock</td>
+
+                <td class="planned-cell">
+                    <span class="planned-value">@grp.Planned</span>
+                </td>
+
+
+                <td>@grp.DetailedInProgress</td>
+                <td>@grp.DetailedFinish</td>
+                <td>@grp.AssemblyINProgress</td>
+                <td>@grp.AssemblyFinish</td>
+                <td>@grp.FinishingInProgress</td>
+            </tr>
+
+@if (grp.Versions is not null && grp.IsExpanded)
+{
+    @for (int i = 0; i < grp.Versions.Count; i++)
+    {
+        var ver = grp.Versions[i];
+        var isLast = i == grp.Versions.Count - 1;
+
+        <tr class="excel-detail @(isLast ? "last-detail" : "")">
+
+            <td class="name-cell detail-name">
+                <div class="detail-wrap">
+                    @grp.ProductName
+                    @if (!string.IsNullOrWhiteSpace(ver.versionName))
+                    {
+                        <span class="detail-version">(@ver.versionName)</span>
+                    }
+                </div>
+            </td>
+
+            <td class="minus-cell">
+                
+<button type="button"
+        class="instock-btn minus"
+        @onclick="() => OnSell.InvokeAsync(ver)">
+    –
+</button>
+
+
+            </td>
+
+            <td>
+                <span class="instock-value">@ver.InStock</span>
+            </td>
+
+            <td>
+                <div class="planned-cell">
+                    <span class="planned-value">@ver.Planned</span>
+                </div>
+            </td>
+
+            <td>@ver.DetailedInProgress</td>
+            <td>@ver.DetailedFinish</td>
+            <td>@ver.AssemblyINProgress</td>
+            <td>@ver.AssemblyFinish</td>
+            <td>@ver.FinishingInProgress</td>
+
+        </tr>
+        }
+        }
+        }
+        }
+    
+</tbody>
+
+</table>
+</div>
+
+
+@code {
+    [Parameter] 
+    public List<ProductGroupRow> Groups { get; set; } = new();
+
+[Parameter] public EventCallback<ProductRow> OnSell { get; set; }
+
+private async Task OpenSell(ProductRow row)
+{
+    if (OnSell.HasDelegate)
+        await OnSell.InvokeAsync(row);
+}
+
+
+}
+

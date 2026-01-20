@@ -2,111 +2,57 @@
 @using ManaApp.Components
 @using ManaApp.Models
 
-<div class="planning-batch-panel">
+
+
+@if (activeSheet == BatchPanelSheet.Sales)
+{
     
-@if (activeSheet == BatchPanelSheet.Production)
-{
+    <h4 class="panel-subtitle">Pievienotās preces</h4>
 
-    <h3 class="panel-title">
-        Jauns ražošanas plāns
-    </h3>
+    @if (SalesItems.Count == 0)
+    {
+        <div style="opacity:.6;font-size:13px;">
+            Nav pievienotu preču
+        </div>
+    }
+    else
+    {
+        <div style="margin-top:12px;">
+            @foreach (var it in SalesItems)
+            {
+                <div class="sales-row">
+                <div class="sales-info-row">
 
-    <div class="panel-field">
-        <label class="panel-label">
-            Pagaidu nosaukums:
-        </label>
-        
-        <input type="text"
-       class="panel-input draft-title"
-       value="@DraftTitle"
-       disabled
-       placeholder="Ražošanas plāns" />
+    <div style="display:flex; gap:6px;">
 
-
-    </div>
-
-    <div class="panel-field">
-        <label class="panel-label">
-            Komentārs
-        </label>
-
-<textarea class="panel-textarea"
-          placeholder="Komentārs"
-          @bind="Model.Comment"
-          @bind:event="oninput"
-          @bind:after="OnCommentChanged">
-</textarea>
-
-
-    </div>
-
-    <hr class="panel-separator" />
-
-<div class="panel-actions">
-<button type="button"
-        class="panel-btn danger"
-        disabled="@(Model.BatchId == null)"
-        @onclick="DeleteDraftClicked">
-    Dzēst melnrakstu
+<button class="btn btn-sm"
+        @onclick:stopPropagation="true"
+        @onclick="EditSalesRequested">
+    Labot
 </button>
 
 
-    <button type="button"
-        class="panel-btn primary"
-        disabled="@(Items.Count == 0)"
-        @onclick="OpenCreateDialog">
-    IZVEIDOT
-</button>
-
-</div>
-
-
-    <hr />
-
-<h4 class="panel-subtitle">Pievienotās preces</h4>
-
-@if (Items.Count == 0)
-{
-    <div style="opacity:.6;font-size:13px;">Nav pievienotu preču</div>
-}
-else
-{
-    <div style="margin-top:12px;">
-        @foreach (var it in Items)
-        {
-            <div style="display:grid;
-                        grid-template-columns:120px 1fr 60px 1fr;
-                        gap:8px;
-                        align-items:center;
-                        padding:6px 0;
-                        border-bottom:1px solid #e5e7eb;">
-                
-                <div>@it.Code</div>
-                <div>@it.Name</div>
-                <div>@it.Qty</div>
-                <div>@it.Comment</div>
-<div class="batch-row-actions">
-    <button class="icon-btn"
-        title="Labot"
-        @onclick="() => OpenEdit(it)">
-    ✏️
-</button>
-
-
-    <button class="icon-btn"
-            title="Dzēst"
-            @onclick="() => OnDelete.InvokeAsync(it)">
-        🗑️
+    <button class="btn btn-sm btn-primary"
+            @onclick:stopPropagation="true"
+            @onclick="OnSoldClicked">
+        Pārdot
     </button>
 </div>
 
-            </div>
-        }
-    </div>
+    <span class="sales-name">
+    @it.ProductName
+    <span class="sales-version">@it.VersionName</span>
+</span>
+    <span class="sales-type">@(it.IsAssembly ? "ASSEMBLY" : "STOCK")</span>
+    <span class="sales-qty">@it.Qty GB</span>
+</div>
+                       
+                </div>
+            }
+        </div>
+    }
 }
-}
-    </div>
-
+  
 <BatchLineEditDialog
     IsOpen="isEditOpen"
     IsOpenChanged="v => isEditOpen = v"
@@ -334,13 +280,12 @@ private void OpenEdit(BatchCartItem it)
 
     isEditOpen = true;
 }
-
 private enum BatchPanelSheet
 {
-    Production
+    Sales
 }
 
-private BatchPanelSheet activeSheet = BatchPanelSheet.Production;
+private BatchPanelSheet activeSheet = BatchPanelSheet.Sales;
 
 private CancellationTokenSource? _commentCts;
 
@@ -415,10 +360,13 @@ public void SetComment(string? comment)
 
 [Parameter]
 public int? BatchId { get; set; }
+
 protected override void OnParametersSet()
 {
     Model.BatchId = BatchId;
+    StateHasChanged();
 }
+
 
 private bool isCreateOpen = false;
 
@@ -543,16 +491,22 @@ private void CloseEditSalesDialog()
     editingSalesItem = null;
 }
 
-private void OnEditSalesConfirmed(int qty)
+[Parameter]
+public EventCallback OnAutosave { get; set; }
+
+private async Task OnEditSalesConfirmed(int qty)
+
 {
     if (editingSalesItem != null)
 {
     // Qty vienmēr rēķinām no batchiem
     editingSalesItem.Qty = editingSalesItem.Batches.Sum(b => b.Qty);
 }
+CloseEditSalesDialog();
+StateHasChanged();
+await OnAutosave.InvokeAsync();
 
-    CloseEditSalesDialog();
-    StateHasChanged();
+
 }
 
 private async Task DeleteSalesItem(SalesCartItem item)
@@ -571,6 +525,5 @@ private async Task DeleteSalesItem(SalesCartItem item)
 
     StateHasChanged();
 }
-
 
 }

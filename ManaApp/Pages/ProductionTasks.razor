@@ -1402,10 +1402,8 @@ private IEnumerable<PartLine> GetFinishingPartsForActiveBatch()
         var key = GetPartSelectionKey(part);
 
         // Plāns produktos: izmantojam Assembly, ja tas ir > 0, citādi Planned
-        var plannedProducts = _activeBatch.Assembly > 0
-            ? _activeBatch.Assembly
-            : _activeBatch.Planned;
 
+var plannedProducts = GetBaseAssemblyQty();
        
        // DB pusē jau nosūtītais uz Finishing (produktos)
 int finishedProducts = 0;
@@ -1475,14 +1473,10 @@ private int GetPlannedQuantity(PartLine part)
         return 0;
 
     // JA Assembly ir pabeigts (>0), Finishing drīkst ņemt TIKAI no Assembly
-    var baseQty = _activeBatch.Assembly > 0
-        ? _activeBatch.Assembly
-        : _activeBatch.Planned;
+var baseQty = GetBaseAssemblyQty();
+return part.Quantity * baseQty;
 
-    return part.Quantity * baseQty;
 }
-
-
 
 /// atzīmētās detaļas Detailed sarakstā (pēc BatchId + ProductToPartId)
 private readonly HashSet<string> _selectedPartKeys = new();
@@ -1868,8 +1862,8 @@ private async Task OnFinishingEditClick(PartLine part)
     _finishingPart = part;
 
     var batchId         = _activeBatch.BatchId;
-    var plannedProducts = _activeBatch.Planned;
-
+    var plannedProducts = GetBaseAssemblyQty();
+    
     // cik produktu jau ir aizsūtīts uz Finishing (no DB kopsavilkuma)
     var alreadySentProducts = 0;
     if (_finishingTotalByBatchId.TryGetValue(batchId, out var sent))
@@ -2394,9 +2388,8 @@ private IEnumerable<FinishingWaveRow> GetFinishingRowsForActiveBatch()
         ProductToPartId = part.ProductToPartId,
         PartName = part.TopPartName,
 
-        Planned = (_activeBatch.Assembly > 0)
-            ? _activeBatch.Assembly
-            : _activeBatch.Planned,
+     Planned = GetBaseAssemblyQty(),
+
 
         FinishingQty = 0,
         StartedAt = null,
@@ -2408,6 +2401,18 @@ private IEnumerable<FinishingWaveRow> GetFinishingRowsForActiveBatch()
     }
 
     return allRows;
+}
+
+private int GetBaseAssemblyQty()
+{
+    if (_activeBatch is null) return 0;
+
+    var total =
+        _activeBatch.Assembly +
+        _activeBatch.Finishing +
+        _activeBatch.Done;
+
+    return total > 0 ? total : _activeBatch.Planned;
 }
 
 private FinishingWaveRow? _finishingWave;

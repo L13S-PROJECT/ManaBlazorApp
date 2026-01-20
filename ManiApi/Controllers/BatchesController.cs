@@ -456,30 +456,15 @@ SUM(
     -- ir vismaz viens Assembly ar 3
     -- UN vairs nav neviena Assembly ar 1/2/5
 -- Assembly FINISH:
-SUM(
-    CASE
-        WHEN EXISTS (
-            SELECT 1
-            FROM tasks t
-            JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-            WHERE t.BatchProduct_ID = bp.ID
-              AND t.IsActive = 1
-              AND ts.Step_Type = 2
-              AND t.Tasks_Status = 3
-        )
-        AND NOT EXISTS (
-            SELECT 1
-            FROM tasks t
-            JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-            WHERE t.BatchProduct_ID = bp.ID
-              AND t.IsActive = 1
-              AND ts.Step_Type = 2
-              AND t.Tasks_Status IN (1,2,5)
-        )
-        THEN bp.Planned_Qty
-        ELSE 0
-    END
-) AS Done
+SUM((
+    SELECT COALESCE(SUM(sm.Stock_Qty), 0)
+    FROM stock_movements sm
+    WHERE sm.IsActive = 1
+      AND sm.Move_Type = 'ASSEMBLY'
+      AND sm.BatchProduct_ID = bp.ID
+)) AS Done
+
+
 ,
 SUM((
     SELECT COALESCE(SUM(t.Qty_Done),0)

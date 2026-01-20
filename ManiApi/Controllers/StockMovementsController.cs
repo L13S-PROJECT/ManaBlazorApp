@@ -487,7 +487,8 @@ SELECT
     bp.ID              AS BatchProductId,
     b.Batches_Code     AS BatchCode,
     sm.Move_Type       AS MoveType,
-    SUM(sm.Stock_Qty)  AS AvailableQty
+    SUM(sm.Stock_Qty) AS AvailableQty
+
 FROM stock_movements sm
 JOIN batches_products bp
     ON bp.ID = sm.BatchProduct_ID

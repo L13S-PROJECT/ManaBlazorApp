@@ -33,19 +33,23 @@
         <td>@b.StockQty</td>
         <td>
             <input type="number"
-                   min="0"
-                   max="@b.StockQty"
-                   @bind="b.SellFromStock"
-                   class="qty-input" />
+       min="0"
+       max="@b.StockQty"
+       @bind="b.SellFromStock"
+       @bind:event="oninput"
+       class="qty-input" />
+
         </td>
 
         <td>@b.AssemblyQty</td>
         <td>
             <input type="number"
-                   min="0"
-                   max="@b.AssemblyQty"
-                   @bind="b.SellFromAssembly"
-                   class="qty-input" />
+       min="0"
+       max="@b.AssemblyQty"
+       @bind="b.SellFromAssembly"
+       @bind:event="oninput"
+       class="qty-input" />
+
         </td>
     </tr>
 }
@@ -139,23 +143,36 @@ private async Task OnOk()
         StockTotal = Batches.Sum(b => b.SellFromStock),
         AssemblyTotal = Batches.Sum(b => b.SellFromAssembly),
         BatchSelections = Batches
-            .Where(b => b.SellFromStock > 0 || b.SellFromAssembly > 0)
+    .SelectMany(b =>
+    {
+        var list = new List<BatchSelection>();
 
-// STRICT UI DATA PASS-THROUGH
-// BatchSelection has BatchCode property
-// Copy BatchCode from b.BatchCode
-// Do NOT change any existing logic or calculations
-// Do NOT rename properties or variables
-
-
-            .Select(b => new BatchSelection
+        if (b.SellFromStock > 0)
+        {
+            list.Add(new BatchSelection
             {
                 BatchProductId = b.BatchProductId,
                 BatchCode = b.BatchCode,
                 FromStock = b.SellFromStock,
+                FromAssembly = 0
+            });
+        }
+
+        if (b.SellFromAssembly > 0)
+        {
+            list.Add(new BatchSelection
+            {
+                BatchProductId = b.BatchProductId,
+                BatchCode = b.BatchCode,
+                FromStock = 0,
                 FromAssembly = b.SellFromAssembly
-            })
-            .ToList()
+            });
+        }
+
+        return list;
+    })
+    .ToList()
+
     };
 
     await OnConfirm.InvokeAsync(result);
