@@ -73,35 +73,30 @@ else
 {
     <div style="margin-top:12px;">
         @foreach (var it in Items)
-        {
-            <div style="display:grid;
-                        grid-template-columns:120px 1fr 60px 1fr;
-                        gap:8px;
-                        align-items:center;
-                        padding:6px 0;
-                        border-bottom:1px solid #e5e7eb;">
-                
-                <div>@it.Code</div>
-                <div>@it.Name</div>
-                <div>@it.Qty</div>
-                <div>@it.Comment</div>
-<div class="batch-row-actions">
-    <button class="icon-btn"
-        title="Labot"
-        @onclick="() => OpenEdit(it)">
-    ✏️
+{
+    <div class="batch-row">
+        <div class="batch-name">@it.Name</div>
+        <div class="batch-code">@it.Code</div>
+        <div class="batch-qty">@it.Qty</div>
+        <div class="batch-comment">@it.Comment</div>
+
+        <div class="batch-actions">
+            <button class="icon-btn"
+                    title="Labot"
+                    @onclick="() => OpenEdit(it)">
+                ✏️
+            </button>
+
+            <button class="icon-btn"
+        title="Dzēst preci"
+        @onclick="() => DeleteItem(it)">
+    🗑️
 </button>
 
+        </div>
+    </div>
+}
 
-    <button class="icon-btn"
-            title="Dzēst"
-            @onclick="() => OnDelete.InvokeAsync(it)">
-        🗑️
-    </button>
-</div>
-
-            </div>
-        }
     </div>
 }
 }
@@ -111,8 +106,8 @@ else
     IsOpen="isEditOpen"
     IsOpenChanged="v => isEditOpen = v"
     Line="editLine"
+    ProductName="@editProductName"
     OnSaved="OnEditSaved" />
-
 
         @if (isCreateOpen)
         {
@@ -167,12 +162,38 @@ private string DraftTitle =>
         : $"Melnraksts no {DateTime.Now:dd.MM.yyyy}";
 
 
-private void OnEditSaved(ProductionTasks.BatchLine line)
+private async Task OnEditSaved(ProductionTasks.BatchLine line)
 {
-    // te vēlāk ieliksim precīzu piesaisti pie Items
+    // 1️⃣ atrodam rindu panelī
+    var item = Items.FirstOrDefault(x => x.VersionId == line.VersionId);
+    if (item == null)
+        return;
+
+    // 2️⃣ atjaunojam UI
+    item.Qty     = line.Planned;
+    item.Comment = line.Comment;
+
+    // 3️⃣ saglabājam DB (draft/update)
+    var dto = new
+    {
+        BatchId = Model.BatchId,
+        Items = Items.Select(it => new
+        {
+            VersionId = it.VersionId,
+            Qty       = it.Qty,
+            Comment   = it.Comment
+        })
+    };
+
+    await Http.PostAsJsonAsync(
+        "http://localhost:5270/api/batches/draft/update",
+        dto
+    );
+
     isEditOpen = false;
     StateHasChanged();
 }
+
 
 private ProductionTasks.BatchLine? editLine;
 
@@ -272,6 +293,47 @@ private void SaveEditItem()
     Model.Items[editingIndex.Value] = itemDraft.Clone();
     editingIndex = null;
 }
+
+private async Task DeleteItem(BatchCartItem it)
+{
+    var ok = await JS.InvokeAsync<bool>(
+        "confirm",
+        "Vai tiešām dzēst preci no melnraksta?"
+    );
+
+    if (!ok)
+        return;
+
+    // 1️⃣ UI — izņemam rindu
+    var idx = Items.ToList().FindIndex(x => x.VersionId == it.VersionId);
+    if (idx < 0)
+        return;
+
+    var list = Items.ToList();
+    list.RemoveAt(idx);
+    Items = list;
+
+    // 2️⃣ DB — update draft
+    var dto = new
+    {
+        BatchId = Model.BatchId,
+        Items = Items.Select(x => new
+        {
+            VersionId = x.VersionId,
+            Qty       = x.Qty,
+            Comment   = x.Comment
+        })
+    };
+
+    await Http.PostAsJsonAsync(
+        "http://localhost:5270/api/batches/draft/update",
+        dto
+    );
+
+    StateHasChanged();
+}
+
+
 private async Task DeleteItem(int idx)
 {
     var ok = await JS.InvokeAsync<bool>("confirm", "Vai dzēst rindu?");
@@ -321,18 +383,25 @@ private async Task SaveDraftClicked()
 
 private bool isEditOpen = false;
 private int editIndex = -1;
+
+private string? editProductName;
+
 private void OpenEdit(BatchCartItem it)
 {
     // izveidojam rindu dialogam
-    editLine = new ProductionTasks.BatchLine
-    {
-        BatchCode = it.Code,      // ja nav īstā lauka, nav kritiski – tikai virsrakstam
-        Planned   = it.Qty,
-        Comment   = it.Comment,
-        BatchStatus = 5           // lai ļauj labot qty (pēc tava dialoga loģikas)
-    };
+editProductName = it.Name;
 
-    isEditOpen = true;
+editLine = new ProductionTasks.BatchLine
+{
+    BatchCode   = it.Code,
+    VersionId   = it.VersionId,
+    Planned     = it.Qty,
+    Comment     = it.Comment,
+    BatchStatus = 4
+};
+
+isEditOpen = true;
+
 }
 
 private enum BatchPanelSheet

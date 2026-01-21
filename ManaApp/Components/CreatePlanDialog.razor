@@ -6,20 +6,22 @@
         <h3>Ražošanas plāna izveide</h3>
 
         <label class="panel-label">Ražošanas plāna kods *</label>
-        <input class="panel-input"
-               @bind="PlanCode"
-               placeholder="piem. RP-2026-001" />
 
-            @if (!string.IsNullOrWhiteSpace(ErrorMessage))
-            {
-                <div class="error-text">@ErrorMessage</div>
-            }
+        <input class="form-control"
+               placeholder="GADA BURTS & NEDĒĻAS NUMURS"
+               @bind="planCode"
+               @bind:event="oninput" />
 
+        @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+        {
+            <div class="error-text">@ErrorMessage</div>
+        }
 
         <div class="modal-actions">
             <button class="panel-btn" @onclick="Cancel">Atcelt</button>
-            <button class="panel-btn primary"
-                    disabled="@string.IsNullOrWhiteSpace(PlanCode)"
+
+            <button class="btn btn-primary"
+                    disabled="@string.IsNullOrWhiteSpace(planCode)"
                     @onclick="Confirm">
                 Apstiprināt
             </button>
@@ -28,18 +30,17 @@
     </div>
 </div>
 
-
 @code {
-[Parameter] public EventCallback<string> OnConfirm { get; set; }
-[Parameter] public EventCallback OnCancel { get; set; }
-[Parameter] public string? ErrorMessage { get; set; }
+    [Parameter] public EventCallback<string> OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public string? ErrorMessage { get; set; }
 
-private string PlanCode = "";
-    
+    private string planCode = "";
+
     private async Task Confirm()
-{
-    await OnConfirm.InvokeAsync(PlanCode.Trim());
-}
+    {
+        await OnConfirm.InvokeAsync(planCode.Trim());
+    }
 
     private async Task Cancel()
     {

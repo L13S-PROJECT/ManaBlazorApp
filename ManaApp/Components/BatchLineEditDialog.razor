@@ -26,15 +26,16 @@ else
             max-width:420px;
             box-shadow:0 0 10px rgba(0,0,0,0.35);">
 
-            <h3>
-                @(IsAddMode ? "Pievienot preci" : "Labot pievienoto preci")
-                @if (Line is not null)
-                {
-                    <span> (@Line.BatchCode)</span>
-                }
-            </h3>
+<h3>
+    @(IsAddMode ? "Pievienot preci" : "Labot pievienoto preci")
+</h3>
 
-
+@if (!string.IsNullOrWhiteSpace(ProductName))
+{
+    <div style="margin-bottom:8px; font-weight:600;">
+        @ProductName
+    </div>
+}
 
             @if (Line is null)
             {
@@ -62,10 +63,11 @@ else
 
                     <div style="text-align:right;">
                         <button class="e-btn e-flat"
-                                style="margin-right:8px;"
-                                @onclick="Close">
-                            Atcelt
-                        </button>
+                            style="margin-right:8px;"
+                            @onclick="Close">
+                        Atcelt
+                    </button>
+
 
                         <button class="e-btn e-primary" @onclick="SaveClicked">
                             @(IsAddMode ? "Pievienot" : "OK")
@@ -85,6 +87,9 @@ else
 
     // Rinda, ko labo (no ProductionTasks BatchLine)
     [Parameter] public ProductionTasks.BatchLine? Line { get; set; }
+
+[Parameter] public string? ProductName { get; set; }
+
 
     // Notikums, kad saglabāts
     [Parameter] public EventCallback<ProductionTasks.BatchLine> OnSaved { get; set; }
@@ -142,7 +147,7 @@ else
 
     }
 
-    private async Task SaveClicked()
+private async Task SaveClicked()
     {
         if (Line is null)
             return;

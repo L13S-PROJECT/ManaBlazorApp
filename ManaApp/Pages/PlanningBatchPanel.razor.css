@@ -78,3 +78,37 @@
     font-weight: 500;
     color: #374151;
 }
+
+.batch-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 70px 2fr 80px;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.batch-name {
+    font-weight: 500;
+}
+
+.batch-code {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.batch-qty {
+    text-align: right;
+    font-weight: 500;
+}
+
+.batch-comment {
+    font-size: 13px;
+    opacity: 0.9;
+}
+
+.batch-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+}

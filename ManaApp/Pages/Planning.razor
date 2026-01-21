@@ -29,15 +29,9 @@
 
 @* <PlanningGrid Rows="@groupedRows" /> *@
 
-
 <PlanningTable
     Groups="@FilteredRows"
-    PlannedPlus="OnPlannedPlus"
-    PlannedMinus="OnPlannedMinus"
-    OnSell="OpenSellPopup" />
-
-
-
+    PlannedPlus="OnPlannedPlus" />
 
            @if (selected is not null && Summary is not null)
            {
@@ -99,7 +93,17 @@
     @bind-IsOpen="isAddOpen"
     Line="addLine"
     IsAddMode="true"
+    ProductName="@addProductName"
     OnSaved="OnAddSaved" />
+
+<BatchLineEditDialog
+    @bind-IsOpen="isEditOpen"
+    Line="editLine"
+    IsAddMode="false"
+    ProductName="@editProductName"
+    OnSaved="OnEditSaved" />
+
+
 
 @*
 @if (isMinusOpen && minusRow is not null)
@@ -143,6 +147,36 @@ private List<CategoryRow> categoriesFiltered = new();
 
 private List<SalesAllocateDialog.BatchRow> sellBatches = new();
    
+private string? addProductName;
+private string? editProductName;
+
+// EDIT dialoga stāvoklis
+private bool isEditOpen = false;
+
+// rinda, ko labo
+private ProductionTasks.BatchLine? editLine;
+
+// nosaukums edit dialogam
+
+private async Task OnEditSaved(ProductionTasks.BatchLine updated)
+{
+    if (updated is null)
+        return;
+
+    // atrodam rindu panelī
+    var idx = batchItems.FindIndex(x => x.VersionId == updated.VersionId);
+    if (idx >= 0)
+    {
+        batchItems[idx].Qty = updated.Planned;
+        batchItems[idx].Comment = updated.Comment;
+    }
+
+    // TODO (vēlāk): draft/update API
+
+    isEditOpen = false;
+    StateHasChanged();
+}
+
 
 
     private int? draftBatchId = null;
@@ -160,10 +194,6 @@ protected override async Task OnInitializedAsync()
 
     isInitializing = false;
 }
-
-// "-" popup stāvoklis
-private bool isMinusOpen = false;
-private ProductRow? minusRow;
 
 private async Task LoadSummariesForRows(IEnumerable<ProductRow> targetRows)
     {
@@ -530,15 +560,19 @@ private async Task OnPlannedPlus(ProductGroupRow row)
         return;
 
     var ver = row.Versions
-        .OrderByDescending(v => v.VersionId ?? 0)
-        .FirstOrDefault(v => v.VersionId is > 0);
+        .FirstOrDefault(v => IsLatestVersion(v));
 
     if (ver is null)
         return;
 
+    // ✅ ŠEIT ieliekam pareizo produkta nosaukumu dialogam
+    addProductName = row.ProductName;
+
+    addProductId = ver.id;
+
     addLine = new ProductionTasks.BatchLine
     {
-        BatchId     = draftBatchId ?? 0,   // VAR BŪT 0
+        BatchId     = draftBatchId ?? 0,
         VersionId   = ver.VersionId!.Value,
         BatchCode   = ver.productCode,
         Planned     = 1,
@@ -546,12 +580,19 @@ private async Task OnPlannedPlus(ProductGroupRow row)
         BatchStatus = 5
     };
 
-    isAddOpen = true; // popup atveras VIENMĒR
+    isAddOpen = true;
 }
-
 
 private async Task OnAddSaved(ProductionTasks.BatchLine line)
 {
+    ProductContentDto? product = null;
+
+if (addProductId.HasValue)
+{
+    product = await Http.GetFromJsonAsync<ProductContentDto>(
+        $"http://localhost:5270/api/products/content?id={addProductId.Value}");
+};
+    
     if (line.Planned <= 0)
         return;
 
@@ -593,8 +634,8 @@ var createDto = new
     batchItems.Add(new BatchCartItem
     {
         VersionId = line.VersionId,
-        Code      = line.BatchCode,
-        Name      = selected?.productName ?? "",
+        Name = product?.ProductName ?? "",
+        Code = product?.ProductCode ?? line.BatchCode,
         Qty       = line.Planned,
         Comment   = line.Comment
     });
@@ -642,24 +683,17 @@ batchItems.Add(new BatchCartItem
 {
     VersionId = line.VersionId,
     Code      = line.BatchCode,
-    Name      = selected?.productName ?? "",
+    Name = product?.ProductName ?? "",
     Qty       = line.Planned,
     Comment   = line.Comment
 });
+
+await LoadDraftAsync();
 
 isAddOpen = false;
 addLine = null;
 StateHasChanged();
 }
-
-private Task OnPlannedMinus(ProductRow row)
-{
-    minusRow = row;
-    isMinusOpen = true;
-    StateHasChanged();
-    return Task.CompletedTask;
-}
-
 
 private bool MatchRoot(ProductGroupRow g)
 {
@@ -750,14 +784,15 @@ foreach (var it in draft.Items)
 {
     var row = rows.FirstOrDefault(r => r.VersionId == it.VersionId);
 
-    batchItems.Add(new BatchCartItem
-    {
-        VersionId = it.VersionId,
-        Code      = row?.productCode ?? "",
-        Name      = row?.productName ?? "",
-        Qty       = it.Qty,
-        Comment   = it.Comment
-    });
+                batchItems.Add(new BatchCartItem
+                {
+                    VersionId = it.VersionId,
+                    Code      = row?.productCode ?? "",
+                    Name      = row?.productName ?? "",
+                    Qty       = it.Qty,
+                    Comment   = it.Comment
+                });
+
 }
 
 
@@ -855,38 +890,10 @@ private async Task DeleteDraftAsync()
     forceNewDraft = true;
 
     batchPanelRef?.SetComment(null);
+    batchPanelRef?.Refresh();
     StateHasChanged();
 }
 
-private void CloseMinusDialog()
-{
-    isMinusOpen = false;
-    minusRow = null;
-}
-
-private void OnMinusConfirmed(int qty)
-{
-    if (minusRow is null)
-        return;
-
-            salesItems = salesItems
-                .Append(new SalesCartItem
-                {
-                    VersionId   = minusRow.VersionId ?? 0,
-                    ProductName = minusRow.productName ?? "",
-                    VersionName = minusRow.versionName,
-                    Qty         = qty,
-                    InStock     = minusRow.InStock     //  ŠIS
-                })
-                .ToList();
-
-
-    isMinusOpen = false;
-    minusRow = null;
-
-    batchPanelRef?.Refresh();
-
-}
 
 private List<SalesCartItem> salesItems = new();
 
@@ -1097,6 +1104,8 @@ await SaveSalesDraftAsync();
 
 }
 
+
+
 private void OpenEditSalesPopup()
 {
     // Izveidojam dziļu salesItems kopiju popup rediģēšanai
@@ -1286,5 +1295,8 @@ private sealed class SalesDraftItemDto
     public int Qty { get; set; }
     public bool IsAssembly { get; set; }
 }
+
+private int? addProductId;
+
 
 }

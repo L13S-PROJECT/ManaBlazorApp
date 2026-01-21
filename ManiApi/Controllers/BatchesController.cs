@@ -252,6 +252,23 @@ UPDATE batches
             // 3) Rindas (UPSERT pēc (Batch_Id, Version_Id))
 if (dto.Items is not null)
 {
+    // 0️⃣ Deaktivējam VISAS rindas šim batch
+await using (var clear = conn.CreateCommand())
+{
+    clear.Transaction = tx;
+    clear.CommandText = @"
+UPDATE batches_products
+SET IsActive = 0
+WHERE Batch_Id = @bid;";
+    var p = clear.CreateParameter();
+    p.ParameterName = "@bid";
+    p.Value = dto.BatchId!.Value;
+    clear.Parameters.Add(p);
+
+    await clear.ExecuteNonQueryAsync();
+}
+
+    
     foreach (var it in dto.Items)
     {
         // ✅ Backend aizsardzība: nedrīkst mainīt produktu (VersionId)

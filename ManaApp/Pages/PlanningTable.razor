@@ -6,7 +6,6 @@
 <thead>
     <tr>
         <th class="col-name">Nosaukums</th>
-        <th class="col-minus"></th>
         <th>Stock</th>
         <th>Plan</th>
         <th class="col-plus"></th>
@@ -42,8 +41,6 @@
                         @grp.ProductName
                     </span>
                 </td>
-
-                <td class="minus-cell"></td>
 
                 <td>@grp.InStock</td>
 
@@ -85,17 +82,6 @@
                         <span class="detail-version">(@ver.versionName)</span>
                     }
                 </div>
-            </td>
-
-            <td class="minus-cell">
-                
-<button type="button"
-        class="instock-btn minus"
-        @onclick="() => OnSell.InvokeAsync(ver)">
-    –
-</button>
-
-
             </td>
 
             <td>
@@ -148,15 +134,6 @@ private async Task OnPlannedMinus(ProductRow row)
 {
     if (PlannedMinus.HasDelegate)
         await PlannedMinus.InvokeAsync(row);
-}
-
-
-[Parameter] public EventCallback<ProductRow> OnSell { get; set; }
-
-private async Task OpenSell(ProductRow row)
-{
-    if (OnSell.HasDelegate)
-        await OnSell.InvokeAsync(row);
 }
 
 
