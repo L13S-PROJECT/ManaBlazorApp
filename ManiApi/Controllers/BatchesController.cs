@@ -622,7 +622,30 @@ WHERE bp.Batch_Id = @bid
         tasksCreated = await tcmd.ExecuteNonQueryAsync();
     }
 
-    Console.WriteLine($"[SetPlanned] batchId={dto.BatchId}, tasksCreated={tasksCreated}");
+    // 3️⃣ STOCK_MOVEMENTS: -PLANNED (rezervējam apjomu)
+await using (var smCmd = conn.CreateCommand())
+{
+    smCmd.CommandText = @"
+INSERT INTO stock_movements
+    (Version_ID, BatchProduct_ID, Move_Type, Stock_Qty, Created_At, IsActive)
+SELECT
+    bp.Version_Id,
+    bp.ID,
+    'PLANNED',
+    -bp.Planned_Qty,
+    UTC_TIMESTAMP(),
+    1
+FROM batches_products bp
+WHERE bp.Batch_Id = @bid
+  AND bp.IsActive = 1;";
+
+    var pBid2 = smCmd.CreateParameter();
+    pBid2.ParameterName = "@bid";
+    pBid2.Value = dto.BatchId;
+    smCmd.Parameters.Add(pBid2);
+
+    await smCmd.ExecuteNonQueryAsync();
+}
 
     return Ok(new
     {
@@ -630,6 +653,7 @@ WHERE bp.Batch_Id = @bid
         status = 1,
         tasksCreated
     });
+
 }
 
 [HttpPost("draft/delete")]

@@ -421,3 +421,35 @@
     margin: 0 auto;
 }
 
+.toolbar-btn {
+    height: 36px;
+    padding: 0 16px;
+    border-radius: 18px;          /* ⬅️ noapaļoti stūri kā Excel */
+    border: 1px solid #d0d0d0;
+    background-color: #ffffff;
+    color: #333;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.toolbar-btn:hover {
+    background-color: #f3f3f3;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+.toolbar-btn:active {
+    background-color: #e8e8e8;
+}
+
+.refresh-btn {
+    margin-left: 8px;   /* ⬅️ tieši blakus EXCEL */
+}
+
+.planning-toolbar-row {
+    display: flex;
+    align-items: center;
+}

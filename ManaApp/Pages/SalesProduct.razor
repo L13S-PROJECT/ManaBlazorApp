@@ -19,13 +19,21 @@
                            <!-- Šeit sākas preču saraksts -->
         <div class="planning-main">
             <div class="planning-panel">
+<div class="planning-toolbar-row">
 
-<PlanningToolbar
-    SearchText="@searchText"
-    SearchTextChanged="(v) => searchText = v"
-    SelectedView="@selectedView"
-    SelectedViewChanged="(v) => selectedView = v"
-    OnDownloadExcel="DownloadPlanningExcel" />
+    <PlanningToolbar
+        SearchText="@searchText"
+        SearchTextChanged="(v) => searchText = v"
+        SelectedView="@selectedView"
+        SelectedViewChanged="(v) => selectedView = v"
+        OnDownloadExcel="DownloadPlanningExcel" />
+
+    <button class="toolbar-btn refresh-btn"
+            @onclick="ManualRefresh">
+        🔄 Atsvaidzināt
+    </button>
+
+</div>
 
 @* <PlanningGrid Rows="@groupedRows" /> *@
 
@@ -82,10 +90,11 @@
 
 
 </div>
-    
-</div>
 
 </div>
+    
+</div>
+  
 
 @if (isSellPopupOpen)
 {
@@ -325,6 +334,9 @@ private async Task ReloadPlanningDataAsync()
         }
 
         var vid = r.VersionId.Value;
+
+        Console.WriteLine($"[DEBUG] row vid={vid}, planned={(plannedByVersion.TryGetValue(vid, out var p2) ? p2 : -1)}");
+
 
         r.Planned = plannedByVersion.TryGetValue(vid, out var p) ? p : 0;
         r.DetailedInProgress = detailedInProgressByVersion.TryGetValue(vid, out var d) ? d : 0;
@@ -581,9 +593,15 @@ private async Task OnSalesSold()
     }
 
     // UI RESET pēc commit
-    salesItems.Clear();
-    await ReloadPlanningDataAsync();
-    StateHasChanged();
+    // UI RESET pēc commit
+salesItems.Clear();
+
+// ⬅️ OBLIGĀTI: pārlādē datus, kas baro Plan kolonnu
+await ReloadPlanningDataAsync();
+
+// ⬅️ OBLIGĀTI: Blazor render ciklā
+await InvokeAsync(StateHasChanged);
+
 }
 
 public class SalesCommitResult
@@ -979,5 +997,12 @@ private sealed class SalesDraftItemDto
     public int Qty { get; set; }
     public bool IsAssembly { get; set; }
 }
+
+private async Task ManualRefresh()
+{
+    await ReloadPlanningDataAsync();
+    await InvokeAsync(StateHasChanged);
+}
+
 
 }

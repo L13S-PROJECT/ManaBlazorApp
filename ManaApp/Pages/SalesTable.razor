@@ -44,18 +44,29 @@
 
                 <td class="minus-cell"></td>
 
-                <td>@grp.InStock</td>
-
                 <td class="planned-cell">
                     <span class="planned-value">@grp.Planned</span>
                 </td>
 
+                    <td class="planned-cell @(grp.Planned > 0 ? "cell-plan" : "")">
+                        <span class="planned-value">@grp.Planned</span>
+                    </td>
+                    <td class="@(grp.DetailedInProgress > 0 ? "cell-det-ip" : "")">
+                        @grp.DetailedInProgress
+                    </td>
+                    <td class="@(grp.DetailedFinish > 0 ? "cell-det-f" : "")">
+                        @grp.DetailedFinish
+                    </td>
+                    <td class="@(grp.AssemblyINProgress > 0 ? "cell-asm-ip" : "")">
+                        @grp.AssemblyINProgress
+                    </td>
+                    <td class="@(grp.AssemblyFinish > 0 ? "cell-asm-f" : "")">
+                        @grp.AssemblyFinish
+                    </td>
+                    <td class="@(grp.FinishingInProgress > 0 ? "cell-fin-ip" : "")">
+                        @grp.FinishingInProgress
+                    </td>
 
-                <td>@grp.DetailedInProgress</td>
-                <td>@grp.DetailedFinish</td>
-                <td>@grp.AssemblyINProgress</td>
-                <td>@grp.AssemblyFinish</td>
-                <td>@grp.FinishingInProgress</td>
             </tr>
 
 @if (grp.Versions is not null && grp.IsExpanded)
@@ -84,8 +95,6 @@
         @onclick="() => OnSell.InvokeAsync(ver)">
     –
 </button>
-
-
             </td>
 
             <td>

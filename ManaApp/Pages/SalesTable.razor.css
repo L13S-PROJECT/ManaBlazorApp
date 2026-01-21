@@ -395,7 +395,57 @@
     border-top-width: 0;
 }
 
-/* RINDAS HOVER – bet NE pogu kolonnas */
-.excel-row:hover td:not(.plus-cell):not(.minus-cell) {
-    background: #e1e5ea; /* tumšāks pelēks */
+/* === SALES TABLE: krāsojam TIKAI galvenās rindas === */
+.excel-row .cell-instock {
+    background-color: #f7fa44;
+}
+
+.excel-row .cell-plan {
+    background-color: #48f96e;
+}
+
+.excel-row .cell-det-ip {
+    background-color: #a2fab8;
+}
+
+.excel-row .cell-det-f {
+    background-color: #6aef8e;
+}
+
+.excel-row .cell-asm-ip {
+    background-color: #fbddbd;
+}
+
+.excel-row .cell-asm-f {
+    background-color: #f5b26e;
+}
+
+.excel-row .cell-fin-ip {
+    background-color: #cac1ff;
+}
+
+.excel-row td:not([class*="cell-"]) {
+    color: #111827; /* ne pilnīgi melns, bet ass */
+    font-weight: 500;
+}
+
+/* hover efekts TIKAI šūnām bez statusa */
+.excel-row:hover td:not(
+    .cell-instock,
+    .cell-plan,
+    .cell-det-ip,
+    .cell-det-f,
+    .cell-asm-ip,
+    .cell-asm-f,
+    .cell-fin-ip,
+    .plus-cell,
+    .minus-cell
+) {
+    background-color: #e1e5ea;
+}
+
+/* PROCESS kolonnas – vienmēr gaiši pelēkas */
+.excel-row td.cell-det-ip,
+.excel-row td.cell-asm-ip {
+    background-color: #b9baba; /* gaiši pelēks */
 }

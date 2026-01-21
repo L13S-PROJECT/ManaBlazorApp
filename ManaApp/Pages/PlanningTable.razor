@@ -42,9 +42,11 @@
                     </span>
                 </td>
 
-                <td>@grp.InStock</td>
+                <td class="@(grp.InStock > 0 ? "cell-instock" : "")">
+                    @grp.InStock
+                </td>
 
-                <td class="planned-cell">
+                <td class="planned-cell @(grp.Planned > 0 ? "cell-plan" : "")">
                     <span class="planned-value">@grp.Planned</span>
                 </td>
 

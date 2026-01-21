@@ -212,20 +212,19 @@ private async Task LoadSummariesForRows(IEnumerable<ProductRow> targetRows)
     if (r.VersionId is null || r.VersionId <= 0) continue;
 }
 
-            var sum = await Http.GetFromJsonAsync<StockSummary>(
-    $"http://localhost:5270/api/stockmovements/summary?versionId={r.VersionId}");
+        var sum = await Http.GetFromJsonAsync<StockSummary>(
+            $"http://localhost:5270/api/stockmovements/summary?versionId={r.VersionId}");
 
-            if (sum is null) continue;
-            
-           r.InStock = sum.Stock;
+        if (sum is null) continue;
 
-// AssemblyINProgress / AssemblyFinish vairs NEMAINĀM šeit,
-// tie tagad nāk no /api/batches/list
-// r.AssemblyINProgress  = ...
-// r.AssemblyFinish      = ...
+        r.InStock = sum.Stock;
 
-r.FinishingInProgress = sum.Finishing;
-r.InStock            = sum.Stock;
+        // ⬅️ ŠĪ IR TRŪKSTOŠĀ RINDA
+        r.AssemblyFinish = sum.Assembly;
+
+        r.FinishingInProgress = sum.Finishing;
+        r.InStock            = sum.Stock;
+
 
 var finAlloc = await Http.GetFromJsonAsync<FinAllocatedDto>(
     $"http://localhost:5270/api/tasks/finishing-allocated-by-version?versionId={r.VersionId}");
@@ -399,8 +398,10 @@ private async Task ReloadPlanningDataAsync()
         r.DetailedInProgress = detailedInProgressByVersion.TryGetValue(vid, out var d) ? d : 0;
         r.DetailedFinish = detailedFinishByVersion.TryGetValue(vid, out var df) ? df : 0;
         r.AssemblyINProgress = assemblyInProgressByVersion.TryGetValue(vid, out var ap) ? ap : 0;
-        r.AssemblyFinish =
-    assemblyFinishByVersion.TryGetValue(vid, out var af) ? af : 0;
+            // Asm.F = reālais Assembly no stock_movements
+            // LoadSummariesForRows() jau ielika šo vērtību
+            r.AssemblyFinish = r.AssemblyFinish;
+
     
 
             if (r.AssemblyFinish < 0)
@@ -413,17 +414,6 @@ private async Task ReloadPlanningDataAsync()
         .OrderBy(r => r.categoryName)
         .ThenBy(r => r.productName)
         .ToList();
-
-    // 6) UI KOREKCIJA:
-    // AssemblyFinish -= FinishingInProgress
-    foreach (var r in rows)
-{
-    if (r.AssemblyFinish > 0 && r.FinishingAllocated > 0)
-    {
-        var corrected = r.AssemblyFinish - r.FinishingAllocated;
-        r.AssemblyFinish = corrected > 0 ? corrected : 0;
-    }
-}
 
 
 // Uztaisām "viena rinda uz produktu" + bērni = versijas
@@ -440,20 +430,7 @@ groupedRows = rows
 
         var first = g.First();
 
-var soldAsmTotal = salesItems
-    .Where(x => x.IsAssembly)
-    .Sum(x =>
-        g.Any(v => v.VersionId == x.VersionId)
-            ? x.Qty
-            : 0
-    );
-
-var asmFinish = g.Sum(x => x.AssemblyFinish) - soldAsmTotal;
-if (asmFinish < 0)
-    asmFinish = 0;
-
-
-        return new ProductGroupRow
+  return new ProductGroupRow
         {
             CategoryName = cat,
             ProductCode  = code,
@@ -464,7 +441,7 @@ if (asmFinish < 0)
             DetailedInProgress = g.Sum(x => x.DetailedInProgress),
             DetailedFinish     = g.Sum(x => x.DetailedFinish),
             AssemblyINProgress = g.Sum(x => x.AssemblyINProgress),
-            AssemblyFinish = asmFinish,
+            AssemblyFinish = g.Sum(x => x.AssemblyFinish),
             Versions = g
                 .OrderByDescending(x => x.VersionId ?? 0) // jaunākā augšā
                 .ToList()
@@ -854,10 +831,10 @@ if (!draftBatchId.HasValue)
     draftComment = null;
     forceNewDraft = true;
 
-    batchPanelRef?.CloseCreateDialog();
-    StateHasChanged();
-    return true;
-    
+batchPanelRef?.CloseCreateDialog();
+await ReloadPlanningDataAsync();
+await InvokeAsync(StateHasChanged);
+return true;
 
 }
 

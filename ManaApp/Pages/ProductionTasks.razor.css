@@ -11,6 +11,9 @@
   gap:8px;
   overflow:hidden;
   min-height:0;
+  flex: 2;
+  min-width: 0;
+  overflow: auto;
 }
 
 .productiontasks-right{
@@ -19,6 +22,9 @@
   gap:8px;
   overflow:hidden;
   min-height:0;
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
 }
 
 .productiontasks-right-grid{
@@ -87,4 +93,53 @@
   align-items:center;
   margin:6px 0 10px 0;
   flex-wrap:wrap;
+}
+/* jaunais vizuālais labojums 21.01.2026 */
+
+.productiontasks-root {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  height: 100vh;
+  padding: 8px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* vispārējs */
+.cell-val {
+    font-weight: 600;
+}
+
+/* InStock */
+.cell-instock {
+    background-color: #f7fa44;
+}
+
+/* Planned */
+.cell-plan {
+    background-color: #48f96e;
+}
+
+/* Detailed */
+.cell-det-ip {
+    background-color: #a2fab8;
+}
+
+.cell-det-f {
+    background-color: #6aef8e;
+}
+
+/* Assembly */
+.cell-asm-ip {
+    background-color: #fbddbd;
+}
+
+.cell-asm-f {
+    background-color: #f5b26e;
+}
+
+/* Finishing */
+.cell-fin-ip {
+    background-color: #cac1ff;
 }
