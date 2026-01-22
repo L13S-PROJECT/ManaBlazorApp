@@ -1,0 +1,349 @@
+@page "/productiontasks-v2"
+
+@using ManaApp.Components
+@using ManaApp.Models
+@inject HttpClient Http
+
+<PageHeader Title="Ražošanas plānošana" />
+
+<div class="ptv2-root">
+
+    <!-- LEFT -->
+    <div class="ptv2-left">
+        <div class="ptv2-box">
+
+            <div class="ptv2-parent-tabs">
+                @foreach (var p in Categories
+                    .Where(x => x.ParentId == null)
+                    .OrderByDescending(x => x.CategoryName == "Kauss"))
+                {
+                    <div class="ptv2-parent-tab @(p.Id == SelectedParentId ? "active" : "")"
+                         @onclick="() => SelectParent(p.Id)">
+                        @p.CategoryName
+                    </div>
+                }
+            </div>
+
+            <ul class="ptv2-category-list">
+                @foreach (var c in Categories.Where(x => x.ParentId == SelectedParentId))
+                {
+                    <li class="ptv2-category-item @(c.Id == SelectedCategoryId ? "active" : "")"
+                        @onclick="() => SelectCategory(c)">
+                        @c.CategoryName
+                    </li>
+                }
+            </ul>
+
+        </div>
+    </div>
+
+<!-- RIGHT -->
+<div class="ptv2-right">
+
+    <!-- AUGŠA: 2 + 3 box -->
+    <div class="ptv2-right-top">
+
+        <!-- 2. BOX -->
+        <div class="ptv2-box ptv2-box-products">
+            @if (SelectedCategory != null)
+            {
+                <h3>@SelectedCategory.CategoryName</h3>
+
+                @if (Products.Count == 0)
+                {
+                    <div>Nav datu</div>
+                }
+                else
+                {
+                    <div class="ptv2-products">
+
+                        <div class="ptv2-products-header">
+                            <div>NOSAUKUMS</div>
+                            <div>KODS</div>
+                            <div class="num">PLĀNOTS</div>
+                            <div class="num">PROCESĀ</div>
+                        </div>
+
+                        @foreach (var p in Products)
+                        {
+                            <div class="ptv2-product-row @(SelectedProduct?.productCode == p.productCode ? "active" : "")"
+                                 @onclick="() => SelectProduct(p)">
+                                <div>@p.productName</div>
+                                <div>@p.productCode</div>
+                                <div class="num">@p.Planned</div>
+                                <div class="num">
+                                    @(p.DetailedInProgress
+                                      + p.DetailedFinish
+                                      + p.AssemblyINProgress
+                                      + p.AssemblyFinish
+                                      + p.FinishingInProgress)
+                                </div>
+                            </div>
+                        }
+
+                    </div>
+                }
+            }
+            else
+            {
+                <h3>Izvēlies kategoriju</h3>
+            }
+        </div>
+
+        <!-- 3. BOX -->
+        <div class="ptv2-box ptv2-box-detail">
+            @if (SelectedProduct == null)
+            {
+                <h3>Izvēlies preci</h3>
+            }
+            else
+            {
+                <h3>@SelectedProduct.productName</h3>
+
+                @if (ProductBatches.Count == 0)
+                {
+                    <div>Nav batchu</div>
+                }
+                else
+                {
+                    <div class="ptv2-detail-table">
+
+                        <div class="ptv2-detail-header">
+                            <div>Raž.kods</div>
+                            <div class="num">Apjoms</div>
+                            <div>Versija</div>
+                            <div>Datums</div>
+                            <div class="num">Done</div>
+                            <div>Komentāri</div>
+                        </div>
+
+                        @foreach (var b in ProductBatches)
+                        {
+                            <div class="ptv2-detail-row">
+                                <div>
+                                    @b.BatchCode
+                                    @if (!string.IsNullOrEmpty(SelectedProduct?.productCode)
+                                        && _latestVersionByProductCode.TryGetValue(SelectedProduct.productCode, out var latest)
+                                        && b.VersionId == latest)
+                                    {
+                                        <span style="margin-left:6px; font-weight:500; color:#facc15;">★</span>
+                                    }
+                                </div>
+
+                                <div class="num">@b.Planned</div>
+                                <div>@b.VersionName</div>
+                                <div>
+                                    @(b.StartedAt.HasValue
+                                        ? b.StartedAt.Value.ToString("dd.MM.yyyy")
+                                        : "")
+                                </div>
+                                <div class="num">@b.Done</div>
+                                <div>@b.Comment</div>
+                            </div>
+                        }
+
+                    </div>
+                }
+            }
+        </div>
+
+    </div>
+
+    <!-- APAKŠA: 4. BOX -->
+    <div class="ptv2-right-bottom">
+        <div class="ptv2-box ptv2-box-tasks">
+            <h3>DETAIL</h3>
+        </div>
+    </div>
+
+</div>
+</div>
+
+@code {
+private List<CategoryRow> Categories = new();
+private int? SelectedParentId;
+    protected override async Task OnInitializedAsync()
+    {
+        Categories = await Http.GetFromJsonAsync<List<CategoryRow>>(
+            "http://localhost:5270/api/categories"
+        ) ?? new();
+
+        SelectedParentId = Categories
+    .FirstOrDefault(x => x.ParentId == null && x.CategoryName == "Kauss")
+    ?.Id
+    ?? Categories.FirstOrDefault(x => x.ParentId == null)?.Id;
+
+AllProducts = await Http.GetFromJsonAsync<List<ProductRow>>(
+    "http://localhost:5270/api/products/planning-list"
+) ?? new();
+
+
+    }
+
+    private void SelectParent(int id)
+    {
+        SelectedParentId = id;
+    }
+
+    private int? SelectedCategoryId;
+    private CategoryRow? SelectedCategory;
+
+    private List<ProductRow> AllProducts = new();
+    private List<ProductRow> Products = new();
+    private List<ProductBatchRow> ProductBatches = new();
+
+    private async Task SelectCategory(CategoryRow c)
+    {
+            SelectedCategoryId = c.Id;
+SelectedCategory   = c;
+
+// 1) paņemam tikai šīs kategorijas rindas (version līmenī)
+var catRows = AllProducts
+    .Where(p => string.Equals((p.categoryName ?? "").Trim(), (c.CategoryName ?? "").Trim(), StringComparison.OrdinalIgnoreCase))
+    .ToList();
+
+// 2) batches/list -> Planned + Detailed + Assembly (inprogress/finish)
+var plannedList = await Http.GetFromJsonAsync<List<BatchPlannedRow>>(
+    "http://localhost:5270/api/batches/list?batch_type=1"
+) ?? new();
+
+var plannedByVersion = plannedList.GroupBy(x => x.VersionId).ToDictionary(g => g.Key, g => g.Sum(x => x.Planned));
+var detIpByVersion   = plannedList.GroupBy(x => x.VersionId).ToDictionary(g => g.Key, g => g.Sum(x => x.DetailedInProgress));
+var detFinByVersion  = plannedList.GroupBy(x => x.VersionId).ToDictionary(g => g.Key, g => g.Sum(x => x.DetailedFinish));
+var asmIpByVersion   = plannedList.GroupBy(x => x.VersionId).ToDictionary(g => g.Key, g => g.Sum(x => x.AssemblyInProgress));
+var asmFinByVersion  = plannedList.GroupBy(x => x.VersionId).ToDictionary(g => g.Key, g => g.Sum(x => x.AssemblyFinish));
+
+// 3) stockmovements/summary -> Assembly (reālais), Finishing, Stock
+foreach (var r in catRows)
+{
+    if (r.VersionId is not int vid || vid <= 0) continue;
+
+    r.Planned            = plannedByVersion.TryGetValue(vid, out var p) ? p : 0;
+    r.DetailedInProgress = detIpByVersion.TryGetValue(vid, out var d1) ? d1 : 0;
+    r.DetailedFinish     = detFinByVersion.TryGetValue(vid, out var d2) ? d2 : 0;
+    r.AssemblyINProgress = asmIpByVersion.TryGetValue(vid, out var a1) ? a1 : 0;
+
+    // AssemblyFinish kā Planning lapā: no summary (reālais)
+    var sum = await Http.GetFromJsonAsync<StockSummary>(
+        $"http://localhost:5270/api/stockmovements/summary?versionId={vid}"
+    );
+
+    if (sum is not null)
+    {
+        r.AssemblyFinish      = sum.Assembly;
+        r.FinishingInProgress = sum.Finishing;
+        r.InStock             = sum.Stock;
+    }
+}
+
+// 4) Grupējam uz 1 rindu uz produktu (bez versijām)
+Products = AllProducts
+    .Where(p => string.Equals(
+        p.categoryName,
+        c.CategoryName,
+        StringComparison.OrdinalIgnoreCase))
+
+    .GroupBy(p => p.productCode) // ← VIENA PRECE
+    .Select(g => new ProductRow
+    {
+        productCode = g.Key,
+        productName = g.First().productName,
+
+        Planned = g.Sum(x => x.Planned),
+
+        // PROCESSĀ = viss, kas nav Planned un nav Stock
+        DetailedInProgress = g.Sum(x => x.DetailedInProgress),
+        DetailedFinish     = g.Sum(x => x.DetailedFinish),
+        AssemblyINProgress = g.Sum(x => x.AssemblyINProgress),
+        AssemblyFinish     = g.Sum(x => x.AssemblyFinish),
+        FinishingInProgress = g.Sum(x => x.FinishingInProgress),
+        FinishingAllocated  = g.Sum(x => x.FinishingAllocated),
+
+        InStock = g.Sum(x => x.InStock)
+    })
+    .ToList();
+
+    }
+
+private ProductRow? SelectedProduct;
+
+private async Task SelectProduct(ProductRow p)
+{
+    _latestVersionByProductCode.Clear();
+
+var versions = AllProducts
+    .Where(x => x.productCode == p.productCode && x.VersionId > 0)
+    .GroupBy(x => x.productCode)
+    .Select(g => g.Max(x => x.VersionId!.Value))
+    .ToList();
+
+if (versions.Count == 1)
+{
+    _latestVersionByProductCode[p.productCode] = versions[0];
+}
+    
+    SelectedProduct = p;
+    ProductBatches.Clear();
+
+    var vid = AllProducts
+    .FirstOrDefault(x => x.productCode == p.productCode && x.VersionId > 0)
+    ?.VersionId;
+
+if (vid is null)
+    return;
+
+var versionIds = AllProducts
+    .Where(x => x.productCode == p.productCode && x.VersionId > 0)
+    .Select(x => x.VersionId!.Value)
+    .Distinct()
+    .ToList();
+
+var all = new List<ProductBatchRow>();
+
+foreach (var v in versionIds)
+{
+    var list = await Http.GetFromJsonAsync<List<ProductBatchRow>>(
+        $"http://localhost:5270/api/batches/by-version?versionId={v}"
+    ) ?? new();
+
+    foreach (var b in list)
+    {
+        b.VersionId = v;
+        b.VersionName = AllProducts
+            .FirstOrDefault(x => x.VersionId == v)
+            ?.versionName;
+    }
+
+    all.AddRange(list);
+}
+
+
+
+ProductBatches = all;
+
+}
+private sealed class ProductBatchRow
+{
+    public int BatchId { get; set; }
+    public int BatchProductId { get; set; }
+
+    public string BatchCode { get; set; } = "";
+
+    public int Planned { get; set; }
+    public int Done { get; set; }
+
+    public string? Comment { get; set; }
+    public DateTime? StartedAt { get; set; }
+
+    public int VersionId { get; set; }
+    public string? VersionName { get; set; }
+}
+
+private readonly Dictionary<string, int> _latestVersionByProductCode
+    = new(StringComparer.OrdinalIgnoreCase);
+
+
+}
+
+
+

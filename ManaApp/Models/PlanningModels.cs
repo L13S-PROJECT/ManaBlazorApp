@@ -24,12 +24,27 @@ public sealed class ProductRow
     public int AssemblyFinish { get; set; }
     public int FinishingInProgress { get; set; }
     public int FinishingAllocated { get; set; }
+
+    public int InProgress =>
+    DetailedInProgress
+  + DetailedFinish
+  + AssemblyINProgress
+  + AssemblyFinish
+  + FinishingInProgress;
+
+public int PlannedRemaining =>
+    Math.Max(Planned - InProgress, 0);
+
 }
 
 public sealed class CategoryRow
 {
+    public int Id { get; set; }
     public string CategoryName { get; set; } = "";
+    public int? ParentId { get; set; }
+    public bool IsActive { get; set; }
 }
+
 
 public sealed class ProductSimpleRow
 {
@@ -62,6 +77,9 @@ public sealed class StockSummary
 
 public sealed class BatchPlannedRow
 {
+    [JsonPropertyName("batchProductId")]
+    public int BatchProductId { get; set; }
+
     [JsonPropertyName("versionId")]
     public int VersionId { get; set; }
 
@@ -126,4 +144,13 @@ public sealed class CategoryHeaderRow : IPlanningRow
 {
     public bool IsCategory => true;
     public string CategoryName { get; set; } = "";
+}
+
+public sealed class BatchProductRow
+{
+    public int BatchProductId { get; set; }
+    public string BatchCode { get; set; } = "";
+    public int Qty { get; set; }
+    public string VersionName { get; set; } = "";
+    public string VersionDate { get; set; } = "";
 }
