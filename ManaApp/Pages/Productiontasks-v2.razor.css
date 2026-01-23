@@ -217,8 +217,10 @@
 
 /* 3.box */
 .ptv2-box-detail {
-    flex: 0 0 auto;
+    flex: 1;
+    min-width: 0;
 }
+
 
 /* 4.box (apakšējais) */
 .ptv2-box-tasks {
@@ -229,7 +231,7 @@
 .ptv2-right-top {
     display: flex;
     gap: 16px;
-    flex: 0 0 45%;   /* ← augšējā daļa aizņem ~45% ekrāna */
+    flex: 0 0 37%;   /* ← augšējā daļa aizņem ~45% ekrāna */
     min-height: 280px;
 }
 
