@@ -44,117 +44,71 @@
     <div class="ptv2-right-top">
 
         <!-- 2. BOX -->
-        <div class="ptv2-box ptv2-box-products">
-            @if (SelectedCategory != null)
-            {
-                <h3>@SelectedCategory.CategoryName</h3>
 
-                @if (Products.Count == 0)
-                {
-                    <div>Nav datu</div>
-                }
-                else
-                {
-                    <div class="ptv2-products">
+<div class="ptv2-box ptv2-box-products">
+    @if (SelectedCategory != null)
+    {
+        <h3>@SelectedCategory.CategoryName</h3>
 
-                        <div class="ptv2-products-header">
-                            <div>NOSAUKUMS</div>
-                            <div>KODS</div>
-                            <div class="num">PLĀNOTS</div>
-                            <div class="num">PROCESĀ</div>
+        @if (Products.Count == 0)
+        {
+            <div>Nav datu</div>
+        }
+        else
+        {
+            <div class="ptv2-products">
+
+                <div class="ptv2-products-header">
+                    <div>NOSAUKUMS</div>
+                    <div>KODS</div>
+                    <div class="num">PLĀNOTS</div>
+                    <div class="num">PROCESĀ</div>
+                </div>
+
+                @foreach (var p in Products)
+                {
+                    <div class="ptv2-product-row @(SelectedProduct?.productCode == p.productCode ? "active" : "")"
+                         @onclick="() => SelectProduct(p)">
+                        <div>@p.productName</div>
+                        <div>@p.productCode</div>
+                        <div class="num">@p.Planned</div>
+                        <div class="num">
+                            @(p.DetailedInProgress
+                              + p.DetailedFinish
+                              + p.AssemblyINProgress
+                              + p.AssemblyFinish
+                              + p.FinishingInProgress)
                         </div>
-
-                        @foreach (var p in Products)
-                        {
-                            <div class="ptv2-product-row @(SelectedProduct?.productCode == p.productCode ? "active" : "")"
-                                 @onclick="() => SelectProduct(p)">
-                                <div>@p.productName</div>
-                                <div>@p.productCode</div>
-                                <div class="num">@p.Planned</div>
-                                <div class="num">
-                                    @(p.DetailedInProgress
-                                      + p.DetailedFinish
-                                      + p.AssemblyINProgress
-                                      + p.AssemblyFinish
-                                      + p.FinishingInProgress)
-                                </div>
-                            </div>
-                        }
-
                     </div>
                 }
-            }
-            else
-            {
-                <h3>Izvēlies kategoriju</h3>
-            }
-        </div>
 
-        <!-- 3. BOX -->
-        <div class="ptv2-box ptv2-box-detail">
-            @if (SelectedProduct == null)
-            {
-                <h3>Izvēlies preci</h3>
-            }
-            else
-            {
-                <h3>@SelectedProduct.productName</h3>
+            </div>
+        }
+    }
+    else
+    {
+        <h3>Izvēlies kategoriju</h3>
+    }
+</div>
 
-                @if (ProductBatches.Count == 0)
-                {
-                    <div>Nav batchu</div>
-                }
-                else
-                {
-                    <div class="ptv2-detail-table">
-
-                        <div class="ptv2-detail-header">
-                            <div>Raž.kods</div>
-                            <div class="num">Apjoms</div>
-                            <div>Versija</div>
-                            <div>Datums</div>
-                            <div class="num">Done</div>
-                            <div>Komentāri</div>
-                        </div>
-
-                        @foreach (var b in ProductBatches)
-                        {
-                            <div class="ptv2-detail-row">
-                                <div>
-                                    @b.BatchCode
-                                    @if (!string.IsNullOrEmpty(SelectedProduct?.productCode)
-                                        && _latestVersionByProductCode.TryGetValue(SelectedProduct.productCode, out var latest)
-                                        && b.VersionId == latest)
-                                    {
-                                        <span style="margin-left:6px; font-weight:500; color:#facc15;">★</span>
-                                    }
-                                </div>
-
-                                <div class="num">@b.Planned</div>
-                                <div>@b.VersionName</div>
-                                <div>
-                                    @(b.StartedAt.HasValue
-                                        ? b.StartedAt.Value.ToString("dd.MM.yyyy")
-                                        : "")
-                                </div>
-                                <div class="num">@b.Done</div>
-                                <div>@b.Comment</div>
-                            </div>
-                        }
-
-                    </div>
-                }
-            }
-        </div>
-
+<!-- 3. BOX -->
+<div class="ptv2-box ptv2-box-detail">
+    <ProductionTasksBatchDetail
+        SelectedProduct="SelectedProduct"
+        ProductBatches="ProductBatches"
+        LatestVersionByProductCode="_latestVersionByProductCode" />
+</div>
+    
     </div>
 
     <!-- APAKŠA: 4. BOX -->
-    <div class="ptv2-right-bottom">
-        <div class="ptv2-box ptv2-box-tasks">
-            <h3>DETAIL</h3>
-        </div>
+
+<div class="ptv2-right-bottom">
+    <div class="ptv2-box ptv2-box-tasks">
+        <ProductionTasksDetailPanel />
     </div>
+</div>
+
 
 </div>
 </div>
@@ -322,26 +276,9 @@ foreach (var v in versionIds)
 ProductBatches = all;
 
 }
-private sealed class ProductBatchRow
-{
-    public int BatchId { get; set; }
-    public int BatchProductId { get; set; }
-
-    public string BatchCode { get; set; } = "";
-
-    public int Planned { get; set; }
-    public int Done { get; set; }
-
-    public string? Comment { get; set; }
-    public DateTime? StartedAt { get; set; }
-
-    public int VersionId { get; set; }
-    public string? VersionName { get; set; }
-}
 
 private readonly Dictionary<string, int> _latestVersionByProductCode
     = new(StringComparer.OrdinalIgnoreCase);
-
 
 }
 

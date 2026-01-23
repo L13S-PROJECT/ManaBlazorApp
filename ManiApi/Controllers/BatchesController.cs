@@ -250,7 +250,8 @@ UPDATE batches
             }
 
             // 3) Rindas (UPSERT pēc (Batch_Id, Version_Id))
-if (dto.Items is not null)
+if (dto.Items is not null && dto.Items.Count > 0)
+
 {
     // 0️⃣ Deaktivējam VISAS rindas šim batch
 await using (var clear = conn.CreateCommand())
@@ -728,8 +729,7 @@ SELECT
   GREATEST(COALESCE(s.Finishing, 0), 0) AS Finishing,
   GREATEST(COALESCE(s.Stock,     0), 0) AS Done,
 
-  bp.BatchProduct_Comments AS Comment,
-
+  b.Comments AS Comment,
   (
       SELECT MIN(t.Started_At)
       FROM tasks t
@@ -962,6 +962,8 @@ WHERE Batch_Id = @bid
     });
 }
 
+
+
  // POST: /api/batches/update-line
 [HttpPost("update-line")]
 public async Task<IActionResult> UpdateLine([FromBody] UpdateBatchProductDto? dto)
@@ -1061,6 +1063,40 @@ UPDATE batches_products
     });
 }
 
+// POST: /api/batches/update-comment
+[HttpPost("update-comment")]
+public async Task<IActionResult> UpdateBatchComment([FromBody] UpdateBatchCommentDto dto)
+{
+    if (dto.BatchId <= 0)
+        return BadRequest("BatchId is required.");
+
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+UPDATE batches
+SET Comments = @comment
+WHERE ID = @id
+  AND IsActive = 1;";
+
+    var pId = cmd.CreateParameter();
+    pId.ParameterName = "@id";
+    pId.Value = dto.BatchId;
+    cmd.Parameters.Add(pId);
+
+    var pCom = cmd.CreateParameter();
+    pCom.ParameterName = "@comment";
+    pCom.Value = (object?)dto.Comment ?? DBNull.Value;
+    cmd.Parameters.Add(pCom);
+
+    await cmd.ExecuteNonQueryAsync();
+
+    return Ok(new { batchId = dto.BatchId });
+}
+
+
+
     } // <-- beidzas public class BatchesController
 
     // === DTO (tie paši nosaukumi, ko izmanto Blazor) ===
@@ -1096,5 +1132,12 @@ public sealed class SetPlannedDto
     public int BatchId { get; set; }
     public string Code { get; set; } = "";
 }
+
+public sealed class UpdateBatchCommentDto
+{
+    public int BatchId { get; set; }
+    public string? Comment { get; set; }
+}
+
 
 } // <-- beidzas namespace ManiApi.Controllers

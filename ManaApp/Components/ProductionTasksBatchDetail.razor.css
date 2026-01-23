@@ -1,0 +1,138 @@
+.ptv2-box-detail {
+    flex: 1;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+
+
+.ptv2-detail-table {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ptv2-detail-header,
+.ptv2-detail-row {
+    display: grid;
+    grid-template-columns: 90px 80px 70px 110px 100px 1fr;
+    gap: 6px;
+}
+
+
+
+.ptv2-detail-header div {
+    font-weight: 700;
+    font-size: 13px;
+    padding: 6px;
+}
+
+.ptv2-detail-row div {
+    padding: 6px;
+    border-radius: 6px;
+    background: #f3f3f3;
+    font-size: 13px;
+}
+
+.ptv2-detail-table {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 8px;
+    flex: 1;
+    overflow: auto;
+}
+
+/* 3.box tabulas formatēšana */
+
+/* ===== 3. BOX – BATCH TABLE ===== */
+
+.ptv2-batches {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.ptv2-batches-header,
+.ptv2-batch-row {
+    display: grid;
+    grid-template-columns:
+        70px   /* Raž.kods */
+        40px   /* Versija */
+        40px   /* Apjoms */
+        40px   /* Done */
+        100px  /* Datums */
+        1fr    /* Komentārs */
+        34px;  /* Edit */
+    padding: 6px 8px;
+    gap: 6px;
+    font-size: 12px;
+}
+
+/* Centrē TIKAI Versija, Apjoms, Done */
+.ptv2-batches-header div:nth-child(2),
+.ptv2-batches-header div:nth-child(3),
+.ptv2-batches-header div:nth-child(4),
+.ptv2-batches-header div:nth-child(1),
+.ptv2-batches-header div:nth-child(5),
+.ptv2-batch-row div:nth-child(1),
+.ptv2-batch-row div:nth-child(2),
+.ptv2-batch-row div:nth-child(3),
+.ptv2-batch-row div:nth-child(4),
+.ptv2-batch-row div:nth-child(5)
+{
+    text-align: center;
+}
+
+
+.ptv2-batches-header {
+    font-weight: 600;
+    background: #f3f4f6;
+}
+
+/* RINDA */
+.ptv2-batch-row {
+    border-top: 1px solid #e5e7eb;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+}
+
+.ptv2-batch-row:hover {
+    background: #eafff1;
+}
+
+.ptv2-batch-row.active {
+    background: #22c55e;
+    color: #ffffff;
+}
+
+.ptv2-batch-row .num {
+    text-align: right;
+}
+
+/* KOMENTĀRS */
+.ptv2-comment {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ZVAIGZNĪTE */
+.ptv2-star {
+    margin-left: 6px;
+    color: #facc15;
+    font-weight: 600;
+}
+
+/* EDIT POGA */
+.ptv2-edit {
+    text-align: center;
+    border-radius: 6px;
+    font-size: 14px;
+    opacity: .7;
+}
+
+.ptv2-batch-row:hover .ptv2-edit {
+    opacity: 1;
+}
+

@@ -1,0 +1,148 @@
+@using ManaApp.Models
+@using ManaApp.Components
+
+
+<div class="ptv2-box ptv2-box-detail ptv2-box-batches">
+
+    <h3>
+        @(SelectedProduct == null
+            ? "Izvēlies preci"
+            : SelectedProduct.productName)
+    </h3>
+
+   
+    @if (SelectedProduct == null)
+    {
+        <div class="ptv2-detail-placeholder">
+            Izvēlies preci, lai redzētu batchus
+        </div>
+    }
+    else if (ProductBatches.Count == 0)
+    {
+        <div class="ptv2-detail-placeholder">
+            Nav batchu
+        </div>
+    }
+    else
+    {
+        <div class="ptv2-batches">
+
+
+           <!-- HEADER -->
+            <div class="ptv2-batches-header">
+                <div>Raž.kods</div>
+                <div>Versija</div>
+                <div class="num">Apjoms</div>
+                <div class="num">Done</div>
+                <div>Datums</div>
+                <div>Komentārs</div>
+                <div></div>
+            </div>
+
+            <!-- ROWS -->
+            @foreach (var b in ProductBatches)
+            {
+                <div class="ptv2-batch-row @(SelectedBatchId == b.BatchId ? "active" : "")"
+                     @onclick="() => SelectBatch(b)">
+
+                    <div>
+                        @b.BatchCode
+                        @if (LatestVersionByProductCode.TryGetValue(
+                            SelectedProduct!.productCode, out var latest)
+                            && b.VersionId == latest)
+                        {
+                            <span class="ptv2-star">★</span>
+                        }
+                    </div>
+
+                    <div>@b.VersionName</div>
+                    <div class="num">@b.Planned</div>
+                    <div class="num">@b.Done</div>
+                    <div>
+                        @(b.StartedAt?.ToString("dd.MM.yyyy") ?? "")
+                    </div>
+
+                    <div class="ptv2-comment" title="@b.Comment">
+                        @b.Comment
+                    </div>
+<button type="button"
+        class="ptv2-edit"
+        @onclick="() => OpenCommentDialog(b)"
+        @onclick:stopPropagation="true">
+    ✏️
+</button>
+
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@if (IsCommentDialogOpen)
+{
+<BatchCommentDialog
+    Comment="@DialogComment"
+    OnSave="OnCommentSaved"
+    OnClose="CloseCommentDialog" />
+
+}
+
+@code {
+
+string? BatchComment =>
+    ProductBatches.FirstOrDefault()?.Comment;
+
+    [Parameter] public ProductRow? SelectedProduct { get; set; }
+    [Parameter] public List<ProductBatchRow> ProductBatches { get; set; } = new();
+    [Parameter] public Dictionary<string, int> LatestVersionByProductCode { get; set; } = new();
+
+    private int? SelectedBatchId;
+
+    void SelectBatch(ProductBatchRow batch)
+    {
+        SelectedBatchId = batch.BatchId;
+        // TODO: atvērt 4.box
+    }
+
+bool IsCommentDialogOpen = false;
+string? DialogComment;
+int? EditingBatchId;
+
+void OpenCommentDialog(ProductBatchRow row)
+{
+    EditingBatchId = row.BatchId;
+    DialogComment = row.Comment;   // <-- esošais DB komentārs šim batcham
+    IsCommentDialogOpen = true;
+}
+
+void CloseCommentDialog()
+{
+    IsCommentDialogOpen = false;
+    EditingBatchId = null;
+}
+
+async Task OnCommentSaved(string? newComment)
+{
+    if (EditingBatchId is null)
+        return;
+
+    await Http.PostAsJsonAsync(
+        "http://localhost:5270/api/batches/update-comment",
+        new
+        {
+            BatchId = EditingBatchId.Value,
+            Comment = newComment
+        });
+
+    // atjaunojam TIKAI šo batch rindu(s)
+    foreach (var r in ProductBatches.Where(x => x.BatchId == EditingBatchId.Value))
+        r.Comment = newComment;
+
+    IsCommentDialogOpen = false;
+    EditingBatchId = null;
+    StateHasChanged();
+}
+
+[Inject] HttpClient Http { get; set; } = default!;
+
+}

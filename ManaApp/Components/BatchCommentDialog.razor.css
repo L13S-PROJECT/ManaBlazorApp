@@ -1,0 +1,69 @@
+.ptv2-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 9999;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ptv2-modal {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 16px;
+    width: 420px;
+    max-width: 90%;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+}
+
+.ptv2-modal h4 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+}
+
+.ptv2-modal-textarea {
+    width: 100%;
+    min-height: 120px;
+    resize: vertical;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    font-size: 13px;
+}
+
+.ptv2-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.ptv2-btn-primary,
+.ptv2-btn-secondary {
+    border-radius: 10px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+
+.ptv2-btn-primary {
+    background: #22c55e;
+    color: #ffffff;
+}
+
+.ptv2-btn-primary:hover {
+    background: #16a34a;
+}
+
+.ptv2-btn-secondary {
+    background: #f3f4f6;
+    color: #111827;
+    border-color: #d1d5db;
+}
+
+.ptv2-btn-secondary:hover {
+    background: #e5e7eb;
+}

@@ -1,0 +1,45 @@
+<div class="ptv2-modal-backdrop">
+    <div class="ptv2-modal">
+
+        <h4>Komentārs</h4>
+
+        <textarea class="ptv2-modal-textarea"
+                 @bind="EditValue">
+        </textarea>
+
+        <div class="ptv2-modal-actions">
+            <button class="ptv2-btn-primary" @onclick="Save">
+                Saglabāt
+            </button>
+            <button class="ptv2-btn-secondary" @onclick="Close">
+                Atcelt
+            </button>
+        </div>
+
+    </div>
+</div>
+
+@code {
+    [Parameter] public string? Comment { get; set; }
+    [Parameter] public EventCallback<string?> OnSave { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    string? EditValue;
+
+    protected override void OnParametersSet()
+{
+    EditValue = Comment;
+}
+
+
+    async Task Save()
+    {
+        await OnSave.InvokeAsync(EditValue);
+
+    }
+
+    async Task Close()
+    {
+        await OnClose.InvokeAsync();
+    }
+}
