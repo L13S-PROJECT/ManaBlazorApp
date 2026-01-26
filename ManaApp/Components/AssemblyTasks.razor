@@ -1,0 +1,23 @@
+@using ManaApp.Models
+
+<div class="ptv2-section">
+    <div class="ptv2-section-title">assembly</div>
+
+    @if (SelectedBatch is null)
+    {
+        <div class="ptv2-detail-placeholder">
+            Izvēlies batch
+        </div>
+    }
+    else
+    {
+        <div class="ptv2-section-body">
+            ASSEMBLY saturs (tukšs)
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public ProductBatchRow? SelectedBatch { get; set; }
+}

@@ -38,10 +38,42 @@ LIMIT 1;";
             return Ok(new { id, name });
         }
 
+
+        // GET: /api/employees
+[HttpGet]
+public async Task<IActionResult> GetAll()
+{
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+SELECT ID, Employee_Name
+FROM employees
+WHERE IsActive = 1
+ORDER BY Employee_Name;
+";
+
+    var list = new List<object>();
+
+    await using var r = await cmd.ExecuteReaderAsync();
+    while (await r.ReadAsync())
+    {
+        list.Add(new
+        {
+            Id = r.GetInt32(0),
+            Name = r.GetString(1)
+        });
+    }
+
+    return Ok(list);
+}
         public sealed class LoginDto
         {
             public string Username { get; set; } = "";
             public string Password { get; set; } = "";
         }
     }
+
+    
 }

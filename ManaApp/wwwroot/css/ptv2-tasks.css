@@ -1,0 +1,77 @@
+/* ===== 4. BOX – DETAIL / ASSEMBLY / FINISHING ===== */
+
+.ptv2-tasks-grid {
+    display: grid;
+    grid-template-columns:
+        2fr     /* Nosaukums */
+        0.6fr   /* Apjoms */
+        0.6fr   /* Gatavs */
+        1.2fr   /* Darba centrs */
+        1fr     /* Piešķirts */
+        1fr     /* Pieņemts */
+        0.9fr   /* Sākums */
+        0.9fr   /* Pabeigts */
+        2fr;    /* Komentārs */
+
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+    font-size: 12px;
+}
+
+/* ===== HEADER ===== */
+.ptv2-tasks-header {
+    display: contents;
+}
+
+.ptv2-tasks-header > div {
+    font-weight: 600;
+    background: #f3f4f6;
+    padding: 8px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+/* ===== ROWS ===== */
+.ptv2-tasks-row {
+    display: contents;
+}
+
+.ptv2-tasks-row > div {
+    padding: 6px 8px;
+    border-bottom: 1px solid #e5e7eb;
+    background: #ffffff;
+}
+
+/* hover pa VISU rindu */
+.ptv2-tasks-row:hover > div {
+    background: #eafff1;
+}
+
+/* centrējam ciparus / checkbox */
+.ptv2-tasks-row > div:nth-child(2),
+.ptv2-tasks-row > div:nth-child(3),
+.ptv2-tasks-row > div:nth-child(7),
+.ptv2-tasks-row > div:nth-child(8),
+.ptv2-tasks-header > div:nth-child(2),
+.ptv2-tasks-header > div:nth-child(3),
+.ptv2-tasks-header > div:nth-child(7),
+.ptv2-tasks-header > div:nth-child(8) {
+    text-align: center;
+}
+
+/* SECTION TITLES */
+.ptv2-section-title {
+    margin: 10px 0 4px;
+    font-weight: 600;
+    text-transform: lowercase;
+    color: #444;
+}
+
+/* PLACEHOLDER */
+.ptv2-detail-placeholder {
+    grid-column: 1 / -1;
+    padding: 8px;
+    color: #777;
+    font-style: italic;
+}

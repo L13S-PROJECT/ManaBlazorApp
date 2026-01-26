@@ -1296,6 +1296,143 @@ public sealed class UpdateFinishingQtyDto
     public string? Comment { get; set; }
 }
 
+// piešķir konkrētam tasksam konkrētu darbinieku - Assigned_TO
+public sealed class UpdateTaskAssigneeDto
+{
+    public int TaskId { get; set; }
+    public int? Assigned_To { get; set; } // null = noņemt
+}
+
+[HttpPost("update-assignee")]
+public async Task<IActionResult> UpdateAssignee([FromBody] UpdateTaskAssigneeDto dto)
+{
+    if (dto is null || dto.TaskId <= 0)
+        return BadRequest("TaskId is required.");
+
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+UPDATE tasks
+SET Assigned_To = @emp
+WHERE ID = @id
+  AND IsActive = 1;
+";
+
+    cmd.Parameters.Add(new MySqlParameter("@id", dto.TaskId));
+    cmd.Parameters.Add(new MySqlParameter(
+        "@emp",
+        (object?)dto.Assigned_To ?? DBNull.Value
+    ));
+
+    var affected = await cmd.ExecuteNonQueryAsync();
+    if (affected == 0)
+        return NotFound("Task not found or inactive.");
+
+    return Ok(new { ok = true, taskId = dto.TaskId, assignedTo = dto.Assigned_To });
+}
+
+// GET: /api/tasks/by-step?batchProductId=123&topPartStepId=456
+[HttpGet("by-step")]
+public async Task<IActionResult> GetByStep(
+    [FromQuery] int batchProductId,
+    [FromQuery] int topPartStepId
+)
+{
+    if (batchProductId <= 0 || topPartStepId <= 0)
+        return BadRequest("batchProductId and topPartStepId are required.");
+
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+SELECT
+    t.ID            AS TaskId,
+    t.Tasks_Status  AS Status,
+    t.Assigned_To   AS AssignedTo,
+    COALESCE(t.Qty_Done, 0) AS Done
+FROM tasks t
+WHERE t.IsActive = 1
+  AND t.BatchProduct_ID = @bp
+  AND t.TopPartStep_ID  = @step
+ORDER BY t.ID;
+";
+
+    cmd.Parameters.Add(new MySqlParameter("@bp", batchProductId));
+    cmd.Parameters.Add(new MySqlParameter("@step", topPartStepId));
+
+    var list = new List<object>();
+    await using var r = await cmd.ExecuteReaderAsync();
+    while (await r.ReadAsync())
+    {
+        list.Add(new
+        {
+            TaskId      = r.GetInt32(0),
+            Status      = r.GetInt32(1),
+            Assigned_To = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
+            Done        = r.GetInt32(3)
+        });
+    }
+
+    return Ok(list);
+}
+
+// GET: /api/tasks/by-batch?batchProductId=123&stepType=1
+[HttpGet("by-batch")]
+public async Task<IActionResult> GetTasksByBatch(
+    [FromQuery] int batchProductId,
+    [FromQuery] int stepType)
+{
+    if (batchProductId <= 0)
+        return BadRequest("batchProductId is required.");
+
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+SELECT
+    t.ID               AS TaskId,
+    t.Tasks_Status     AS Status,
+    t.Assigned_To,
+    t.Claimed_By,
+    COALESCE(t.Qty_Done, 0) AS Done,
+    t.TopPartStep_ID   AS TopPartStepId,
+    t.Started_At,
+    t.Finished_At
+FROM tasks t
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+WHERE t.IsActive = 1
+  AND t.BatchProduct_ID = @bpId
+  AND ts.Step_Type = @stepType
+ORDER BY ts.Step_Order, t.ID;
+";
+
+    cmd.Parameters.Add(new MySqlParameter("@bpId", batchProductId));
+    cmd.Parameters.Add(new MySqlParameter("@stepType", stepType));
+
+    var list = new List<object>();
+    await using var r = await cmd.ExecuteReaderAsync();
+    while (await r.ReadAsync())
+    {
+            list.Add(new
+            {
+                TaskId        = r.GetInt32(0),
+                Status        = r.GetInt32(1),
+                Assigned_To   = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
+                Claimed_By    = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
+                Done          = r.IsDBNull(4) ? 0 : r.GetInt32(4),
+                TopPartStepId = r.GetInt32(5),
+                StartedAt     = r.IsDBNull(6) ? (DateTime?)null : r.GetDateTime(6),
+                FinishedAt    = r.IsDBNull(7) ? (DateTime?)null : r.GetDateTime(7)
+            });
+
+    }
+
+    return Ok(list);
+}
 
 
     }

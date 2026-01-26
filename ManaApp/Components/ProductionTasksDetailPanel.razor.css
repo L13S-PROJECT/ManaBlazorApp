@@ -1,0 +1,77 @@
+/* ===== 4. BOX – DETAIL / ASSEMBLY / FINISHING (ISOLATED) ===== */
+
+.ptv2-tasks-grid {
+    display: grid;
+    grid-template-columns:
+        2fr
+        0.6fr
+        0.6fr
+        1.2fr
+        1fr
+        1fr
+        0.9fr
+        0.9fr
+        2fr;
+
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow-x: hidden;
+    overflow: hidden;
+    font-size: 12px;
+    flex: 1;
+    min-height: 0;
+  }
+
+.ptv2-tasks-header > div {
+    font-weight: 600;
+    padding: 0 6px; 
+    line-height: 1;
+}
+
+
+.ptv2-tasks-header {
+    display: grid;
+    grid-template-columns: inherit;
+    grid-column: 1 / -1;
+
+    background: #f3f4f6;
+    border-bottom: 1px solid #e5e7eb;
+
+    height: 32px;              /* ← fiksēts, šaurs header */
+    align-items: center;       /* ← vertikāli centrē tekstu */
+}
+
+.ptv2-tasks-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    flex: 1;                 /* ← aizņem visu pieejamo augstumu */
+    min-height: 0;           /* ← KRITISKI flex konteineros */
+    overflow-y: auto;        /* ← scroll tikai šeit */
+    overflow-x: hidden;
+
+    grid-column: 1 / -1;
+}
+
+
+.ptv2-tasks-header {
+    display: grid;
+    grid-template-columns: inherit;
+}
+
+
+.ptv2-tasks-subheader {
+    background: #f3f4f6;
+    font-weight: 600;
+    padding: 8px 10px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.ptv2-tasks-block {
+    grid-column: 1 / -1;
+    width: 100%;
+    overflow-x: hidden;
+}
+

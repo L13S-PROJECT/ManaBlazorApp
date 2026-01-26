@@ -93,10 +93,12 @@
 
 <!-- 3. BOX -->
 <div class="ptv2-box ptv2-box-detail">
-    <ProductionTasksBatchDetail
-        SelectedProduct="SelectedProduct"
-        ProductBatches="ProductBatches"
-        LatestVersionByProductCode="_latestVersionByProductCode" />
+<ProductionTasksBatchDetail
+    SelectedProduct="SelectedProduct"
+    ProductBatches="ProductBatches"
+    LatestVersionByProductCode="_latestVersionByProductCode"
+    OnBatchSelected="OnBatchSelected" />
+
 </div>
     
     </div>
@@ -105,15 +107,24 @@
 
 <div class="ptv2-right-bottom">
     <div class="ptv2-box ptv2-box-tasks">
-        <ProductionTasksDetailPanel />
+        <ProductionTasksDetailPanel
+            SelectedBatch="SelectedBatch" />
     </div>
 </div>
-
 
 </div>
 </div>
 
 @code {
+
+private ProductBatchRow? SelectedBatch;
+
+private void OnBatchSelected(ProductBatchRow batch)
+{
+    SelectedBatch = batch;
+}
+
+
 private List<CategoryRow> Categories = new();
 private int? SelectedParentId;
     protected override async Task OnInitializedAsync()

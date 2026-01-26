@@ -1,0 +1,248 @@
+@using ManaApp.Models
+@using ManaApp.Components
+@inject HttpClient Http
+
+@if (SelectedBatch is null)
+{
+    <div class="ptv2-detail-placeholder">
+        Izvēlies Ražošanas partiju, lai redzētu detaļas
+    </div>
+    return;
+}
+
+
+@foreach (var p in Parts)
+{
+<div class="ptv2-tasks-row">
+    <!-- 1. Nosaukums -->
+    <div title="@p.TopPartName">@p.TopPartName</div>
+
+    <!-- 2. Gatavs -->
+    <div></div>
+
+    <!-- 3. Apjoms -->
+    <div>@(SelectedBatch!.Planned * p.Quantity)</div>
+
+    <!-- 4. Piešķirts -->
+    <div></div>
+
+    <!-- 5. Pieņēma -->
+    <div></div>
+
+    <!-- 6. Sākums (NO SUMMARY API) -->
+    <div>
+        @p.StartDate?.ToString("dd.MM.yyyy HH:mm")
+    </div>
+
+    <!-- 7. Pabeigts (NO SUMMARY API) -->
+    <div>
+        @p.EndDate?.ToString("dd.MM.yyyy HH:mm")
+    </div>
+
+    <!-- 8. Komentārs -->
+    <div></div>
+</div>
+
+@foreach (var step in p.Steps)
+{
+    <!-- STEP ROW (vienmēr redzams) -->
+<div class="ptv2-tasks-row sub step">
+    <div title="@step.StepName">
+        @step.StepName
+    </div>
+    <div></div> <!-- Gatavs -->
+    <div></div> <!-- Apjoms -->
+    <div></div> <!-- Piešķirts -->
+    <div></div> <!-- Pieņem -->
+    <div></div> <!-- Sākums -->
+    <div></div> <!-- Pabeigts -->
+    <div></div> <!-- Komentārs -->
+    <div></div> <!-- Done -->
+</div>
+
+    @if (TasksByStep.TryGetValue(step.Id, out var tasks))
+
+    {
+        @foreach (var t in tasks)
+        {
+            <div class="ptv2-tasks-row sub task">
+                <!-- 1. Nosaukums (tukšs – step jau ir augstāk) -->
+                        <div></div>
+
+                        <!-- 2. Gatavs -->
+                        <div></div>
+
+                        <!-- 3. Apjoms -->
+                        <div></div>
+
+                        <!-- 4. Piešķirts -->
+                        <div>
+                            <select value="@t.Assigned_To"
+                                    @onchange="e => OnAssignedChanged(t.TaskId, e)">
+                                <option value="">—</option>
+                                @foreach (var emp in Employees)
+                                {
+                                    <option value="@emp.Id">@emp.Name</option>
+                                }
+                            </select>
+                        </div>
+
+                        <!-- 5. Pieņēma -->
+                        <div>
+                            @Employees.FirstOrDefault(e => e.Id == t.Claimed_By)?.Name
+
+                        </div>
+
+                        <!-- 6. Sākums -->
+                        <div>
+    @(p.StartDate.HasValue
+        ? p.StartDate.Value.ToString("dd.MM.yyyy HH:mm")
+        : "—")
+</div>
+
+
+                        <!-- 7. Pabeigts -->
+<div>
+    @(p.EndDate.HasValue
+        ? p.EndDate.Value.ToString("dd.MM.yyyy HH:mm")
+        : "—")
+</div>
+
+
+                        <!-- 8. Komentārs -->
+                        <div></div>
+
+                        <!-- 9. Done -->
+                        <div>@t.Done</div>
+
+            </div>
+        }
+    }
+}
+
+
+}
+
+@code {
+    [Parameter] public ProductBatchRow? SelectedBatch { get; set; }
+
+// Parts ir ProductTopParts konkrētajai VersionId (no SelectedBatch) 26.01.2026
+    private List<DetailPartRow> Parts = new();
+
+    private Dictionary<int, List<DetailTaskRow>> TasksByStep
+    = new(); // key = TopPartStepId
+
+
+    protected override async Task OnParametersSetAsync()
+{
+    Parts.Clear();
+    TasksByStep.Clear();
+
+    if (SelectedBatch?.VersionId is not int vid || vid <= 0)
+        return;
+
+    // 1) Ielādējam ProductTopParts (DETAIL)
+    var partsUrl =
+        $"http://localhost:5270/api/products/details?versionId={vid}&stepType=1";
+
+    Parts =
+        await Http.GetFromJsonAsync<List<DetailPartRow>>(partsUrl)
+        ?? new();
+
+    
+    if (SelectedBatch?.BatchProductId is not int bpId || bpId <= 0)
+        return;
+
+    // 2) Ielādējam DETAIL taskus ŠAI PARTIJAI
+    var tasksUrl =
+        $"http://localhost:5270/api/tasks/by-batch" +
+        $"?batchProductId={bpId}&stepType=1";
+
+    var tasks =
+        await Http.GetFromJsonAsync<List<DetailTaskRow>>(tasksUrl)
+        ?? new();
+
+    // 3) Grupējam pēc TopPartStep_ID
+    TasksByStep = tasks
+        .GroupBy(t => t.TopPartStepId)
+        .ToDictionary(g => g.Key, g => g.ToList());
+    
+    // 4) Aprēķinām PART Start / End no taskiem
+foreach (var p in Parts)
+{
+    var partTasks = tasks
+        .Where(t =>
+            p.Steps.Any(s => s.Id == t.TopPartStepId))
+        .ToList();
+
+    if (partTasks.Count == 0)
+        continue;
+
+    p.StartDate = partTasks
+        .Where(t => t.StartedAt.HasValue)
+        .Min(t => t.StartedAt);
+
+    p.EndDate = partTasks
+        .Where(t => t.FinishedAt.HasValue)
+        .Max(t => t.FinishedAt);
+}
+
+}
+
+private List<EmployeeRow> Employees = new();
+
+protected override async Task OnInitializedAsync()
+{
+    Employees =
+        await Http.GetFromJsonAsync<List<EmployeeRow>>(
+            "http://localhost:5270/api/employees")
+        ?? new();
+}
+
+public sealed class EmployeeRow
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+}
+
+async Task OnAssignedChanged(int taskId, ChangeEventArgs e)
+{
+    int? empId =
+        int.TryParse(e.Value?.ToString(), out var v)
+            ? v
+            : (int?)null;
+
+    await Http.PostAsJsonAsync(
+        "http://localhost:5270/api/tasks/update-assignee",
+        new
+        {
+            TaskId = taskId,
+            Assigned_To = empId
+        });
+}
+
+private sealed class DetailTaskRow
+{
+    public int TaskId { get; set; }
+    public int Status { get; set; }
+    public int? Assigned_To { get; set; }
+    public int Done { get; set; }
+
+    public int TopPartStepId { get; set; }
+
+    // 🆕 NO EmployeeTasks
+    public int? Claimed_By { get; set; }
+    public DateTime? StartedAt { get; set; }
+    public DateTime? FinishedAt { get; set; }
+}
+
+private sealed class DetailSummaryRow
+{
+    public int ProductToPartId { get; set; }
+    public DateTime? StartedAt { get; set; }
+    public DateTime? FinishedAt { get; set; }
+}
+
+
+
+}

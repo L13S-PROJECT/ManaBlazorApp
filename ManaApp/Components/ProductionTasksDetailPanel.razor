@@ -1,11 +1,47 @@
 @using ManaApp.Models
+@using ManaApp.Components
 
-<div class="ptv2-box ptv2-box-tasks">
+<div class="ptv2-tasks-grid">
 
-    <h3>DETAIL</h3>
-
-    <div class="ptv2-detail-placeholder">
-        Izvēlies batch, lai redzētu detaļas
+    <div class="ptv2-tasks-header">
+        <div>Nosaukums</div>
+        <div>Gatavs</div>
+        <div>Apjoms</div>
+        <div>Piešķirts</div>
+        <div>Pieņēma</div>
+        <div>Sākums</div>
+        <div>Pabeigts</div>
+        <div>Komentārs</div>
+        <div></div>
     </div>
 
+    <!-- ŠEIT VĒLĀK NĀKS xxxTasks.razor -->
+<div class="ptv2-tasks-section">
+
+<!-- DetailTasks.razor -->
+
+<div class="ptv2-tasks-block">
+    <div class="ptv2-tasks-subheader">DETAIL</div>
+    <DetailTasks SelectedBatch="SelectedBatch" />
 </div>
+<!-- AssemblyTasks.razor -->
+
+<div class="ptv2-tasks-block">
+    <div class="ptv2-tasks-subheader">ASSEMBLY</div>
+    <AssemblyTasks SelectedBatch="SelectedBatch" />
+</div>
+
+<!-- FinishingTasks.razor -->
+
+<div class="ptv2-tasks-block">
+    <div class="ptv2-tasks-subheader">FINISHING</div>   
+    <FinishingTasks SelectedBatch="SelectedBatch" />
+</div>
+
+</div>
+
+</div>
+
+@code {
+    [Parameter] public ProductBatchRow? SelectedBatch { get; set; }
+}

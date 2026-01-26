@@ -98,10 +98,12 @@ string? BatchComment =>
 
     private int? SelectedBatchId;
 
-    void SelectBatch(ProductBatchRow batch)
+    async Task SelectBatch(ProductBatchRow batch)
     {
         SelectedBatchId = batch.BatchId;
-        // TODO: atvērt 4.box
+
+        if (OnBatchSelected.HasDelegate)
+            await OnBatchSelected.InvokeAsync(batch);
     }
 
 bool IsCommentDialogOpen = false;
@@ -144,5 +146,8 @@ async Task OnCommentSaved(string? newComment)
 }
 
 [Inject] HttpClient Http { get; set; } = default!;
+
+[Parameter] public EventCallback<ProductBatchRow> OnBatchSelected { get; set; }
+
 
 }

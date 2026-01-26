@@ -1,0 +1,24 @@
+@using ManaApp.Models
+@using ManaApp.Components
+@inject HttpClient Http
+
+@if (SelectedBatch is null)
+{
+    return;
+}
+
+<div class="ptv2-tasks-row">
+    <div>FINISHING (placeholder)</div>
+    <div></div>
+    <div></div>
+    <div></div>
+    <div></div>
+    <div></div>
+    <div></div>
+    <div></div>
+    <div></div>
+</div>
+
+@code {
+    [Parameter] public ProductBatchRow? SelectedBatch { get; set; }
+}

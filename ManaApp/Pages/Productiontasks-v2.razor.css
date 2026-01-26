@@ -26,10 +26,12 @@
     background: #fff;
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    padding: 12px;
+    padding: 8px;
     width: 100%;
     height: 100%;
-    overflow: auto; /* svarīgi – ne “mūžīgais” */
+    overflow: hidden; 
+    display: flex;
+    flex-direction: column;
 }
 
 .ptv2-category-list {
@@ -226,6 +228,7 @@
 .ptv2-box-tasks {
     flex: 1;
     min-height: 200px; /* lai jau redzams kā bloks */
+    width: 100%;
 }
 
 .ptv2-right-top {
@@ -246,14 +249,9 @@
 }
 
 .ptv2-right-bottom {
-    flex: 1;        /* ← aizņem atlikušo augstumu */
+    flex: 1;
+    min-height: 0;      /* ← KRITISKI */
     display: flex;
 }
 
-.ptv2-box-tasks {
-    width: 100%;
-}
 
-.ptv2-box {
-    overflow: auto;
-}

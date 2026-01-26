@@ -215,24 +215,75 @@ public async Task<IActionResult> GetListSimple()
         } // ← beidzas GetContent()
 
         [HttpGet("details")]
-        public async Task<IActionResult> GetDetails([FromQuery] int versionId)
+public async Task<IActionResult> GetDetails(
+    [FromQuery] int versionId,
+    [FromQuery] int stepType
+)
+{
+    var rows = await _db.ProductTopParts
+        .AsNoTracking()
+        .Where(pt =>
+            pt.VersionId == versionId &&
+            pt.IsActive
+        )
+        .Select(pt => new
         {
-            var rows = await _db.ProductTopParts.AsNoTracking()
-                .Where(pt => pt.VersionId == versionId && pt.IsActive)
-                .Join(_db.TopParts.Where(tp => tp.IsActive),
-                      pt => pt.TopPartId,
-                      tp => tp.Id,
-                      (pt, tp) => new
-                      {
-                          tp.TopPartName,
-                          tp.TopPartCode,
-                          Quantity = pt.QtyPerProduct,
-                          ProductToPartId = pt.Id
-                      })
-                .ToListAsync();
+            pt.Id, // ProductToPartId
+            TopPartName = _db.TopParts
+                .Where(tp => tp.Id == pt.TopPartId && tp.IsActive)
+                .Select(tp => tp.TopPartName)
+                .FirstOrDefault(),
+            Quantity = pt.QtyPerProduct,
 
-            return Ok(rows);
-        }
+            Steps = _db.TopPartSteps
+                .Where(s =>
+                    s.ProductToPartId == pt.Id &&
+                    s.IsActive &&
+                    s.StepType == stepType
+                )
+                .OrderBy(s => s.StepOrder)
+                .Select(s => new
+                {
+                    s.Id,
+                    s.StepName,
+                    s.StepOrder
+                })
+                .ToList()
+        })
+        .Where(x => x.Steps.Any()) // tikai detaļas ar DETAIL soļiem
+        .ToListAsync();
+
+    return Ok(rows);
+}
+
+[HttpGet("toppartsteps")]
+public async Task<IActionResult> GetTopPartSteps(
+    [FromQuery] int versionId,
+    [FromQuery] int stepType
+)
+{
+    var rows = await _db.TopPartSteps
+        .AsNoTracking()
+        .Where(ts =>
+            ts.IsActive &&
+            ts.StepType == stepType &&
+            _db.ProductTopParts.Any(pt =>
+                pt.Id == ts.ProductToPartId &&
+                pt.VersionId == versionId &&
+                pt.IsActive
+            )
+        )
+        .Select(ts => new
+        {
+            Id = ts.Id,
+            ProductToPartId = ts.ProductToPartId, // 🔑 SAIKNE AR ProductTopPart
+            StepName = ts.StepName
+        })
+        .ToListAsync();
+
+    return Ok(rows);
+}
+
 
         [HttpGet("details-by-product")]
         public async Task<IActionResult> GetDetailsByProduct([FromQuery] int id)
