@@ -1,23 +1,263 @@
 @using ManaApp.Models
+@using ManaApp.Components
+@inject HttpClient Http
 
-<div class="ptv2-section">
-    <div class="ptv2-section-title">assembly</div>
+@if (SelectedBatch is null)
+{
+    <div class="ptv2-detail-placeholder">
+        Izvēlies Ražošanas partiju, lai redzētu ASSEMBLY detaļas
+    </div>
 
-    @if (SelectedBatch is null)
-    {
-        <div class="ptv2-detail-placeholder">
-            Izvēlies batch
+    return;
+}
+
+@foreach (var p in Parts)
+{
+    <div class="ptv2-tasks-row">
+        <!-- 1. Nosaukums -->
+        <div class="ptv2-part-name" title="@p.TopPartName">
+            <span class="ptv2-part-indicator state-gray"></span>
+            @p.TopPartName
         </div>
-    }
-    else
+
+
+        <!-- 2. Gatavs -->
+        <div></div>
+
+        <!-- 3. Apjoms -->
+        <div></div>
+
+        <!-- 4. Piešķirts -->
+        <div></div>
+
+        <!-- 5. Pieņēma -->
+        <div></div>
+
+        <!-- 6. Sākums -->
+        <div></div>
+
+        <!-- 7. Pabeigts -->
+        <div></div>
+
+        <!-- 8. Komentārs -->
+        <div></div>
+
+        <!-- 9. Done -->
+        <div></div>
+    </div>
+
+@foreach (var step in p.Steps)
+{
+
+@if (TasksByStep.TryGetValue(step.Id, out var tasks))
+{
+    @foreach (var t in tasks)
     {
-        <div class="ptv2-section-body">
-            ASSEMBLY saturs (tukšs)
-        </div>
-    }
+        <div class="ptv2-tasks-row sub task">
+<div title="@step.StepName">
+    @step.StepName
 </div>
 
+<div></div> <!-- Gatavs -->
+<div></div> <!-- Apjoms -->
+
+<div>
+    <select value="@t.Assigned_To"
+            @onchange="e => OnAssignedChanged(t.TaskId, e)">
+        <option value="">—</option>
+        @foreach (var emp in Employees)
+        {
+            <option value="@emp.Id">@emp.Name</option>
+        }
+    </select>
+</div>
+
+
+<div>
+    @Employees.FirstOrDefault(e => e.Id == t.Claimed_By)?.Name
+</div>
+
+<div>
+    @(t.StartedAt?.ToString("dd.MM.yyyy") ?? "—")
+</div>
+
+<div>
+    @(t.FinishedAt?.ToString("dd.MM.yyyy") ?? "—")
+</div>
+
+<div class="ptv2-comment-wrap">
+    <input
+        type="text"
+        class="ptv2-comment-input @(string.IsNullOrWhiteSpace(t.Comment) ? "empty" : "")"
+        value="@(string.IsNullOrWhiteSpace(t.Comment) ? "(Pievienot komentāru)" : t.Comment)"
+        readonly />
+    <button
+    type="button"
+    class="ptv2-comment-edit"
+    title="Labot komentāru"
+    @onclick="() => OpenCommentEditor(t)"
+    @onclick:stopPropagation="true">
+    ✎
+</button>
+
+</div>
+
+<div class="ptv2-done-cell">
+    <input type="checkbox"
+           class="ptv2-done-checkbox"
+           title="Redzams"
+           checked="@(t.Done > 0)" />
+</div>
+
+        </div>
+            }
+        }
+
+    }
+
+}
+
+@if (IsCommentPopupOpen && EditingTask is not null)
+{
+    <div class="ptv2-popup-backdrop">
+        <div class="ptv2-popup">
+            <h4>Komentārs</h4>
+
+            <textarea
+                style="width:100%; height:80px;"
+                @bind="EditingCommentText">
+            </textarea>
+
+            <div style="margin-top:8px; text-align:right;">
+                <button @onclick="CancelComment">Atcelt</button>
+                <button style="margin-left:6px;" @onclick="ConfirmComment">OK</button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
-    [Parameter]
-    public ProductBatchRow? SelectedBatch { get; set; }
+[Parameter] public ProductBatchRow? SelectedBatch { get; set; }
+
+private List<DetailPartRow> Parts = new();
+
+private Dictionary<int, List<DetailTaskRow>> TasksByStep = new();
+// key = TopPartStepId
+
+protected override async Task OnParametersSetAsync()
+{
+    Parts.Clear();
+
+    if (SelectedBatch?.VersionId is not int vid || vid <= 0)
+        return;
+
+    var partsUrl =
+        $"http://localhost:5270/api/products/details?versionId={vid}&stepType=2";
+
+    Parts =
+        await Http.GetFromJsonAsync<List<DetailPartRow>>(partsUrl)
+        ?? new();
+
+if (SelectedBatch?.BatchProductId is not int bpId || bpId <= 0)
+    return;
+
+var tasksUrl =
+    $"http://localhost:5270/api/tasks/by-batch" +
+    $"?batchProductId={bpId}&stepType=2";
+
+var tasks =
+    await Http.GetFromJsonAsync<List<DetailTaskRow>>(tasksUrl)
+    ?? new();
+
+TasksByStep = tasks
+    .GroupBy(t => t.TopPartStepId)
+    .ToDictionary(g => g.Key, g => g.ToList());
+
+
+}
+
+private sealed class DetailTaskRow
+{
+    public int TaskId { get; set; }
+    public int Status { get; set; }
+    public int? Assigned_To { get; set; }
+    public int Done { get; set; }
+
+    public int TopPartStepId { get; set; }
+
+    public int? Claimed_By { get; set; }
+    public DateTime? StartedAt { get; set; }
+    public DateTime? FinishedAt { get; set; }
+    public string? Comment { get; set; }
+}
+
+
+private List<EmployeeRow> Employees = new();
+
+protected override async Task OnInitializedAsync()
+{
+    Employees =
+        await Http.GetFromJsonAsync<List<EmployeeRow>>(
+            "http://localhost:5270/api/employees")
+        ?? new();
+}
+
+public sealed class EmployeeRow
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+}
+
+async Task OnAssignedChanged(int taskId, ChangeEventArgs e)
+{
+    int? empId =
+        int.TryParse(e.Value?.ToString(), out var v)
+            ? v
+            : (int?)null;
+
+    await Http.PostAsJsonAsync(
+        "http://localhost:5270/api/tasks/update-assignee",
+        new
+        {
+            TaskId = taskId,
+            Assigned_To = empId
+        });
+}
+
+private bool IsCommentPopupOpen = false;
+private DetailTaskRow? EditingTask;
+private string EditingCommentText = "";
+
+void OpenCommentEditor(DetailTaskRow task)
+{
+    EditingTask = task;
+    EditingCommentText = task.Comment ?? "";
+    IsCommentPopupOpen = true;
+}
+
+void CancelComment()
+{
+    IsCommentPopupOpen = false;
+    EditingTask = null;
+}
+
+async Task ConfirmComment()
+{
+    if (EditingTask is not null)
+    {
+        await Http.PostAsJsonAsync(
+            "http://localhost:5270/api/tasks/update-comment",
+            new
+            {
+                TaskId = EditingTask.TaskId,
+                Comment = EditingCommentText
+            });
+
+        EditingTask.Comment = EditingCommentText;
+    }
+
+    IsCommentPopupOpen = false;
+    EditingTask = null;
+}
+
 }

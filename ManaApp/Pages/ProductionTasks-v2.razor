@@ -158,10 +158,15 @@ AllProducts = await Http.GetFromJsonAsync<List<ProductRow>>(
     private List<ProductBatchRow> ProductBatches = new();
 
     private async Task SelectCategory(CategoryRow c)
-    {
-            SelectedBatch = null; 
+{
+            // ⬇ RESET ķēdei 2 → 3 → 4
+            SelectedBatch   = null;      // 4. box
+            SelectedProduct = null;      // 3. box
+            ProductBatches.Clear();      // 3. box saturs
+
             SelectedCategoryId = c.Id;
             SelectedCategory   = c;
+
 
 // 1) paņemam tikai šīs kategorijas rindas (version līmenī)
 var catRows = AllProducts

@@ -136,3 +136,16 @@
     opacity: 1;
 }
 
+
+.ptv2-detail-placeholder {
+    font-size: 12px;          /* smalkāki burti */
+    font-style: italic;       /* italic */
+    color: #9ca3af;           /* gaiši pelēks */
+    padding: 12px 8px;
+
+    text-align: left;
+    user-select: none;        /* neuzkrītošs*/
+    letter-spacing: 0.2px;
+    opacity: 0.9;
+}
+
