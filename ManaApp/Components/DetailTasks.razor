@@ -30,35 +30,20 @@
     <div></div>
 
     <!-- 6. Sākums (NO SUMMARY API) -->
-    <div>
-        @p.StartDate?.ToString("dd.MM.yyyy HH:mm")
-    </div>
+    <div> </div>
 
     <!-- 7. Pabeigts (NO SUMMARY API) -->
-    <div>
-        @p.EndDate?.ToString("dd.MM.yyyy HH:mm")
-    </div>
+    <div> </div>
 
     <!-- 8. Komentārs -->
+    <div></div>
+
+    <!-- 9. Done -->
     <div></div>
 </div>
 
 @foreach (var step in p.Steps)
 {
-    <!-- STEP ROW (vienmēr redzams) -->
-<div class="ptv2-tasks-row sub step">
-    <div title="@step.StepName">
-        @step.StepName
-    </div>
-    <div></div> <!-- Gatavs -->
-    <div></div> <!-- Apjoms -->
-    <div></div> <!-- Piešķirts -->
-    <div></div> <!-- Pieņem -->
-    <div></div> <!-- Sākums -->
-    <div></div> <!-- Pabeigts -->
-    <div></div> <!-- Komentārs -->
-    <div></div> <!-- Done -->
-</div>
 
     @if (TasksByStep.TryGetValue(step.Id, out var tasks))
 
@@ -67,7 +52,9 @@
         {
             <div class="ptv2-tasks-row sub task">
                 <!-- 1. Nosaukums (tukšs – step jau ir augstāk) -->
-                        <div></div>
+                    <div title="@step.StepName">
+                        @step.StepName
+                    </div>
 
                         <!-- 2. Gatavs -->
                         <div></div>
@@ -94,26 +81,39 @@
                         </div>
 
                         <!-- 6. Sākums -->
-                        <div>
-    @(p.StartDate.HasValue
-        ? p.StartDate.Value.ToString("dd.MM.yyyy HH:mm")
-        : "—")
-</div>
+                 <div>
+                        @(p.StartDate.HasValue
+                            ? p.StartDate.Value.ToString("dd.MM.yyyy")
+                            : "—")
+                    </div>
 
 
                         <!-- 7. Pabeigts -->
-<div>
-    @(p.EndDate.HasValue
-        ? p.EndDate.Value.ToString("dd.MM.yyyy HH:mm")
-        : "—")
-</div>
+                <div>
+                    @(p.EndDate.HasValue
+                        ? p.EndDate.Value.ToString("dd.MM.yyyy")
+                        : "—")
+                </div>
+
+                   
+                <!-- 8. Komentārs (vizuāli, funkcija vēlāk) -->
+                <div class="ptv2-comment-wrap">
+                    <input type="text"
+                        class="ptv2-comment-input"
+                        placeholder="Komentārs…" />
+                    <button type="button" class="ptv2-comment-edit" title="Labot komentāru">✎</button>
+                </div>
 
 
-                        <!-- 8. Komentārs -->
-                        <div></div>
+                        <!-- 9. Done (vizuāli checkbox, funkcija vēlāk) -->
+                <div class="ptv2-done-cell">
+                    <input type="checkbox"
+                        class="ptv2-done-checkbox"
+                        title="Redzams"
+                        checked="@(t.Done > 0)" />
+                </div>
 
-                        <!-- 9. Done -->
-                        <div>@t.Done</div>
+
 
             </div>
         }

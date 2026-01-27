@@ -159,8 +159,9 @@ AllProducts = await Http.GetFromJsonAsync<List<ProductRow>>(
 
     private async Task SelectCategory(CategoryRow c)
     {
+            SelectedBatch = null; 
             SelectedCategoryId = c.Id;
-SelectedCategory   = c;
+            SelectedCategory   = c;
 
 // 1) paņemam tikai šīs kategorijas rindas (version līmenī)
 var catRows = AllProducts
@@ -234,6 +235,7 @@ private ProductRow? SelectedProduct;
 
 private async Task SelectProduct(ProductRow p)
 {
+    SelectedBatch = null; 
     _latestVersionByProductCode.Clear();
 
 var versions = AllProducts

@@ -4,41 +4,31 @@
 <div class="ptv2-tasks-grid">
 
     <div class="ptv2-tasks-header">
-        <div>Nosaukums</div>
-        <div>Gatavs</div>
-        <div>Apjoms</div>
-        <div>Piešķirts</div>
-        <div>Pieņēma</div>
-        <div>Sākums</div>
-        <div>Pabeigts</div>
-        <div>Komentārs</div>
+        <div>NOSAUKUMS</div>
+        <div>GATAVS</div>
+        <div>APJOMS</div>
+        <div>PIEŠĶIRTS</div>
+        <div>PIEŅĒMA</div>
+        <div>SĀKUMS</div>
+        <div>PABEIGTS</div>
+        <div>KOMENTĀRS</div>
         <div></div>
     </div>
 
     <!-- ŠEIT VĒLĀK NĀKS xxxTasks.razor -->
 <div class="ptv2-tasks-section">
 
-<!-- DetailTasks.razor -->
-
-<div class="ptv2-tasks-block">
     <div class="ptv2-tasks-subheader">DETAIL</div>
     <DetailTasks SelectedBatch="SelectedBatch" />
-</div>
-<!-- AssemblyTasks.razor -->
 
-<div class="ptv2-tasks-block">
     <div class="ptv2-tasks-subheader">ASSEMBLY</div>
     <AssemblyTasks SelectedBatch="SelectedBatch" />
-</div>
 
-<!-- FinishingTasks.razor -->
-
-<div class="ptv2-tasks-block">
-    <div class="ptv2-tasks-subheader">FINISHING</div>   
+    <div class="ptv2-tasks-subheader">FINISHING</div>
     <FinishingTasks SelectedBatch="SelectedBatch" />
-</div>
 
 </div>
+
 
 </div>
 

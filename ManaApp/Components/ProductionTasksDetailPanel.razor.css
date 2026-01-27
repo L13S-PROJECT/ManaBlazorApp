@@ -1,33 +1,24 @@
 /* ===== 4. BOX – DETAIL / ASSEMBLY / FINISHING (ISOLATED) ===== */
 
 .ptv2-tasks-grid {
+    --ptv2-cols:
+    1.8fr      /* Nosaukums */
+    0.4fr    /* Gatavs */
+    0.6fr    /* Apjoms */
+    1.2fr    /* Piešķirts */
+    1fr      /* Pieņēma */
+    1fr      /* Sākums */
+    1fr    /* Pabeigts */
+    4.5fr    /* tukšā / rezerves */
+        /* Komentārs – LIELĀKS, bet bez scroll */
+    0.4fr;   /* Done – ŠAURS */
+
     display: grid;
-    grid-template-columns:
-        2fr
-        0.6fr
-        0.6fr
-        1.2fr
-        1fr
-        1fr
-        0.9fr
-        0.9fr
-        2fr;
+    grid-template-columns: var(--ptv2-cols);
 
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    overflow-x: hidden;
-    overflow: hidden;
-    font-size: 12px;
-    flex: 1;
-    min-height: 0;
-  }
-
-.ptv2-tasks-header > div {
-    font-weight: 600;
-    padding: 0 6px; 
-    line-height: 1;
-}
+    width: 100%;
+    overflow-x: auto;
+    }
 
 
 .ptv2-tasks-header {
@@ -35,22 +26,38 @@
     grid-template-columns: inherit;
     grid-column: 1 / -1;
 
-    background: #f3f4f6;
-    border-bottom: 1px solid #e5e7eb;
+    background: #14d65e;          /* tumši pelēks */
+    border-bottom: 1px solid #171718;
+    border-radius: 10px 10px 0 0; /* noapaļoti ārējie stūri */
 
-    height: 32px;              /* ← fiksēts, šaurs header */
-    align-items: center;       /* ← vertikāli centrē tekstu */
+    height: 28px;
+    align-items: center;
+
+    font-size: 11.5px;            /* mazliet mazāks fonts */
+    font-weight: 600;
 }
+
+.ptv2-tasks-header > div {
+    padding: 0 6px;
+    line-height: 1.1;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+
+    color: #1a1717;               /* kontrasts uz zaļā fona */
+}
+
 
 .ptv2-tasks-section {
     display: flex;
     flex-direction: column;
-    gap: 12px;
 
-    flex: 1;                 /* ← aizņem visu pieejamo augstumu */
-    min-height: 0;           /* ← KRITISKI flex konteineros */
-    overflow-y: auto;        /* ← scroll tikai šeit */
-    overflow-x: hidden;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: visible;
 
     grid-column: 1 / -1;
 }
@@ -63,11 +70,20 @@
 
 
 .ptv2-tasks-subheader {
-    background: #f3f4f6;
-    font-weight: 600;
-    padding: 8px 10px;
-    border-bottom: 1px solid #e5e7eb;
+    grid-column: 1 / -1;
+
+    background: #f0f1f0;          /* gaišāks par header */
+    color: #1f2c1d;
+
+    font-weight: 500;
+    font-size: 12px;
+
+    padding: 4px 4px;
+    border-top: 1px solid #d1d5db;
+    border-bottom: 1px solid #d1d5db;
 }
+
+
 
 .ptv2-tasks-block {
     grid-column: 1 / -1;
@@ -75,3 +91,12 @@
     overflow-x: hidden;
 }
 
+/* labojums 27.01.2026 */
+
+/* Pēdējā kolonna (Done) – pie pašas labās malas */
+.ptv2-tasks-header > div:last-child,
+.ptv2-tasks-row > div:last-child {
+    justify-self: end;
+    padding-right: 0;
+    text-align: right;
+}

@@ -1,13 +1,17 @@
 
 .ptv2-tasks-row {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr 2fr auto;
+    grid-template-columns: var(--ptv2-cols);
     align-items: center;
+    font-size: 11px;
+    line-height: 1.3;
 }
 
-.ptv2-tasks-row.sub {
+
+.ptv2-tasks-row.sub > div:first-child {
     padding-left: 1rem;
 }
+
 
 .ptv2-tasks-row.sub.step {
     font-weight: 600;
@@ -16,4 +20,202 @@
 
 .ptv2-tasks-row.sub.task {
     background: #fafafa;
+}
+
+/* Kolonnu līdzināšana ar header */
+.ptv2-tasks-row > div:nth-child(2),
+.ptv2-tasks-row > div:nth-child(3),
+.ptv2-tasks-row > div:nth-child(4),
+.ptv2-tasks-row > div:nth-child(5),
+.ptv2-tasks-row > div:nth-child(6),
+.ptv2-tasks-row > div:nth-child(7),
+.ptv2-tasks-row > div:nth-child(8),
+.ptv2-tasks-row > div:nth-child(9) {
+    text-align: center;
+}
+
+/* Detaļas (PART) rinda – vidējs fonts */
+.ptv2-tasks-row:not(.sub) {
+    font-size: 12.5px;
+    font-weight: 500;
+}
+
+/* Step / Task rindas – mazākas */
+.ptv2-tasks-row.sub {
+    font-size: 11px;
+    font-weight: 400;
+}
+
+/* Done kolonna (10.) – piespiest pie labās malas */
+.ptv2-tasks-row > div:nth-child(10) {
+    text-align: right;
+}
+
+/* Detaļas (PART) rinda – izceļas virs step */
+.ptv2-tasks-row:not(.sub) {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e2024;   /* gaiši pelēks */
+    background: #dcdedc;
+}
+
+/* STEP rindas – atdalītas un “elpo” */
+.ptv2-tasks-row.sub.step {
+    background: #f9fafb;                 /* gaišāks par part */
+    border-top: 1px solid #d1d5db;        /* tumšāks border */
+    border-bottom: 1px solid #d1d5db;
+
+    padding-top: 6px;
+    padding-bottom: 6px;
+
+    margin-top: 2px;
+    margin-bottom: 2px;
+}
+
+/* STEP nosaukums – mazliet izcelts */
+.ptv2-tasks-row.sub.step > div:first-child {
+    font-weight: 500;
+    color: #4b5563;
+}
+
+/* DONE kolonnas saturs – pie pašas labās malas */
+.ptv2-tasks-row > div:last-child {
+    display: flex;
+    justify-content: flex-end;
+    padding-right: 0;
+}
+
+/* Select (Piešķirts) – noapaļoti stūri un vienots stils */
+.ptv2-tasks-row select {
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+    padding: 2px 6px;
+    font-size: 11px;
+    background-color: #ffffff;
+}
+
+/* Fokusā – tāds pats stils kā pārējā UI */
+.ptv2-tasks-row select:focus {
+    outline: none;
+    border-color: #9ca3af;
+    box-shadow: 0 0 0 1px rgba(156, 163, 175, 0.5);
+}
+
+/* Hover efekts STEP rindām */
+/* Hover uz TASK (step) rindām */
+.ptv2-tasks-row.sub.task:hover {
+    background: #eef7ef;
+    cursor: pointer;
+}
+
+/* Asāki borderi hover laikā */
+.ptv2-tasks-row.sub.task:hover {
+    border-top: 1px solid #88f472;
+    border-bottom: 1px solid #88f472;
+}
+
+/* Vizuāla apaļa check poga PART rindām */
+.ptv2-tasks-row:not(.sub) > div:first-child {
+    position: relative;
+    padding-left: 26px; /* vieta aplim */
+}
+
+.ptv2-tasks-row:not(.sub) > div:first-child::before {
+    content: "";
+    position: absolute;
+    left: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+
+    background: #e5e7eb;          /* gaiši pelēks aplis */
+    border: 2px solid #9ca3af;    /* pelēks kontūrs */
+}
+
+
+/* GATAVS poga – TIKAI detaļas (PART) rindām, 2. kolonna */
+.ptv2-tasks-row:not(.sub) > div:nth-child(2) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ptv2-tasks-row:not(.sub) > div:nth-child(2)::before {
+    content: "";
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+
+    background: #14d65e;     /* zaļš tonis */
+    border: 2px solid #0fb84f;
+
+    cursor: pointer;
+}
+
+
+/* DONE checkbox – zaļš, saglabā native checkbox */
+.ptv2-done-checkbox {
+    accent-color: #14d65e;
+}
+
+/* Komentāra ievades lauks – STEP/TASK rindām */
+.ptv2-tasks-row.sub .ptv2-comment-input {
+    width: 100%;
+    height: 20px;
+
+    padding: 2px 6px;
+    font-size: 11px;
+
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+
+    outline: none;
+}
+
+/* Fokusā – skaidrs, bet mierīgs */
+.ptv2-tasks-row.sub .ptv2-comment-input:focus {
+    border-color: #9ca3af;
+    box-shadow: 0 0 0 1px rgba(156, 163, 175, 0.4);
+}
+
+/* Komentārs ar zīmulīti */
+.ptv2-comment-wrap {
+    position: relative;
+    width: 100%;
+}
+
+.ptv2-comment-input {
+    padding-right: 24px; /* vieta ikonai */
+}
+
+.ptv2-comment-edit {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+
+    width: 18px;
+    height: 18px;
+    border-radius: 6px;
+
+    border: 1px solid #d1d5db;
+    background: #f9fafb;
+    color: #6b7280;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.ptv2-comment-edit:hover {
+    background: #eef2f7;
+    color: #374151;
 }
