@@ -114,47 +114,12 @@
     border-bottom: 1px solid #88f472;
 }
 
-/* Vizuāla apaļa check poga PART rindām */
-.ptv2-tasks-row:not(.sub) > div:first-child {
-    position: relative;
-    padding-left: 26px; /* vieta aplim */
-}
-
-.ptv2-tasks-row:not(.sub) > div:first-child::before {
-    content: "";
-    position: absolute;
-    left: 6px;
-    top: 50%;
-    transform: translateY(-50%);
-
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-
-    background: #e5e7eb;          /* gaiši pelēks aplis */
-    border: 2px solid #9ca3af;    /* pelēks kontūrs */
-}
-
-
 /* GATAVS poga – TIKAI detaļas (PART) rindām, 2. kolonna */
 .ptv2-tasks-row:not(.sub) > div:nth-child(2) {
     display: flex;
     align-items: center;
     justify-content: center;
 }
-
-.ptv2-tasks-row:not(.sub) > div:nth-child(2)::before {
-    content: "";
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-
-    background: #14d65e;     /* zaļš tonis */
-    border: 2px solid #0fb84f;
-
-    cursor: pointer;
-}
-
 
 /* DONE checkbox – zaļš, saglabā native checkbox */
 .ptv2-done-checkbox {
@@ -219,3 +184,161 @@
     background: #eef2f7;
     color: #374151;
 }
+
+/* switch (GATAVS) */
+
+/* GATAVS switch */
+.ptv2-switch {
+    appearance: none;
+    width: 34px;
+    height: 18px;
+    background: #d1d5db;          /* OFF – pelēks */
+    border-radius: 999px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.ptv2-switch::before {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    background: #ffffff;
+    border-radius: 50%;
+    transition: transform 0.2s ease;
+}
+
+/* ON */
+.ptv2-switch:checked {
+    background: #14d65e;          /* TĀ PATS zaļais */
+}
+
+.ptv2-switch:checked::before {
+    transform: translateX(16px);
+}
+
+/* Disabled – pēc nospiešanas */
+.ptv2-switch:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.ptv2-part-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;          /* nedaudz vairāk vietas starp apli un tekstu */
+    padding-left: 6px; /* ATTĀLINA visu bloku no malas */
+}
+
+
+/* pamata aplītis pelēks */
+.ptv2-part-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #9ca3af; /* gray default */
+}
+
+/* stāvokļi */
+.ptv2-part-indicator.state-gray   { background: #9ca3af; }
+.ptv2-part-indicator.state-blue   { background: #2563eb; }
+.ptv2-part-indicator.state-yellow { background: #facc15; }
+.ptv2-part-indicator.state-green  { background: #16a34a; }
+
+.ptv2-comment-readonly {
+    font-size: 11px;
+    color: #374151;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ptv2-comment-empty {
+    font-style: italic;
+    color: #9ca3af;
+}
+
+/* popup fons */
+.ptv2-popup-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+/* popup logs */
+.ptv2-popup {
+    background: #ffffff;
+    border-radius: 10px;
+
+    padding: 16px;
+    min-width: 320px;
+    max-width: 420px;
+
+    border: 1px solid #86efac; /* maiga zaļa kontūra */
+    box-shadow:
+        0 8px 20px rgba(0,0,0,0.12),
+        0 0 0 2px rgba(34,197,94,0.15); /* zaļš “glow” */
+
+    animation: popupFadeIn 0.15s ease-out;
+}
+.ptv2-popup textarea {
+    width: 100%;
+    min-height: 90px;
+
+    padding: 8px 10px;
+    border-radius: 8px;
+
+    border: 1px solid #d1d5db;
+    font-size: 13px;
+    resize: vertical;
+}
+
+.ptv2-popup textarea:focus {
+    outline: none;
+    border-color: #22c55e;
+    box-shadow: 0 0 0 2px rgba(34,197,94,0.25);
+}
+
+.ptv2-popup button {
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+/* Atcelt */
+.ptv2-popup button:first-child {
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+}
+
+/* OK */
+.ptv2-popup button:last-child {
+    background: #22c55e;
+    border: 1px solid #16a34a;
+    color: white;
+}
+
+.ptv2-popup button:last-child:hover {
+    background: #16a34a;
+}
+
+@keyframes popupFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+

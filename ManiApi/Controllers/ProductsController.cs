@@ -228,7 +228,7 @@ public async Task<IActionResult> GetDetails(
         )
         .Select(pt => new
         {
-            pt.Id, // ProductToPartId
+            ProductToPartId = pt.Id, // ProductToPartId
             TopPartName = _db.TopParts
                 .Where(tp => tp.Id == pt.TopPartId && tp.IsActive)
                 .Select(tp => tp.TopPartName)

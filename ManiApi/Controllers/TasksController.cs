@@ -799,34 +799,37 @@ UPDATE tasks
 [HttpPost("activate-part")]
 public async Task<IActionResult> ActivatePart([FromBody] ActivatePartDto dto)
 {
-    if (dto is null || dto.BatchId <= 0 || dto.ProductToPartId <= 0)
-        return BadRequest("BatchId un ProductToPartId ir obligāti.");
+    Console.WriteLine(
+    $"[activate-part] BatchProductId={dto.BatchProductId}, ProductToPartId={dto.ProductToPartId}"
+);
+    
+    if (dto is null || dto.BatchProductId <= 0 || dto.ProductToPartId <= 0)
+    return BadRequest("BatchId un ProductToPartId ir obligāti.");
 
     var conn = _db.Database.GetDbConnection();
     await conn.OpenAsync();
 
     await using var cmd = conn.CreateCommand();
-    cmd.CommandText = @"
+cmd.CommandText = @"
 UPDATE tasks t
-JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
-JOIN toppartsteps     ts ON ts.ID = t.TopPartStep_ID
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
 SET t.Tasks_Status = 1
-WHERE t.IsActive          = 1
-  AND t.Tasks_Status      IN (0,5)
-  AND bp.Batch_Id         = @batch
-  AND ts.ProductToPart_ID = @ptp
-  ";
+WHERE t.IsActive = 1
+  AND t.Tasks_Status = 5
+  AND t.BatchProduct_ID = @bp
+  AND ts.ProductToPart_ID = @ptp;
+";
 
+    var pBp = cmd.CreateParameter();
+pBp.ParameterName = "@bp";
+pBp.Value = dto.BatchProductId;
+cmd.Parameters.Add(pBp);
 
-    var pBatch = cmd.CreateParameter();
-    pBatch.ParameterName = "@batch";
-    pBatch.Value = dto.BatchId;      // DTO.BatchId = batches.ID
-    cmd.Parameters.Add(pBatch);
+var pPtp = cmd.CreateParameter();
+pPtp.ParameterName = "@ptp";
+pPtp.Value = dto.ProductToPartId;
+cmd.Parameters.Add(pPtp);
 
-    var pPtp = cmd.CreateParameter();
-    pPtp.ParameterName = "@ptp";
-    pPtp.Value = dto.ProductToPartId;
-    cmd.Parameters.Add(pPtp);
 
     var affected = await cmd.ExecuteNonQueryAsync();
 
@@ -992,10 +995,10 @@ parent.Tasks_Comment = dto.Comment; // ✅ PIEVIENO
 /// šo vajag pie ProductioTasks.razor "ķeksim" 5->1
 public sealed class ActivatePartDto
 {
-    public int BatchId { get; set; }
+    public int BatchProductId { get; set; }
     public int ProductToPartId { get; set; }
-    
 }
+
 
 public sealed class UpdateStepDto
 {
@@ -1024,11 +1027,13 @@ public async Task<IActionResult> GetActiveParts([FromQuery] int batchId)
     cmd.CommandText = @"
 SELECT DISTINCT ts.ProductToPart_ID
 FROM tasks t
-JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
-JOIN toppartsteps     ts ON ts.ID = t.TopPartStep_ID
+JOIN batches_products bp   ON bp.ID = t.BatchProduct_ID
+JOIN toppartsteps     ts   ON ts.ID = t.TopPartStep_ID
+JOIN producttopparts  ptp  ON ptp.ID = ts.ProductToPart_ID
 WHERE t.IsActive      = 1
-  AND t.Tasks_Status  IN (1,2,3,4)   -- ← ← ← ŠI IR VIENA RINDA, KAS JĀMAINĀ, LAI NEAKTĪVS IR TIKAI STATUSS 5
-  AND bp.Batch_Id     = @batch;
+  AND t.Tasks_Status  IN (1,2,3,4)
+  AND bp.Batch_Id     = @batch
+  AND ptp.IsActive    = 1;
 ";
 
     var pBatch = cmd.CreateParameter();
@@ -1289,6 +1294,101 @@ public async Task<IActionResult> UpdateFinishingQty([FromBody] UpdateFinishingQt
     return Ok(new { updated = true, taskId = t.ID, qty = t.Qty_Done });
 }
 
+// GET: /api/tasks/detailed-indicators?batchProductId=123
+[HttpGet("detailed-indicators")]
+public async Task<IActionResult> GetDetailedIndicators([FromQuery] int batchProductId)
+{
+    if (batchProductId <= 0)
+        return BadRequest("batchProductId is required.");
+
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+SELECT
+    ts.ProductToPart_ID,
+
+    SUM(CASE WHEN t.Tasks_Status = 1 THEN 1 ELSE 0 END) AS Cnt1,
+    SUM(CASE WHEN t.Tasks_Status = 2 THEN 1 ELSE 0 END) AS Cnt2,
+    SUM(CASE WHEN t.Tasks_Status = 3 THEN 1 ELSE 0 END) AS Cnt3,
+    SUM(CASE WHEN t.Tasks_Status = 5 THEN 1 ELSE 0 END) AS Cnt5,
+    COUNT(*) AS TotalCnt
+
+
+FROM tasks t
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+
+WHERE t.IsActive = 1
+  AND t.BatchProduct_ID = @bp
+  AND ts.Step_Type = 1          -- 🔴 TIKAI DETAILED
+
+GROUP BY ts.ProductToPart_ID;
+";
+
+    var p = cmd.CreateParameter();
+    p.ParameterName = "@bp";
+    p.Value = batchProductId;
+    cmd.Parameters.Add(p);
+
+    var list = new List<object>();
+    await using var r = await cmd.ExecuteReaderAsync();
+    while (await r.ReadAsync())
+    {
+        int cnt1 = r.GetInt32(1);
+        int cnt2 = r.GetInt32(2);
+        int cnt3 = r.GetInt32(3);
+        int cnt5 = r.GetInt32(4);
+        int total = r.GetInt32(5);          
+
+        string state =
+            cnt5 == total ? "gray" :
+            cnt3 == total ? "green" :
+            cnt2 > 0      ? "yellow" :
+            cnt1 == total ? "blue" :
+                            "gray";
+
+
+        list.Add(new
+        {
+            ProductToPartId = r.GetInt32(0),
+            State = state
+        });
+    }
+
+    return Ok(list);
+}
+
+[HttpPost("update-comment")]
+public async Task<IActionResult> UpdateComment([FromBody] UpdateCommentDto dto)
+{
+    if (dto is null || dto.TaskId <= 0)
+        return BadRequest("TaskId is required.");
+
+    var t = await _db.Tasks.FirstOrDefaultAsync(x => x.ID == dto.TaskId && x.IsActive);
+    if (t is null)
+        return NotFound();
+
+    // komentāru drīkst labot tikai, ja task NAV sācies
+    if (t.Started_At != null)
+        return BadRequest("Task already started.");
+
+    t.Tasks_Comment = string.IsNullOrWhiteSpace(dto.Comment)
+        ? null
+        : dto.Comment;
+
+    await _db.SaveChangesAsync();
+
+    return Ok(new { updated = true, taskId = t.ID });
+}
+
+public sealed class UpdateCommentDto
+{
+    public int TaskId { get; set; }
+    public string? Comment { get; set; }
+}
+
+
 public sealed class UpdateFinishingQtyDto
 {
     public int TaskId { get; set; }
@@ -1401,7 +1501,8 @@ SELECT
     COALESCE(t.Qty_Done, 0) AS Done,
     t.TopPartStep_ID   AS TopPartStepId,
     t.Started_At,
-    t.Finished_At
+    t.Finished_At,
+    t.Tasks_Comment    AS Comment   -- ✅ ŠIS
 FROM tasks t
 JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
 WHERE t.IsActive = 1
@@ -1409,7 +1510,6 @@ WHERE t.IsActive = 1
   AND ts.Step_Type = @stepType
 ORDER BY ts.Step_Order, t.ID;
 ";
-
     cmd.Parameters.Add(new MySqlParameter("@bpId", batchProductId));
     cmd.Parameters.Add(new MySqlParameter("@stepType", stepType));
 
@@ -1426,7 +1526,8 @@ ORDER BY ts.Step_Order, t.ID;
                 Done          = r.IsDBNull(4) ? 0 : r.GetInt32(4),
                 TopPartStepId = r.GetInt32(5),
                 StartedAt     = r.IsDBNull(6) ? (DateTime?)null : r.GetDateTime(6),
-                FinishedAt    = r.IsDBNull(7) ? (DateTime?)null : r.GetDateTime(7)
+                FinishedAt    = r.IsDBNull(7) ? (DateTime?)null : r.GetDateTime(7),
+                Comment      = r.IsDBNull(8) ? null : r.GetString(8)
             });
 
     }

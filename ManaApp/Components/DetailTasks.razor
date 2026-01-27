@@ -1,6 +1,8 @@
 @using ManaApp.Models
 @using ManaApp.Components
 @inject HttpClient Http
+@inject IJSRuntime JS
+
 
 @if (SelectedBatch is null)
 {
@@ -15,10 +17,23 @@
 {
 <div class="ptv2-tasks-row">
     <!-- 1. Nosaukums -->
-    <div title="@p.TopPartName">@p.TopPartName</div>
+            <div class="ptv2-part-name" title="@p.TopPartName">
+                <span class="ptv2-part-indicator
+                    @(DetailedIndicators.TryGetValue(p.ProductToPartId, out var st)
+                        ? $"state-{st}"
+                        : "state-gray")">
+                </span>
 
+                @p.TopPartName
+            </div>
     <!-- 2. Gatavs -->
-    <div></div>
+        <div>
+            <input type="checkbox"
+                class="ptv2-switch"
+                checked="@ActivatedParts.Contains(p.ProductToPartId)"
+                disabled="@ActivatedParts.Contains(p.ProductToPartId)"  
+                @onclick="() => OnActivatePart(p.ProductToPartId)" />
+        </div>
 
     <!-- 3. Apjoms -->
     <div>@(SelectedBatch!.Planned * p.Quantity)</div>
@@ -98,10 +113,19 @@
                    
                 <!-- 8. Komentārs (vizuāli, funkcija vēlāk) -->
                 <div class="ptv2-comment-wrap">
-                    <input type="text"
-                        class="ptv2-comment-input"
-                        placeholder="Komentārs…" />
-                    <button type="button" class="ptv2-comment-edit" title="Labot komentāru">✎</button>
+                    <input
+                        type="text"
+                        class="ptv2-comment-input @(string.IsNullOrWhiteSpace(t.Comment) ? "empty" : "")"
+                        value="@(string.IsNullOrWhiteSpace(t.Comment) ? "(Pievienot komentāru)" : t.Comment)"
+                        readonly />
+                        <button
+                            type="button"
+                            class="ptv2-comment-edit"
+                            title="Labot komentāru"
+                            @onclick="() => OpenCommentEditor(t)">
+                            ✎
+                        </button>
+
                 </div>
 
 
@@ -113,8 +137,6 @@
                         checked="@(t.Done > 0)" />
                 </div>
 
-
-
             </div>
         }
     }
@@ -123,11 +145,44 @@
 
 }
 
+@if (IsCommentPopupOpen && EditingTask is not null)
+{
+    <div class="ptv2-popup-backdrop">
+        <div class="ptv2-popup">
+            <h4>Komentārs</h4>
+
+                    <textarea
+                        style="width:100%; height:80px;"
+                        @bind="EditingCommentText">
+                    </textarea>
+
+            <div style="margin-top:8px; text-align:right;">
+                <button @onclick="CancelComment">Atcelt</button>
+                <button style="margin-left:6px;" @onclick="ConfirmComment">OK</button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
+
+    // glabās ProductToPartId, kuri jau ir aktivizēti šai partijai
+    private HashSet<int> ActivatedParts = new();
+    
+    // DETAILED indikatori pa detaļām
+    private Dictionary<int, string> DetailedIndicators = new();
+
     [Parameter] public ProductBatchRow? SelectedBatch { get; set; }
 
 // Parts ir ProductTopParts konkrētajai VersionId (no SelectedBatch) 26.01.2026
     private List<DetailPartRow> Parts = new();
+
+private sealed class DetailedIndicatorRow
+{
+    public int ProductToPartId { get; set; }
+    public string State { get; set; } = "";
+}
+
 
     private Dictionary<int, List<DetailTaskRow>> TasksByStep
     = new(); // key = TopPartStepId
@@ -140,6 +195,31 @@
 
     if (SelectedBatch?.VersionId is not int vid || vid <= 0)
         return;
+
+// 🆕 ielādējam aktivizētās detaļas (status != 5)
+if (SelectedBatch?.BatchId is int batchId && batchId > 0)
+{
+    var activeParts =
+        await Http.GetFromJsonAsync<List<int>>(
+            $"http://localhost:5270/api/tasks/active-parts?batchId={batchId}"
+        ) ?? new();
+
+    ActivatedParts = activeParts.ToHashSet();
+}
+
+// 🆕 ielādējam DETAILED indikatorus (gray / blue / yellow / green)
+if (SelectedBatch?.BatchProductId is int batchProductId2 && batchProductId2 > 0)
+{
+    var indicators =
+        await Http.GetFromJsonAsync<List<DetailedIndicatorRow>>(
+            $"http://localhost:5270/api/tasks/detailed-indicators?batchProductId={batchProductId2}"
+        ) ?? new();
+
+    DetailedIndicators = indicators.ToDictionary(
+        x => x.ProductToPartId,
+        x => x.State
+    );
+}
 
     // 1) Ielādējam ProductTopParts (DETAIL)
     var partsUrl =
@@ -234,6 +314,7 @@ private sealed class DetailTaskRow
     public int? Claimed_By { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? FinishedAt { get; set; }
+    public string? Comment { get; set; }
 }
 
 private sealed class DetailSummaryRow
@@ -241,6 +322,98 @@ private sealed class DetailSummaryRow
     public int ProductToPartId { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? FinishedAt { get; set; }
+}
+// switch pogas funkcija 27.01.2026
+async Task OnActivatePart(int productToPartId)
+{
+    if (SelectedBatch?.BatchId is not int batchId || batchId <= 0)
+        return;
+
+    var part = Parts.FirstOrDefault(p => p.ProductToPartId == productToPartId);
+    if (part is null)
+        return;
+
+    var batchCode = SelectedBatch?.BatchCode ?? "—";
+
+        var ok = await JS.InvokeAsync<bool>(
+            "confirm",
+            $"Vai detaļa \"{part.TopPartName}\" ({batchCode}) ir gatava?"
+        );
+
+    if (!ok)
+        return;
+
+    
+
+Console.WriteLine(
+    $"[UI] BatchProductId={SelectedBatch?.BatchProductId}, ProductToPartId={productToPartId}"
+);
+
+
+    await Http.PostAsJsonAsync(
+    "http://localhost:5270/api/tasks/activate-part",
+    new
+    {
+        BatchProductId = SelectedBatch!.BatchProductId,
+        ProductToPartId = productToPartId
+    }
+    );
+
+
+    var activeParts =
+        await Http.GetFromJsonAsync<List<int>>(
+            $"http://localhost:5270/api/tasks/active-parts?batchId={batchId}"
+        ) ?? new();
+
+    ActivatedParts = activeParts.ToHashSet();
+
+    
+
+    // pārlādējam detaļas / taskus
+    await OnParametersSetAsync();
+}
+
+    private bool IsCommentPopupOpen = false;
+    private int EditingTaskId;
+    private string? EditingComment;
+    private DetailTaskRow? EditingTask;
+
+void OpenCommentEditor(DetailTaskRow task)
+{
+    EditingTask = task;
+    EditingCommentText = task.Comment ?? "";
+    IsCommentPopupOpen = true;
+}
+
+
+private string EditingCommentText = "";
+
+void CancelComment()
+{
+    IsCommentPopupOpen = false;
+    EditingTask = null;
+}
+
+async Task ConfirmComment()
+{
+    if (EditingTask is null)
+        return;
+
+    await Http.PostAsJsonAsync(
+        "http://localhost:5270/api/tasks/update-finishing-qty",
+        new
+        {
+            TaskId = EditingTask.TaskId,
+            Qty = EditingTask.Done,        // ← obligāts API laukam
+            Comment = EditingCommentText
+        }
+    );
+
+    // UI uzreiz atjaunojam
+    EditingTask.Comment = EditingCommentText;
+
+    IsCommentPopupOpen = false;
+    EditingTask = null;
 }
 
 
