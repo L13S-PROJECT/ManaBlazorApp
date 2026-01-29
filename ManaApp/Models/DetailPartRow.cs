@@ -5,7 +5,6 @@ public sealed class DetailPartRow
     public string TopPartName { get; set; } = "";
     public int Quantity { get; set; }
     public int ProductToPartId { get; set; }
-
     public string? WorkCenterName { get; set; }
 
     public bool IsDone { get; set; } = false;
@@ -27,3 +26,4 @@ public sealed class TopPartStepRow
     public int ProductToPartId { get; set; }   // ✅ obligāti sasaistīšanai ar DetailPartRow
     public string StepName { get; set; } = "";
 }
+

@@ -25,16 +25,6 @@ public sealed class ProductRow
     public int FinishingInProgress { get; set; }
     public int FinishingAllocated { get; set; }
 
-    public int InProgress =>
-    DetailedInProgress
-  + DetailedFinish
-  + AssemblyINProgress
-  + AssemblyFinish
-  + FinishingInProgress;
-
-public int PlannedRemaining =>
-    Math.Max(Planned - InProgress, 0);
-
 }
 
 public sealed class CategoryRow

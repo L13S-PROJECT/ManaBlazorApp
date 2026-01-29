@@ -95,22 +95,20 @@
 
                         </div>
 
-                        <!-- 6. Sākums -->
-                 <div>
-                        @(p.StartDate.HasValue
-                            ? p.StartDate.Value.ToString("dd.MM.yyyy")
-                            : "—")
-                    </div>
+                <!-- 6. Sākums -->
+                        <div>
+                            @(t.StartedAt.HasValue
+                                ? t.StartedAt.Value.ToString("dd.MM.yyyy")
+                                : "—")
+                        </div>
 
+                <!-- 7. Pabeigts -->
+                        <div>
+                            @(t.FinishedAt.HasValue
+                                ? t.FinishedAt.Value.ToString("dd.MM.yyyy")
+                                : "—")
+                        </div>
 
-                        <!-- 7. Pabeigts -->
-                <div>
-                    @(p.EndDate.HasValue
-                        ? p.EndDate.Value.ToString("dd.MM.yyyy")
-                        : "—")
-                </div>
-
-                   
                 <!-- 8. Komentārs (vizuāli, funkcija vēlāk) -->
                 <div class="ptv2-comment-wrap">
                     <input
@@ -396,26 +394,22 @@ void CancelComment()
 
 async Task ConfirmComment()
 {
-    if (EditingTask is null)
-        return;
+    if (EditingTask is not null)
+    {
+        await Http.PostAsJsonAsync(
+            "http://localhost:5270/api/tasks/update-comment",
+            new
+            {
+                TaskId = EditingTask.TaskId,
+                Comment = EditingCommentText
+            });
 
-    await Http.PostAsJsonAsync(
-        "http://localhost:5270/api/tasks/update-finishing-qty",
-        new
-        {
-            TaskId = EditingTask.TaskId,
-            Qty = EditingTask.Done,        // ← obligāts API laukam
-            Comment = EditingCommentText
-        }
-    );
-
-    // UI uzreiz atjaunojam
-    EditingTask.Comment = EditingCommentText;
+        EditingTask.Comment = EditingCommentText;
+    }
 
     IsCommentPopupOpen = false;
     EditingTask = null;
 }
-
 
 
 }

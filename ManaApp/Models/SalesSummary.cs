@@ -7,3 +7,5 @@ namespace ManaApp.Models
         public int AssemblyQty { get; set; }
     }
 }
+
+// create an endpoint that returns current server time

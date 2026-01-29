@@ -16,13 +16,25 @@
     <div class="ptv2-tasks-row">
         <!-- 1. Nosaukums -->
         <div class="ptv2-part-name" title="@p.TopPartName">
-            <span class="ptv2-part-indicator state-gray"></span>
+            <span class="ptv2-part-indicator state-@(
+                AssemblyIndicators.TryGetValue(p.ProductToPartId, out var s)
+                    ? s
+                    : "gray"
+            )"></span>
+
             @p.TopPartName
         </div>
 
-
         <!-- 2. Gatavs -->
-        <div></div>
+        <div>
+            <input type="checkbox"
+                class="ptv2-switch"
+                checked="@(AssemblyIndicators.ContainsKey(p.ProductToPartId) 
+           && AssemblyIndicators[p.ProductToPartId] != "gray")"
+                disabled />
+
+        </div>
+
 
         <!-- 3. Apjoms -->
         <div></div>
@@ -77,13 +89,20 @@
     @Employees.FirstOrDefault(e => e.Id == t.Claimed_By)?.Name
 </div>
 
-<div>
-    @(t.StartedAt?.ToString("dd.MM.yyyy") ?? "—")
-</div>
+                <!-- 6. Sākums -->
+                    <div>
+                        @(t.StartedAt.HasValue
+                            ? t.StartedAt.Value.ToString("dd.MM.yyyy")
+                            : "—")
+                    </div>
 
-<div>
-    @(t.FinishedAt?.ToString("dd.MM.yyyy") ?? "—")
-</div>
+                <!-- 7. Pabeigts -->
+                    <div>
+                        @(t.FinishedAt.HasValue
+                            ? t.FinishedAt.Value.ToString("dd.MM.yyyy")
+                            : "—")
+                    </div>
+
 
 <div class="ptv2-comment-wrap">
     <input
@@ -147,10 +166,16 @@ private Dictionary<int, List<DetailTaskRow>> TasksByStep = new();
 protected override async Task OnParametersSetAsync()
 {
     Parts.Clear();
+    TasksByStep.Clear();
+    AssemblyIndicators.Clear();
 
     if (SelectedBatch?.VersionId is not int vid || vid <= 0)
         return;
 
+    if (SelectedBatch?.BatchProductId is not int bpId || bpId <= 0)
+        return;
+
+    // 1) Parts (Assembly)
     var partsUrl =
         $"http://localhost:5270/api/products/details?versionId={vid}&stepType=2";
 
@@ -158,23 +183,33 @@ protected override async Task OnParametersSetAsync()
         await Http.GetFromJsonAsync<List<DetailPartRow>>(partsUrl)
         ?? new();
 
-if (SelectedBatch?.BatchProductId is not int bpId || bpId <= 0)
-    return;
-
-var tasksUrl =
-    $"http://localhost:5270/api/tasks/by-batch" +
-    $"?batchProductId={bpId}&stepType=2";
-
-var tasks =
-    await Http.GetFromJsonAsync<List<DetailTaskRow>>(tasksUrl)
-    ?? new();
-
-TasksByStep = tasks
-    .GroupBy(t => t.TopPartStepId)
-    .ToDictionary(g => g.Key, g => g.ToList());
+    // 2) Indicators (kopīgi DETAIL + ASSEMBLY)
+    var indicators =
+    await Http.GetFromJsonAsync<List<AssemblyIndicatorRow>>(
+        $"http://localhost:5270/api/tasks/assembly-indicators?batchProductId={bpId}"
+    ) ?? new();
 
 
+        AssemblyIndicators = indicators.ToDictionary(
+            x => x.ProductToPartId,
+            x => x.State
+        );
+
+
+    // 3) Tasks (Assembly)
+    var tasksUrl =
+        $"http://localhost:5270/api/tasks/by-batch" +
+        $"?batchProductId={bpId}&stepType=2";
+
+    var tasks =
+        await Http.GetFromJsonAsync<List<DetailTaskRow>>(tasksUrl)
+        ?? new();
+
+    TasksByStep = tasks
+        .GroupBy(t => t.TopPartStepId)
+        .ToDictionary(g => g.Key, g => g.ToList());
 }
+
 
 private sealed class DetailTaskRow
 {
@@ -259,5 +294,13 @@ async Task ConfirmComment()
     IsCommentPopupOpen = false;
     EditingTask = null;
 }
+private Dictionary<int, string> AssemblyIndicators = new();
+
+private sealed class AssemblyIndicatorRow
+{
+    public int ProductToPartId { get; set; }
+    public string State { get; set; } = "";
+}
+
 
 }

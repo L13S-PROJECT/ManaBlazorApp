@@ -1321,7 +1321,7 @@ JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
 
 WHERE t.IsActive = 1
   AND t.BatchProduct_ID = @bp
-  AND ts.Step_Type = 1          -- 🔴 TIKAI DETAILED
+  AND ts.Step_Type = 1     -- TIKAI DETAIL posmam
 
 GROUP BY ts.ProductToPart_ID;
 ";
@@ -1359,6 +1359,67 @@ GROUP BY ts.ProductToPart_ID;
     return Ok(list);
 }
 
+// GET: /api/tasks/assembly-indicators?batchProductId=123
+[HttpGet("assembly-indicators")]
+public async Task<IActionResult> GetAssemblyIndicators([FromQuery] int batchProductId)
+{
+    if (batchProductId <= 0)
+        return BadRequest("batchProductId is required.");
+
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+SELECT
+    ts.ProductToPart_ID,
+
+    SUM(CASE WHEN t.Tasks_Status = 1 THEN 1 ELSE 0 END) AS Cnt1,
+    SUM(CASE WHEN t.Tasks_Status = 2 THEN 1 ELSE 0 END) AS Cnt2,
+    SUM(CASE WHEN t.Tasks_Status = 3 THEN 1 ELSE 0 END) AS Cnt3,
+    SUM(CASE WHEN t.Tasks_Status = 5 THEN 1 ELSE 0 END) AS Cnt5,
+    COUNT(*) AS TotalCnt
+
+FROM tasks t
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+
+WHERE t.IsActive = 1
+  AND t.BatchProduct_ID = @bp
+  AND ts.Step_Type = 2          -- 🔵 TIKAI ASSEMBLY
+
+GROUP BY ts.ProductToPart_ID;
+";
+
+    cmd.Parameters.Add(new MySqlParameter("@bp", batchProductId));
+
+    var list = new List<object>();
+    await using var r = await cmd.ExecuteReaderAsync();
+    while (await r.ReadAsync())
+    {
+        int cnt1 = r.GetInt32(1);
+        int cnt2 = r.GetInt32(2);
+        int cnt3 = r.GetInt32(3);
+        int cnt5 = r.GetInt32(4);
+        int total = r.GetInt32(5);
+
+        string state =
+            cnt5 == total ? "gray" :
+            cnt3 == total ? "green" :
+            cnt2 > 0      ? "yellow" :
+            cnt1 == total ? "blue" :
+                            "gray";
+
+        list.Add(new
+        {
+            ProductToPartId = r.GetInt32(0),
+            State = state
+        });
+    }
+
+    return Ok(list);
+}
+
+
 [HttpPost("update-comment")]
 public async Task<IActionResult> UpdateComment([FromBody] UpdateCommentDto dto)
 {
@@ -1368,10 +1429,6 @@ public async Task<IActionResult> UpdateComment([FromBody] UpdateCommentDto dto)
     var t = await _db.Tasks.FirstOrDefaultAsync(x => x.ID == dto.TaskId && x.IsActive);
     if (t is null)
         return NotFound();
-
-    // komentāru drīkst labot tikai, ja task NAV sācies
-    if (t.Started_At != null)
-        return BadRequest("Task already started.");
 
     t.Tasks_Comment = string.IsNullOrWhiteSpace(dto.Comment)
         ? null
