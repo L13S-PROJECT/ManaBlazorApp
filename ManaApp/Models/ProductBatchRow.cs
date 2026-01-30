@@ -9,6 +9,9 @@ public sealed class ProductBatchRow
     public string BatchCode { get; set; } = "";
 
     public int Planned { get; set; }
+
+    public int Sold { get; set; }
+
     public int Done { get; set; }
 
     public string? Comment { get; set; }

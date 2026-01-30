@@ -200,11 +200,12 @@ foreach (var r in catRows)
     );
 
     if (sum is not null)
-    {
-        r.AssemblyFinish      = sum.Assembly;
-        r.FinishingInProgress = sum.Finishing;
-        r.InStock             = sum.Stock;
-    }
+        {
+            r.AssemblyFinish      = Math.Max(sum.Assembly - sum.Out, 0);
+            r.FinishingInProgress = sum.Finishing;
+            r.InStock             = sum.Stock;
+        }
+
 }
 
 // 4) Grupējam uz 1 rindu uz produktu (bez versijām)
@@ -289,14 +290,27 @@ foreach (var v in versionIds)
     all.AddRange(list);
 }
 
-
-
+// 1) piešķiram batchus UI modelim
 ProductBatches = all;
+
+// 2) TAD ielādējam SOLD katram batchproduct
+foreach (var b in ProductBatches)
+{
+    b.Sold = await Http.GetFromJsonAsync<int>(
+        $"http://localhost:5270/api/stockmovements/sold-by-batchproduct?batchProductId={b.BatchProductId}"
+    );
+}
+
+// 3) piespiežam UI pārzīmēties
+StateHasChanged();
+
 
 }
 
 private readonly Dictionary<string, int> _latestVersionByProductCode
     = new(StringComparer.OrdinalIgnoreCase);
+
+
 
 }
 

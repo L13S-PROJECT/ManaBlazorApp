@@ -214,13 +214,16 @@ protected override async Task OnParametersSetAsync()
 var s = summary?.FirstOrDefault(x => x.BatchProductId == bpId);
 
 FinPlanned = s?.Planned ?? 0;
-
-
-        FinAvailable =
+FinAvailable =
     await Http.GetFromJsonAsync<int>(
         $"http://localhost:5270/api/stockmovements/assembly-total?batchProductId={bpId}"
     );
-    
+
+FinSold =
+    await Http.GetFromJsonAsync<int>(
+        $"http://localhost:5270/api/stockmovements/sold-before-finishing?batchProductId={bpId}"
+    );
+
 }
 
 private List<EmployeeRow> Employees = new();
@@ -359,7 +362,7 @@ private async Task OnFinishingOk((int Qty, string? Comment) data)
         });
 
     ShowFinishingPopup = false;
-
+  
     // ja viss apjoms nodots → neko nedarām, API iedos green
     // ja daļējs → switch paliek OFF (jau ir)
         IsFinishingSwitchOn = false;

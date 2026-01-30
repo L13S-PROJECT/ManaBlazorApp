@@ -91,15 +91,16 @@ public async Task<IActionResult> Move([FromBody] MoveRequest dto)
     var toType   = Enum.Parse<MoveType>(dto.To,   ignoreCase: true);
 
     var fromRow = new StockMovement
-    {
-        Version_ID      = dto.Version_ID,
-        BatchProduct_ID = bpId,
-        Move_Type       = fromType,
-        Stock_Qty       = -dto.Qty,
-        Created_At      = now,
-        Task_ID         = dto.Task_ID,
-        IsActive        = true
-    };
+{
+    Version_ID      = dto.Version_ID,
+    BatchProduct_ID = bpId,
+    Move_Type       = fromType,
+    Stock_Qty       = -dto.Qty,
+    Created_At      = now,
+    Task_ID         = dto.Task_ID,
+    IsActive        = true
+};
+
 
     var toRow = new StockMovement
     {
@@ -556,6 +557,60 @@ var reservedForFinishing = await _db.Tasks
 
     return Ok(available);
 }
+
+// GET: api/stockmovements/sold-before-finishing?batchProductId=123
+[HttpGet("sold-before-finishing")]
+public async Task<IActionResult> GetSoldBeforeFinishing([FromQuery] int batchProductId)
+{
+    if (batchProductId <= 0)
+        return BadRequest("batchProductId is required.");
+
+    var sold = await _db.StockMovements
+        .Where(x =>
+            x.IsActive &&
+            x.BatchProduct_ID == batchProductId &&
+            x.Move_Type == MoveType.OUT)
+        .SumAsync(x => (int?)x.Stock_Qty) ?? 0;
+
+    return Ok(sold);
+}
+
+// GET: api/stockmovements/sold-by-batch?batchProductId=123
+[HttpGet("sold-by-batch")]
+public async Task<IActionResult> GetSoldByBatch([FromQuery] int batchProductId)
+{
+    if (batchProductId <= 0)
+        return BadRequest("batchProductId is required.");
+
+    var sold = await _db.StockMovements
+        .Where(x =>
+            x.IsActive &&
+            x.BatchProduct_ID == batchProductId &&
+            x.Move_Type == MoveType.OUT)
+        .SumAsync(x => (int?)x.Stock_Qty) ?? 0;
+
+    return Ok(Math.Abs(sold));
+}
+
+// GET: api/stockmovements/sold-by-batchproduct?batchProductId=479
+[HttpGet("sold-by-batchproduct")]
+public async Task<IActionResult> GetSoldByBatchProduct(
+    [FromQuery] int batchProductId)
+{
+    if (batchProductId <= 0)
+        return Ok(0);
+
+    var sold = await _db.StockMovements
+        .Where(x =>
+            x.IsActive &&
+            x.BatchProduct_ID == batchProductId &&
+            x.Move_Type == MoveType.OUT)
+        .SumAsync(x => (int?)x.Stock_Qty) ?? 0;
+
+    // OUT parasti ir pozitīvs, bet drošībai:
+    return Ok(Math.Abs(sold));
+}
+
 
    }
     

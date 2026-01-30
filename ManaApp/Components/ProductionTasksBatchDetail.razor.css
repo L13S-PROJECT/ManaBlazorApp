@@ -1,10 +1,9 @@
 .ptv2-box-detail {
     flex: 1;
-    min-height: 100%;
+    min-height: 0;      /* !!! ļoti svarīgi flex bērniem */
     display: flex;
     flex-direction: column;
 }
-
 
 
 .ptv2-detail-table {
@@ -50,39 +49,56 @@
 .ptv2-batches {
     border: 1px solid #e5e7eb;
     border-radius: 12px;
-    overflow: hidden;
+    overflow-y: auto;   /* iekšējais scroll */
+    max-height: 100%;   /* pakļaujas box augstumam */
 }
+
 
 .ptv2-batches-header,
 .ptv2-batch-row {
     display: grid;
     grid-template-columns:
-        70px   /* Raž.kods */
-        40px   /* Versija */
-        40px   /* Apjoms */
-        40px   /* Done */
-        100px  /* Datums */
+        60px   /* Raž.kods */
+        36px   /* Versija */
+        42px   /* Apjoms */
+        36px   /* SOLD */
+        42px   /* Done */
+        86px   /* Datums */
         1fr    /* Komentārs */
-        34px;  /* Edit */
+        32px;  /* Edit */
     padding: 6px 8px;
     gap: 6px;
     font-size: 12px;
 }
 
+.ptv2-batches-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #f3f4f6;
+}
+
+
 /* Centrē TIKAI Versija, Apjoms, Done */
+/* Header */
+.ptv2-batches-header div:nth-child(1),
 .ptv2-batches-header div:nth-child(2),
 .ptv2-batches-header div:nth-child(3),
 .ptv2-batches-header div:nth-child(4),
-.ptv2-batches-header div:nth-child(1),
 .ptv2-batches-header div:nth-child(5),
+.ptv2-batches-header div:nth-child(6),
+
+/* Rows */
 .ptv2-batch-row div:nth-child(1),
 .ptv2-batch-row div:nth-child(2),
 .ptv2-batch-row div:nth-child(3),
 .ptv2-batch-row div:nth-child(4),
-.ptv2-batch-row div:nth-child(5)
+.ptv2-batch-row div:nth-child(5),
+.ptv2-batch-row div:nth-child(6)
 {
     text-align: center;
 }
+
 
 
 .ptv2-batches-header {
@@ -115,6 +131,9 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    font-style: italic;
+    color: #76797e;      /* tailwind gray-500 */
+    font-size: 11px;     /* nedaudz smalkāks par cipariem */
 }
 
 /* ZVAIGZNĪTE */
@@ -147,5 +166,18 @@
     user-select: none;        /* neuzkrītošs*/
     letter-spacing: 0.2px;
     opacity: 0.9;
+}
+
+.ptv2-batches::-webkit-scrollbar {
+    width: 6px;
+}
+
+.ptv2-batches::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 6px;
+}
+
+.ptv2-batches::-webkit-scrollbar-track {
+    background: transparent;
 }
 

@@ -29,5 +29,6 @@ namespace ManiApi.Models
 
         [Column("IsActive")]
         public bool IsActive { get; set; } = true;
-    }
+
+     }
 }
