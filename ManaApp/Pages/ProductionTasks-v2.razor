@@ -201,7 +201,7 @@ foreach (var r in catRows)
 
     if (sum is not null)
         {
-            r.AssemblyFinish      = Math.Max(sum.Assembly - sum.Out, 0);
+            r.AssemblyFinish      = sum.Assembly;
             r.FinishingInProgress = sum.Finishing;
             r.InStock             = sum.Stock;
         }
@@ -291,7 +291,8 @@ foreach (var v in versionIds)
 }
 
 // 1) piešķiram batchus UI modelim
-ProductBatches = all;
+ProductBatches = new List<ProductBatchRow>(all);
+
 
 // 2) TAD ielādējam SOLD katram batchproduct
 foreach (var b in ProductBatches)

@@ -250,6 +250,24 @@ VALUES
 
 
 await ins.ExecuteNonQueryAsync();
+
+
+//  JAUNA OUT kustība (PĀRDOŠANA) 
+await using var outCmd = conn.CreateCommand();
+outCmd.Transaction = tx;
+outCmd.CommandText = @"
+INSERT INTO stock_movements
+(Version_ID, BatchProduct_ID, Move_Type, Stock_Qty, IsActive)
+VALUES
+(@vid, @bp, 'OUT', @qty, 1);
+";
+
+outCmd.Parameters.Add(new MySqlParameter("@vid", item.VersionId));
+outCmd.Parameters.Add(new MySqlParameter("@bp",  item.BatchProductId));
+outCmd.Parameters.Add(new MySqlParameter("@qty", item.Qty)); // PLUSS
+
+await outCmd.ExecuteNonQueryAsync();
+
         }
 
         // 4️⃣ atzīmējam draftu kā committed

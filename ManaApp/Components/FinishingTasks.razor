@@ -189,6 +189,11 @@ protected override async Task OnParametersSetAsync()
         await Http.GetFromJsonAsync<List<FinishingTaskRow>>(
             $"http://localhost:5270/api/tasks/by-batch?batchProductId={bpId}&stepType=3"
         ) ?? new();
+
+        tasks = tasks
+            .Where(t => t.Status != 5)
+            .ToList();
+
     
         var indicators =
             await Http.GetFromJsonAsync<List<FinishingIndicatorVm>>(
@@ -355,7 +360,7 @@ private async Task OnFinishingOk((int Qty, string? Comment) data)
         new
         {
             BatchProductId = SelectedBatch.BatchProductId,
-            ProductToPartId = Parts.First().Tasks.First().ProductToPartId, // FINISHING detaļa
+            ProductToPartId = FinishingIndicators.First().ProductToPartId, // FINISHING detaļa
             Qty = data.Qty,
             Comment = data.Comment
 

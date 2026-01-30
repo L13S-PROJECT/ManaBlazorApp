@@ -42,11 +42,11 @@
                     </span>
                 </td>
 
-                <td class="minus-cell"></td>
+                    <td class="minus-cell"></td>
 
-                <td class="planned-cell">
-                    <span class="planned-value">@grp.Planned</span>
-                </td>
+                    <td>
+                        <span class="instock-value">@grp.InStock</span>
+                    </td>
 
                     <td class="planned-cell @(grp.Planned > 0 ? "cell-plan" : "")">
                         <span class="planned-value">@grp.Planned</span>
@@ -63,9 +63,12 @@
                     <td class="@(grp.AssemblyFinish > 0 ? "cell-asm-f" : "")">
                         @grp.AssemblyFinish
                     </td>
-                    <td class="@(grp.FinishingInProgress > 0 ? "cell-fin-ip" : "")">
-                        @grp.FinishingInProgress
-                    </td>
+                        @{
+                            var finIp = grp.Versions?.Sum(v => v.FinishingInProgress) ?? 0;
+                        }
+                        <td class="@(finIp > 0 ? "cell-fin-ip" : "")">
+                            @finIp
+                        </td>
 
             </tr>
 

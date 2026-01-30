@@ -442,6 +442,7 @@ groupedRows = rows
             DetailedFinish     = g.Sum(x => x.DetailedFinish),
             AssemblyINProgress = g.Sum(x => x.AssemblyINProgress),
             AssemblyFinish = g.Sum(x => x.AssemblyFinish),
+            FinishingInProgress = g.Sum(x => x.FinishingInProgress),
             Versions = g
                 .OrderByDescending(x => x.VersionId ?? 0) // jaunākā augšā
                 .ToList()
