@@ -1,24 +1,399 @@
 @using ManaApp.Models
 @using ManaApp.Components
 @inject HttpClient Http
+@inject IJSRuntime JS
+
 
 @if (SelectedBatch is null)
 {
+    <div class="ptv2-detail-placeholder">
+        Izvēlies Ražošanas partiju, lai redzētu Finishing
+    </div>
     return;
 }
 
-<div class="ptv2-tasks-row">
-    <div>FINISHING (placeholder)</div>
-    <div></div>
-    <div></div>
-    <div></div>
-    <div></div>
-    <div></div>
-    <div></div>
-    <div></div>
-    <div></div>
+@foreach (var p in Parts)
+{
+    <div class="ptv2-tasks-row">
+        <!-- 1. Nosaukums -->
+        <div class="ptv2-part-name" title="@p.PartName">
+            <span class="ptv2-part-indicator state-@(
+                FinishingIndicators.FirstOrDefault()?.State ?? "gray")">
+            </span>
+            @p.PartName
+        </div>
+
+        <!-- 2. Gatavs -->
+        <div>
+            <input type="checkbox"
+                class="ptv2-switch"
+                checked="@IsFinishingSwitchOn"
+                disabled="@AssemblyNotFinished"
+                @onclick:preventDefault="true"
+                @onclick="OnFinishingSwitchClicked" />
+        </div>
+
+        <!-- 3. Apjoms -->
+        <div class="@(FinishingState == "gray" ? "qty-gray" : "qty-normal")">
+            @(FinishingState == "gray" ? "—" : FinAvailable)
+        </div>
+
+        <!-- 4. Piešķirts -->
+        <div></div>
+
+        <!-- 5. Pieņēma -->
+        <div></div>
+
+        <!-- 6. Sākums -->
+        <div></div>
+
+        <!-- 7. Pabeigts -->
+        <div></div>
+
+        <!-- 8. Komentārs -->
+        <div></div>
+
+        <!-- 9. Done -->
+        <div></div>
+    </div>
+
+    @foreach (var t in p.Tasks)
+    {
+        <div class="ptv2-tasks-row sub task">
+            <!-- 1. Nosaukums -->
+            <div title="Finishing">
+                @t.PartName
+            </div>
+
+            <!-- 2. Gatavs -->
+            <div></div>
+
+            <!-- 3. Apjoms -->
+            <div>@t.Done</div>
+
+            <!-- 4. Piešķirts -->
+            <div>
+                <select value="@t.Assigned_To"
+                        @onchange="e => OnAssignedChanged(t.TaskId, e)">
+                    <option value="">—</option>
+                    @foreach (var emp in Employees)
+                    {
+                        <option value="@emp.Id">@emp.Name</option>
+                    }
+                </select>
+            </div>
+
+
+            <!-- 5. Pieņēma -->
+            <div>
+                @Employees.FirstOrDefault(e => e.Id == t.Claimed_By)?.Name
+            </div>
+
+            <!-- 6. Sākums -->
+            <div>
+                @(t.StartedAt.HasValue
+                    ? t.StartedAt.Value.ToString("dd.MM.yyyy")
+                    : "—")
+            </div>
+
+
+            <!-- 7. Pabeigts -->
+            <div>
+                @(t.FinishedAt.HasValue
+                    ? t.FinishedAt.Value.ToString("dd.MM.yyyy")
+                    : "—")
+            </div>
+
+            <!-- 8. Komentārs -->
+            <div class="ptv2-comment-wrap">
+    <input
+        type="text"
+        class="ptv2-comment-input @(string.IsNullOrWhiteSpace(t.Comment) ? "empty" : "")"
+        value="@(string.IsNullOrWhiteSpace(t.Comment) ? "(Pievienot komentāru)" : t.Comment)"
+        readonly />
+    <button
+        type="button"
+        class="ptv2-comment-edit"
+        title="Labot komentāru"
+        @onclick="() => OpenCommentEditor(t)">
+        ✎
+    </button>
 </div>
+
+            <!-- 9. Done -->
+            <div class="ptv2-done-cell">
+    <input type="checkbox"
+           class="ptv2-done-checkbox"
+           title="Redzams"
+           checked="@(t.Done > 0)" />
+</div>
+
+        </div>
+    }
+}
+
+@if (IsCommentPopupOpen && EditingTask is not null)
+{
+    <div class="ptv2-popup-backdrop">
+        <div class="ptv2-popup">
+            <h4>Komentārs</h4>
+
+            <textarea
+                style="width:100%; height:80px;"
+                @bind="EditingCommentText">
+            </textarea>
+
+            <div style="margin-top:8px; text-align:right;">
+                <button @onclick="CancelComment">Atcelt</button>
+                <button style="margin-left:6px;" @onclick="ConfirmComment">OK</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Finishing popup 29.01.2026 -->
+
+<FinishingOpenPopup
+    IsOpen="ShowFinishingPopup"
+    PlannedQty="FinPlanned"
+    SoldQty="FinSold"
+    ScrapQty="FinScrap"
+    AvailableQty="FinAvailable"
+    OnCancel="CloseFinishingPopup"
+    OnOk="OnFinishingOk" />
 
 @code {
     [Parameter] public ProductBatchRow? SelectedBatch { get; set; }
+
+    private List<FinishingPartVm> Parts = new();
+
+    private sealed class FinishingPartVm
+    {
+        public string PartName { get; set; } = "";
+        public List<FinishingTaskRow> Tasks { get; set; } = new();
+    }
+
+private int FinPlanned;
+private int FinSold;
+private int FinScrap;
+private int FinAvailable;
+
+protected override async Task OnParametersSetAsync()
+{
+    Parts.Clear();
+
+    if (SelectedBatch?.BatchProductId is not int bpId || bpId <= 0)
+        return;
+
+    var tasks =
+        await Http.GetFromJsonAsync<List<FinishingTaskRow>>(
+            $"http://localhost:5270/api/tasks/by-batch?batchProductId={bpId}&stepType=3"
+        ) ?? new();
+    
+        var indicators =
+            await Http.GetFromJsonAsync<List<FinishingIndicatorVm>>(
+                $"http://localhost:5270/api/tasks/finishing-indicators?batchProductId={bpId}"
+            ) ?? new();
+
+        FinishingIndicators = indicators;
+
+        FinishingState = indicators.FirstOrDefault()?.State ?? "gray";
+
+
+    Parts.Add(new FinishingPartVm
+    {
+        PartName = "FINISHING",
+        Tasks = tasks
+    });
+
+    var summary =
+    await Http.GetFromJsonAsync<List<FinishingSummaryVm>>(
+        $"http://localhost:5270/api/stockmovements/finishing-summary-by-batch?batchId={SelectedBatch.BatchId}"
+    );
+
+var s = summary?.FirstOrDefault(x => x.BatchProductId == bpId);
+
+FinPlanned = s?.Planned ?? 0;
+
+
+        FinAvailable =
+    await Http.GetFromJsonAsync<int>(
+        $"http://localhost:5270/api/stockmovements/assembly-total?batchProductId={bpId}"
+    );
+    
+}
+
+private List<EmployeeRow> Employees = new();
+
+protected override async Task OnInitializedAsync()
+{
+    Employees =
+        await Http.GetFromJsonAsync<List<EmployeeRow>>(
+            "http://localhost:5270/api/employees")
+        ?? new();
+}
+
+public sealed class EmployeeRow
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+}
+
+async Task OnAssignedChanged(int taskId, ChangeEventArgs e)
+{
+    int? empId =
+        int.TryParse(e.Value?.ToString(), out var v)
+            ? v
+            : (int?)null;
+
+    await Http.PostAsJsonAsync(
+        "http://localhost:5270/api/tasks/update-assignee",
+        new
+        {
+            TaskId = taskId,
+            Assigned_To = empId
+        });
+}
+
+private bool IsCommentPopupOpen = false;
+private FinishingTaskRow? EditingTask;
+private string EditingCommentText = "";
+
+void OpenCommentEditor(FinishingTaskRow task)
+{
+    EditingTask = task;
+    EditingCommentText = task.Comment ?? "";
+    IsCommentPopupOpen = true;
+}
+
+void CancelComment()
+{
+    IsCommentPopupOpen = false;
+    EditingTask = null;
+}
+
+async Task ConfirmComment()
+{
+    if (EditingTask is not null)
+    {
+        await Http.PostAsJsonAsync(
+            "http://localhost:5270/api/tasks/update-comment",
+            new
+            {
+                TaskId = EditingTask.TaskId,
+                Comment = EditingCommentText
+            });
+
+        EditingTask.Comment = EditingCommentText;
+    }
+
+    IsCommentPopupOpen = false;
+    EditingTask = null;
+}
+
+/* popup Finishin daļai */
+private bool ShowFinishingPopup = false;
+
+
+private void OpenFinishingPopup()
+{
+    ShowFinishingPopup = true;
+}
+
+private void CloseFinishingPopup()
+{
+    ShowFinishingPopup = false;
+
+    // Atcelts → switch vienmēr atpakaļ OFF (pelēks)
+    IsFinishingSwitchOn = false;
+}
+
+private bool IsFinishingSwitchOn = false;
+
+private void OnFinishingSwitchChanged(ChangeEventArgs e)
+{
+    if (e.Value is bool isOn && isOn)
+    {
+        // tikai OFF → ON gadījumā
+        ShowFinishingPopup = true;
+    }
+
+    // neatļaujam switch palikt ON bez apstiprinājuma
+    IsFinishingSwitchOn = false;
+}
+
+private sealed class FinishingSummaryVm
+{
+    public int BatchProductId { get; set; }
+    public int Planned { get; set; }
+    public int SentToFinishing { get; set; }
+    public int Remaining { get; set; }
+}
+
+private bool ShowFinishingConfirmPopup = false;
+
+private async Task OnFinishingOk((int Qty, string? Comment) data)
+
+{
+        if (data.Qty <= 0 || SelectedBatch is null)
+            return;
+
+
+    var ok = await JS.InvokeAsync<bool>(
+        "confirm",
+        $"Vai nosūtīt {data.Qty} GB uz krāsošanu?"
+    );
+
+    if (!ok)
+        return;
+
+    await Http.PostAsJsonAsync(
+        "http://localhost:5270/api/tasks/open-finishing",
+        new
+        {
+            BatchProductId = SelectedBatch.BatchProductId,
+            ProductToPartId = Parts.First().Tasks.First().ProductToPartId, // FINISHING detaļa
+            Qty = data.Qty,
+            Comment = data.Comment
+
+        });
+
+    ShowFinishingPopup = false;
+
+    // ja viss apjoms nodots → neko nedarām, API iedos green
+    // ja daļējs → switch paliek OFF (jau ir)
+        IsFinishingSwitchOn = false;
+
+    // pārlādējam datus, lai UI atjaunojas
+    await OnParametersSetAsync();
+}
+
+private List<FinishingIndicatorVm> FinishingIndicators = new();
+
+private sealed class FinishingIndicatorVm
+{
+    public int ProductToPartId { get; set; }
+    public string State { get; set; } = "gray";
+}
+
+private string FinishingState = "gray";
+
+private bool AssemblyNotFinished => FinAvailable <= 0;
+
+private bool IsFinishingSwitchDisabled =>
+    !AssemblyNotFinished && FinishingState == "green";
+
+private void OnFinishingSwitchClicked()
+{
+    // atļauts tikai, ja Assembly ir pabeigts
+    if (AssemblyNotFinished)
+        return;
+
+    ShowFinishingPopup = true;
+
+    // switch NEKAD nekļūst zaļš pats
+    IsFinishingSwitchOn = false;
+}
+
+
 }

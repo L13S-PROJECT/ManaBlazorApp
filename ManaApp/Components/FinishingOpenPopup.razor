@@ -1,0 +1,104 @@
+@if (IsOpen)
+{
+    <div class="ptv2-popup-backdrop">
+        <div class="ptv2-popup finishing-popup">
+            <h4 class="finishing-title">KRĀSOŠANA</h4>
+
+        <div class="finishing-grid">
+            <div class="finishing-label">PLĀNOTAIS APJOMS</div>
+            <div class="finishing-value">@PlannedQty</div>
+
+            <div class="finishing-label">PĀRDOTS</div>
+            <div class="finishing-value">@SoldQty</div>
+
+            <div class="finishing-label">SCRAP (BOJĀTS)</div>
+            <div class="finishing-value">@ScrapQty</div>
+
+            <div class="finishing-label strong">PIEEJAMS KRĀSOŠANAI</div>
+            <div class="finishing-value strong">@AvailableQty</div>
+        </div>
+
+            <div class="finishing-send">
+                <div class="finishing-send-label">NOSŪTĪT</div>
+                <input type="number"
+                    class="finishing-send-input"
+                    placeholder="GB"
+                    min="0"
+                    max="@AvailableQty"
+                    value="@SendQty"
+                        @oninput="OnQtyInput" />
+            </div>
+
+            <div class="finishing-comment">
+                <label class="finishing-comment-toggle">
+                    <input type="checkbox" @bind="HasComment" />
+                    Pievienot komentāru
+                </label>
+
+            <textarea
+                class="finishing-comment-textarea"
+                placeholder="Komentārs"
+                @bind="CommentText">
+            </textarea>
+
+
+            </div>
+
+            <div class="ptv2-popup-actions">
+                <button @onclick="ConfirmOk">OK</button>
+                <button @onclick="OnCancel">ATCELT</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public EventCallback<(int Qty, string? Comment)> OnOk { get; set; }
+    [Parameter] public int PlannedQty { get; set; }
+    [Parameter] public int SoldQty { get; set; }
+    [Parameter] public int ScrapQty { get; set; }
+    [Parameter] public int AvailableQty { get; set; }
+
+    private int SendQty;
+
+    private bool HasComment;
+    private string CommentText = "";
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen)
+        {
+            SendQty = AvailableQty;
+
+        }
+    }
+
+
+    private void OnQtyInput(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var v))
+            v = 0;
+
+        if (v < 0)
+            SendQty = 0;
+        else if (v > AvailableQty)
+            SendQty = AvailableQty;
+        else
+            SendQty = v;
+    }
+
+private async Task ConfirmOk()
+{
+    var comment = string.IsNullOrWhiteSpace(CommentText)
+        ? null
+        : CommentText;
+
+    await OnOk.InvokeAsync((SendQty, comment));
+}
+
+
+}
+
+

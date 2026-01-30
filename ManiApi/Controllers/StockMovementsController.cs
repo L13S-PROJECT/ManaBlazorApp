@@ -524,6 +524,38 @@ GROUP BY
     return Ok(rows);
 }
 
+[HttpGet("assembly-total")]
+public async Task<IActionResult> GetAssemblyTotal([FromQuery] int batchProductId)
+{
+    if (batchProductId <= 0)
+        return BadRequest("batchProductId is required.");
+
+    // 1) Reālais ASSEMBLY stock
+    var assemblyStock = await _db.StockMovements
+        .Where(x =>
+            x.IsActive &&
+            x.BatchProduct_ID == batchProductId &&
+            x.Move_Type == MoveType.ASSEMBLY)
+        .SumAsync(x => (int?)x.Stock_Qty) ?? 0;
+
+    // 2) Jau rezervētais FINISHING apjoms (status 1 un 2)
+var reservedForFinishing = await _db.Tasks
+    .Join(_db.TopPartSteps,
+          t => t.TopPartStep_ID,
+          ts => ts.Id,
+          (t, ts) => new { t, ts })
+    .Where(x =>
+        x.t.IsActive &&
+        x.t.BatchProduct_ID == batchProductId &&
+        x.ts.StepType == 3 &&          // FINISHING
+        x.t.Tasks_Status == 1 &&       // TIKAI rezervētie
+        x.t.Qty_Done > 0)
+    .SumAsync(x => (int?)x.t.Qty_Done) ?? 0;
+    // Pieejamais ASSEMBLY apjoms FINISHING uzsākšanai
+    var available = Math.Max(assemblyStock - reservedForFinishing, 0);
+
+    return Ok(available);
+}
 
    }
     

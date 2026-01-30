@@ -37,7 +37,14 @@
 
 
         <!-- 3. Apjoms -->
-        <div></div>
+        <div>
+            <span class="@(AssemblyIndicators.TryGetValue(p.ProductToPartId, out var st) && st != "gray"
+                ? "ptv2-qty-active"
+                : "ptv2-qty-inactive")">
+                @(SelectedBatch!.Planned * p.Quantity)
+            </span>
+
+        </div>
 
         <!-- 4. Piešķirts -->
         <div></div>

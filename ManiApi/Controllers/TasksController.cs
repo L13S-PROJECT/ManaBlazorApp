@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using ManiApi.Data;
 using Microsoft.EntityFrameworkCore;
 using MySqlConnector;
-using Microsoft.EntityFrameworkCore.Storage;
+using ManiApi.Models;
 
 
 namespace ManiApi.Controllers
@@ -882,6 +882,33 @@ Console.WriteLine(
 
     var batchProductId = dto.BatchProductId;
 
+    // ASSEMBLY reālais stock
+var assemblyStock = await _db.StockMovements
+    .Where(x =>
+        x.IsActive &&
+        x.BatchProduct_ID == batchProductId &&
+        x.Move_Type == MoveType.ASSEMBLY)
+    .SumAsync(x => (int?)x.Stock_Qty) ?? 0;
+
+// Jau rezervēts Finishing (status=1) – vēl nav sācies, bet apjoms vairs nav brīvs
+var reservedForFinishing = await _db.Tasks
+    .Join(_db.TopPartSteps,
+          t => t.TopPartStep_ID,
+          ts => ts.Id,
+          (t, ts) => new { t, ts })
+    .Where(x =>
+        x.t.IsActive &&
+        x.t.BatchProduct_ID == batchProductId &&
+        x.ts.StepType == 3 &&
+        x.t.Tasks_Status == 1 &&
+        x.t.Qty_Done > 0)
+    .SumAsync(x => (int?)x.t.Qty_Done) ?? 0;
+
+// Pieejams jaunam Finishing vilnim
+var assemblyAvailable = Math.Max(assemblyStock - reservedForFinishing, 0);
+
+
+
     // 2) visi gaidošie (status 5) Finishing taski šai partijai + detaļai
     var waitingTasks = await _db.Tasks
         .Where(t =>
@@ -915,7 +942,7 @@ Console.WriteLine(
     {
         // 3b) Ir vismaz viens gaidošais (status 5) – ņemam pirmo kā "parentu"
         var parent = waitingTasks[0];
-        var planned = parent.Qty_Done;      // kopējais plānotais šim parentam
+        var planned = assemblyAvailable;      // kopējais Assembly šim parentam
         var delta   = dto.Qty;              // šī vilnīša apjoms
 
         if (planned <= 0 || delta >= planned)
@@ -948,7 +975,7 @@ parent.Tasks_Comment = dto.Comment; // ✅ PIEVIENO
 
 
             // Jaunais aktīvais vilnītis
-            activeTask = new ManiApi.Models.Tasks
+           activeTask = new ManiApi.Models.Tasks
 {
     BatchProduct_ID = parent.BatchProduct_ID,
     TopPartStep_ID  = parent.TopPartStep_ID,
@@ -956,9 +983,9 @@ parent.Tasks_Comment = dto.Comment; // ✅ PIEVIENO
     IsActive        = true,
     Qty_Done        = delta,
     Qty_Scrap       = 0,
-
-    Tasks_Comment   = dto.Comment // ✅
+    Tasks_Comment   = dto.Comment
 };
+
 
             _db.Tasks.Add(activeTask);
 
@@ -970,8 +997,7 @@ parent.Tasks_Comment = dto.Comment; // ✅ PIEVIENO
     Tasks_Status    = 5,
     IsActive        = true,
     Qty_Done        = remaining,
-    Qty_Scrap       = 0,
-    Tasks_Comment   = dto.Comment // ✅ lai komentārs nepazūd “atlikumā”
+    Qty_Scrap       = 0
 };
 
             _db.Tasks.Add(waitingRemainder);
@@ -979,6 +1005,9 @@ parent.Tasks_Comment = dto.Comment; // ✅ PIEVIENO
             // vecos “gaidošos”, ja tādi ir, deaktivējam
             foreach (var extra in waitingTasks.Skip(1))
                 extra.IsActive = false;
+            
+            // komentārs paliek tikai parent taskam
+            parent.Tasks_Comment = dto.Comment;
 
             await _db.SaveChangesAsync();
         }
@@ -1420,6 +1449,69 @@ GROUP BY ts.ProductToPart_ID;
 }
 
 
+// GET: /api/tasks/finishing-indicators?batchProductId=123
+[HttpGet("finishing-indicators")]
+public async Task<IActionResult> GetFinishingIndicators([FromQuery] int batchProductId)
+{
+    if (batchProductId <= 0)
+        return BadRequest("batchProductId is required.");
+
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    // 1) Statusu skaitīšana FINISHING
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+SELECT
+    ts.ProductToPart_ID,
+
+    SUM(CASE WHEN t.Tasks_Status = 1 THEN 1 ELSE 0 END) AS Cnt1,
+    SUM(CASE WHEN t.Tasks_Status = 2 THEN 1 ELSE 0 END) AS Cnt2,
+    SUM(CASE WHEN t.Tasks_Status = 3 THEN 1 ELSE 0 END) AS Cnt3,
+    COUNT(*) AS TotalCnt
+
+FROM tasks t
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+WHERE t.IsActive = 1
+  AND t.BatchProduct_ID = @bp
+  AND ts.Step_Type = 3       -- !!! Finishing
+GROUP BY ts.ProductToPart_ID;
+";
+    cmd.Parameters.Add(new MySqlParameter("@bp", batchProductId));
+
+    var list = new List<object>();
+
+    await using var r = await cmd.ExecuteReaderAsync();
+    while (await r.ReadAsync())
+    {
+        int cnt1 = r.GetInt32(1);
+        int cnt2 = r.GetInt32(2);
+        int cnt3 = r.GetInt32(3);
+        int total = r.GetInt32(4);
+
+        // 🔑 loģika, par kuru vienojāmies
+
+            string state =
+    total == 0
+        ? "gray"        // nav vispār finishing tasku
+        : cnt3 == total
+            ? "green"   // 🔑 VISI finishing taski = 3
+            : (cnt1 > 0 || cnt2 > 0)
+                ? "yellow"  // iesākts
+                : "gray";   // vēl nav sācies
+
+
+        list.Add(new
+        {
+            ProductToPartId = r.GetInt32(0),
+            State = state
+        });
+    }
+
+    return Ok(list);
+}
+
+
 [HttpPost("update-comment")]
 public async Task<IActionResult> UpdateComment([FromBody] UpdateCommentDto dto)
 {
@@ -1557,11 +1649,16 @@ SELECT
     t.Claimed_By,
     COALESCE(t.Qty_Done, 0) AS Done,
     t.TopPartStep_ID   AS TopPartStepId,
+    ptp.ID             AS ProductToPartId,
     t.Started_At,
     t.Finished_At,
-    t.Tasks_Comment    AS Comment   -- ✅ ŠIS
+    t.Tasks_Comment    AS Comment,   -- ✅ ŠIS
+    tp.TopPart_Name  AS PartName
+
 FROM tasks t
-JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+JOIN toppartsteps    ts  ON ts.ID = t.TopPartStep_ID
+JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
+JOIN toppart         tp  ON tp.ID  = ptp.TopPart_ID
 WHERE t.IsActive = 1
   AND t.BatchProduct_ID = @bpId
   AND ts.Step_Type = @stepType
@@ -1582,9 +1679,11 @@ ORDER BY ts.Step_Order, t.ID;
                 Claimed_By    = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
                 Done          = r.IsDBNull(4) ? 0 : r.GetInt32(4),
                 TopPartStepId = r.GetInt32(5),
-                StartedAt     = r.IsDBNull(6) ? (DateTime?)null : r.GetDateTime(6),
-                FinishedAt    = r.IsDBNull(7) ? (DateTime?)null : r.GetDateTime(7),
-                Comment      = r.IsDBNull(8) ? null : r.GetString(8)
+                ProductToPartId = r.GetInt32(6),
+                StartedAt     = r.IsDBNull(7) ? (DateTime?)null : r.GetDateTime(7),
+                FinishedAt    = r.IsDBNull(8) ? (DateTime?)null : r.GetDateTime(8),
+                Comment      = r.IsDBNull(9) ? null : r.GetString(9),
+                PartName = r.IsDBNull(10) ? null : r.GetString(10)
             });
 
     }

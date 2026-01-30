@@ -1,4 +1,4 @@
-/* DETAILTASKS.RAZOR.CSS */
+/* FINISHINGTASKS.RAZOR.CSS */
 
 .ptv2-tasks-row {
     display: grid;
@@ -354,14 +354,13 @@
     opacity: 0.9;
 }
 
-.ptv2-qty-active {
-    color: #111827;      /* normāls tumšs */
-    font-weight: 500;
+.qty-gray {
+    color: #9e9e9e;
 }
 
-.ptv2-qty-inactive {
-    color: #9ca3af;      /* pelēks */
-    font-weight: 400;
+.qty-normal {
+    color: #000;
 }
 
 
+/* FINISHINGTASKS.RAZOR.CSS */

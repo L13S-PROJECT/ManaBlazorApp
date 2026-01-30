@@ -28,11 +28,12 @@
             </div>
     <!-- 2. Gatavs -->
         <div>
-            <input type="checkbox"
-                class="ptv2-switch"
-                checked="@ActivatedParts.Contains(p.ProductToPartId)"
-                disabled="@ActivatedParts.Contains(p.ProductToPartId)"  
-                @onclick="() => OnActivatePart(p.ProductToPartId)" />
+<input type="checkbox"
+       class="ptv2-switch"
+       checked="@ActivatedParts.Contains(p.ProductToPartId)"
+       disabled="@ActivatedParts.Contains(p.ProductToPartId)"
+       @onclick:preventDefault="true"
+       @onclick="() => OnActivatePart(p.ProductToPartId)" />
         </div>
 
     <!-- 3. Apjoms -->
