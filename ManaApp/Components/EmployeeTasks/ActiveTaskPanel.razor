@@ -1,0 +1,41 @@
+@using ManaApp.Models
+
+@if (ActiveTask is null)
+{
+    <div class="no-active-task">
+        Aktīvs uzdevums nav izvēlēts.
+    </div>
+}
+else
+{
+    <div class="active-task">
+        <h4>Aktīvais uzdevums</h4>
+
+        <div><b>Batch:</b> @ActiveTask.BatchCode</div>
+        <div><b>Detaļa:</b> @ActiveTask.PartName</div>
+        <div><b>Solis:</b> @ActiveTask.StepName</div>
+        <div><b>Statuss:</b> @StatusText(ActiveTask.Status)</div>
+
+        @if (ActiveTask.StepType == 3)
+        {
+            <div><b>Apjoms (Finishing):</b> @ActiveTask.Done</div>
+        }
+        else
+        {
+            <div><b>Planned / Done:</b> @ActiveTask.Planned / @ActiveTask.Done</div>
+        }
+
+        <div class="actions">
+            <button class="btn btn-success"
+                    @onclick="() => OnFinish.InvokeAsync(ActiveTask)">
+                Pabeigts
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public TaskRow? ActiveTask { get; set; }
+    [Parameter] public EventCallback<TaskRow> OnFinish { get; set; }
+    [Parameter] public Func<int, string> StatusText { get; set; } = default!;
+}

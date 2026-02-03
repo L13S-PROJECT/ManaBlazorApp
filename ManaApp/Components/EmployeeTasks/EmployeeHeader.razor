@@ -1,0 +1,13 @@
+@* Employee header / darbinieka izvēle *@
+
+<div class="employee-header">
+    <label>Darbinieka ID: </label>
+    <input type="number" min="1" @bind="EmpId" />
+    <button @onclick="OnLoad">Ielādēt</button>
+</div>
+
+@code {
+    [Parameter] public int EmpId { get; set; }
+    [Parameter] public EventCallback OnLoad { get; set; }
+}
+

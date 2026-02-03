@@ -1,0 +1,30 @@
+.employee-tasks-wrapper {
+    max-width: 1600px;      /* vai 1100px – pieskaņo savam header */
+    margin: 0 auto;         /* CENTRĒ */
+    padding: 0 12px;        /* maza elpa malās */
+}
+
+.employee-tasks-page {
+    background: #f0f2f4;
+    border-radius: 16px;
+}
+
+
+.employee-card {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 12px;              /* mazāks iekšējais baltais */
+    margin-bottom: 6px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08); /* viegls pelēks shadow */
+}
+
+
+.ptv2-root {
+  max-width: 1600px;   /* TĀDS PATS kā header wrapper */
+  margin: 0 auto;
+  padding: 0 12px;
+}
+
+.employee-card:last-child {
+    margin-bottom: 0;
+}

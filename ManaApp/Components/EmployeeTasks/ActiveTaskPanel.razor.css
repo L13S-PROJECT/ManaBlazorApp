@@ -1,0 +1,57 @@
+.active-task {
+    background: #ececec;          /* viegli pelēks kā bildē */
+    border: 1px solid #d0d0d0;
+    border-radius: 12px;          /* lielāks, mīkstāks */
+    padding: 16px;                /* kompaktāks */
+}
+
+
+.active-task h4 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 1.3rem;
+}
+
+.active-task > div:not(.active-task-info) {
+    margin-bottom: 6px;
+    font-size: 0.95rem;
+}
+
+
+.active-task .actions {
+    margin-top: 8px;
+    display: flex;
+    gap: 12px;
+}
+
+.no-active-task {
+    background: #fafafa;
+    border: 1px dashed #cfcfcf;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 20px;
+    color: #666;
+}
+
+.active-task-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 24px;
+    margin-bottom: 12px;
+}
+
+.task-header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    font-size: 1.6rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.task-subtitle {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    font-size: 1rem;
+    margin-bottom: 16px;
+    color: #444;
+}

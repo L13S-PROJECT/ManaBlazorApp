@@ -2,215 +2,47 @@
 @using System.Net.Http.Json
 @using System.Linq
 @inject HttpClient Http
+@using ManaApp.Components.EmployeeTasks
+@using ManaApp.Shared
 
+<div class="employee-tasks-wrapper">
+<PageHeader Title="Darbinieku uzdevumi" />
 
-<h3>Darbinieka uzdevumi</h3>
+<div class="employee-tasks-page">
 
-<div style="margin:8px 0">
-  <label>Darbinieka ID: </label>
-  <input type="number" min="1" style="width:80px" @bind="empId" />
-  <button @onclick="LoadTasks">Ielādēt</button>
-</div>
-
-@if (_activeTask is null)
-{
-    <div style="margin:12px 0; padding:8px; border:1px dashed #ccc; border-radius:4px; color:#666;">
-        Aktīvs uzdevums nav izvēlēts.
+    <div class="employee-card">
+        <EmployeeHeader EmpId="@empId" OnLoad="LoadTasks" />
     </div>
-}
-else
-{
-    <div style="margin:12px 0; padding:10px; border:1px solid #ccc; border-radius:4px; background:#fffbe6;">
-        <h4 style="margin-top:0;">Aktīvais uzdevums</h4>
-        <div><b>Batch:</b> @_activeTask.BatchCode</div>
-        <div><b>Detaļa:</b> @_activeTask.PartName</div>
-        <div><b>Solis:</b> @_activeTask.StepName</div>
-        <div><b>Statuss:</b> @StatusText(_activeTask.Status)</div>
-        @if (_activeTask.StepType == 3)
-{
-    <div><b>Apjoms (Finishing):</b> @_activeTask.Done</div>
-}
-else
-{
-    <div><b>Planned / Done:</b> @_activeTask.Planned / @_activeTask.Done</div>
-}
 
-
-        <div style="text-align:right; margin-top:10px;">
-            <button class="btn btn-success"
-                @onclick="async () => await FinishTask(_activeTask)">
-                Pabeigts
-            </button>
-
-        </div>
+    <div class="employee-card">
+        <ActiveTaskPanel ActiveTask="_activeTask"
+                         OnFinish="FinishTask"
+                         StatusText="StatusText" />
     </div>
-}  
 
-
-@if (!tasks.Any())
-{
-    <p>Nav nākamo uzdevumu.</p>
-}
-else
-{
-    var orderedTasks = tasks
-        .OrderBy(t => t.BatchCode)
-        .ThenBy(t => t.PartName)
-        .ThenBy(t => t.StepOrder)      // soļu secība produktā/partijai
-        .ThenBy(t => t.Status)         // 1 → 2 → 3
-        .ThenByDescending(t => t.Priority);
-
-    <table class="table table-striped">
-       <thead>
-            <tr>
-                <th>Batch</th>           <!-- 1 -->
-                <th>Nosaukums</th>       <!-- 2 -->
-                <th>Detaļa</th>          <!-- 3 -->
-                <th>Solis</th>           <!-- 4 -->
-                <th>Prioritāte</th>      <!-- 5 -->
-                <th>Statuss</th>         <!-- 6 -->
-                <th>Planned</th>         <!-- 7 -->
-                <th>Finishing qty</th>   <!-- 8 -->
-                <th>Procesā</th>            <!-- 9 -->
-                <th>Komentārs</th>       <!-- 10 -->
-                <th>Izvēlēties</th>      <!-- 11 -->
-            </tr>
-</thead>
-
-        <tbody>
-    @foreach (var t in orderedTasks)
-{
-<tr class="@(t.Status == 2 ? "table-warning" : (t.Status == 3 ? "table-success" : ""))">
-    <td>@t.BatchCode</td>
-    <td>@t.ProductName</td>
-    <td>@t.PartName</td>
-    <td>@t.StepName</td>
-    <td>@t.Priority</td>
-    <td>@StatusText(t.Status)</td>
-
-    <!-- Planned -->
-    <td>
-        @if (t.StepType != 3)
-        {
-            @t.Planned
-        }
-    </td>
-
-    <!-- Finishing qty -->
-    <td>
-        @if (t.StepType == 3)
-        {
-            @t.Done
-        }
-    </td>
-
-    <!-- Procesā -->
-            <td>
-                @if (t.Status == 2)
-                {
-                    @t.Done
-                }
-            </td>
-
-    <!-- Komentārs -->
-    <td>
-        @if (t.IsCommentForEmployee && !string.IsNullOrWhiteSpace(t.Comment))
-        {
-            @t.Comment
-        }
-    </td>
-
-    <!-- Izvēlēties -->
-    <td>
-        <button type="button"
-                class="btn btn-primary"
-                disabled="@(t.Status == 1 && !CanStart(t))"
-                @onclick="() => OpenTaskDialog(t)">
-            Atvērt
-        </button>
-    </td>
-</tr>
-
-}
-
-        </tbody>
-    </table>
-}
-
-@if (_isDialogOpen && _selectedTask is not null)
-{
-    <div style="
-        position:fixed;
-        top:0; left:0;
-        width:100vw; height:100vh;
-        background:rgba(0,0,0,0.4);
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        z-index:9999;">
-
-        <div style="
-            background:white;
-            padding:20px;
-            border-radius:8px;
-            min-width:320px;
-            box-shadow:0 0 10px rgba(0,0,0,0.4);">
-
-            <h4 style="margin-top:0;">
-                @(_selectedTask.BatchCode) – @_selectedTask.PartName – @_selectedTask.StepName
-            </h4>
-
-            <p>Statuss: @StatusText(_selectedTask.Status)</p>
-
-         <div style="text-align:right; margin-top:16px;">
-    <button class="btn btn-secondary"
-            style="margin-right:8px;"
-            @onclick="CloseTaskDialog">
-        Aizvērt
-    </button>
-
- <button class="btn btn-primary"
-        disabled="@(_selectedTask is null || _selectedTask.Status != 1 || !CanStart(_selectedTask))"
-        @onclick="async () => await ClaimTask(_selectedTask!.TaskId)">
-    Sākt
-</button>
-
+    <div class="employee-card">
+        <TasksTable Tasks="tasks"
+                    StatusText="StatusText"
+                    CanStart="CanStart"
+                    OnOpen="OpenTaskDialog" />
+    </div>
 
 </div>
 
-        </div>
-    </div>
-}
+
+<TaskDialog IsOpen="_isDialogOpen"
+            SelectedTask="_selectedTask"
+            StatusText="StatusText"
+            CanStart="CanStart"
+            OnStart="async t => await ClaimTask(t.TaskId)"
+            OnClose="CloseTaskDialog" />
+</div>
 
 @code {
     private List<TaskRow> tasks = new();
 
     protected override async Task OnInitializedAsync() => await LoadTasks();
 
-public sealed class TaskRow
-{
-    public int TaskId { get; set; }
-    public byte Priority { get; set; }
-    public int Status { get; set; }
-    public DateTime? StartedAt { get; set; }
-    public DateTime? FinishedAt { get; set; }
-    public string? PartName { get; set; }
-    public string? StepName { get; set; }
-    public string? ProductName { get; set; }
-    public string? BatchCode { get; set; }
-    public int Planned { get; set; }
-    public int Done { get; set; }
-    public int StepOrder { get; set; }
-
-    public int StepType { get; set; }        // 1 = Detailed, 2 = Assembly, 3 = Finishing
-    public int BatchId { get; set; }         // batches.ID
-    public int VersionId { get; set; }       // versions.ID
-    public int BatchProductId { get; set; }  // batches_products.ID
-
-    public string? Comment { get; set; }     // 🔸 komentārs (īpaši Finishing)
-    public bool IsCommentForEmployee { get; set; }
-
-}
     private string StatusText(int s) => s switch
 {
     1 => "Nav iesākts",
@@ -235,8 +67,6 @@ private async Task ClaimTask(int taskId)
         Console.WriteLine($"Claim failed: {resp.StatusCode} - {await resp.Content.ReadAsStringAsync()}");
     }
 }
-
-
 
 int empId = 1;
 

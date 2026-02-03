@@ -1,0 +1,28 @@
+.employee-header {
+    background: #ffffff;
+    border: 1px solid #dcdcdc;
+    border-radius: 10px;
+    padding: 8px 8px;
+    margin-bottom: 0x;
+
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.employee-header label {
+    font-weight: 600;
+    color: #333;
+}
+
+.employee-header input[type="number"] {
+    width: 80px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid #cfcfcf;
+}
+
+.employee-header button {
+    padding: 6px 14px;
+    border-radius: 6px;
+}

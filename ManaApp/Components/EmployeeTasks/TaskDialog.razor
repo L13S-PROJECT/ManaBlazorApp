@@ -1,0 +1,37 @@
+@using ManaApp.Models
+
+@if (IsOpen && SelectedTask is not null)
+{
+    <div class="dialog-backdrop">
+        <div class="dialog">
+            <h4>@SelectedTask.BatchCode – @SelectedTask.PartName – @SelectedTask.StepName</h4>
+
+            <p>Statuss: @StatusText(SelectedTask.Status)</p>
+
+            <div class="actions">
+                <button class="btn btn-secondary"
+                        @onclick="OnClose">
+                    Aizvērt
+                </button>
+
+                <button class="btn btn-primary"
+                        disabled="@(SelectedTask.Status != 1 || !CanStart(SelectedTask))"
+                        @onclick="() => OnStart.InvokeAsync(SelectedTask)">
+                    Sākt
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public TaskRow? SelectedTask { get; set; }
+
+    [Parameter] public Func<int, string> StatusText { get; set; } = default!;
+    [Parameter] public Func<TaskRow, bool> CanStart { get; set; } = default!;
+
+    [Parameter] public EventCallback<TaskRow> OnStart { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+}
+
