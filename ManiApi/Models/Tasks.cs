@@ -15,6 +15,7 @@ namespace ManiApi.Models
 
         [Column("Tasks_Comment")]
         public string? Tasks_Comment { get; set; }
+        public bool Is_Comment_For_Employee { get; set; }
 
         public DateTime? Started_At { get; set; }
         public DateTime? Finished_At { get; set; }

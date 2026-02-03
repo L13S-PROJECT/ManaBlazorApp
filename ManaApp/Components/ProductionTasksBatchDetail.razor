@@ -4,11 +4,21 @@
 
 <div class="ptv2-box ptv2-box-detail ptv2-box-batches">
 
-    <h3>
-        @(SelectedProduct == null
-            ? "Izvēlies preci"
-            : SelectedProduct.productName)
-    </h3>
+        <div class="ptv2-box-header">
+            <h3>
+                @(SelectedProduct == null
+                    ? "Izvēlies preci"
+                    : SelectedProduct.productName)
+            </h3>
+
+            <label class="ptv2-archive-toggle">
+                <input type="checkbox"
+                    class="ptv2-toggle"
+                    @bind="ShowArchived" />
+                <span>Rādīt arhīvu</span>
+            </label>
+
+        </div>
 
    
     @if (SelectedProduct == null)
@@ -41,10 +51,15 @@
             </div>
 
             <!-- ROWS -->
-            @foreach (var b in ProductBatches)
-            {
-                <div class="ptv2-batch-row @(SelectedBatchId == b.BatchId ? "active" : "")"
-                     @onclick="() => SelectBatch(b)">
+                @foreach (var b in ProductBatches
+                    .Where(b => ShowArchived || !IsArchived(b)))
+                {
+
+                <div class="ptv2-batch-row
+                    @(IsArchived(b) ? "archived" : "")
+                    @(SelectedBatchId == b.BatchId ? "active" : "")"
+                    @onclick="() => SelectBatch(b)">
+
 
                     <div>
                         @b.BatchCode
@@ -151,5 +166,9 @@ async Task OnCommentSaved(string? newComment)
 
 [Parameter] public EventCallback<ProductBatchRow> OnBatchSelected { get; set; }
 
+private bool ShowArchived = false;
+
+bool IsArchived(ProductBatchRow b)
+    => b.Planned > 0 && (b.Done + b.Sold) >= b.Planned;
 
 }

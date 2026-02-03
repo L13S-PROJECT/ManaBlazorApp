@@ -62,66 +62,75 @@ else
 
     <table class="table table-striped">
        <thead>
-    <tr>
-        <th>Batch</th>
-        <th>Detaļa</th>
-        <th>Solis</th>
-        <th>Prioritāte</th>
-        <th>Statuss</th>
-        <th>Planned</th>
-        <th>Finishing qty</th>
-        <th>Done</th>
-        <th>Komentārs</th>
-        <th></th>
-    </tr>
+            <tr>
+                <th>Batch</th>           <!-- 1 -->
+                <th>Nosaukums</th>       <!-- 2 -->
+                <th>Detaļa</th>          <!-- 3 -->
+                <th>Solis</th>           <!-- 4 -->
+                <th>Prioritāte</th>      <!-- 5 -->
+                <th>Statuss</th>         <!-- 6 -->
+                <th>Planned</th>         <!-- 7 -->
+                <th>Finishing qty</th>   <!-- 8 -->
+                <th>Procesā</th>            <!-- 9 -->
+                <th>Komentārs</th>       <!-- 10 -->
+                <th>Izvēlēties</th>      <!-- 11 -->
+            </tr>
 </thead>
 
         <tbody>
     @foreach (var t in orderedTasks)
 {
-    <tr class="@(t.Status == 2 ? "table-warning" : (t.Status == 3 ? "table-success" : ""))">
-        <td>@t.BatchCode</td>
-<td>@t.PartName</td>
-<td>@t.StepName</td>
-<td>@t.Priority</td>
-<td>@StatusText(t.Status)</td>
+<tr class="@(t.Status == 2 ? "table-warning" : (t.Status == 3 ? "table-success" : ""))">
+    <td>@t.BatchCode</td>
+    <td>@t.ProductName</td>
+    <td>@t.PartName</td>
+    <td>@t.StepName</td>
+    <td>@t.Priority</td>
+    <td>@StatusText(t.Status)</td>
 
-<!-- Planned: tikai ne-Finishing soļiem -->
-<td>
-    @if (t.StepType == 3)
-    {
-        @("")   <!-- vai "-" ja gribi -->
-    }
-    else
-    {
-        @t.Planned
-    }
-</td>
+    <!-- Planned -->
+    <td>
+        @if (t.StepType != 3)
+        {
+            @t.Planned
+        }
+    </td>
 
-<td>@t.Done</td>
+    <!-- Finishing qty -->
+    <td>
+        @if (t.StepType == 3)
+        {
+            @t.Done
+        }
+    </td>
 
-<!-- komentārs no ProductionTasks Finishing popupa -->
-        <td>@t.Comment</td>
+    <!-- Procesā -->
+            <td>
+                @if (t.Status == 2)
+                {
+                    @t.Done
+                }
+            </td>
 
+    <!-- Komentārs -->
+    <td>
+        @if (t.IsCommentForEmployee && !string.IsNullOrWhiteSpace(t.Comment))
+        {
+            @t.Comment
+        }
+    </td>
 
-<!-- Finishing qty: tikai Finishing soļiem -->
-<td>
-    @if (t.StepType == 3)
-    {
-        @t.Planned
-    }
-</td>
+    <!-- Izvēlēties -->
+    <td>
+        <button type="button"
+                class="btn btn-primary"
+                disabled="@(t.Status == 1 && !CanStart(t))"
+                @onclick="() => OpenTaskDialog(t)">
+            Atvērt
+        </button>
+    </td>
+</tr>
 
-<td>
-    <button type="button"
-            class="btn btn-primary"
-            disabled="@(t.Status == 1 && !CanStart(t))"
-            @onclick="() => OpenTaskDialog(t)">
-        Atvērt
-    </button>
-</td>
-
-    </tr>
 }
 
         </tbody>
@@ -187,6 +196,7 @@ public sealed class TaskRow
     public DateTime? FinishedAt { get; set; }
     public string? PartName { get; set; }
     public string? StepName { get; set; }
+    public string? ProductName { get; set; }
     public string? BatchCode { get; set; }
     public int Planned { get; set; }
     public int Done { get; set; }
@@ -198,6 +208,8 @@ public sealed class TaskRow
     public int BatchProductId { get; set; }  // batches_products.ID
 
     public string? Comment { get; set; }     // 🔸 komentārs (īpaši Finishing)
+    public bool IsCommentForEmployee { get; set; }
+
 }
     private string StatusText(int s) => s switch
 {

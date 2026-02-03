@@ -130,10 +130,14 @@
 
                         <!-- 9. Done (vizuāli checkbox, funkcija vēlāk) -->
                 <div class="ptv2-done-cell">
+                <div class="ptv2-done-cell" style="position:relative; z-index:5;">
                     <input type="checkbox"
                         class="ptv2-done-checkbox"
-                        title="Redzams"
-                        checked="@(t.Done > 0)" />
+                        style="position:relative; z-index:6;"
+                        title="Redzams darbiniekam"
+                        checked="@t.IsCommentForEmployee"
+                        @onchange="e => OnCommentVisibilityChanged(t, e)" />
+                </div>
                 </div>
 
             </div>
@@ -314,6 +318,7 @@ private sealed class DetailTaskRow
     public DateTime? StartedAt { get; set; }
     public DateTime? FinishedAt { get; set; }
     public string? Comment { get; set; }
+    public bool IsCommentForEmployee { get; set; }
 }
 
 private sealed class DetailSummaryRow
@@ -402,7 +407,8 @@ async Task ConfirmComment()
             new
             {
                 TaskId = EditingTask.TaskId,
-                Comment = EditingCommentText
+                Comment = EditingCommentText,
+                IsForEmployee = true
             });
 
         EditingTask.Comment = EditingCommentText;
@@ -411,6 +417,23 @@ async Task ConfirmComment()
     IsCommentPopupOpen = false;
     EditingTask = null;
 }
+
+async Task OnCommentVisibilityChanged(DetailTaskRow task, ChangeEventArgs e)
+{
+    var isChecked = (bool)e.Value!;
+
+    await Http.PostAsJsonAsync(
+        "http://localhost:5270/api/tasks/update-comment-visibility",
+        new
+        {
+            TaskId = task.TaskId,
+            IsCommentForEmployee = isChecked
+        });
+
+    task.IsCommentForEmployee = isChecked; // UI sync
+}
+
+
 
 
 }

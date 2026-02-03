@@ -364,4 +364,14 @@
     font-weight: 400;
 }
 
+.ptv2-comment-wrap {
+    position: relative;
+    z-index: 1;
+}
+
+/* svarīgā rinda ↓ */
+.ptv2-comment-wrap::before,
+.ptv2-comment-wrap::after {
+    pointer-events: none;
+}
 

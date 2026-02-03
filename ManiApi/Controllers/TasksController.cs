@@ -28,31 +28,43 @@ public async Task<IActionResult> GetForEmployee([FromQuery] int empId = 1)
     await using var cmd = conn.CreateCommand();
 cmd.CommandText = @"
 SELECT
-  t.ID,             -- 0 TaskId
-  t.Tasks_Priority, -- 1 Priority
-  t.Tasks_Status,   -- 2 Status
-  t.Started_At,     -- 3 StartedAt
-  t.Finished_At,    -- 4 FinishedAt
-  tp.TopPart_Name,  -- 5 PartName
-  ts.Step_Name,     -- 6 StepName (konkrētais soļa nosaukums, nevis vispārīgais tips)
-  b.Batches_Code,   -- 7 BatchCode
+  t.ID,                      -- 0 TaskId
+  t.Tasks_Priority,          -- 1 Priority
+  t.Tasks_Status,            -- 2 Status
+  t.Started_At,              -- 3 StartedAt
+  t.Finished_At,             -- 4 FinishedAt
+
+  t.Is_Comment_For_Employee, -- 5 IsCommentForEmployee
+
+  CASE 
+    WHEN t.Is_Comment_For_Employee = 1 
+    THEN t.Tasks_Comment 
+    ELSE NULL 
+  END AS Comment,             -- 6 Comment
+
+  p.Product_Name,            -- 7 ProductName
+  tp.TopPart_Name,           -- 8 PartName
+  ts.Step_Name,              -- 9 StepName
+  b.Batches_Code,            -- 10 BatchCode
+
 
  CASE 
     WHEN ts.Step_Type IN (1,2) THEN bp.Planned_Qty * ptp.Qty_Per_product
     WHEN ts.Step_Type = 3      THEN t.Qty_Done
     ELSE bp.Planned_Qty
-END AS PlannedForTask,        -- 8 Planned
+END AS PlannedForTask,        -- 9 Planned
 
-  COALESCE(t.Qty_Done, 0) AS DoneForTask, -- 9 Done
+  COALESCE(t.Qty_Done, 0) AS DoneForTask, -- 10 Done
 
-  COALESCE(ts.Step_Order, 0) AS StepOrder, -- 10 soļa secība
-
-  ts.Step_Type              AS StepType,       -- 11 (Detailed/Assembly/Finishing)
-  b.ID                      AS BatchId,       -- 12 (batches.ID)
-  bp.Version_Id             AS VersionId,     -- 13 (versions.ID)
-  bp.ID                     AS BatchProductId -- 14 (batches_products.ID)
+  COALESCE(ts.Step_Order, 0) AS StepOrder, -- 11 soļa secība    
+  ts.Step_Type              AS StepType,       -- 12 (Detailed/Assembly/Finishing)
+  b.ID                      AS BatchId,       -- 13 (batches.ID)
+  bp.Version_Id             AS VersionId,     -- 14 (versions.ID)
+  bp.ID                     AS BatchProductId -- 15  (batches_products.ID)
 FROM tasks t
 JOIN batches_products bp   ON bp.ID  = t.BatchProduct_ID AND bp.IsActive = 1
+JOIN versions v   ON v.ID   = bp.Version_Id AND v.IsActive = 1
+JOIN products p   ON p.ID   = v.Product_ID AND p.IsActive = 1
 JOIN batches          b    ON b.ID   = bp.Batch_Id       AND b.IsActive  = 1 AND b.Batches_Statuss = 1
 JOIN toppartsteps     ts   ON ts.ID  = t.TopPartStep_ID
 JOIN producttopparts  ptp  ON ptp.ID = ts.ProductToPart_ID
@@ -80,26 +92,31 @@ ORDER BY
     await using var r = await cmd.ExecuteReaderAsync();
     while (await r.ReadAsync())
     {
-        list.Add(new
-{
-    TaskId     = r.GetInt32(0),
-    Priority   = r.IsDBNull(1) ? (byte)0 : r.GetByte(1),
-    Status     = r.GetInt32(2),
-    StartedAt  = r.IsDBNull(3) ? (DateTime?)null : r.GetDateTime(3),
-    FinishedAt = r.IsDBNull(4) ? (DateTime?)null : r.GetDateTime(4),
-    PartName   = r.IsDBNull(5) ? null : r.GetString(5),
-    StepName   = r.IsDBNull(6) ? null : r.GetString(6),
-    BatchCode  = r.IsDBNull(7) ? null : r.GetString(7),
-    Planned    = r.IsDBNull(8) ? 0    : r.GetInt32(8),
-    Done       = r.IsDBNull(9) ? 0    : r.GetInt32(9),
-    StepOrder  = r.IsDBNull(10) ? 0   : r.GetInt32(10),
+            list.Add(new
+                {
+                    TaskId      = r.GetInt32(0),
+                    Priority    = r.IsDBNull(1) ? (byte)0 : r.GetByte(1),
+                    Status      = r.GetInt32(2),
+                    StartedAt   = r.IsDBNull(3) ? (DateTime?)null : r.GetDateTime(3),
+                    FinishedAt  = r.IsDBNull(4) ? (DateTime?)null : r.GetDateTime(4),
 
-    StepType       = r.IsDBNull(11) ? 0 : r.GetInt32(11),
-    BatchId        = r.IsDBNull(12) ? 0 : r.GetInt32(12),
-    VersionId      = r.IsDBNull(13) ? 0 : r.GetInt32(13),
-    BatchProductId = r.IsDBNull(14) ? 0 : r.GetInt32(14)
-});
+                    IsCommentForEmployee = r.GetBoolean(5),
+                    Comment     = r.IsDBNull(6) ? null : r.GetString(6),
 
+                    ProductName = r.IsDBNull(7) ? null : r.GetString(7),
+                    PartName    = r.IsDBNull(8) ? null : r.GetString(8),
+                    StepName    = r.IsDBNull(9) ? null : r.GetString(9),
+                    BatchCode   = r.IsDBNull(10) ? null : r.GetString(10),
+
+                    Planned     = r.IsDBNull(11) ? 0 : r.GetInt32(11),
+                    Done        = r.IsDBNull(12) ? 0 : r.GetInt32(12),
+                    StepOrder   = r.IsDBNull(13) ? 0 : r.GetInt32(13),
+
+                    StepType       = r.IsDBNull(14) ? 0 : r.GetInt32(14),
+                    BatchId        = r.IsDBNull(15) ? 0 : r.GetInt32(15),
+                    VersionId      = r.IsDBNull(16) ? 0 : r.GetInt32(16),
+                    BatchProductId = r.IsDBNull(17) ? 0 : r.GetInt32(17)
+                });
     }
 
     return Ok(list);
@@ -1006,9 +1023,6 @@ parent.Tasks_Comment = dto.Comment; // ✅ PIEVIENO
             foreach (var extra in waitingTasks.Skip(1))
                 extra.IsActive = false;
             
-            // komentārs paliek tikai parent taskam
-            parent.Tasks_Comment = dto.Comment;
-
             await _db.SaveChangesAsync();
         }
     }
@@ -1511,7 +1525,6 @@ GROUP BY ts.ProductToPart_ID;
     return Ok(list);
 }
 
-
 [HttpPost("update-comment")]
 public async Task<IActionResult> UpdateComment([FromBody] UpdateCommentDto dto)
 {
@@ -1531,10 +1544,13 @@ public async Task<IActionResult> UpdateComment([FromBody] UpdateCommentDto dto)
     return Ok(new { updated = true, taskId = t.ID });
 }
 
+
 public sealed class UpdateCommentDto
 {
     public int TaskId { get; set; }
     public string? Comment { get; set; }
+    public bool IsForEmployee { get; set; }
+
 }
 
 
@@ -1653,6 +1669,7 @@ SELECT
     t.Started_At,
     t.Finished_At,
     t.Tasks_Comment    AS Comment,   -- ✅ ŠIS
+    t.Is_Comment_For_Employee AS IsCommentForEmployee,
     tp.TopPart_Name  AS PartName
 
 FROM tasks t
@@ -1682,13 +1699,32 @@ ORDER BY ts.Step_Order, t.ID;
                 ProductToPartId = r.GetInt32(6),
                 StartedAt     = r.IsDBNull(7) ? (DateTime?)null : r.GetDateTime(7),
                 FinishedAt    = r.IsDBNull(8) ? (DateTime?)null : r.GetDateTime(8),
-                Comment      = r.IsDBNull(9) ? null : r.GetString(9),
-                PartName = r.IsDBNull(10) ? null : r.GetString(10)
+                Comment = r.IsDBNull(9) ? null : r.GetString(9),
+                IsCommentForEmployee = !r.IsDBNull(10) && r.GetBoolean(10),
+                PartName = r.IsDBNull(11) ? null : r.GetString(11)
             });
 
     }
 
     return Ok(list);
+}
+
+[HttpPost("update-comment-visibility")]
+public async Task<IActionResult> UpdateCommentVisibility([FromBody] UpdateCommentVisibilityDto dto)
+{
+    var t = await _db.Tasks.FirstOrDefaultAsync(x => x.ID == dto.TaskId && x.IsActive);
+    if (t is null) return NotFound();
+
+    t.Is_Comment_For_Employee = dto.IsCommentForEmployee;
+    await _db.SaveChangesAsync();
+
+    return Ok();
+}
+
+public sealed class UpdateCommentVisibilityDto
+{
+    public int TaskId { get; set; }
+    public bool IsCommentForEmployee { get; set; }
 }
 
 

@@ -120,13 +120,16 @@
     </button>
 </div>
 
-            <!-- 9. Done -->
-            <div class="ptv2-done-cell">
-    <input type="checkbox"
-           class="ptv2-done-checkbox"
-           title="Redzams"
-           checked="@(t.Done > 0)" />
-</div>
+            <!-- 9. Redzams darbiniekam -->
+                <div class="ptv2-done-cell" style="position:relative; z-index:5;">
+                    <input type="checkbox"
+                        class="ptv2-done-checkbox"
+                        style="position:relative; z-index:6;"
+                        title="Redzams darbiniekam"
+                        checked="@t.IsCommentForEmployee"
+                        @onchange="e => OnCommentVisibilityChanged(t, e)" />
+                </div>
+
 
         </div>
     }
@@ -289,7 +292,8 @@ async Task ConfirmComment()
             new
             {
                 TaskId = EditingTask.TaskId,
-                Comment = EditingCommentText
+                Comment = EditingCommentText,
+                IsForEmployee = true
             });
 
         EditingTask.Comment = EditingCommentText;
@@ -302,9 +306,9 @@ async Task ConfirmComment()
 /* popup Finishin daļai */
 private bool ShowFinishingPopup = false;
 
-
 private void OpenFinishingPopup()
 {
+    EditingCommentText = ""; // ⬅️ OBLIGĀTI
     ShowFinishingPopup = true;
 }
 
@@ -401,6 +405,21 @@ private void OnFinishingSwitchClicked()
 
     // switch NEKAD nekļūst zaļš pats
     IsFinishingSwitchOn = false;
+}
+
+async Task OnCommentVisibilityChanged(FinishingTaskRow task, ChangeEventArgs e)
+{
+    var isChecked = (bool)e.Value!;
+
+    await Http.PostAsJsonAsync(
+        "http://localhost:5270/api/tasks/update-comment-visibility",
+        new
+        {
+            TaskId = task.TaskId,
+            IsCommentForEmployee = isChecked
+        });
+
+    task.IsCommentForEmployee = isChecked;
 }
 
 
