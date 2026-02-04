@@ -1,57 +1,259 @@
 .active-task {
-    background: #ececec;          /* viegli pelēks kā bildē */
+    background: #ededed;          /* viegli pelēks kā bildē */
     border: 1px solid #d0d0d0;
-    border-radius: 12px;          /* lielāks, mīkstāks */
-    padding: 16px;                /* kompaktāks */
-}
-
-
-.active-task h4 {
-    margin-top: 0;
-    margin-bottom: 12px;
-    font-size: 1.3rem;
-}
-
-.active-task > div:not(.active-task-info) {
-    margin-bottom: 6px;
-    font-size: 0.95rem;
-}
-
-
-.active-task .actions {
-    margin-top: 8px;
-    display: flex;
-    gap: 12px;
+    border-radius: 10px;          /* */
+    padding: 24px; 
+    position: relative;
+    padding-top: 65px;
+        
+    height: 100%;          /* augstums - visam blokam */
+    display: flex;         /* flex noteikumi */
+    flex-direction: column;
 }
 
 .no-active-task {
+    height: 100%; /* lai aiznemtu visu augstumu */
     background: #fafafa;
-    border: 1px dashed #cfcfcf;
+    border: 1px solid #cfcfcf;
     border-radius: 10px;
-    padding: 14px;
+    padding: 24px; /* lai nav pielipis pie malas teksts */
+
     margin-bottom: 20px;
     color: #666;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
 }
 
-.active-task-info {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px 24px;
+.task-batch-corner {
+    position: absolute;
+    top: 12px;
+    left: 16px;
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: #444;
+}
+
+.task-product {
+    text-align: center;
+    font-size: 32px;
+    font-weight: 700;
     margin-bottom: 12px;
+    color: #444;
 }
 
+/*----------------------*/
 .task-header {
     display: grid;
-    grid-template-columns: 1fr auto;
-    font-size: 1.6rem;
-    font-weight: 600;
-    margin-bottom: 6px;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 24px;
 }
 
-.task-subtitle {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    font-size: 1rem;
-    margin-bottom: 16px;
+
+.task-part {
+    font-size: 20px;
+    font-weight: 500;
     color: #444;
+    text-align: center;
+
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 12px 12px;
+
+    width: 240px;          /* fiksēts platums */
+    box-sizing: border-box;
+    height: 88px; 
+    
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    box-shadow:
+        inset 0 2px 4px rgba(0,0,0,0.15),   /* “iespiests” efekts */
+        inset 0 -1px 2px rgba(255,255,255,0.6);
+}
+
+
+.task-step {
+    width: 240px;          /* FIKSĒTS PLATUMS */
+    height: 88px; 
+    padding: 12px 16px;
+
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.15);
+
+    font-size: 1.5rem;     /* NOKLUSĒTAIS (kā 2.attēlā) */
+    font-weight: 500;
+
+    color: #444;
+    text-align: left;
+
+    display: flex;
+    align-items: center;
+}
+
+.task-box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.task-box-label {
+    font-size: 1rem;
+    text-align: center;
+    color: #777;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: 4px;
+}
+
+
+/*----------------------*/
+
+.task-amount {
+    display: grid;
+    grid-template-columns: repeat(3, 120px);
+    gap: 24px;
+    margin-top: 24px; /*attālums no ieprekšējā bloka*/
+
+    justify-content: center;   /* centrē gridu panelī */
+    max-width: 100%;           /* neļauj pārsniegt vecāku */
+}
+
+.amount-box {
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    gap: 12px;
+    width: 120px;
+}
+
+
+.amount-label {
+    font-size: 1rem;
+    text-transform: uppercase;
+    text-align: left;
+    color: #555;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.amount-value,
+.amount-input {
+    width: 46px;
+    height: 46px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: #ffffff;
+    border-radius: 6px;
+    font-size: 2rem;
+    font-weight: 600;
+    box-sizing: border-box;
+
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.15);
+}
+
+
+.amount-box.disabled .amount-input {
+    background: #f0f0f0;
+    color: #999;
+}
+
+ /*----------------------*/
+
+.task-comment > label {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #555;
+    text-transform: uppercase;
+}
+
+ .task-comment {
+    margin-top: 32px;     /* GALVENAIS: distance no augšas */
+    margin-bottom: 12px;
+
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    }
+
+.comment-text {
+    width: 100%;
+    max-width: 600px;     /* fiksēts, kontrolēts platums */
+    min-height: 80px;     /* lielāks, stabils augstums */
+
+    padding: 10px 12px;
+    background: #fffefe;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+
+    font-size: 0.95rem;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.15);
+}
+
+/*----------------------*/
+
+.actions {
+    display: flex;
+    justify-content: center;   /* pa vidu */
+    gap: 24px;
+    margin-top: 24px;          /* atdalām no augšas */
+}
+
+.actions .btn {
+    min-width: 220px;          /* VIENĀDS platums */
+    height: 56px;              /* lielākas */
+    font-size: 1.2rem;         /* saprotams teksts */
+    font-weight: 600;
+}
+
+.btn-primary {
+    background-color: #3f5f6f;   /* pelēk-zils */
+    border-color: #3f5f6f;
+    color: #fff;
+}
+
+.btn-primary:disabled {
+    background-color: #9fb3bf;
+    border-color: #9fb3bf;
+}
+
+
+.btn-finish {
+    background-color: #b96a2c;   /* rūsas tonis */
+    border-color: #b96a2c;
+    color: #fff;
+}
+
+.btn-finish:disabled {
+    background-color: #d8b49a;
+    border-color: #d8b49a;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Nav iesākts */
+.active-task.panel-idle {
+    background-color: #f0f0f0;
+}
+
+/* Aktīvs */
+.active-task.panel-active {
+    background-color: #f3ebc4;   /* viegls dzeltens */
+}
+
+/* Pabeigts */
+.active-task.panel-done {
+    background-color: #e3e3e3;
 }

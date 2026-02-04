@@ -13,7 +13,7 @@ else
         .ThenBy(t => t.Status)
         .ThenByDescending(t => t.Priority);
 
-    <table class="table table-striped">
+    <table class="table">
         <thead>
             <tr>
                 <th>Batch</th>
@@ -24,16 +24,17 @@ else
                 <th>Statuss</th>
                 <th>Planned</th>
                 <th>Finishing qty</th>
-                <th>Procesā</th>
-                <th>Komentārs</th>
-                <th>Izvēlēties</th>
             </tr>
         </thead>
 
         <tbody>
             @foreach (var t in orderedTasks)
             {
-                <tr class="@(t.Status == 2 ? "table-warning" : (t.Status == 3 ? "table-success" : ""))">
+            <tr class="@(t.Status == 2 ? "table-warning" : (t.Status == 3 ? "table-success" : ""))"
+                style="cursor: pointer"
+                @onclick="() => OnSelect.InvokeAsync(t)">
+
+
                     <td>@t.BatchCode</td>
                     <td>@t.ProductName</td>
                     <td>@t.PartName</td>
@@ -54,28 +55,6 @@ else
                             @t.Done
                         }
                     </td>
-
-                    <td>
-                        @if (t.Status == 2)
-                        {
-                            @t.Planned
-                        }
-                    </td>
-
-                    <td>
-                        @if (t.IsCommentForEmployee && !string.IsNullOrWhiteSpace(t.Comment))
-                        {
-                            @t.Comment
-                        }
-                    </td>
-
-                    <td>
-                        <button class="btn btn-primary"
-                                disabled="@(t.Status == 1 && !CanStart(t))"
-                                @onclick="() => OnOpen.InvokeAsync(t)">
-                            Atvērt
-                        </button>
-                    </td>
                 </tr>
             }
         </tbody>
@@ -87,5 +66,7 @@ else
     [Parameter] public Func<int, string> StatusText { get; set; } = default!;
     [Parameter] public Func<TaskRow, bool> CanStart { get; set; } = default!;
     [Parameter] public EventCallback<TaskRow> OnOpen { get; set; }
+    [Parameter] public EventCallback<TaskRow> OnSelect { get; set; }
+
 }
 

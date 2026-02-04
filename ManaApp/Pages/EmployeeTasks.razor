@@ -5,38 +5,53 @@
 @using ManaApp.Components.EmployeeTasks
 @using ManaApp.Shared
 
-<div class="employee-tasks-wrapper">
+
 <PageHeader Title="Darbinieku uzdevumi" />
 
-<div class="employee-tasks-page">
-
-    <div class="employee-card">
+   
         <EmployeeHeader EmpId="@empId" OnLoad="LoadTasks" />
-    </div>
+    
 
-    <div class="employee-card">
-        <ActiveTaskPanel ActiveTask="_activeTask"
-                         OnFinish="FinishTask"
-                         StatusText="StatusText" />
-    </div>
+    <div class="main-layout">
 
-    <div class="employee-card">
+    <div class="left-panel">
         <TasksTable Tasks="tasks"
                     StatusText="StatusText"
                     CanStart="CanStart"
+                    OnSelect="SelectTask"
                     OnOpen="OpenTaskDialog" />
     </div>
 
-</div>
+    <div class="right-panel">
+        <ActiveTaskPanel ActiveTask="_activeTask"
+                    OnFinish="FinishTask"
+                    StatusText="StatusText"
+                    OnStart="OpenTaskDialog"
+                    OnFinishConfirm="OpenFinishDialog" />
 
+    </div>
+
+    </div>
 
 <TaskDialog IsOpen="_isDialogOpen"
+            IsFinish="_isFinishDialog"
             SelectedTask="_selectedTask"
             StatusText="StatusText"
             CanStart="CanStart"
-            OnStart="async t => await ClaimTask(t.TaskId)"
-            OnClose="CloseTaskDialog" />
-</div>
+            OnConfirm="@(async t => {
+                if (_isFinishDialog)
+                    await FinishTask(t);
+                else
+                    await ClaimTask(t.TaskId);
+
+                _isDialogOpen = false;
+                _isFinishDialog = false;
+            })"
+            OnClose="() => {
+                _isDialogOpen = false;
+                _isFinishDialog = false;
+            }" />
+
 
 @code {
     private List<TaskRow> tasks = new();
@@ -142,6 +157,20 @@ private TaskRow? _activeTask;
 
     // ja priekšā ir nepabeigti soļi -> šo sākt nedrīkst
     return !hasPrevNotFinished;
+}
+
+private void SelectTask(TaskRow task)
+{
+    _activeTask = task;
+}
+
+bool _isFinishDialog = false;
+
+private void OpenFinishDialog(TaskRow t)
+{
+    _selectedTask = t;
+    _isFinishDialog = true;
+    _isDialogOpen = true;
 }
 
 }

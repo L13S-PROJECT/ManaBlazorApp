@@ -1,30 +1,33 @@
-.employee-tasks-wrapper {
-    max-width: 1600px;      /* vai 1100px – pieskaņo savam header */
-    margin: 0 auto;         /* CENTRĒ */
-    padding: 0 12px;        /* maza elpa malās */
+.main-layout {
+    display: flex;        /* liek bērnus rindā */
+    gap: 24px; 
+
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 16px;   /* lai nepielīp no augšas */
+    height: calc(100vh - 200px);
+
+    background: #ffffff;        /* balts fons */
+    border-radius: 10px;        /* noapaļoti stūri */
+    padding: 10px;              /* iekšējā atkāpe */
+    border: 1px solid #e0e0e0;  /* viegla maliņa *//* atstarpe starp blokiem */
 }
 
-.employee-tasks-page {
-    background: #f0f2f4;
-    border-radius: 16px;
+.left-panel {
+    flex: 1;
+    min-width: 0; /*lai tabula ir tik cik vajag, nevis pēc satura */
+    overflow-x: auto;
+
+    background: #f7f7f7;
+    border-radius: 8px;
+    padding: 10px;              
 }
 
-
-.employee-card {
-    background: #ffffff;
-    border-radius: 14px;
-    padding: 12px;              /* mazāks iekšējais baltais */
-    margin-bottom: 6px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.08); /* viegls pelēks shadow */
-}
-
-
-.ptv2-root {
-  max-width: 1600px;   /* TĀDS PATS kā header wrapper */
-  margin: 0 auto;
-  padding: 0 12px;
-}
-
-.employee-card:last-child {
-    margin-bottom: 0;
+.right-panel {
+    flex: 1; 
+    height: 100%;
+    min-width: 0; /*lai tabula ir tik cik vajag, nevis pēc satura */
+    background: #f7f7f7;
+    border-radius: 8px;
+    padding: 10px;             
 }

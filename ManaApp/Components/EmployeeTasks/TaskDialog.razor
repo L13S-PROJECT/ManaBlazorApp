@@ -4,7 +4,17 @@
 {
     <div class="dialog-backdrop">
         <div class="dialog">
-            <h4>@SelectedTask.BatchCode – @SelectedTask.PartName – @SelectedTask.StepName</h4>
+             <h4>
+                @if (IsFinish)
+                {
+                    <span>Vai tiešām pabeigt?</span>
+                }
+                else
+                {
+                    <span>Vai tiešām sākt?</span>
+                }
+            </h4>
+
 
             <p>Statuss: @StatusText(SelectedTask.Status)</p>
 
@@ -15,10 +25,10 @@
                 </button>
 
                 <button class="btn btn-primary"
-                        disabled="@(SelectedTask.Status != 1 || !CanStart(SelectedTask))"
-                        @onclick="() => OnStart.InvokeAsync(SelectedTask)">
-                    Sākt
+                        @onclick="() => OnConfirm.InvokeAsync(SelectedTask)">
+                    @(IsFinish ? "Pabeigt" : "Sākt")
                 </button>
+
             </div>
         </div>
     </div>
@@ -33,5 +43,9 @@
 
     [Parameter] public EventCallback<TaskRow> OnStart { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public bool IsFinish { get; set; }
+    [Parameter] public EventCallback<TaskRow> OnConfirm { get; set; }
+
+
 }
 
