@@ -34,6 +34,7 @@ namespace ManiApi.Data
         .Property(sm => sm.Move_Type)
         .HasConversion<string>();
 }
+    public DbSet<BatchProduct> BatchProducts { get; set; }
 
     }
 

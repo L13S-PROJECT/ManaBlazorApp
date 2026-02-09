@@ -1,30 +1,60 @@
 @using Microsoft.AspNetCore.Components.Routing
+@using ManaApp.Services
+@implements IDisposable
 
-<div class="app-sidebar sidebar-root">
+@inject AppState AppState
 
-    <div class="app-sidebar-title">SIA FMM</div>
+<div style="color:red">SIDEBAR LOADS</div>
 
-    <nav class="app-nav">
-        <NavLink class="app-nav-link" href="/products" Match="NavLinkMatch.All">
-            Katalogs
-        </NavLink>
 
-        <NavLink class="app-nav-link" href="/planning">
-            Plānošana
-        </NavLink>
+@if (AppState.CurrentEmployee != null)
 
-        <NavLink class="app-nav-link" href="/productiontasks-v2">
-            Ražošanas plānošana
-        </NavLink>
+{
+    <div class="app-sidebar sidebar-root">
 
-        <NavLink class="app-nav-link" href="/sales">
-            Izdošana
-        </NavLink>
+        <div class="app-sidebar-title">SIA FMM</div>
 
-        <NavLink class="app-nav-link" href="/employeetasks">
-            Darbinieku uzdevumi
-        </NavLink>
-    
-    </nav>
-</div>
+        <nav class="app-nav">
 
+            <NavLink class="app-nav-link" href="/products" Match="NavLinkMatch.All">
+                Katalogs
+            </NavLink>
+
+            <NavLink class="app-nav-link" href="/planning">
+                Plānošana
+            </NavLink>
+
+            <NavLink class="app-nav-link" href="/productiontasks-v2">
+                Ražošanas plānošana
+            </NavLink>
+
+            @if (AppState.CurrentEmployee?.Role == "OFFICE")
+                {
+                    <NavLink class="app-nav-link" href="/production-priorities">
+                        Ražošanas prioritātes
+                    </NavLink>
+                }
+
+
+            <NavLink class="app-nav-link" href="/sales">
+                Izdošana
+            </NavLink>
+
+            @if (AppState.CurrentEmployee?.Role == "WORKSHOP")
+            {
+                <NavLink class="app-nav-link" href="/employeetasks">
+                    Darbinieku uzdevumi
+                </NavLink>
+            }
+
+        </nav>
+    </div>
+}
+
+@code {
+    protected override void OnInitialized()
+        => AppState.OnChange += StateHasChanged;
+
+    public void Dispose()
+        => AppState.OnChange -= StateHasChanged;
+}

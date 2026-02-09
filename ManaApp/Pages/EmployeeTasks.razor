@@ -4,23 +4,33 @@
 @inject HttpClient Http
 @using ManaApp.Components.EmployeeTasks
 @using ManaApp.Shared
+@using ManaApp.Services
+@inject AppState AppState
 
 
-<PageHeader Title="Darbinieku uzdevumi" />
-
-   
-        <EmployeeHeader EmpId="@empId" OnLoad="LoadTasks" />
-    
+<PageHeader Title="Darbinieku uzdevumi" /> 
 
     <div class="main-layout">
 
     <div class="left-panel">
-        <TasksTable Tasks="tasks"
-                    StatusText="StatusText"
-                    CanStart="CanStart"
-                    OnSelect="SelectTask"
-                    OnOpen="OpenTaskDialog" />
+
+        @if (tasks.Count == 0)
+        {
+            <div class="empty-state">
+                Šobrīd tev nav piešķirtu darbu.
+            </div>
+        }
+        else
+        {
+            <TasksTable Tasks="tasks"
+                        StatusText="StatusText"
+                        CanStart="CanStart"
+                        OnSelect="SelectTask"
+                        OnOpen="OpenTaskDialog" />
+        }
+
     </div>
+
 
     <div class="right-panel">
         <ActiveTaskPanel ActiveTask="_activeTask"
@@ -56,7 +66,11 @@
 @code {
     private List<TaskRow> tasks = new();
 
-    protected override async Task OnInitializedAsync() => await LoadTasks();
+protected override async Task OnInitializedAsync()
+{
+    await LoadTasks();
+}
+
 
     private string StatusText(int s) => s switch
 {
@@ -69,31 +83,40 @@
 
 private async Task ClaimTask(int taskId)
 {
-    var body = new { taskId, empId };
-    var resp = await Http.PostAsJsonAsync("http://localhost:5270/api/tasks/claim", body);
+    if (AppState.CurrentEmployee == null)
+        return;
+
+    var body = new
+    {
+        taskId,
+        empId = 1 // testējam ar vienu darbinieku
+    };
+
+    var resp = await Http.PostAsJsonAsync("api/tasks/claim", body);
 
     if (resp.IsSuccessStatusCode)
     {
         await LoadTasks();
         CloseTaskDialog();
     }
-    else
-    {
-        Console.WriteLine($"Claim failed: {resp.StatusCode} - {await resp.Content.ReadAsStringAsync()}");
-    }
 }
-
-int empId = 1;
 
 private async Task LoadTasks()
 {
-    tasks = await Http.GetFromJsonAsync<List<TaskRow>>(
-        $"http://localhost:5270/api/tasks/for-employee?empId={empId}"
-    ) ?? new();
+tasks = await Http.GetFromJsonAsync<List<TaskRow>>(
+    "http://localhost:5270/api/tasks/for-employee"
+) ?? new();
 
-    // Meklējam aktīvo uzdevumu (Tasks_Status = 2)
-    _activeTask = tasks.FirstOrDefault(t => t.Status == 2);
+Console.WriteLine($"TASKS COUNT = {tasks.Count}");
+
+_activeTask = tasks.FirstOrDefault(t => t.Status == 2);
+
+Console.WriteLine($"ACTIVE = {_activeTask?.TaskId}, STATUS = {_activeTask?.Status}");
+
+StateHasChanged(); // 
+
 }
+
 
 
 private async Task FinishTask(TaskRow task)
@@ -125,11 +148,15 @@ private async Task FinishTask(TaskRow task)
 private bool _isDialogOpen = false;
 private TaskRow? _selectedTask;
 
-private void OpenTaskDialog(TaskRow t)
+private Task OpenTaskDialog(TaskRow t)
 {
     _selectedTask = t;
+    _isFinishDialog = false;
     _isDialogOpen = true;
+    return Task.CompletedTask;
 }
+
+
 
 private void CloseTaskDialog()
 {
@@ -162,7 +189,11 @@ private TaskRow? _activeTask;
 private void SelectTask(TaskRow task)
 {
     _activeTask = task;
+    _isFinishDialog = false; // reset dialog mode
 }
+
+
+
 
 bool _isFinishDialog = false;
 

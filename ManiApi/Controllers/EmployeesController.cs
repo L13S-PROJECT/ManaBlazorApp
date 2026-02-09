@@ -23,7 +23,7 @@ namespace ManiApi.Controllers
 
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-SELECT ID, Employee_Name
+SELECT ID, Employee_Name, Role, WorkCentrTypeID
 FROM employees
 WHERE UserName = @u AND Password = @p AND IsActive = 1
 LIMIT 1;";
@@ -35,7 +35,10 @@ LIMIT 1;";
 
             var id   = r.GetInt32(0);
             var name = r.GetString(1);
-            return Ok(new { id, name });
+            var role = r.GetString(2);
+            var workcentrTypeId = r.IsDBNull(3) ? (int?)null : r.GetInt32(3);
+
+            return Ok(new { id, name, role, workcentrTypeId });
         }
 
 

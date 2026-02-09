@@ -1,0 +1,17 @@
+.app-layout {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.app-layout > :first-child {
+    flex: 0 0 260px; /* LeftSidebar platums */
+    border-right: 1px solid #ddd;
+}
+
+.app-main {
+    flex: 1;
+    overflow: auto;
+    padding: 16px;
+}

@@ -348,6 +348,9 @@ SELECT
     bp.Version_Id                      AS VersionId,
     p.Product_Name                     AS ProductName,
     p.Product_Code                     AS ProductCode,
+    c.Category_Name                    AS CategoryName,
+    v.Version_Name                     AS VersionName,
+    bp.is_priority                     AS IsPriority,
 
    -- Planned: tikai 1/5, nav 2/3
 SUM(
@@ -497,7 +500,8 @@ SUM((
 FROM batches_products bp
 JOIN batches  b ON b.ID = bp.Batch_Id
 JOIN versions v ON v.ID = bp.Version_Id
-JOIN products p ON p.ID = v.Product_ID
+JOIN products p   ON p.ID = v.Product_ID
+JOIN categories c ON c.ID = p.Category_ID AND c.IsActive = 1
 WHERE
     bp.IsActive = 1
     AND b.IsActive = 1
@@ -525,12 +529,15 @@ list.Add(new
     VersionId           = r.GetInt32(1),
     ProductName         = r.GetString(2),
     ProductCode         = r.GetString(3),
-    Planned             = r.GetInt32(4),
-    DetailedInProgress  = r.GetInt32(5),
-    DetailedFinish      = r.GetInt32(6),
-    Assembly            = r.GetInt32(7),
-    Done                = r.GetInt32(8),
-    FinishingInProgress = r.GetInt32(9)
+    CategoryName        = r.GetString(4),
+    VersionName         = r.GetString(5),
+    IsPriority          = r.GetBoolean(6),
+    Planned             = r.GetInt32(7),
+    DetailedInProgress  = r.GetInt32(8),
+    DetailedFinish      = r.GetInt32(9),
+    Assembly            = r.GetInt32(10),
+    Done                = r.GetInt32(11),
+    FinishingInProgress = r.GetInt32(12)
 });
 
     }

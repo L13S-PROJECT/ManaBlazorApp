@@ -74,8 +74,10 @@ public class UpdateStepRequest
         [HttpGet("test")]
         public string Test() => "API strādā!";
 
- [HttpGet("list")]
-public async Task<IActionResult> GetList()
+[HttpGet("list")]
+[ProducesResponseType(typeof(IEnumerable<ProductListItemDto>), StatusCodes.Status200OK)]
+public async Task<ActionResult<IEnumerable<ProductListItemDto>>> GetList()
+
 {
     var rows = await _db.Products
         .AsNoTracking()
@@ -104,30 +106,52 @@ public async Task<IActionResult> GetList()
                 .FirstOrDefault(),
 
             Version = _db.ProductVersions
-                .Where(v => v.ProductId == p.Id && v.IsActive)
+                .Where(v =>
+                    v.ProductId == p.Id &&
+                    _db.Tasks.Any(t =>
+                        t.IsActive &&
+                       _db.TopPartSteps.Any(s =>
+                            s.Id == t.TopPartStep_ID &&   // ← OK
+                            s.IsActive &&
+                            _db.ProductTopParts.Any(pt =>
+                                pt.Id == s.ProductToPartId &&
+                                pt.VersionId == v.Id &&
+                                pt.IsActive
+                            )
+                        )
+
+                    )
+                )
+
                 .OrderByDescending(v => v.VersionDate)
                 .Select(v => new
                 {
                     v.VersionName,
-                    v.VersionDate
+                    v.VersionDate,
+                    v.IsPriority
                 })
                 .FirstOrDefault()
+
         })
         .ToListAsync();
 
-    var result = rows.Select(x => new
-    {
-        x.Id,
-        x.ProductCode,
-        x.ProductName,
-        x.CategoryName,
-        x.RootName,
-        VersionName = x.Version?.VersionName,
-        VersionDate = x.Version?.VersionDate,
+        var result = rows.Select(x => new ProductListItemDto
+        {
+            Id = x.Id,
+            ProductCode = x.ProductCode,
+            ProductName = x.ProductName,
+            CategoryName = x.CategoryName,
+            RootName = x.RootName,
 
-        GroupType = string.Equals(x.RootName, "KAUSS", StringComparison.OrdinalIgnoreCase) ? 1 :
+            VersionName = x.Version?.VersionName,
+            VersionDate = x.Version?.VersionDate,
+            IsPriority = x.Version?.IsPriority ?? false,
+
+            GroupType =
+                string.Equals(x.RootName, "KAUSS", StringComparison.OrdinalIgnoreCase) ? 1 :
                 string.Equals(x.RootName, "ADAPTERIS", StringComparison.OrdinalIgnoreCase) ? 2 : 0
-    });
+        });
+
 
     return Ok(result);
 }
@@ -1117,6 +1141,50 @@ var list = new List<object>();
     }
 
     return Ok(list);
+}
+
+public sealed class SetPriorityRequest
+{
+    public int VersionId { get; set; }
+    public bool IsPriority { get; set; }
+}
+
+[HttpPut("set-priority")]
+public async Task<IActionResult> SetPriority([FromBody] SetPriorityRequest dto)
+{
+    if (dto.VersionId <= 0)
+        return BadRequest("VersionId is required.");
+
+    var version = await _db.ProductVersions
+        .FirstOrDefaultAsync(v => v.Id == dto.VersionId);
+
+    if (version is null)
+        return NotFound("Version not found.");
+
+    version.IsPriority = dto.IsPriority;
+    await _db.SaveChangesAsync();
+
+    return Ok(new
+    {
+        version.Id,
+        version.IsPriority
+    });
+}
+
+public class ProductListItemDto
+{
+    public int Id { get; set; }
+    public string ProductCode { get; set; } = "";
+    public string ProductName { get; set; } = "";
+    public string? CategoryName { get; set; }
+    public string? RootName { get; set; }
+
+    public string? VersionName { get; set; }
+    public DateOnly? VersionDate { get; set; }
+
+    public bool IsPriority { get; set; }
+
+    public int GroupType { get; set; }   
 }
 
 

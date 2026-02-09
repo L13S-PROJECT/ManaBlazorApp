@@ -74,10 +74,11 @@ else
 
     <div class="actions">
                 <button class="btn btn-primary"
-                        disabled="@(ActiveTask?.Status != 1)"
-                        @onclick="() => OnStart.InvokeAsync(ActiveTask)">
+                        disabled="@(ActiveTask == null || ActiveTask.Status != 1)"
+                        @onclick="() => OnStart.InvokeAsync(ActiveTask!)">
                     SĀKT
                 </button>
+
 
                 <button class="btn btn-finish"
                         disabled="@(ActiveTask?.Status != 2)"

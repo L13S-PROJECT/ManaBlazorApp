@@ -1,0 +1,63 @@
+@page "/login"
+@inject HttpClient Http
+@inject ManaApp.Services.AppState AppState
+
+<h3>Login</h3>
+
+<div>
+    <input @bind="username" placeholder="Lietotājs" />
+</div>
+
+<div>
+    <input type="password" @bind="password" placeholder="Parole" />
+</div>
+
+<button @onclick="DoLogin">Login</button>
+
+@code {
+
+    protected override void OnInitialized()
+{
+    AppState.CurrentEmployee = new ManaApp.Services.EmployeeInfo
+    {
+        Id = 1,
+        Role = "OFFICE",
+        WorkcentrTypeId = null
+    };
+}
+
+    string username = "";
+    string password = "";
+
+    private async Task DoLogin()
+{
+    var resp = await Http.PostAsJsonAsync(
+        "http://localhost:5270/api/employees/login",
+        new { Username = username, Password = password }
+    );
+
+    if (!resp.IsSuccessStatusCode)
+        return;
+
+    var data = await resp.Content.ReadFromJsonAsync<LoginResult>();
+    if (data is null)
+        return;
+
+    AppState.CurrentEmployee = new ManaApp.Services.EmployeeInfo
+            {
+                Id = data.id,
+                Role = data.role,
+                WorkcentrTypeId = data.workcentrTypeId
+            };
+
+
+}
+
+public sealed class LoginResult
+{
+    public int id { get; set; }
+    public string role { get; set; } = "";
+    public int? workcentrTypeId { get; set; }
+}
+
+}

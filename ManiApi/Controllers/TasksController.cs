@@ -20,7 +20,11 @@ namespace ManiApi.Controllers
 
 
 [HttpGet("for-employee")]
-public async Task<IActionResult> GetForEmployee([FromQuery] int empId = 1)
+public async Task<IActionResult> GetForEmployee(
+    [FromQuery] int empId = 1,
+    [FromQuery] int workcentrId = 0
+)
+
 {
     var conn = _db.Database.GetDbConnection();
     await conn.OpenAsync();
@@ -65,13 +69,12 @@ FROM tasks t
 JOIN batches_products bp   ON bp.ID  = t.BatchProduct_ID AND bp.IsActive = 1
 JOIN versions v   ON v.ID   = bp.Version_Id AND v.IsActive = 1
 JOIN products p   ON p.ID   = v.Product_ID AND p.IsActive = 1
-JOIN batches          b    ON b.ID   = bp.Batch_Id       AND b.IsActive  = 1 AND b.Batches_Statuss = 1
+JOIN batches          b    ON b.ID   = bp.Batch_Id       AND b.IsActive  = 1
 JOIN toppartsteps     ts   ON ts.ID  = t.TopPartStep_ID
 JOIN producttopparts  ptp  ON ptp.ID = ts.ProductToPart_ID
 JOIN toppart          tp   ON tp.ID  = ptp.TopPart_ID
 WHERE t.IsActive = 1
   AND t.Tasks_Status IN (1,2)
-  AND (t.Claimed_By IS NULL OR t.Claimed_By = 0 OR t.Claimed_By = @empId)
 ORDER BY
   b.Batches_Code,
   tp.TopPart_Name,
@@ -85,6 +88,11 @@ ORDER BY
     // Šobrīd empId vēl neizmantojam filtrēšanai, bet parametru paturam nākotnei
     var pEmp = cmd.CreateParameter();
     pEmp.ParameterName = "@empId";
+    var pWc = cmd.CreateParameter();
+            pWc.ParameterName = "@workcentrId";
+            pWc.Value = workcentrId;
+            cmd.Parameters.Add(pWc);
+
     pEmp.Value = empId;
     cmd.Parameters.Add(pEmp);
 
@@ -100,7 +108,7 @@ ORDER BY
                     StartedAt   = r.IsDBNull(3) ? (DateTime?)null : r.GetDateTime(3),
                     FinishedAt  = r.IsDBNull(4) ? (DateTime?)null : r.GetDateTime(4),
 
-                    IsCommentForEmployee = r.GetBoolean(5),
+                    IsCommentForEmployee = !r.IsDBNull(5) && r.GetBoolean(5),
                     Comment     = r.IsDBNull(6) ? null : r.GetString(6),
 
                     ProductName = r.IsDBNull(7) ? null : r.GetString(7),

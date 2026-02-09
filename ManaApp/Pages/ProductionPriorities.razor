@@ -1,0 +1,132 @@
+@page "/production-priorities"
+@inject HttpClient Http
+@inject ManaApp.Services.AppState AppState
+
+@if (products == null)
+
+{
+    <p>Ielādē...</p>
+}
+else
+{
+    <h3>Ražošanas prioritātes</h3>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Kods</th>
+                <th>Nosaukums</th>
+                <th>Kategorija</th>
+                <th>Versija</th>
+                <th>Apjoms</th>
+                <th>Detailed</th>
+                <th>Assembly</th>
+                <th>Finishing</th>
+                <th>Datums</th>
+                <th>Prioritāte</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in products)
+                {
+                    <tr>
+                        <td>@p.ProductCode</td>
+                        <td>@p.ProductName</td>
+                        <td>@p.CategoryName</td>
+                        <td>@p.VersionName</td>
+                        <td>@p.Done / @p.Planned</td>
+                        <td>@GetDetailedStatus(p)</td>
+                        <td>@GetAssemblyStatus(p)</td>
+                        <td>@GetFinishingStatus(p)</td>
+                        <td></td>
+                        <td>
+                            <input type="checkbox"
+                            checked="@p.IsPriority"
+                            @onchange="e => OnPriorityChanged(p.BatchProductId, e)" />
+
+                        </td>
+                    </tr>
+                }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<ProductRow>? products;
+    
+protected override async Task OnInitializedAsync()
+{
+    await LoadProducts();
+}
+
+private async Task LoadProducts()
+{
+    products = await Http.GetFromJsonAsync<List<ProductRow>>(
+    "http://localhost:5270/api/production-priorities");
+
+}
+
+private async Task OnPriorityChanged(int batchProductId, ChangeEventArgs e)
+{
+    var isChecked = (bool)e.Value!;
+
+    await Http.PutAsJsonAsync(
+        $"http://localhost:5270/api/production-priorities/{batchProductId}",
+        isChecked
+    );
+
+    await LoadProducts();
+}
+
+private string GetDetailedStatus(ProductRow p)
+{
+    if (p.DetailedFinish > 0)
+        return "Done";
+
+    if (p.DetailedInProgress > 0)
+        return "In progress";
+
+    return "Not started";
+}
+
+private string GetAssemblyStatus(ProductRow p)
+{
+    if (p.Done > 0)
+        return "Done";
+
+    if (p.Assembly > 0)
+        return "In progress";
+
+    return "Not started";
+}
+
+private string GetFinishingStatus(ProductRow p)
+{
+    if (p.FinishingInProgress > 0)
+        return "In progress";
+
+    return "Not started";
+}
+
+private class ProductRow
+{
+    public int BatchProductId { get; set; }
+    public int VersionId { get; set; }
+
+    public string ProductName { get; set; } = "";
+    public string ProductCode { get; set; } = "";
+    public string CategoryName { get; set; } = "";
+    public string VersionName { get; set; } = "";   // ← TE
+
+    public bool IsPriority { get; set; }
+
+    public int Planned { get; set; }
+    public int DetailedInProgress { get; set; }
+    public int DetailedFinish { get; set; }
+    public int Assembly { get; set; }
+    public int FinishingInProgress { get; set; }
+    public int Done { get; set; }
+}
+
+
+}
