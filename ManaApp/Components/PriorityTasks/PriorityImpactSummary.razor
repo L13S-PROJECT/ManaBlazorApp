@@ -1,0 +1,60 @@
+@using System.Linq
+@inject HttpClient Http
+@using System.Text.Json.Serialization
+@namespace ManaApp.Components.PriorityTasks
+
+
+@if (rows == null)
+{
+    <div>Ielādē...</div>
+}
+else
+{
+    <table class="table table-sm">
+        <thead>
+            <tr>
+                <th>Workcentrs</th>
+                <th>Prioritārie darbi</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in rows)
+            {
+                <tr>
+                    <td>@r.WorkCenter</td>
+                    <td>@r.TaskCount</td>
+
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+
+@code {
+      
+    private List<PriorityImpactRow>? rows;
+
+private class PriorityImpactRow
+{
+    public string WorkCenter { get; set; } = "";
+    public int TaskCount { get; set; }
+}
+
+
+protected override async Task OnInitializedAsync()
+{
+    rows = await Http.GetFromJsonAsync<List<PriorityImpactRow>>(
+        "http://localhost:5270/api/production-priorities/impact");
+}
+
+public async Task Reload()
+{
+    rows = await Http.GetFromJsonAsync<List<PriorityImpactRow>>(
+        "http://localhost:5270/api/production-priorities/impact");
+
+    StateHasChanged();
+}
+
+
+}

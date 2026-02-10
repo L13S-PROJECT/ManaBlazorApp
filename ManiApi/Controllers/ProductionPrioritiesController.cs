@@ -361,6 +361,55 @@ public async Task<IActionResult> GetList()
     return Ok(rows);
 }
 
+// GET: api/production-priorities/impact
+[HttpGet("impact")]
+public async Task<IActionResult> GetPriorityImpact()
+{
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    var result = new List<object>();
+
+    await using (var cmd = conn.CreateCommand())
+    {
+        cmd.CommandText = @"
+SELECT
+    wc.WorkCentr_Name AS WorkCenter,
+    COUNT(t.ID)       AS TaskCount
+FROM workcentr_type wc
+LEFT JOIN toppartsteps s
+    ON s.WorkCentr_ID = wc.ID
+    AND s.IsActive = 1
+LEFT JOIN tasks t
+    ON t.TopPartStep_ID = s.ID
+    AND t.IsActive = 1
+    AND t.Tasks_Status IN (1,2)
+LEFT JOIN batches_products bp
+    ON bp.ID = t.BatchProduct_ID
+    AND bp.IsActive = 1
+    AND bp.is_priority = 1
+WHERE wc.IsActive = 1
+  AND bp.ID IS NOT NULL
+GROUP BY wc.WorkCentr_Name
+ORDER BY wc.WorkCentr_Name;
+";
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            result.Add(new
+                {
+                    WorkCenter = reader.GetString(0),
+                    TaskCount  = reader.GetInt32(1)
+                });
+
+
+        }
+    }
+
+    return Ok(result);
+}
+
+
 }
 
 

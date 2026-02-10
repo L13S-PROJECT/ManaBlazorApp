@@ -1,6 +1,7 @@
 @page "/production-priorities"
 @inject HttpClient Http
 @inject ManaApp.Services.AppState AppState
+@using ManaApp.Components.PriorityTasks
 
 @if (products == null)
 
@@ -56,21 +57,40 @@ else
                         </td>
 
                         <td>
-                            <!-- cipari augšā -->
-                            <div class="d-flex justify-content-between text-center fw-bold" style="font-size:12px;">
-                                <span>@p.FinishingY</span>
-                                <span>@(p.FinishingX - p.FinishingDone)</span>
-                                <span>@p.FinishingDone</span>
-                            </div>
+                            <div class="d-flex justify-content-center gap-3">
 
-                            <!-- mini pill indikatori apakšā -->
-                            <div class="d-flex justify-content-between mt-1">
-                                <div class="rounded-pill bg-primary" style="height:6px; width:30%;"></div>
-                                <div class="rounded-pill bg-warning" style="height:6px; width:30%;"></div>
-                                <div class="rounded-pill bg-success" style="height:6px; width:30%;"></div>
+                                <!-- ASSEMBLY (zilais) -->
+                                <div class="text-center">
+                                    <div class="text-muted" style="font-size:12px;">
+                                        @p.FinishingY
+                                    </div>
+                                    <div class="rounded-pill bg-primary mt-1"
+                                        style="height:6px; width:28px;">
+                                    </div>
+                                </div>
+
+                                <!-- FINISHING procesā (dzeltens) -->
+                                <div class="text-center">
+                                    <div class="text-muted" style="font-size:12px;">
+                                        @(p.FinishingX - p.FinishingDone)
+                                    </div>
+                                    <div class="rounded-pill bg-warning mt-1"
+                                        style="height:6px; width:28px;">
+                                    </div>
+                                </div>
+
+                                <!-- PABEIGTS (zaļš) -->
+                                <div class="text-center">
+                                    <div class="text-muted" style="font-size:12px;">
+                                        @p.FinishingDone
+                                    </div>
+                                    <div class="rounded-pill bg-success mt-1"
+                                        style="height:6px; width:28px;">
+                                    </div>
+                                </div>
+
                             </div>
                         </td>
-
 
                         <td></td>
                         <td>
@@ -84,6 +104,8 @@ else
         </tbody>
     </table>
 }
+
+<PriorityImpactSummary />
 
 @code {
     private List<ProductRow>? products;
