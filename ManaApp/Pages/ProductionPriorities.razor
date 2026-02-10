@@ -35,9 +35,43 @@ else
                         <td>@p.CategoryName</td>
                         <td>@p.VersionName</td>
                         <td>@p.Done / @p.Planned</td>
-                        <td>@GetDetailedStatus(p)</td>
-                        <td>@GetAssemblyStatus(p)</td>
-                        <td>@GetFinishingStatus(p)</td>
+                        <td>
+                            <div>@p.DetailedX / @p.DetailedY</div>
+
+                            <div class="progress mt-1" style="height:6px;">
+                                <div class="progress-bar @GetDetailedBarClass(p)"
+                                    style="width:@(p.DetailedY == 0 ? 0 : (p.DetailedX * 100 / p.DetailedY))%">
+                                </div>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div>@GetAssemblyStatus(p)</div>
+
+                            <div class="progress mt-1" style="height:6px;">
+                                <div class="progress-bar @GetAssemblyBarClass(p)"
+                                    style="width:100%">
+                                </div>
+                            </div>
+                        </td>
+
+                        <td>
+                            <!-- cipari augšā -->
+                            <div class="d-flex justify-content-between text-center fw-bold" style="font-size:12px;">
+                                <span>@p.FinishingY</span>
+                                <span>@(p.FinishingX - p.FinishingDone)</span>
+                                <span>@p.FinishingDone</span>
+                            </div>
+
+                            <!-- mini pill indikatori apakšā -->
+                            <div class="d-flex justify-content-between mt-1">
+                                <div class="rounded-pill bg-primary" style="height:6px; width:30%;"></div>
+                                <div class="rounded-pill bg-warning" style="height:6px; width:30%;"></div>
+                                <div class="rounded-pill bg-success" style="height:6px; width:30%;"></div>
+                            </div>
+                        </td>
+
+
                         <td></td>
                         <td>
                             <input type="checkbox"
@@ -89,6 +123,18 @@ private string GetDetailedStatus(ProductRow p)
     return "Not started";
 }
 
+private string GetDetailedBarClass(ProductRow p)
+{
+    if (p.DetailedIsDone)
+        return "bg-success";   // viss pabeigts
+
+    if (p.DetailedHasStarted)
+        return "bg-warning";   // ir iesākts
+
+    return "bg-light";         // nav iesākts
+}
+
+
 private string GetAssemblyStatus(ProductRow p)
 {
     if (p.Done > 0)
@@ -99,6 +145,18 @@ private string GetAssemblyStatus(ProductRow p)
 
     return "Not started";
 }
+
+private string GetAssemblyBarClass(ProductRow p)
+{
+    if (p.Assembly > 0)
+        return "bg-warning";   // In progress
+
+    if (p.Done > 0)
+        return "bg-success";   // Done
+
+    return "bg-light";         // Not started
+}
+
 
 private string GetFinishingStatus(ProductRow p)
 {
@@ -126,6 +184,16 @@ private class ProductRow
     public int Assembly { get; set; }
     public int FinishingInProgress { get; set; }
     public int Done { get; set; }
+
+    public int DetailedX { get; set; }
+    public int DetailedY { get; set; }
+    public bool DetailedHasStarted { get; set; }
+    public bool DetailedIsDone { get; set; }
+
+    public int FinishingX { get; set; }
+    public int FinishingY { get; set; }
+    public int FinishingDone { get; set; }
+
 }
 
 

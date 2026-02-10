@@ -8,16 +8,16 @@ namespace ManiApi.Controllers;
 [ApiController]
 [Route("api/production-priorities")]
 public class ProductionPrioritiesController : ControllerBase
-{
-    private readonly AppDbContext _db;
+        {
+            private readonly AppDbContext _db;
 
-    public ProductionPrioritiesController(AppDbContext db)
-    {
-        _db = db;
-    }
+            public ProductionPrioritiesController(AppDbContext db)
+            {
+                _db = db;
+            }
 
-    [HttpGet]
-    public async Task<IActionResult> Get()
+[HttpGet]
+public async Task<IActionResult> Get()
     {
                         var conn = _db.Database.GetDbConnection();
             await conn.OpenAsync();
@@ -36,6 +36,69 @@ public class ProductionPrioritiesController : ControllerBase
                 v.Version_Name   AS VersionName,
                 bp.Planned_Qty   AS Planned,
                 bp.is_priority   AS IsPriority,
+
+                -- Detailed Y = cik detaļu šim BatchProduct (no taskiem)
+                (
+                    SELECT COUNT(DISTINCT ts.ProductToPart_ID)
+                    FROM tasks t
+                    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+                    WHERE t.BatchProduct_ID = bp.ID
+                    AND t.IsActive = 1
+                    AND ts.Step_Type = 1
+                ) AS DetailedY,
+
+
+            -- Detailed X = cik detaļu ir procesā (šim BatchProduct)
+            (
+                SELECT COUNT(DISTINCT ts.ProductToPart_ID)
+                FROM tasks t
+                JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+                WHERE t.BatchProduct_ID = bp.ID
+                AND t.IsActive = 1
+                AND ts.Step_Type = 1
+                AND t.Tasks_Status <> 5
+            ) AS DetailedX,
+
+(
+    CASE
+        WHEN (
+            SELECT COUNT(DISTINCT ts.ProductToPart_ID)
+            FROM tasks t
+            JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+            WHERE t.BatchProduct_ID = bp.ID
+              AND t.IsActive = 1
+              AND ts.Step_Type = 1
+              AND t.Tasks_Status <> 5
+        ) > 0
+        THEN 1
+        ELSE 0
+    END
+) AS DetailedHasStarted,
+
+
+    -- Detailed IS DONE = visi Detailed taski šim BatchProduct ir 3
+(
+    CASE
+        WHEN EXISTS (
+            SELECT 1
+            FROM tasks t
+            JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+            WHERE t.BatchProduct_ID = bp.ID
+              AND t.IsActive = 1
+              AND ts.Step_Type = 1
+        )
+        AND NOT EXISTS (
+            SELECT 1
+            FROM tasks t
+            JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+            WHERE t.BatchProduct_ID = bp.ID
+              AND t.IsActive = 1
+              AND ts.Step_Type = 1
+              AND t.Tasks_Status <> 3
+        )
+        THEN 1 ELSE 0
+    END
+) AS DetailedIsDone,
 
                 -- Detailed IN PROGRESS
                 CASE
@@ -127,6 +190,39 @@ public class ProductionPrioritiesController : ControllerBase
                     AND sm.BatchProduct_ID = bp.ID
                 ) AS Done,
 
+                -- Finishin X = cik detaļu ir procesā (šim BatchProduct)
+                (
+                    SELECT COALESCE(SUM(t.Qty_Done), 0)
+                    FROM tasks t
+                    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+                    WHERE t.BatchProduct_ID = bp.ID
+                    AND t.IsActive = 1
+                    AND ts.Step_Type = 3
+                    AND t.Tasks_Status IN (1,2,3)
+                ) AS FinishingX,
+
+                -- Finishing Y = cik detaļu ir DONE (šim BatchProduct)
+
+                (
+                    SELECT COALESCE(SUM(sm.Stock_Qty), 0)
+                    FROM stock_movements sm
+                    WHERE sm.IsActive = 1
+                    AND sm.BatchProduct_ID = bp.ID
+                    AND sm.Move_Type = 'ASSEMBLY'
+                ) AS FinishingY,
+
+                -- Finishing FINISHED = pabeigtie (status = 3)
+                (
+                    SELECT COALESCE(SUM(t.Qty_Done), 0)
+                    FROM tasks t
+                    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+                    WHERE t.BatchProduct_ID = bp.ID
+                    AND t.IsActive = 1
+                    AND ts.Step_Type = 3
+                    AND t.Tasks_Status = 3
+                ) AS FinishingDone,
+
+
                 -- Finishing IN PROGRESS
                 (
                     SELECT COALESCE(SUM(t.Qty_Done),0)
@@ -166,11 +262,20 @@ public class ProductionPrioritiesController : ControllerBase
                     Planned             = reader.GetInt32(6),
                     IsPriority          = reader.GetBoolean(7),
 
-                    DetailedInProgress  = reader.GetInt32(8),
-                    DetailedFinish      = reader.GetInt32(9),
-                    Assembly            = reader.GetInt32(10),
-                    Done                = reader.GetInt32(11),
-                    FinishingInProgress = reader.GetInt32(12)
+                   DetailedY = reader.GetInt32(8),
+                    DetailedX = reader.GetInt32(9),
+                    DetailedHasStarted = reader.GetBoolean(10),
+                    DetailedIsDone     = reader.GetBoolean(11),
+
+                DetailedInProgress  = reader.GetInt32(12),
+                DetailedFinish      = reader.GetInt32(13),
+                Assembly            = reader.GetInt32(14),
+                Done                = reader.GetInt32(15),
+                FinishingX          = reader.GetInt32(16),
+                FinishingY          = reader.GetInt32(17),
+                FinishingDone       = reader.GetInt32(18),
+                FinishingInProgress = reader.GetInt32(19)
+
                 });
 
                 }

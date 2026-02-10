@@ -611,8 +611,7 @@ public async Task<IActionResult> GetSoldByBatchProduct(
     return Ok(Math.Abs(sold));
 }
 
-
    }
-    
+
     
 }
