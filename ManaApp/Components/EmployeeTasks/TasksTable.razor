@@ -30,11 +30,9 @@ else
         <tbody>
             @foreach (var t in orderedTasks)
             {
-            <tr class="@(t.Status == 2 ? "table-warning" : (t.Status == 3 ? "table-success" : ""))"
-                style="cursor: pointer"
-                @onclick="() => OnSelect.InvokeAsync(t)">
-
-
+    <tr class="@(t.Status == 2 ? "table-warning" : (t.Status == 3 ? "table-success" : ""))"
+    style="cursor: @(CanStart(t) ? "pointer" : "not-allowed")"
+    @onclick="() => { if (CanStart(t)) OnSelect.InvokeAsync(t); }">
                     <td>@t.BatchCode</td>
                     <td>@t.ProductName</td>
                     <td>@t.PartName</td>

@@ -28,8 +28,13 @@ else
             </tr>
         </thead>
         <tbody>
-            @foreach (var p in products)
+
+            <h5>Prioritārie produkti</h5>
+
+            @foreach (var p in PriorityProducts)
+
                 {
+                   
                     <tr>
                         <td>@p.ProductCode</td>
                         <td>@p.ProductName</td>
@@ -103,12 +108,104 @@ else
                 }
         </tbody>
     </table>
+
+    <h5 class="mt-4">Parastie produkti</h5>
+
+<table class="table">
+    <thead>
+        <!-- NOKOPĒ esošo thead -->
+    </thead>
+    <tbody>
+        @foreach (var p in NormalProducts)
+        {
+            <tr>
+                        <td>@p.ProductCode</td>
+                        <td>@p.ProductName</td>
+                        <td>@p.CategoryName</td>
+                        <td>@p.VersionName</td>
+                        <td>@p.Done / @p.Planned</td>
+                        <td>
+                            <div>@p.DetailedX / @p.DetailedY</div>
+
+                            <div class="progress mt-1" style="height:6px;">
+                                <div class="progress-bar @GetDetailedBarClass(p)"
+                                    style="width:@(p.DetailedY == 0 ? 0 : (p.DetailedX * 100 / p.DetailedY))%">
+                                </div>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div>@GetAssemblyStatus(p)</div>
+
+                            <div class="progress mt-1" style="height:6px;">
+                                <div class="progress-bar @GetAssemblyBarClass(p)"
+                                    style="width:100%">
+                                </div>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="d-flex justify-content-center gap-3">
+
+                                <!-- ASSEMBLY (zilais) -->
+                                <div class="text-center">
+                                    <div class="text-muted" style="font-size:12px;">
+                                        @p.FinishingY
+                                    </div>
+                                    <div class="rounded-pill bg-primary mt-1"
+                                        style="height:6px; width:28px;">
+                                    </div>
+                                </div>
+
+                                <!-- FINISHING procesā (dzeltens) -->
+                                <div class="text-center">
+                                    <div class="text-muted" style="font-size:12px;">
+                                        @(p.FinishingX - p.FinishingDone)
+                                    </div>
+                                    <div class="rounded-pill bg-warning mt-1"
+                                        style="height:6px; width:28px;">
+                                    </div>
+                                </div>
+
+                                <!-- PABEIGTS (zaļš) -->
+                                <div class="text-center">
+                                    <div class="text-muted" style="font-size:12px;">
+                                        @p.FinishingDone
+                                    </div>
+                                    <div class="rounded-pill bg-success mt-1"
+                                        style="height:6px; width:28px;">
+                                    </div>
+                                </div>
+
+                            </div>
+                        </td>
+
+                        <td></td>
+                        <td>
+                            <input type="checkbox"
+                            checked="@p.IsPriority"
+                            @onchange="e => OnPriorityChanged(p.BatchProductId, e)" />
+
+                        </td>
+                    </tr>
+        }
+    </tbody>
+</table>
+
 }
 
 <PriorityImpactSummary />
 
+
 @code {
     private List<ProductRow>? products;
+    
+    private IEnumerable<ProductRow> PriorityProducts =>
+    products?.Where(p => p.IsPriority) ?? Enumerable.Empty<ProductRow>();
+
+    private IEnumerable<ProductRow> NormalProducts =>
+    products?.Where(p => !p.IsPriority) ?? Enumerable.Empty<ProductRow>();
+
     
 protected override async Task OnInitializedAsync()
 {

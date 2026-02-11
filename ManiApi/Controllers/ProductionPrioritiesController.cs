@@ -372,36 +372,64 @@ public async Task<IActionResult> GetPriorityImpact()
 
     await using (var cmd = conn.CreateCommand())
     {
-        cmd.CommandText = @"
+            cmd.CommandText = @"
 SELECT
     wc.WorkCentr_Name AS WorkCenter,
-    COUNT(t.ID)       AS TaskCount
+    COALESCE(e.Employee_Name, 'Nav piešķirts') AS EmployeeName,
+
+    SUM(
+        CASE 
+            WHEN t.ID IS NOT NULL 
+             AND bp.is_priority = 1 
+            THEN 1 ELSE 0 
+        END
+    ) AS PriorityCount,
+
+    SUM(
+        CASE 
+            WHEN t.ID IS NOT NULL 
+             AND bp.is_priority = 0 
+            THEN 1 ELSE 0 
+        END
+    ) AS NormalCount
+
 FROM workcentr_type wc
+
 LEFT JOIN toppartsteps s
     ON s.WorkCentr_ID = wc.ID
     AND s.IsActive = 1
+
 LEFT JOIN tasks t
     ON t.TopPartStep_ID = s.ID
     AND t.IsActive = 1
     AND t.Tasks_Status IN (1,2)
+
 LEFT JOIN batches_products bp
     ON bp.ID = t.BatchProduct_ID
     AND bp.IsActive = 1
-    AND bp.is_priority = 1
+
+LEFT JOIN employees e
+    ON e.ID = t.Assigned_To
+
 WHERE wc.IsActive = 1
-  AND bp.ID IS NOT NULL
-GROUP BY wc.WorkCentr_Name
-ORDER BY wc.WorkCentr_Name;
-";
+
+GROUP BY wc.WorkCentr_Name, e.Employee_Name
+HAVING PriorityCount > 0 OR NormalCount > 0
+
+ORDER BY wc.WorkCentr_Name, EmployeeName;
+
+            ";
+
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
             result.Add(new
-                {
-                    WorkCenter = reader.GetString(0),
-                    TaskCount  = reader.GetInt32(1)
-                });
-
+            {
+                WorkCenter   = reader.GetString(0),
+                EmployeeName = reader.GetString(1),
+                PriorityCount = reader.IsDBNull(2) ? 0 : reader.GetInt32(2),
+                NormalCount   = reader.IsDBNull(3) ? 0 : reader.GetInt32(3)
+            });
 
         }
     }

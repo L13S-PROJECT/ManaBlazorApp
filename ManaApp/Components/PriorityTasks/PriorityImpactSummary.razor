@@ -1,8 +1,7 @@
 @using System.Linq
-@inject HttpClient Http
 @using System.Text.Json.Serialization
+@inject HttpClient Http
 @namespace ManaApp.Components.PriorityTasks
-
 
 @if (rows == null)
 {
@@ -10,51 +9,106 @@
 }
 else
 {
+    
+        var employees = rows
+            .Select(r => r.EmployeeName)
+            .Distinct()
+            .OrderBy(e => e)
+            .ToList();
+
+        var workCenters = rows
+            .Select(r => r.WorkCenter)
+            .Distinct()
+            .OrderBy(w => w)
+            .ToList();
+    
+
+    <h5>Prioritārie darbi</h5>
+
     <table class="table table-sm">
         <thead>
             <tr>
                 <th>Workcentrs</th>
-                <th>Prioritārie darbi</th>
+                @foreach (var emp in employees)
+                {
+                    <th>@emp</th>
+                }
             </tr>
         </thead>
         <tbody>
-            @foreach (var r in rows)
+            @foreach (var wc in workCenters)
             {
                 <tr>
-                    <td>@r.WorkCenter</td>
-                    <td>@r.TaskCount</td>
+                    <td><strong>@wc</strong></td>
 
+                    @foreach (var emp in employees)
+                    {
+                        var match = rows.FirstOrDefault(r =>
+                            r.WorkCenter == wc &&
+                            r.EmployeeName == emp);
+
+                        <td>@(match?.PriorityCount ?? 0)</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <h5>Parastie darbi</h5>
+
+    <table class="table table-sm">
+        <thead>
+            <tr>
+                <th>Workcentrs</th>
+                @foreach (var emp in employees)
+                {
+                    <th>@emp</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var wc in workCenters)
+            {
+                <tr>
+                    <td><strong>@wc</strong></td>
+
+                    @foreach (var emp in employees)
+                    {
+                        var match = rows.FirstOrDefault(r =>
+                            r.WorkCenter == wc &&
+                            r.EmployeeName == emp);
+
+                        <td>@(match?.NormalCount ?? 0)</td>
+                    }
                 </tr>
             }
         </tbody>
     </table>
 }
 
-
 @code {
-      
+
     private List<PriorityImpactRow>? rows;
 
-private class PriorityImpactRow
-{
-    public string WorkCenter { get; set; } = "";
-    public int TaskCount { get; set; }
-}
+    private class PriorityImpactRow
+    {
+        public string WorkCenter { get; set; } = "";
+        public string EmployeeName { get; set; } = "";
+        public int PriorityCount { get; set; }
+        public int NormalCount { get; set; }
+    }
 
+    protected override async Task OnInitializedAsync()
+    {
+        rows = await Http.GetFromJsonAsync<List<PriorityImpactRow>>(
+            "http://localhost:5270/api/production-priorities/impact");
+    }
 
-protected override async Task OnInitializedAsync()
-{
-    rows = await Http.GetFromJsonAsync<List<PriorityImpactRow>>(
-        "http://localhost:5270/api/production-priorities/impact");
-}
+    public async Task Reload()
+    {
+        rows = await Http.GetFromJsonAsync<List<PriorityImpactRow>>(
+            "http://localhost:5270/api/production-priorities/impact");
 
-public async Task Reload()
-{
-    rows = await Http.GetFromJsonAsync<List<PriorityImpactRow>>(
-        "http://localhost:5270/api/production-priorities/impact");
-
-    StateHasChanged();
-}
-
-
+        StateHasChanged();
+    }
 }

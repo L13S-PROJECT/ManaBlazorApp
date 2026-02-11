@@ -22,11 +22,26 @@
         }
         else
         {
-            <TasksTable Tasks="tasks"
-                        StatusText="StatusText"
-                        CanStart="CanStart"
-                        OnSelect="SelectTask"
-                        OnOpen="OpenTaskDialog" />
+            @if (priorityTasks.Any())
+            {
+                <h5>Prioritārie darbi</h5>
+                <TasksTable Tasks="priorityTasks"
+                            StatusText="StatusText"
+                            CanStart="CanStart"
+                            OnSelect="SelectTask"
+                            OnOpen="OpenTaskDialog" />
+            }
+
+            @if (normalTasks.Any())
+            {
+                <h5>Pārējie darbi</h5>
+                <TasksTable Tasks="normalTasks"
+                            StatusText="StatusText"
+                            CanStart="CanStart"
+                            OnSelect="SelectTask"
+                            OnOpen="OpenTaskDialog" />
+}
+
         }
 
     </div>
@@ -64,6 +79,13 @@
 
 @code {
     private List<TaskRow> tasks = new();
+    
+    private List<TaskRow> priorityTasks =>
+    tasks?.Where(t => t.Priority == 1).ToList() ?? new();
+
+private List<TaskRow> normalTasks =>
+    tasks?.Where(t => t.Priority == 0).ToList() ?? new();
+
 
 protected override async Task OnInitializedAsync()
 {
