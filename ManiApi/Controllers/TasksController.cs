@@ -34,7 +34,15 @@ cmd.CommandText = @"
 SELECT
   t.ID,                      -- 0 TaskId
   t.Tasks_Priority,          -- 1 Priority
+  bp.is_priority AS BatchPriority,
   t.Tasks_Status,            -- 2 Status
+  CASE
+    WHEN bp.is_priority = 1 AND t.Tasks_Priority = 1 THEN 3
+    WHEN bp.is_priority = 1 AND t.Tasks_Priority = 0 THEN 2
+    WHEN bp.is_priority = 0 AND t.Tasks_Priority = 1 THEN 1
+    ELSE 0
+END AS PriorityLevel,
+
   t.Started_At,              -- 3 StartedAt
   t.Finished_At,             -- 4 FinishedAt
 
@@ -75,16 +83,13 @@ JOIN producttopparts  ptp  ON ptp.ID = ts.ProductToPart_ID
 JOIN toppart          tp   ON tp.ID  = ptp.TopPart_ID
 WHERE t.IsActive = 1
   AND t.Tasks_Status IN (1,2)
-  AND t.Tasks_Priority = 1
+  AND (t.Assigned_To = @empId OR t.Assigned_To = 0)
 ORDER BY
-  b.Batches_Code,
-  tp.TopPart_Name,
-  ts.Step_Order,
+  PriorityLevel DESC,
   t.Tasks_Status,
-  t.Tasks_Priority DESC,
+  ts.Step_Order,
   t.ID DESC;
 ";
-
 
 
     // Šobrīd empId vēl neizmantojam filtrēšanai, bet parametru paturam nākotnei
@@ -106,129 +111,32 @@ ORDER BY
                 {
                     TaskId      = r.GetInt32(0),
                     Priority    = r.IsDBNull(1) ? (byte)0 : r.GetByte(1),
-                    Status      = r.GetInt32(2),
-                    StartedAt   = r.IsDBNull(3) ? (DateTime?)null : r.GetDateTime(3),
-                    FinishedAt  = r.IsDBNull(4) ? (DateTime?)null : r.GetDateTime(4),
+                    BatchPriority = r.GetBoolean(2),
+                    Status        = r.GetInt32(3),
+                    PriorityLevel = r.IsDBNull(4) ? 0 : r.GetInt32(4),
+                    StartedAt   = r.IsDBNull(5) ? (DateTime?)null : r.GetDateTime(5 ),
+                    FinishedAt  = r.IsDBNull(6) ? (DateTime?)null : r.GetDateTime(6),
 
-                    IsCommentForEmployee = !r.IsDBNull(5) && r.GetBoolean(5),
-                    Comment     = r.IsDBNull(6) ? null : r.GetString(6),
+                    IsCommentForEmployee = !r.IsDBNull(7) && r.GetBoolean(7),
+                    Comment     = r.IsDBNull(8) ? null : r.GetString(8),
 
-                    ProductName = r.IsDBNull(7) ? null : r.GetString(7),
-                    PartName    = r.IsDBNull(8) ? null : r.GetString(8),
-                    StepName    = r.IsDBNull(9) ? null : r.GetString(9),
-                    BatchCode   = r.IsDBNull(10) ? null : r.GetString(10),
+                    ProductName = r.IsDBNull(9) ? null : r.GetString(9),
+                    PartName    = r.IsDBNull(10) ? null : r.GetString(10),
+                    StepName    = r.IsDBNull(11) ? null : r.GetString(11),
+                    BatchCode   = r.IsDBNull(12) ? null : r.GetString(12),
 
-                    Planned     = r.IsDBNull(11) ? 0 : r.GetInt32(11),
-                    Done        = r.IsDBNull(12) ? 0 : r.GetInt32(12),
-                    StepOrder   = r.IsDBNull(13) ? 0 : r.GetInt32(13),
+                    Planned     = r.IsDBNull(13) ? 0 : r.GetInt32(13),
+                    Done        = r.IsDBNull(14) ? 0 : r.GetInt32(14),
+                    StepOrder   = r.IsDBNull(15) ? 0 : r.GetInt32(15),
 
-                    StepType       = r.IsDBNull(14) ? 0 : r.GetInt32(14),
-                    BatchId        = r.IsDBNull(15) ? 0 : r.GetInt32(15),
-                    VersionId      = r.IsDBNull(16) ? 0 : r.GetInt32(16),
-                    BatchProductId = r.IsDBNull(17) ? 0 : r.GetInt32(17)
+                    StepType       = r.IsDBNull(16) ? 0 : r.GetInt32(16),
+                    BatchId        = r.IsDBNull(17) ? 0 : r.GetInt32(17),
+                    VersionId      = r.IsDBNull(18) ? 0 : r.GetInt32(18),
+                    BatchProductId = r.IsDBNull(19) ? 0 : r.GetInt32(19)
                 });
     }
    }
-   { await using var cmd2 = conn.CreateCommand();
-cmd2.CommandText = @"
-SELECT
-  t.ID,
-  t.Tasks_Priority,
-  t.Tasks_Status,
-  t.Started_At,
-  t.Finished_At,
-
-  t.Is_Comment_For_Employee,
-
-  CASE 
-    WHEN t.Is_Comment_For_Employee = 1 
-    THEN t.Tasks_Comment 
-    ELSE NULL 
-  END AS Comment,
-
-  p.Product_Name,
-  tp.TopPart_Name,
-  ts.Step_Name,
-  b.Batches_Code,
-
-  CASE 
-    WHEN ts.Step_Type IN (1,2) THEN bp.Planned_Qty * ptp.Qty_Per_product
-    WHEN ts.Step_Type = 3      THEN t.Qty_Done
-    ELSE bp.Planned_Qty
-  END AS PlannedForTask,
-
-  COALESCE(t.Qty_Done, 0) AS DoneForTask,
-  COALESCE(ts.Step_Order, 0) AS StepOrder,
-  ts.Step_Type,
-  b.ID,
-  bp.Version_Id,
-  bp.ID
-FROM tasks t
-JOIN batches_products bp   ON bp.ID  = t.BatchProduct_ID AND bp.IsActive = 1
-JOIN versions v   ON v.ID   = bp.Version_Id AND v.IsActive = 1
-JOIN products p   ON p.ID   = v.Product_ID AND p.IsActive = 1
-JOIN batches          b    ON b.ID   = bp.Batch_Id       AND b.IsActive  = 1
-JOIN toppartsteps     ts   ON ts.ID  = t.TopPartStep_ID
-JOIN producttopparts  ptp  ON ptp.ID = ts.ProductToPart_ID
-JOIN toppart          tp   ON tp.ID  = ptp.TopPart_ID
-WHERE t.IsActive = 1
-  AND t.Tasks_Status IN (1,2)
-  AND t.Tasks_Priority = 0
-ORDER BY
-  b.Batches_Code,
-  tp.TopPart_Name,
-  ts.Step_Order,
-  t.Tasks_Status,
-  t.Tasks_Priority DESC,
-  t.ID DESC;
-";
-
-// parametrus pieliekam tāpat kā pirmajam (pat ja šobrīd SQL tos nelieto)
-var pEmp2 = cmd2.CreateParameter();
-pEmp2.ParameterName = "@empId";
-pEmp2.Value = empId;
-cmd2.Parameters.Add(pEmp2);
-
-
-
-var pWc2 = cmd2.CreateParameter();
-pWc2.ParameterName = "@workcentrId";
-pWc2.Value = workcentrId;
-cmd2.Parameters.Add(pWc2);
-
-{
-    await using var r2 = await cmd2.ExecuteReaderAsync();
-    while (await r2.ReadAsync())
-    {
-        list.Add(new
-        {
-            TaskId      = r2.GetInt32(0),
-            Priority    = r2.IsDBNull(1) ? (byte)0 : r2.GetByte(1),
-            Status      = r2.GetInt32(2),
-            StartedAt   = r2.IsDBNull(3) ? (DateTime?)null : r2.GetDateTime(3),
-            FinishedAt  = r2.IsDBNull(4) ? (DateTime?)null : r2.GetDateTime(4),
-
-            IsCommentForEmployee = !r2.IsDBNull(5) && r2.GetBoolean(5),
-            Comment     = r2.IsDBNull(6) ? null : r2.GetString(6),
-
-            ProductName = r2.IsDBNull(7) ? null : r2.GetString(7),
-            PartName    = r2.IsDBNull(8) ? null : r2.GetString(8),
-            StepName    = r2.IsDBNull(9) ? null : r2.GetString(9),
-            BatchCode   = r2.IsDBNull(10) ? null : r2.GetString(10),
-
-            Planned     = r2.IsDBNull(11) ? 0 : r2.GetInt32(11),
-            Done        = r2.IsDBNull(12) ? 0 : r2.GetInt32(12),
-            StepOrder   = r2.IsDBNull(13) ? 0 : r2.GetInt32(13),
-
-            StepType       = r2.IsDBNull(14) ? 0 : r2.GetInt32(14),
-            BatchId        = r2.IsDBNull(15) ? 0 : r2.GetInt32(15),
-            VersionId      = r2.IsDBNull(16) ? 0 : r2.GetInt32(16),
-            BatchProductId = r2.IsDBNull(17) ? 0 : r2.GetInt32(17)
-        });
-    }
-}
-   }
-
+   
     return Ok(list);
 }
 

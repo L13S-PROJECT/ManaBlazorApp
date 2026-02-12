@@ -80,8 +80,9 @@
 @code {
     private List<TaskRow> tasks = new();
     
-    private List<TaskRow> priorityTasks =>
-    tasks?.Where(t => t.Priority == 1).ToList() ?? new();
+private List<TaskRow> priorityTasks =>
+    tasks?.Where(t => t.PriorityLevel > 0).ToList() ?? new();
+
 
 private List<TaskRow> normalTasks =>
     tasks?.Where(t => t.Priority == 0).ToList() ?? new();
@@ -92,8 +93,7 @@ protected override async Task OnInitializedAsync()
     await LoadTasks();
 }
 
-
-    private string StatusText(int s) => s switch
+private string StatusText(int s, TaskRow t) => s switch
 {
     1 => "Nav iesākts",
     2 => "Procesā",
@@ -101,6 +101,9 @@ protected override async Task OnInitializedAsync()
     4 => "Atcelts",
     _ => "?"
 };
+
+private string StatusText(int s) => StatusText(s, null!);
+
 
 private async Task ClaimTask(int taskId)
 {

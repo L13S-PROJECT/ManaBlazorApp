@@ -7,11 +7,10 @@
 else
 {
     var orderedTasks = Tasks
-        .OrderBy(t => t.BatchCode)
-        .ThenBy(t => t.PartName)
-        .ThenBy(t => t.StepOrder)
-        .ThenBy(t => t.Status)
-        .ThenByDescending(t => t.Priority);
+    .OrderByDescending(t => t.PriorityLevel)
+    .ThenBy(t => t.Status)
+    .ThenBy(t => t.StepOrder);
+
 
     <table class="table">
         <thead>
@@ -38,8 +37,7 @@ else
                     <td>@t.PartName</td>
                     <td>@t.StepName</td>
                     <td>@t.Priority</td>
-                    <td>@StatusText(t.Status)</td>
-
+                    <td>@StatusText(t.Status, t)</td>
                     <td>
                         @if (t.StepType != 3)
                         {
@@ -61,7 +59,7 @@ else
 
 @code {
     [Parameter] public IEnumerable<TaskRow> Tasks { get; set; } = Enumerable.Empty<TaskRow>();
-    [Parameter] public Func<int, string> StatusText { get; set; } = default!;
+    [Parameter] public Func<int, TaskRow, string> StatusText { get; set; } = default!;
     [Parameter] public Func<TaskRow, bool> CanStart { get; set; } = default!;
     [Parameter] public EventCallback<TaskRow> OnOpen { get; set; }
     [Parameter] public EventCallback<TaskRow> OnSelect { get; set; }

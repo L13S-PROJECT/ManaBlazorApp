@@ -5,6 +5,7 @@ public sealed class TaskRow
     public int TaskId { get; set; }
     public byte Priority { get; set; }
     public int Status { get; set; }
+    public int PriorityLevel { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? FinishedAt { get; set; }
     public string? PartName { get; set; }
