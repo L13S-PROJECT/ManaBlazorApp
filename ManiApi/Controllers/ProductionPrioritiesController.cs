@@ -29,6 +29,7 @@ public async Task<IActionResult> Get()
                 cmd.CommandText = @"
             SELECT
                 bp.ID            AS BatchProductId,
+                b.Batches_Code   AS BatchCode,
                 bp.Version_Id    AS VersionId,
                 p.Product_Code   AS ProductCode,
                 p.Product_Name   AS ProductName,
@@ -48,7 +49,7 @@ public async Task<IActionResult> Get()
                 ) AS DetailedY,
 
 
-            -- Detailed X = cik detaļu ir procesā (šim BatchProduct)
+            -- Detailed X = cik detaļu ir aktīvas (status 1/2/3) (šim BatchProduct)
             (
                 SELECT COUNT(DISTINCT ts.ProductToPart_ID)
                 FROM tasks t
@@ -56,8 +57,30 @@ public async Task<IActionResult> Get()
                 WHERE t.BatchProduct_ID = bp.ID
                 AND t.IsActive = 1
                 AND ts.Step_Type = 1
-                AND t.Tasks_Status <> 5
+                AND t.Tasks_Status IN (1,2,3)
             ) AS DetailedX,
+
+            -- Detailed Started X = cik detaļu ir iesāktas (status 2/3)
+                (
+                    SELECT COUNT(DISTINCT ts.ProductToPart_ID)
+                    FROM tasks t
+                    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+                    WHERE t.BatchProduct_ID = bp.ID
+                    AND t.IsActive = 1
+                    AND ts.Step_Type = 1
+                    AND t.Tasks_Status IN (2,3)
+                ) AS DetailedStartedX,
+
+                -- Detailed DONE X = cik detaļu pabeigtas (status 3)
+                (
+                    SELECT COUNT(DISTINCT ts.ProductToPart_ID)
+                    FROM tasks t
+                    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+                    WHERE t.BatchProduct_ID = bp.ID
+                    AND t.IsActive = 1
+                    AND ts.Step_Type = 1
+                    AND t.Tasks_Status = 3
+                ) AS DetailedDoneX,
 
 (
     CASE
@@ -68,7 +91,7 @@ public async Task<IActionResult> Get()
             WHERE t.BatchProduct_ID = bp.ID
               AND t.IsActive = 1
               AND ts.Step_Type = 1
-              AND t.Tasks_Status <> 5
+              AND t.Tasks_Status IN (2,3)
         ) > 0
         THEN 1
         ELSE 0
@@ -235,6 +258,7 @@ public async Task<IActionResult> Get()
                 ) AS FinishingInProgress
 
             FROM batches_products bp
+            JOIN batches b ON b.ID = bp.Batch_Id
             JOIN versions v   ON v.ID = bp.Version_Id
             JOIN products p   ON p.ID = v.Product_ID
             LEFT JOIN categories c ON c.ID = p.Category_ID
@@ -254,27 +278,30 @@ public async Task<IActionResult> Get()
                     list.Add(new
                 {
                     BatchProductId      = reader.GetInt32(0),
-                    VersionId           = reader.GetInt32(1),
-                    ProductCode         = reader.GetString(2),
-                    ProductName         = reader.GetString(3),
-                    CategoryName        = reader.IsDBNull(4) ? "" : reader.GetString(4),
-                    VersionName         = reader.GetString(5),
-                    Planned             = reader.GetInt32(6),
-                    IsPriority          = reader.GetBoolean(7),
+                    BatchCode = reader.GetString(1),
+                    VersionId           = reader.GetInt32(2),
+                    ProductCode         = reader.GetString(3),
+                    ProductName         = reader.GetString(4),
+                    CategoryName        = reader.IsDBNull(5) ? "" : reader.GetString(5),
+                    VersionName         = reader.GetString(6),
+                    Planned             = reader.GetInt32(7),
+                    IsPriority          = reader.GetBoolean(8),
 
-                   DetailedY = reader.GetInt32(8),
-                    DetailedX = reader.GetInt32(9),
-                    DetailedHasStarted = reader.GetBoolean(10),
-                    DetailedIsDone     = reader.GetBoolean(11),
+                    DetailedY = reader.GetInt32(9),
+                    DetailedX = reader.GetInt32(10),
+                    DetailedStartedX    = reader.GetInt32(11),
+                    DetailedDoneX       = reader.GetInt32(12),
+                    DetailedHasStarted  = reader.GetBoolean(13),
+                    DetailedIsDone      = reader.GetBoolean(14),
 
-                DetailedInProgress  = reader.GetInt32(12),
-                DetailedFinish      = reader.GetInt32(13),
-                Assembly            = reader.GetInt32(14),
-                Done                = reader.GetInt32(15),
-                FinishingX          = reader.GetInt32(16),
-                FinishingY          = reader.GetInt32(17),
-                FinishingDone       = reader.GetInt32(18),
-                FinishingInProgress = reader.GetInt32(19)
+                    DetailedInProgress  = reader.GetInt32(15),
+                    DetailedFinish      = reader.GetInt32(16),
+                    Assembly            = reader.GetInt32(17),
+                    Done                = reader.GetInt32(18),
+                    FinishingX          = reader.GetInt32(19),
+                    FinishingY          = reader.GetInt32(20),
+                    FinishingDone       = reader.GetInt32(21),
+                    FinishingInProgress = reader.GetInt32(22),
 
                 });
 

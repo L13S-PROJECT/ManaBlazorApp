@@ -37,7 +37,12 @@ else
                     <td>@t.PartName</td>
                     <td>@t.StepName</td>
                     <td>@t.Priority</td>
-                    <td>@StatusText(t.Status, t)</td>
+                    <td>
+                        @(t.Status == 1 && !CanStart(t)
+                            ? "Gaida..."
+                            : StatusText(t.Status, t))
+                    </td>
+
                     <td>
                         @if (t.StepType != 3)
                         {

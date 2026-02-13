@@ -11,10 +11,16 @@
 else
 {
     <h3>Ražošanas prioritātes</h3>
-
+    <button class="btn btn-primary mb-3"
+        @onclick="SavePriorities">
+    ATJAUNOT
+</button>
+    
+<h5>Prioritārie produkti</h5>
     <table class="table">
         <thead>
             <tr>
+                <th>Batch</th>
                 <th>Kods</th>
                 <th>Nosaukums</th>
                 <th>Kategorija</th>
@@ -29,13 +35,14 @@ else
         </thead>
         <tbody>
 
-            <h5>Prioritārie produkti</h5>
+            
 
             @foreach (var p in PriorityProducts)
 
                 {
                    
                     <tr>
+                        <td>@p.BatchCode</td>
                         <td>@p.ProductCode</td>
                         <td>@p.ProductName</td>
                         <td>@p.CategoryName</td>
@@ -44,9 +51,15 @@ else
                         <td>
                             <div>@p.DetailedX / @p.DetailedY</div>
 
-                            <div class="progress mt-1" style="height:6px;">
-                                <div class="progress-bar @GetDetailedBarClass(p)"
-                                    style="width:@(p.DetailedY == 0 ? 0 : (p.DetailedX * 100 / p.DetailedY))%">
+                            <div class="d-flex align-items-center gap-2 mt-1">
+                                <span class="text-muted" style="font-size:12px;">
+                                    @p.DetailedDoneX / @p.DetailedY
+                                </span>
+
+                                <div class="progress flex-grow-1" style="height:6px;">
+                                    <div class="progress-bar @GetDetailedBarClass(p)"
+                                        style="width:@(p.DetailedY == 0 ? 0 : (p.DetailedStartedX * 100 / p.DetailedY))%">
+                                    </div>
                                 </div>
                             </div>
                         </td>
@@ -100,9 +113,7 @@ else
                         <td></td>
                         <td>
                             <input type="checkbox"
-                            checked="@p.IsPriority"
-                            @onchange="e => OnPriorityChanged(p.BatchProductId, e)" />
-
+                             @bind="p.IsPriority" />
                         </td>
                     </tr>
                 }
@@ -119,6 +130,7 @@ else
         @foreach (var p in NormalProducts)
         {
             <tr>
+                        <td>@p.BatchCode</td>
                         <td>@p.ProductCode</td>
                         <td>@p.ProductName</td>
                         <td>@p.CategoryName</td>
@@ -127,9 +139,15 @@ else
                         <td>
                             <div>@p.DetailedX / @p.DetailedY</div>
 
-                            <div class="progress mt-1" style="height:6px;">
-                                <div class="progress-bar @GetDetailedBarClass(p)"
-                                    style="width:@(p.DetailedY == 0 ? 0 : (p.DetailedX * 100 / p.DetailedY))%">
+                            <div class="d-flex align-items-center gap-2 mt-1">
+                                <span class="text-muted" style="font-size:12px;">
+                                    @p.DetailedDoneX / @p.DetailedY
+                                </span>
+
+                                <div class="progress flex-grow-1" style="height:6px;">
+                                    <div class="progress-bar @GetDetailedBarClass(p)"
+                                        style="width:@(p.DetailedY == 0 ? 0 : (p.DetailedStartedX * 100 / p.DetailedY))%">
+                                    </div>
                                 </div>
                             </div>
                         </td>
@@ -183,9 +201,7 @@ else
                         <td></td>
                         <td>
                             <input type="checkbox"
-                            checked="@p.IsPriority"
-                            @onchange="e => OnPriorityChanged(p.BatchProductId, e)" />
-
+                             @bind="p.IsPriority" />
                         </td>
                     </tr>
         }
@@ -194,7 +210,7 @@ else
 
 }
 
-<PriorityImpactSummary />
+<PriorityImpactSummary @ref="impactSummary" />
 
 
 @code {
@@ -219,18 +235,6 @@ private async Task LoadProducts()
 
 }
 
-private async Task OnPriorityChanged(int batchProductId, ChangeEventArgs e)
-{
-    var isChecked = (bool)e.Value!;
-
-    await Http.PutAsJsonAsync(
-        $"http://localhost:5270/api/production-priorities/{batchProductId}",
-        isChecked
-    );
-
-    await LoadProducts();
-}
-
 private string GetDetailedStatus(ProductRow p)
 {
     if (p.DetailedFinish > 0)
@@ -244,13 +248,13 @@ private string GetDetailedStatus(ProductRow p)
 
 private string GetDetailedBarClass(ProductRow p)
 {
-    if (p.DetailedIsDone)
-        return "bg-success";   // viss pabeigts
+if (p.DetailedIsDone)
+    return "bg-success";
 
-    if (p.DetailedHasStarted)
-        return "bg-warning";   // ir iesākts
+if (p.DetailedStartedX > 0)
+    return "bg-warning";
 
-    return "bg-light";         // nav iesākts
+return "";
 }
 
 
@@ -287,6 +291,7 @@ private string GetFinishingStatus(ProductRow p)
 
 private class ProductRow
 {
+    public string BatchCode { get; set; } = "";
     public int BatchProductId { get; set; }
     public int VersionId { get; set; }
 
@@ -303,9 +308,11 @@ private class ProductRow
     public int Assembly { get; set; }
     public int FinishingInProgress { get; set; }
     public int Done { get; set; }
-
     public int DetailedX { get; set; }
     public int DetailedY { get; set; }
+    public int DetailedStartedX { get; set; }
+
+    public int DetailedDoneX { get; set; }
     public bool DetailedHasStarted { get; set; }
     public bool DetailedIsDone { get; set; }
 
@@ -315,5 +322,26 @@ private class ProductRow
 
 }
 
+private async Task SavePriorities()
+{
+    if (products == null)
+        return;
+
+    foreach (var p in products)
+    {
+        await Http.PutAsJsonAsync(
+            $"http://localhost:5270/api/production-priorities/{p.BatchProductId}",
+            p.IsPriority
+        );
+    }
+
+    await LoadProducts();
+
+if (impactSummary != null)
+    await impactSummary.Reload();
+
+StateHasChanged();
+}
+private PriorityImpactSummary? impactSummary;
 
 }
