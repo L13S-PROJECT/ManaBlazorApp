@@ -183,6 +183,9 @@ private int FinAvailable;
 
 protected override async Task OnParametersSetAsync()
 {
+    if (SelectedBatch == null || SelectedBatch.BatchId <= 0)
+    return;
+    
     Parts.Clear();
 
     if (SelectedBatch?.BatchProductId is not int bpId || bpId <= 0)
@@ -231,7 +234,6 @@ FinSold =
     await Http.GetFromJsonAsync<int>(
         $"http://localhost:5270/api/stockmovements/sold-before-finishing?batchProductId={bpId}"
     );
-
 }
 
 private List<EmployeeRow> Employees = new();

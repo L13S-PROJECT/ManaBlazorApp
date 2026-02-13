@@ -334,6 +334,94 @@ ON DUPLICATE KEY UPDATE
             return Ok(new { batchId = dto.BatchId!.Value });
         }
 
+[HttpGet("by-batchproduct")]
+public async Task<IActionResult> GetByBatchProduct([FromQuery] int batchProductId)
+{
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+SELECT 
+    bp.ID           AS BatchProductId,
+    bp.Version_Id   AS VersionId,
+    p.Product_Code  AS ProductCode,
+    p.Product_Name  AS ProductName,
+    c.Category_Name AS CategoryName
+FROM batches_products bp
+JOIN versions v   ON v.ID = bp.Version_Id
+JOIN products p   ON p.ID = v.Product_ID
+JOIN categories c ON c.ID = p.Category_ID
+WHERE bp.ID = @id
+  AND bp.IsActive = 1;";
+
+    var pId = cmd.CreateParameter();
+    pId.ParameterName = "@id";
+    pId.Value = batchProductId;
+    cmd.Parameters.Add(pId);
+
+    await using var r = await cmd.ExecuteReaderAsync();
+
+    if (!await r.ReadAsync())
+        return NotFound();
+
+    return Ok(new
+    {
+        BatchProductId = r.GetInt32(0),
+        VersionId      = r.GetInt32(1),
+        ProductCode    = r.GetString(2),
+        ProductName    = r.GetString(3),
+        CategoryName   = r.GetString(4)
+    });
+}
+
+// GET: /api/batches/by-id?batchProductId=513
+[HttpGet("by-id")]
+public async Task<IActionResult> GetByBatchProductId([FromQuery] int batchProductId)
+{
+    if (batchProductId <= 0)
+        return BadRequest("batchProductId is required.");
+
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+SELECT 
+    bp.ID           AS BatchProductId,
+    bp.Batch_Id     AS BatchId,
+    bp.Version_Id   AS VersionId,
+    p.Product_Code  AS ProductCode,
+    c.Category_Name AS CategoryName
+FROM batches_products bp
+JOIN versions v ON v.ID = bp.Version_Id
+JOIN products p ON p.ID = v.Product_ID
+JOIN categories c ON c.ID = p.Category_ID
+WHERE bp.ID = @id
+  AND bp.IsActive = 1
+LIMIT 1;
+";
+
+    var p = cmd.CreateParameter();
+    p.ParameterName = "@id";
+    p.Value = batchProductId;
+    cmd.Parameters.Add(p);
+
+    await using var r = await cmd.ExecuteReaderAsync();
+    if (!await r.ReadAsync())
+        return NotFound();
+
+    return Ok(new
+    {
+        BatchProductId = r.GetInt32(0),
+        BatchId        = r.GetInt32(1),
+        VersionId      = r.GetInt32(2),
+        ProductCode    = r.GetString(3),
+        CategoryName   = r.GetString(4)
+    });
+}
+
+
 // GET: /api/batches/list?batch_type=1
 [HttpGet("list")]
 public async Task<IActionResult> GetProductionBatches([FromQuery] int batch_type = 1)

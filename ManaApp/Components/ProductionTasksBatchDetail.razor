@@ -57,7 +57,7 @@
 
                 <div class="ptv2-batch-row
                     @(IsArchived(b) ? "archived" : "")
-                    @(SelectedBatchId == b.BatchId ? "active" : "")"
+                    @(SelectedBatch?.BatchProductId == b.BatchProductId ? "active" : "")"
                     @onclick="() => SelectBatch(b)">
 
 
@@ -112,16 +112,13 @@ string? BatchComment =>
     [Parameter] public ProductRow? SelectedProduct { get; set; }
     [Parameter] public List<ProductBatchRow> ProductBatches { get; set; } = new();
     [Parameter] public Dictionary<string, int> LatestVersionByProductCode { get; set; } = new();
-
-    private int? SelectedBatchId;
-
+    [Parameter] public ProductBatchRow? SelectedBatch { get; set; }
+    
     async Task SelectBatch(ProductBatchRow batch)
-    {
-        SelectedBatchId = batch.BatchId;
-
-        if (OnBatchSelected.HasDelegate)
-            await OnBatchSelected.InvokeAsync(batch);
-    }
+{
+    if (OnBatchSelected.HasDelegate)
+        await OnBatchSelected.InvokeAsync(batch);
+}
 
 bool IsCommentDialogOpen = false;
 string? DialogComment;

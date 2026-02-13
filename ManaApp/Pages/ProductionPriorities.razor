@@ -2,6 +2,8 @@
 @inject HttpClient Http
 @inject ManaApp.Services.AppState AppState
 @using ManaApp.Components.PriorityTasks
+@inject NavigationManager Nav
+
 
 @if (products == null)
 
@@ -29,7 +31,7 @@ else
                 <th>Detailed</th>
                 <th>Assembly</th>
                 <th>Finishing</th>
-                <th>Datums</th>
+                <th>Detalizācija</th>
                 <th>Prioritāte</th>
             </tr>
         </thead>
@@ -110,7 +112,12 @@ else
                             </div>
                         </td>
 
-                        <td></td>
+                        <td>
+    <span style="cursor:pointer;"
+          @onclick="() => GoToBatch(p.BatchProductId)">
+        🔎
+    </span>
+</td>
                         <td>
                             <input type="checkbox"
                              @bind="p.IsPriority" />
@@ -198,7 +205,12 @@ else
                             </div>
                         </td>
 
-                        <td></td>
+                        <td>
+    <span style="cursor:pointer;"
+          @onclick="() => GoToBatch(p.BatchProductId)">
+        🔎
+    </span>
+</td>
                         <td>
                             <input type="checkbox"
                              @bind="p.IsPriority" />
@@ -343,5 +355,10 @@ if (impactSummary != null)
 StateHasChanged();
 }
 private PriorityImpactSummary? impactSummary;
+
+private void GoToBatch(int batchProductId)
+{
+    Nav.NavigateTo($"/productiontasks-v2?batchProductId={batchProductId}");
+}
 
 }

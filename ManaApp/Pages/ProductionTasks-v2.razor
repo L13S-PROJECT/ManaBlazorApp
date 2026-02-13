@@ -3,6 +3,7 @@
 @using ManaApp.Components
 @using ManaApp.Models
 @inject HttpClient Http
+@inject NavigationManager Nav
 
 <PageHeader Title="Ražošanas plānošana" />
 
@@ -93,9 +94,11 @@
 
 <!-- 3. BOX -->
 <div class="ptv2-box ptv2-box-detail">
+
 <ProductionTasksBatchDetail
     SelectedProduct="SelectedProduct"
     ProductBatches="ProductBatches"
+    SelectedBatch="SelectedBatch"
     LatestVersionByProductCode="_latestVersionByProductCode"
     OnBatchSelected="OnBatchSelected" />
 
@@ -127,8 +130,21 @@ private void OnBatchSelected(ProductBatchRow batch)
 
 private List<CategoryRow> Categories = new();
 private int? SelectedParentId;
-    protected override async Task OnInitializedAsync()
+protected override async Task OnInitializedAsync()
     {
+var uri = new Uri(Nav.Uri);
+var queryString = uri.Query;
+
+if (!string.IsNullOrWhiteSpace(queryString) &&
+    queryString.Contains("batchProductId="))
+{
+    var value = queryString
+        .Replace("?batchProductId=", "")
+        .Trim();
+
+    if (int.TryParse(value, out var id))
+        _batchFromUrl = id;
+}
         Categories = await Http.GetFromJsonAsync<List<CategoryRow>>(
             "http://localhost:5270/api/categories"
         ) ?? new();
@@ -142,8 +158,40 @@ AllProducts = await Http.GetFromJsonAsync<List<ProductRow>>(
     "http://localhost:5270/api/products/planning-list"
 ) ?? new();
 
-
     }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+{
+    if (!firstRender || _batchFromUrl <= 0)
+        return;
+
+    var batch = await Http.GetFromJsonAsync<ProductBatchRow>(
+        $"http://localhost:5270/api/batches/by-id?batchProductId={_batchFromUrl}");
+
+    if (batch == null)
+        return;
+
+    var category = Categories
+        .FirstOrDefault(c => c.CategoryName == batch.CategoryName);
+
+    if (category == null)
+        return;
+
+    await SelectCategory(category);
+
+    var product = Products
+        .FirstOrDefault(p => p.productCode == batch.ProductCode);
+
+    if (product == null)
+        return;
+
+    await SelectProduct(product);
+
+    SelectedBatch = ProductBatches
+        .FirstOrDefault(b => b.BatchProductId == _batchFromUrl);
+
+    StateHasChanged();
+}
 
     private void SelectParent(int id)
     {
@@ -310,7 +358,7 @@ StateHasChanged();
 
 private readonly Dictionary<string, int> _latestVersionByProductCode
     = new(StringComparer.OrdinalIgnoreCase);
-
+private int? _batchFromUrl;
 
 
 }
