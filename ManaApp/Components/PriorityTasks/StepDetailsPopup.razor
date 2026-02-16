@@ -1,0 +1,98 @@
+@inject HttpClient Http
+@using System.Text.Json.Serialization;
+
+@if (steps == null)
+{
+   
+    <div class="popup-overlay-details">
+        <div class="popup-box">
+            Ielādē...
+        </div>
+    </div>
+}
+else
+{
+    <div class="popup-overlay-details">
+        <div class="popup-box" style="width:600px;">
+
+            <h5>Soļu informācija</h5>
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Solis</th>
+                        <th>Status</th>
+                        <th>Assigned</th>
+                        <th>Claimed</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var s in steps!)
+{
+    <tr class="@(s.TaskId == HighlightTaskId ? "highlight-row" : "")">
+                        <td>@s.StepOrder</td>
+                        <td>@s.StepName</td>
+                        <td>@GetStatusText(s.Status)</td>
+                        <td>@(s.AssignedName ?? "-")</td>
+                        <td>@(s.ClaimedName ?? "-")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+
+            <div class="d-flex justify-content-end mt-3">
+                <button class="btn btn-secondary" @onclick="Close">
+                    Aizvērt
+                </button>
+            </div>
+
+        </div>
+    </div>
+}
+
+@code {
+
+    [Parameter] public int BatchProductId { get; set; }
+    [Parameter] public int ProductToPartId { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public int HighlightTaskId { get; set; }
+
+    private List<StepRow>? steps;
+
+  protected override async Task OnParametersSetAsync()
+{
+    Console.WriteLine($"BP: {BatchProductId}  PTP: {ProductToPartId}");
+
+    steps = await Http.GetFromJsonAsync<List<StepRow>>(
+        $"api/tasks/steps-for-part?batchProductId={BatchProductId}&productToPartId={ProductToPartId}");
+}
+
+    private async Task Close()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private class StepRow
+{
+    public int TaskId { get; set; }
+    public int StepOrder { get; set; }
+    public string? StepName { get; set; }
+    public int Status { get; set; }
+
+    public string? AssignedName { get; set; }
+    public string? ClaimedName { get; set; }
+}
+
+private string GetStatusText(int status)
+{
+    return status switch
+    {
+        1 => "Gaida",
+        2 => "Procesā",
+        3 => "Pabeigts",
+        _ => "-"
+    };
+}
+
+
+}

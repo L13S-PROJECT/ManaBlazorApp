@@ -3,6 +3,7 @@
 @inject HttpClient Http
 @namespace ManaApp.Components.PriorityTasks
 
+
 @if (rows == null)
 {
     <div>Ielādē...</div>
@@ -31,7 +32,12 @@ else
                 <th>Workcentrs</th>
                 @foreach (var emp in employees)
                 {
-                    <th>@emp</th>
+                    <th>
+                        <span style="cursor:pointer"
+                            @onclick="() => OpenPopup(emp)">
+                            @emp
+                        </span>
+                    </th>
                 }
             </tr>
         </thead>
@@ -86,6 +92,12 @@ else
     </table>
 }
 
+@if (selectedEmployeeId != null)
+{
+    <EmployeeLoadPopup EmployeeId="selectedEmployeeId.Value"
+                       OnClose="ClosePopup" />
+}
+
 @code {
 
     private List<PriorityImpactRow>? rows;
@@ -96,6 +108,7 @@ else
         public string EmployeeName { get; set; } = "";
         public int PriorityCount { get; set; }
         public int NormalCount { get; set; }
+        public int EmployeeId { get; set; }
     }
 
     protected override async Task OnInitializedAsync()
@@ -111,4 +124,18 @@ else
 
         StateHasChanged();
     }
+
+    private int? selectedEmployeeId;
+
+private void OpenPopup(string employeeName)
+{
+    var match = rows?.FirstOrDefault(r => r.EmployeeName == employeeName);
+    if (match != null)
+        selectedEmployeeId = match.EmployeeId;
+}
+
+private void ClosePopup()
+{
+    selectedEmployeeId = null;
+}
 }

@@ -402,7 +402,8 @@ public async Task<IActionResult> GetPriorityImpact()
             cmd.CommandText = @"
 SELECT
     wc.WorkCentr_Name AS WorkCenter,
-    COALESCE(e.Employee_Name, 'Nav piešķirts') AS EmployeeName,
+    e.ID AS EmployeeId,
+COALESCE(e.Employee_Name, 'Nav piešķirts') AS EmployeeName,
 
     SUM(
         CASE 
@@ -440,7 +441,7 @@ LEFT JOIN employees e
 
 WHERE wc.IsActive = 1
 
-GROUP BY wc.WorkCentr_Name, e.Employee_Name
+GROUP BY wc.WorkCentr_Name, e.ID, e.Employee_Name
 HAVING PriorityCount > 0 OR NormalCount > 0
 
 ORDER BY wc.WorkCentr_Name, EmployeeName;
@@ -453,9 +454,10 @@ ORDER BY wc.WorkCentr_Name, EmployeeName;
             result.Add(new
             {
                 WorkCenter   = reader.GetString(0),
-                EmployeeName = reader.GetString(1),
-                PriorityCount = reader.IsDBNull(2) ? 0 : reader.GetInt32(2),
-                NormalCount   = reader.IsDBNull(3) ? 0 : reader.GetInt32(3)
+                EmployeeId   = reader.IsDBNull(1) ? 0 : reader.GetInt32(1),
+                EmployeeName = reader.GetString(2),
+                PriorityCount = reader.IsDBNull(3) ? 0 : reader.GetInt32(3),
+                NormalCount   = reader.IsDBNull(4) ? 0 : reader.GetInt32(4)
             });
 
         }

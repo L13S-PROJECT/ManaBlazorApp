@@ -1745,6 +1745,278 @@ public sealed class UpdateCommentVisibilityDto
     public bool IsCommentForEmployee { get; set; }
 }
 
+// GET: /api/tasks/employee-load?empId=123 - 13.02.2026
+[HttpGet("employee-load")]
+public async Task<IActionResult> GetEmployeeLoad([FromQuery] int empId)
+{
+    if (empId <= 0)
+        return BadRequest("empId is required.");
 
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+
+    string? employeeName = null;
+string? workCenterName = null;
+
+
+await using (var cmdHeader = conn.CreateCommand())
+{
+    cmdHeader.CommandText = @"
+SELECT 
+    Employee_Name
+FROM employees
+WHERE ID = @empId;
+";
+
+    cmdHeader.Parameters.Add(new MySqlConnector.MySqlParameter("@empId", empId));
+
+    await using var rHeader = await cmdHeader.ExecuteReaderAsync();
+    if (await rHeader.ReadAsync())
+    {
+        employeeName = rHeader.IsDBNull(0) ? null : rHeader.GetString(0);
+    }
+}
+
+    cmd.CommandText = @"
+SELECT
+    t.ID AS TaskId,
+    t.BatchProduct_ID,
+    b.Batches_Code AS BatchCode,
+    p.Product_Name AS ProductName,
+    CASE 
+    WHEN ts.Step_Type IN (1,2) THEN bp.Planned_Qty * ptp.Qty_Per_product
+    WHEN ts.Step_Type = 3 THEN t.Qty_Done
+    ELSE bp.Planned_Qty
+END AS Qty,
+    t.Tasks_Status AS Status,
+    ts.Step_Order,
+    ts.Step_Type,
+    ts.ProductToPart_ID,
+    tp.TopPart_Name,
+    ts.IsFinal,
+    t.Assigned_To,
+    t.Tasks_Priority,
+    t.Claimed_By
+FROM tasks t
+JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+JOIN batches b ON b.ID = bp.Batch_Id
+JOIN versions v ON v.ID = bp.Version_Id
+JOIN products p ON p.ID = v.Product_ID
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
+JOIN toppart tp ON tp.ID = ptp.TopPart_ID
+WHERE t.IsActive = 1
+  AND t.Tasks_Status = 2
+  AND t.Claimed_By = @empId;
+";
+
+    cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@empId", empId));
+
+    var list = new List<object>();
+
+    await using (var r = await cmd.ExecuteReaderAsync())
+{
+    while (await r.ReadAsync())
+    {
+        list.Add(new
+        {
+            TaskId = r.GetInt32(0),
+            BatchProductId = r.GetInt32(1),
+            BatchCode = r.GetString(2),
+            ProductName = r.GetString(3),
+            Qty = r.IsDBNull(4) ? 0 : r.GetInt32(4),
+            Status = r.GetInt32(5),
+            StepOrder = r.IsDBNull(6) ? 0 : r.GetInt32(6),
+            StepType = r.GetInt32(7),
+            ProductToPartId = r.GetInt32(8),
+            TopPartName = r.IsDBNull(9) ? null : r.GetString(9),
+            IsFinal = !r.IsDBNull(10) && r.GetBoolean(10),
+            Assigned_To = r.IsDBNull(11) ? (int?)null : r.GetInt32(11),
+            Tasks_Priority = !r.IsDBNull(12) && r.GetBoolean(12),
+            Claimed_By = r.IsDBNull(13) ? (int?)null : r.GetInt32(13)
+        });
+    }
+}
+
+// PRIORITĀRIE (status = 1, batch priority = true)
+
+await using var cmd2 = conn.CreateCommand();
+cmd2.CommandText = @"
+SELECT
+    t.ID AS TaskId,
+    t.BatchProduct_ID,
+    b.Batches_Code AS BatchCode,
+    p.Product_Name AS ProductName,
+    CASE 
+    WHEN ts.Step_Type IN (1,2) THEN bp.Planned_Qty * ptp.Qty_Per_product
+    WHEN ts.Step_Type = 3 THEN t.Qty_Done
+    ELSE bp.Planned_Qty
+END AS Qty,
+    t.Tasks_Status AS Status,
+    ts.Step_Order,
+    ts.Step_Type,
+    ts.ProductToPart_ID,
+    tp.TopPart_Name,
+    ts.IsFinal,
+    t.Assigned_To,
+    t.Tasks_Priority,
+    t.Claimed_By
+FROM tasks t
+JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+JOIN batches b ON b.ID = bp.Batch_Id
+JOIN versions v ON v.ID = bp.Version_Id
+JOIN products p ON p.ID = v.Product_ID
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
+JOIN toppart tp ON tp.ID = ptp.TopPart_ID
+WHERE t.IsActive = 1
+  AND t.Tasks_Status = 1
+  AND bp.is_priority = 1
+  AND (t.Assigned_To = @empId OR t.Assigned_To = 0);
+";
+
+cmd2.Parameters.Add(new MySqlConnector.MySqlParameter("@empId", empId));
+
+var priorityList = new List<object>();
+
+await using (var r2 = await cmd2.ExecuteReaderAsync())
+{
+    while (await r2.ReadAsync())
+    {
+        priorityList.Add(new
+        {
+            TaskId = r2.GetInt32(0),
+            BatchProductId = r2.GetInt32(1),
+            BatchCode = r2.GetString(2),
+            ProductName = r2.GetString(3),
+            Qty = r2.IsDBNull(4) ? 0 : r2.GetInt32(4),
+            Status = r2.GetInt32(5),
+            StepOrder = r2.IsDBNull(6) ? 0 : r2.GetInt32(6),
+            StepType = r2.GetInt32(7),
+            ProductToPartId = r2.GetInt32(8),
+            TopPartName = r2.IsDBNull(9) ? null : r2.GetString(9),
+            IsFinal = !r2.IsDBNull(10) && r2.GetBoolean(10),
+            Assigned_To = r2.IsDBNull(11) ? (int?)null : r2.GetInt32(11),
+            Tasks_Priority = !r2.IsDBNull(12) && r2.GetBoolean(12),
+            Claimed_By = r2.IsDBNull(13) ? (int?)null : r2.GetInt32(13)
+        });
+    }
+}
+// SECĪGIE (status = 1, batch priority = false)
+
+await using var cmd3 = conn.CreateCommand();
+cmd3.CommandText = @"
+SELECT
+    t.ID AS TaskId,
+    t.BatchProduct_ID,
+    b.Batches_Code AS BatchCode,
+    p.Product_Name AS ProductName,
+    CASE 
+    WHEN ts.Step_Type IN (1,2) THEN bp.Planned_Qty * ptp.Qty_Per_product
+    WHEN ts.Step_Type = 3 THEN t.Qty_Done
+    ELSE bp.Planned_Qty
+END AS Qty,
+    t.Tasks_Status AS Status,
+    ts.Step_Order,
+    ts.Step_Type,
+    ts.ProductToPart_ID,
+    tp.TopPart_Name,
+    ts.IsFinal,
+    t.Assigned_To,
+    t.Tasks_Priority,
+    t.Claimed_By
+FROM tasks t
+JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+JOIN batches b ON b.ID = bp.Batch_Id
+JOIN versions v ON v.ID = bp.Version_Id
+JOIN products p ON p.ID = v.Product_ID
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
+JOIN toppart tp ON tp.ID = ptp.TopPart_ID
+WHERE t.IsActive = 1
+  AND t.Tasks_Status = 1
+  AND bp.is_priority = 0
+  AND (t.Assigned_To = @empId OR t.Assigned_To = 0);
+";
+
+cmd3.Parameters.Add(new MySqlConnector.MySqlParameter("@empId", empId));
+
+var normalList = new List<object>();
+
+await using (var r3 = await cmd3.ExecuteReaderAsync())
+{
+    while (await r3.ReadAsync())
+    {
+        normalList.Add(new
+        {
+            TaskId = r3.GetInt32(0),
+            BatchProductId = r3.GetInt32(1),
+            BatchCode = r3.GetString(2),
+            ProductName = r3.GetString(3),
+            Qty = r3.IsDBNull(4) ? 0 : r3.GetInt32(4),
+            Status = r3.GetInt32(5),
+            StepOrder = r3.IsDBNull(6) ? 0 : r3.GetInt32(6),
+            StepType = r3.GetInt32(7),
+            ProductToPartId = r3.GetInt32(8),
+            TopPartName = r3.IsDBNull(9) ? null : r3.GetString(9),
+            IsFinal = !r3.IsDBNull(10) && r3.GetBoolean(10),
+            Assigned_To = r3.IsDBNull(11) ? (int?)null : r3.GetInt32(11),
+            Tasks_Priority = !r3.IsDBNull(12) && r3.GetBoolean(12),
+            Claimed_By = r3.IsDBNull(13) ? (int?)null : r3.GetInt32(13)          
+        });
+    }
+}
+    return Ok(new
+{
+    EmployeeName = employeeName,
+    WorkCenterName = workCenterName,
+    InProgress = list,
+    Priority = priorityList,
+    Normal = normalList
+});
+
+}
+
+// GET: /api/tasks/steps-for-part?batchProductId=123&productToPartId=8
+[HttpGet("steps-for-part")]
+public async Task<IActionResult> GetStepsForPart(
+    int batchProductId,
+    int productToPartId)
+{
+    var list = await (
+        from t in _db.Tasks
+        join ts in _db.TopPartSteps
+            on t.TopPartStep_ID equals ts.Id
+
+        join ea in _db.Employees
+            on t.Assigned_To equals ea.Id into eaJoin
+        from ea in eaJoin.DefaultIfEmpty()
+
+        join ec in _db.Employees
+            on t.Claimed_By equals ec.Id into ecJoin
+        from ec in ecJoin.DefaultIfEmpty()
+
+        where t.IsActive
+              && t.BatchProduct_ID == batchProductId
+              && ts.ProductToPartId == productToPartId
+
+        orderby ts.StepOrder
+
+        select new
+        {
+            TaskId = t.ID,
+            StepOrder = ts.StepOrder,
+            StepName = ts.StepName,
+            Status = t.Tasks_Status,
+
+            AssignedName = ea != null ? ea.EmployeeName : null,
+            ClaimedName = ec != null ? ec.EmployeeName : null
+        }
+    ).ToListAsync();
+
+    return Ok(list);
+}
     }
 }

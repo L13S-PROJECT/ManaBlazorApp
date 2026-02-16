@@ -1,0 +1,269 @@
+@inject HttpClient Http
+@namespace ManaApp.Components.PriorityTasks
+
+@if (model == null)
+{
+    <div class="popup-overlay">
+        <div class="popup-box">
+            Ielādē...
+        </div>
+    </div>
+}
+else
+{
+    <div class="popup-overlay">
+        <div class="popup-box">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h5 class="mb-0">@model.EmployeeName</h5>
+                    <small class="text-muted">@model.WorkCenterName</small>
+                </div>
+                <button class="btn btn-sm btn-secondary" @onclick="Close">X</button>
+            </div>
+
+<h6>Darbs procesā</h6>
+
+            @if (model.InProgress != null && model.InProgress.Any())
+            {
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Batch</th>
+                            <th>Produkts</th>
+                            <th>Detaļa</th>
+                            <th>Skaits</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var t in model.InProgress)
+                    {
+                        <tr>
+                            <td>@t.BatchCode</td>
+                            <td>@t.ProductName</td>
+                            <td>@t.TopPartName</td>
+                            <td>@t.Qty</td>
+                            <td>@t.Status</td>
+                            <td>
+                                <span style="cursor:pointer"
+                                    @onclick="() => OpenTaskDetails(t)">
+                                    🔍
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+
+<h6 class="mt-3">Prioritārie darbi</h6>
+
+                @if (model.Priority != null && model.Priority.Any())
+                {
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Batch</th>
+                                <th>Produkts</th>
+                                <th>Detaļa</th>
+                                <th>Skaits</th>
+                                <th>Prioritārs</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var t in model.Priority)
+                        {
+                            <tr>
+                                <td>@t.BatchCode</td>
+                                <td>@t.ProductName</td>
+                                <td>@t.TopPartName</td>
+                                <td>@t.Qty</td>
+                                <td>
+                                    <input type="checkbox" @bind="t.Tasks_Priority" />
+                                </td>
+                                <td>
+                                    <span style="cursor:pointer"
+                                        @onclick="() => OpenTaskDetails(t)">
+                                        🔍
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                }
+
+ <h6 class="mt-3">Secīgie darbi</h6>
+
+                @if (model.Normal != null && model.Normal.Any())
+                {
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Batch</th>
+                                <th>Produkts</th>
+                                <th>Detaļa</th>
+                                <th>Skaits</th>
+                                <th>Prioritārs</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var t in model.Normal)
+                        {
+                            <tr>
+                                <td>@t.BatchCode</td>
+                                <td>@t.ProductName</td>
+                                <td>@t.TopPartName</td>
+                                <td>@t.Qty</td>
+                                <td>
+                                    <input type="checkbox" @bind="t.Tasks_Priority" />
+                                </td>
+                                <td>
+                                    <span style="cursor:pointer"
+                                        @onclick="() => OpenTaskDetails(t)">
+                                        🔍
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                }
+                   <div class="d-flex justify-content-end mt-3">
+                    <button class="btn btn-secondary me-2" @onclick="Close">Aizvērt</button>
+                    <button class="btn btn-primary" @onclick="UpdateData">Atjaunot</button>
+                </div>
+        </div>
+
+   </div>
+}
+@if (detailsBatchProductId != null && detailsProductToPartId != null)
+{
+    <StepDetailsPopup 
+    BatchProductId="detailsBatchProductId.Value"
+    ProductToPartId="detailsProductToPartId.Value"
+    HighlightTaskId="selectedTaskId ?? 0"
+    OnClose="CloseDetails" />
+}
+@code {
+
+    [Parameter] public int EmployeeId { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    
+    private int? detailsBatchProductId;
+    private int? detailsProductToPartId;
+    private EmployeeLoadModel? model;
+    private int? selectedTaskId;
+    private List<StepDetailRow>? detailSteps;
+
+protected override async Task OnParametersSetAsync()
+{
+    model = await Http.GetFromJsonAsync<EmployeeLoadModel>(
+        $"api/tasks/employee-load?empId={EmployeeId}");
+}
+
+    private async Task Close()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+private void OpenTaskDetails(TaskRow t)
+{
+    detailsBatchProductId = t.BatchProductId;
+    detailsProductToPartId = t.ProductToPartId;
+    selectedTaskId = t.TaskId;
+}
+
+private async Task UpdateData()
+{
+    var list = new List<object>();
+
+    if (model?.Priority != null)
+    {
+        foreach (var t in model.Priority)
+        {
+            list.Add(new
+            {
+                TaskId = t.TaskId,
+                Tasks_Priority = t.Tasks_Priority
+            });
+        }
+    }
+
+    if (model?.Normal != null)
+    {
+        foreach (var t in model.Normal)
+        {
+            list.Add(new
+            {
+                TaskId = t.TaskId,
+                Tasks_Priority = t.Tasks_Priority
+            });
+        }
+    }
+
+    await Http.PostAsJsonAsync("api/tasks/update-steps", list);
+
+    await Close();
+}
+
+private void CloseDetails()
+{
+    detailsBatchProductId = null;
+    detailsProductToPartId = null;
+}
+    private class EmployeeLoadModel
+{
+    public string? EmployeeName { get; set; }
+    public string? WorkCenterName { get; set; }
+
+    public List<TaskRow>? InProgress { get; set; }
+    public List<TaskRow>? Priority { get; set; }
+    public List<TaskRow>? Normal { get; set; }
+}
+
+private class TaskRow
+{
+    public int TaskId { get; set; }
+
+    public string? BatchCode { get; set; }
+    public int BatchProductId { get; set; }
+    public int ProductToPartId { get; set; }
+    public string? ProductName { get; set; }
+    public string? TopPartName { get; set; }
+
+    public int Qty { get; set; }
+    public int Status { get; set; }
+
+    public int StepOrder { get; set; }
+    public int StepType { get; set; }
+
+    public bool IsFinal { get; set; }
+
+    public int? Assigned_To { get; set; }
+    public bool Tasks_Priority { get; set; }
+    public int? Claimed_By { get; set; }
+
+    public bool IsPriority { get; set; }
+}
+
+private class StepDetailRow
+{
+    public int TaskId { get; set; }
+    public int Status { get; set; }
+    public int? Assigned_To { get; set; }
+    public int? Claimed_By { get; set; }
+    public int Done { get; set; }
+    public string? PartName { get; set; }
+}
+
+private void CloseTaskDetails()
+{
+    selectedTaskId = null;
+}
+
+}

@@ -18,11 +18,12 @@ namespace ManiApi.Data
         public DbSet<TopPartStep> TopPartSteps { get; set; }
         public DbSet<ManiApi.Models.StepType> StepTypes { get; set; }
 
-        public DbSet<Tasks> Tasks { get; set; }
+        public DbSet<ManiApi.Models.Employee> Employees { get; set; }
+        public DbSet<ManiApi.Models.Tasks> Tasks { get; set; }
 
-        public DbSet<WorkCenter> WorkCentrs { get; set; }
+        public DbSet<ManiApi.Models.WorkCenter> WorkCentrs { get; set; }
 
-        public DbSet<StockMovement> StockMovements { get; set; }
+        public DbSet<ManiApi.Models.StockMovement> StockMovements { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
 {
     base.OnModelCreating(modelBuilder);
