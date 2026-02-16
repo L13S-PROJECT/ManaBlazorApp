@@ -56,15 +56,12 @@ else
     [Parameter] public int ProductToPartId { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
     [Parameter] public int HighlightTaskId { get; set; }
-
     private List<StepRow>? steps;
 
   protected override async Task OnParametersSetAsync()
 {
-    Console.WriteLine($"BP: {BatchProductId}  PTP: {ProductToPartId}");
-
-    steps = await Http.GetFromJsonAsync<List<StepRow>>(
-        $"api/tasks/steps-for-part?batchProductId={BatchProductId}&productToPartId={ProductToPartId}");
+     steps = await Http.GetFromJsonAsync<List<StepRow>>(
+    $"api/tasks/steps-for-part?batchProductId={BatchProductId}&productToPartId={ProductToPartId}");
 }
 
     private async Task Close()

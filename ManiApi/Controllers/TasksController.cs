@@ -4,7 +4,6 @@ using Microsoft.EntityFrameworkCore;
 using MySqlConnector;
 using ManiApi.Models;
 
-
 namespace ManiApi.Controllers
 {
     [ApiController]
@@ -83,7 +82,10 @@ JOIN producttopparts  ptp  ON ptp.ID = ts.ProductToPart_ID
 JOIN toppart          tp   ON tp.ID  = ptp.TopPart_ID
 WHERE t.IsActive = 1
   AND t.Tasks_Status IN (1,2)
-  AND (t.Assigned_To = @empId OR t.Assigned_To = 0)
+  AND (
+    (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To = 0))
+ OR (@empId = 0 AND (t.Assigned_To IS NULL OR t.Assigned_To = 0))
+);
 ORDER BY
   PriorityLevel DESC,
   t.Tasks_Status,
@@ -1749,8 +1751,8 @@ public sealed class UpdateCommentVisibilityDto
 [HttpGet("employee-load")]
 public async Task<IActionResult> GetEmployeeLoad([FromQuery] int empId)
 {
-    if (empId <= 0)
-        return BadRequest("empId is required.");
+if (empId < 0)
+    return BadRequest("empId is required.");
 
     var conn = _db.Database.GetDbConnection();
     await conn.OpenAsync();
@@ -1874,7 +1876,10 @@ JOIN toppart tp ON tp.ID = ptp.TopPart_ID
 WHERE t.IsActive = 1
   AND t.Tasks_Status = 1
   AND bp.is_priority = 1
-  AND (t.Assigned_To = @empId OR t.Assigned_To = 0);
+  AND (
+    (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To = 0))
+ OR (@empId = 0 AND (t.Assigned_To IS NULL OR t.Assigned_To = 0))
+);
 ";
 
 cmd2.Parameters.Add(new MySqlConnector.MySqlParameter("@empId", empId));
@@ -1938,7 +1943,10 @@ JOIN toppart tp ON tp.ID = ptp.TopPart_ID
 WHERE t.IsActive = 1
   AND t.Tasks_Status = 1
   AND bp.is_priority = 0
-  AND (t.Assigned_To = @empId OR t.Assigned_To = 0);
+  AND (
+    (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To = 0))
+ OR (@empId = 0 AND (t.Assigned_To IS NULL OR t.Assigned_To = 0))
+);
 ";
 
 cmd3.Parameters.Add(new MySqlConnector.MySqlParameter("@empId", empId));
@@ -1983,7 +1991,8 @@ await using (var r3 = await cmd3.ExecuteReaderAsync())
 [HttpGet("steps-for-part")]
 public async Task<IActionResult> GetStepsForPart(
     int batchProductId,
-    int productToPartId)
+    int productToPartId,
+    bool onlyUnassigned = false)
 {
     var list = await (
         from t in _db.Tasks
@@ -1999,8 +2008,8 @@ public async Task<IActionResult> GetStepsForPart(
         from ec in ecJoin.DefaultIfEmpty()
 
         where t.IsActive
-              && t.BatchProduct_ID == batchProductId
-              && ts.ProductToPartId == productToPartId
+      && t.BatchProduct_ID == batchProductId
+      && ts.ProductToPartId == productToPartId
 
         orderby ts.StepOrder
 
