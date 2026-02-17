@@ -4,12 +4,7 @@
 
 @inject AppState AppState
 
-<div style="color:red">SIDEBAR LOADS</div>
 
-
-@if (AppState.CurrentEmployee != null)
-
-{
     <div class="app-sidebar sidebar-root">
 
         <div class="app-sidebar-title">SIA FMM</div>
@@ -27,29 +22,22 @@
             <NavLink class="app-nav-link" href="/productiontasks-v2">
                 Ražošanas plānošana
             </NavLink>
-
-            @if (AppState.CurrentEmployee?.Role == "OFFICE")
-                {
-                    <NavLink class="app-nav-link" href="/production-priorities">
-                        Ražošanas prioritātes
-                    </NavLink>
-                }
-
+            <NavLink class="app-nav-link" href="/production-priorities">
+                Ražošanas prioritātes
+            </NavLink>
 
             <NavLink class="app-nav-link" href="/sales">
                 Izdošana
             </NavLink>
 
-            @if (AppState.CurrentEmployee?.Role == "WORKSHOP")
-            {
-                <NavLink class="app-nav-link" href="/employeetasks">
-                    Darbinieku uzdevumi
-                </NavLink>
-            }
+            <NavLink class="app-nav-link" href="/employeetasks">
+                 Darbinieku uzdevumi
+            </NavLink>
+        
 
         </nav>
     </div>
-}
+
 
 @code {
     protected override void OnInitialized()

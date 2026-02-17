@@ -1,0 +1,71 @@
+@namespace ManaApp.Components.Products
+@using ManaApp.Models
+
+<div class="product-content-box">
+
+    <div class="panel-title">Preces saturs</div>
+
+    @if (Selected is null)
+    {
+        <div style="opacity:.7">Izvēlies rindu kreisajā pusē.</div>
+    }
+    else if (Loading)
+    {
+        <div style="opacity:.7">Ielādēju...</div>
+    }
+    else if (Details is null)
+    {
+        <div style="color:#b00">Neizdevās ielādēt datus.</div>
+        <div><b>Nosaukums:</b> @Selected.productName</div>
+        <div><b>Kods:</b> @Selected.productCode</div>
+    }
+    else
+    {
+        <div class="pc-card">
+            <div class="pc-grid">
+
+                <div class="pc-field pc-span-2">
+                    <div class="pc-label">Kategorija</div>
+                    <div class="pc-value">@Details.CategoryName</div>
+                </div>
+
+                <div class="pc-field pc-span-2">
+                    <div class="pc-label">Nosaukums</div>
+                    <div class="pc-value">@Details.ProductName</div>
+                </div>
+
+                <div class="pc-field">
+                    <div class="pc-label">Kods</div>
+                    <div class="pc-value">@Details.ProductCode</div>
+                </div>
+
+                <div class="pc-field">
+                    <div class="pc-label">Versija</div>
+                    <div class="pc-value">@Details.VersionName</div>
+                </div>
+
+                <div class="pc-field">
+                    <div class="pc-label">Rasējums</div>
+                    <div class="pc-value">@Details.VersionRasejums</div>
+                </div>
+
+                <div class="pc-field">
+                    <div class="pc-label">Datums</div>
+                    <div class="pc-value">@Details.VersionDate.ToString("dd.MM.yyyy")</div>
+                </div>
+
+                <div class="pc-field pc-span-2">
+                    <div class="pc-label">Komentārs</div>
+                    <div class="pc-value pc-multiline">@Details.VersionComment</div>
+                </div>
+
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public ProductRow? Selected { get; set; }
+    [Parameter] public ProductContentDto? Details { get; set; }
+    [Parameter] public bool Loading { get; set; }
+}

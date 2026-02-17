@@ -11,7 +11,8 @@
 @inject HttpClient Http
 @inject IJSRuntime JS
 @layout MainLayout
-
+@using ManaApp.Components.Products
+@using ManaApp.Pages
        
 <PageHeader Title="Produkts" />
 
@@ -24,52 +25,34 @@
             <div class="products-left">
 
                 <div @key="filterResetKey">
-<div class="filters-row">
+<ProductsFilters
+    Categories="filteredCategories"
+    HasFilters="HasAnyFilters"
+    OnCategoryChanged="OnCategoryFilterChanged"
+    OnSearch="OnSearchInput"
+    OnClear="ClearFilters">
 
-    <!-- KREISĀ PUSE: filtri -->
-    <div class="toolbar-left">
-
-       <div class="filters-row">
-
-    <div class="filters-left">
-        <div class="root-filter">
-            <button type="button"
-                    class="root-pill @(string.IsNullOrWhiteSpace(selectedRoot) ? "active" : "")"
-                    @onclick='@(() => SetRootFilter(""))'>
-                Visi
-            </button>
-
-            <button type="button"
-                    class="root-pill @(selectedRoot == "KAUSS" ? "active" : "")"
-                    @onclick='@(() => SetRootFilter("KAUSS"))'>
-                Kausi
-            </button>
-
-            <button type="button"
-                    class="root-pill @(selectedRoot == "ADAPTERIS" ? "active" : "")"
-                    @onclick='@(() => SetRootFilter("ADAPTERIS"))'>
-                Adapteri
-            </button>
-        </div>
-
-        <select class="filter-select" @onchange="OnCategoryFilterChanged">
-            <option value="">-- Visi --</option>
-            @foreach (var parent in filteredCategories)
-            {
-                <option value="@parent">@parent</option>
-            }
-        </select>
+    <RootButtons>
+        <button type="button"
+                class="root-pill @(string.IsNullOrWhiteSpace(selectedRoot) ? "active" : "")"
+                @onclick='@(() => SetRootFilter(""))'>
+            Visi
+        </button>
 
         <button type="button"
-                class="clear-filter-btn"
-                title="Notīrīt filtrus"
-                @onclick="ClearFilters"
-                disabled="@(!HasAnyFilters)">
-            ↺
+                class="root-pill @(selectedRoot == "KAUSS" ? "active" : "")"
+                @onclick='@(() => SetRootFilter("KAUSS"))'>
+            Kausi
         </button>
-    </div>
 
-    <div class="filters-actions">
+        <button type="button"
+                class="root-pill @(selectedRoot == "ADAPTERIS" ? "active" : "")"
+                @onclick='@(() => SetRootFilter("ADAPTERIS"))'>
+            Adapteri
+        </button>
+    </RootButtons>
+
+    <Actions>
         <button type="button"
                 class="action-btn"
                 @onclick="OpenDialog">
@@ -89,206 +72,39 @@
                 disabled="@(selected is null)">
             Dzēst
         </button>
-    </div>
+    </Actions>
 
-</div>
+            </ProductsFilters>
 
-</div>
-</div>
-
-    <input type="text"
-       class="search-input"
-       placeholder="Meklēt..."
-       @oninput="OnSearchInput" />
-
-
+            <ProductsGrid
+                Rows="rows"
+                OnRowSelected="Grid_RowSelected" />
                 </div>
-
-                    <div class="left-grid-box" style="flex:1; min-height:0; overflow:auto;">
-                    <SfGrid CssClass="productsGrid"
-        TValue="ProductRow"
-        DataSource="@rows"
-        Width="100%"
-        Height="100%"
-        AllowSelection="true"
-        GridLines="GridLine.Both">
-
-                        <GridSelectionSettings Type="SelectionType.Single"></GridSelectionSettings>
-                        <GridEvents TValue="ProductRow" RowSelected="Grid_RowSelected"></GridEvents>
-
-                        <GridColumns>
-                            <GridColumn Field=@nameof(ProductRow.categoryName) HeaderText="Kategorija" Width="150"></GridColumn>
-                            <GridColumn Field=@nameof(ProductRow.productName)  HeaderText="Nosaukums"  Width="220"></GridColumn>
-                            <GridColumn Field=@nameof(ProductRow.productCode)  HeaderText="Kods"       Width="120"></GridColumn>
-                            <GridColumn Field=@nameof(ProductRow.versionName)   HeaderText="Versija"    Width="120"></GridColumn>
-                            <GridColumn Field=@nameof(ProductRow.versionDate)   HeaderText="Datums"     Width="140"
-                                        Type="ColumnType.Date" Format="dd.MM.yyyy" TextAlign="TextAlign.Center"></GridColumn>
-                        </GridColumns>
-                    </SfGrid>
-                </div>
-            </div>
+ </div>
 
             <!-- LABĀ PUSE: Preces saturs + Tehnoloģija -->
             <div class="products-right">
 
-                <!-- Preces saturs -->
-                <div class="product-content-box">
+<ProductContentBox
+    Selected="selected"
+    Details="selectedDetails"
+    Loading="loadingDetails" />
 
-                  <div class="panel-title">Preces saturs</div>
-      
+                <!-- Tehnoloģija -->
 
-                    @if (selected is null)
-                    {
-                        <div style="opacity:.7">Izvēlies rindu kreisajā pusē.</div>
-                    }
-                    else if (loadingDetails)
-                    {
-                        <div style="opacity:.7">Ielādēju...</div>
-                    }
-                    else if (selectedDetails is null)
-                    {
-                        <div style="color:#b00">Neizdevās ielādēt datus.</div>
-                        <div><b>Nosaukums:</b> @selected.productName</div>
-                        <div><b>Kods:</b> @selected.productCode</div>
-                    }
-                    else
-                    {
-  <div class="pc-card">
-    <div class="pc-grid">
-        <div class="pc-field pc-span-2">
-            <div class="pc-label">Kategorija</div>
-            <div class="pc-value">@selectedDetails.CategoryName</div>
-        </div>
+<ProductTechnologyBox
+    Selected="selected"
+    LoadingPartDetails="loadingPartDetails"
+    LoadingWorks="loadingWorks"
+    SelectedPartDetails="selectedPartDetails"
+    WorksByParts="worksByParts"
+    OnAddPart="OpenNewPartDialog"
+    OnOpenSteps="OpenStepsForPart">
+</ProductTechnologyBox>
 
-        <div class="pc-field pc-span-2">
-            <div class="pc-label">Nosaukums</div>
-            <div class="pc-value">@selectedDetails.ProductName</div>
-        </div>
-
-        <div class="pc-field">
-            <div class="pc-label">Kods</div>
-            <div class="pc-value">@selectedDetails.ProductCode</div>
-        </div>
-
-        <div class="pc-field">
-            <div class="pc-label">Rasējums</div>
-            <div class="pc-value">@((selectedDetails.VersionRasejums ?? ""))</div>
-        </div>
-
-        <div class="pc-field">
-            <div class="pc-label">Versija</div>
-            <div class="pc-value">@selectedDetails.VersionName</div>
-        </div>
-
-        <div class="pc-field">
-            <div class="pc-label">Datums</div>
-            <div class="pc-value">@selectedDetails.VersionDate.ToString("dd.MM.yyyy")</div>
-        </div>
-
-        <div class="pc-field pc-span-2">
-            <div class="pc-label">Komentārs</div>
-            <div class="pc-value pc-multiline">@((selectedDetails.VersionComment ?? ""))</div>
         </div>
     </div>
 </div>
-
-                    }
-                </div>
-
-                <!-- Tehnoloģija -->
-                <div class="technology-box">
-
-    <div class="technology-header">
-        <div class="panel-title">Tehnoloģija</div>
-
-        <div class="technology-actions">
-            <button type="button"
-        class="action-btn action-btn-sm"
-        disabled="@(selected is null)"
-        @onclick="() =>
-        {
-            newPart = new NewPartVm { TopPartId = null, QtyPerProduct = 1 };
-            newPartSteps = new List<PartStepDto>();
-            isNewPartDialogVisible = true;
-        }">
-    + pievienot jaunu detaļu
-</button>
-
-        </div>
-    </div>
-
-
-
-                    @if (selected is null)
-                    {
-                        <div style="opacity:.7">Izvēlies rindu kreisajā pusē.</div>
-                    }
-                    else if (loadingPartDetails || loadingWorks)
-                    {
-                        <div style="opacity:.7">Ielādēju…</div>
-                    }
-                    else if ((worksByParts is null || worksByParts.Count == 0) && (selectedPartDetails is null || selectedPartDetails.Count == 0))
-                    {
-                        <div style="opacity:.7">Nav detaļu.</div>
-                    }
-                    else
-                    {
-                        @foreach (var part in (worksByParts ?? new List<WorksByPartDto>()))
-                        {
-                            var isOpen = openParts.Contains(part.TopPartCode ?? "");
-                            <div class="tech-item">
-                                <div class="tech-head" @onclick="() => TogglePart(part.TopPartCode)">
-                                    <span class="tech-toggle">@((isOpen ? "−" : "+"))</span>
-                                    <span class="tech-code">@part.TopPartCode</span>
-                                    <span class="tech-name">— @part.TopPartName</span>
-                                    <span class="tech-qty">
-                                        @{
-                                            var qty = selectedPartDetails?.FirstOrDefault(x => x.TopPartCode == part.TopPartCode)?.Quantity ?? 0;
-                                        }
-                                        @(qty > 0 ? $"x{qty}" : "")
-                                    </span>
-                                    <button type="button"
-        class="action-btn action-btn-steps"
-        @onclick="(e) => OpenStepsForPart(part.TopPartCode)"
-        @onclick:stopPropagation="true">
-    + Soļi
-</button>
-
-
- <button type="button"
-        class="tech-delete-btn"
-        title="Dzēst detaļu"
-        aria-label="Dzēst detaļu"
-        @onclick="(e) => DeletePartByCode(part.TopPartCode)"
-        @onclick:stopPropagation="true">
-    🗑
-</button>
-
-
-
-
-                                </div>
-                                @if (isOpen && (part.Steps?.Any() == true))
-                                {
-                                    <ul class="tech-steps">
-  @foreach (var s in part.Steps!)
-  {
-    <li class="tech-step">
-      <span class="tech-step-arrow">➜</span>
-      <span class="tech-step-name">@s.StepName</span>
-     
-    </li>
-  }
-</ul>
-
-                                }
-                            </div>
-                        }
-                    }
-                </div>
-            </div>
-        </div>
-    </div>
 
 
 <!-- === PRECES dialogs (JAUNS/LABOT) === -->
@@ -876,37 +692,7 @@ else
         selected is null ? string.Empty : $"{selected.productName} ({selected.productCode})";
 
     // ===== Modeļi (UI pusē) =====
-    public class ProductRow
-    {
-        public int id { get; set; }
-        public string productCode { get; set; } = "";
-        public string productName { get; set; } = "";
-        public string categoryName { get; set; } = "";
-        public string rootName { get; set; } = "";
-        public string versionName { get; set; } = "";
-        public DateOnly? versionDate { get; set; }
-        public int? VersionId { get; set; }
-    }
-
-    public class ProductContentDto
-    {
-        public int VersionId { get; set; }
-        public string? CategoryName { get; set; }
-        public string? ProductName { get; set; }
-        public string? ProductCode { get; set; }
-        public string? VersionName { get; set; }
-        public string? VersionRasejums { get; set; }
-        public DateOnly VersionDate { get; set; }
-        public string? VersionComment { get; set; }
-    }
-
-    public class ProductDetailDto
-    {
-        public string? TopPartName { get; set; }
-        public string? TopPartCode { get; set; }
-        public int Quantity { get; set; }
-        public int ProductToPartId { get; set; }
-    }
+    
 
     public class CategoryDto
     {
@@ -920,27 +706,6 @@ else
     {
         public int Id { get; set; }
         public string WorkCentr_Name { get; set; } = "";
-    }
-
-    // — DTO soļiem (kā API atnāk) —
-    public class PartStepDto
-    {
-        public int Id { get; set; }
-        public int ProductToPartId { get; set; }
-        public int StepOrder { get; set; }
-        public string StepName { get; set; } = "";
-        public int StepType { get; set; }
-        public int WorkCentrId { get; set; }
-        public int ParallelGroup { get; set; }
-        public bool IsMandatory { get; set; }
-        public bool IsFinal { get; set; }
-        public string? Comments { get; set; }
-
-        public bool IsParallel
-        {
-            get => ParallelGroup > 0;
-            set => ParallelGroup = value ? 1 : 0;
-        }
     }
 
     // ===== Stāvoklis =====
@@ -1372,7 +1137,7 @@ StateHasChanged();
 
     // ===== Soļi (dialogs) =====
     private bool isStepsDialogVisible = false;
-    private List<PartStepDto> editingSteps = new();
+    private List<ManaApp.Models.PartStepDto> editingSteps = new();
 
     private string? stepsError;
 
@@ -1384,10 +1149,10 @@ StateHasChanged();
 
     private int currentStepsPartId;
 
-    private async Task<List<PartStepDto>> LoadStepsAsync(int productToPartId)
+    private async Task<List<ManaApp.Models.PartStepDto>> LoadStepsAsync(int productToPartId)
     {
         var url = $"http://localhost:5270/api/products/steps-by-part?productToPartId={productToPartId}";
-        return await Http.GetFromJsonAsync<List<PartStepDto>>(url) ?? new();
+        return await Http.GetFromJsonAsync<List<ManaApp.Models.PartStepDto>>(url) ?? new();
     }
 
     private async Task OpenStepsForPart(string? topPartCode)
@@ -1442,7 +1207,7 @@ StateHasChanged();
 var defaultStepTypeId = stepTypes?.FirstOrDefault()?.Id ?? 0;
 var defaultWcId       = workCenters?.FirstOrDefault()?.Id ?? 0;
 
-editingSteps.Add(new PartStepDto
+editingSteps.Add(new ManaApp.Models.PartStepDto
 {
     Id = 0,
     ProductToPartId = currentStepsPartId,
@@ -1999,5 +1764,12 @@ private async Task LoadActiveStepTypesAsync()
         "http://localhost:5270/api/steptypes") ?? new();
 }
 private bool copyTechnologySteps = false;
+
+private void OpenNewPartDialog()
+{
+    newPart = new NewPartVm { TopPartId = null, QtyPerProduct = 1 };
+    newPartSteps = new List<ManaApp.Models.PartStepDto>();
+    isNewPartDialogVisible = true;
+}
 
 }

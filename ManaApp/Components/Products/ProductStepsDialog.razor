@@ -1,0 +1,24 @@
+@namespace ManaApp.Components.Products
+@using ManaApp.Models
+
+<SfDialog Width="720px"
+          ShowCloseIcon="true"
+          IsModal="true"
+          ZIndex="10050"
+          Header="Tehnoloģijas soļi"
+          @bind-Visible="Visible">
+
+    <DialogTemplates>
+        <Content>
+            @ChildContent
+        </Content>
+    </DialogTemplates>
+
+</SfDialog>
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

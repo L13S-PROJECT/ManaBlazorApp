@@ -47,9 +47,16 @@ public sealed class ProductSimpleRow
 public sealed class ProductContentDto
 {
     public int VersionId { get; set; }
-    public string? VersionName { get; set; }
+
+    public string? CategoryName { get; set; }   // ← PIEVIENO
+
     public string ProductName { get; set; } = string.Empty;
     public string ProductCode { get; set; } = string.Empty;
+
+    public string? VersionName { get; set; }
+    public string? VersionRasejums { get; set; }   // ← PIEVIENO
+    public DateOnly VersionDate { get; set; }      // ← PIEVIENO
+    public string? VersionComment { get; set; }    // ← PIEVIENO
 }
 
 public sealed class StockSummary
@@ -63,6 +70,7 @@ public sealed class StockSummary
     [JsonPropertyName("scrap")]           public int Scrap { get; set; }
     [JsonPropertyName("out")]             public int Out { get; set; }
     [JsonPropertyName("planned")]         public int Planned { get; set; }
+    
 }
 
 public sealed class BatchPlannedRow

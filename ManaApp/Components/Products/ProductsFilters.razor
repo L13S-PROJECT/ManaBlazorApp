@@ -1,0 +1,48 @@
+@namespace ManaApp.Components.Products
+
+<div class="filters-row">
+
+    <div class="filters-left">
+        <div class="root-filter">
+            @RootButtons
+        </div>
+
+        <select class="filter-select" @onchange="OnCategoryChanged">
+            <option value="">-- Visi --</option>
+            @foreach (var parent in Categories)
+            {
+                <option value="@parent">@parent</option>
+            }
+        </select>
+
+        <button type="button"
+                class="clear-filter-btn"
+                title="Notīrīt filtrus"
+                @onclick="OnClear"
+                disabled="@(!HasFilters)">
+            ↺
+        </button>
+    </div>
+
+    <div class="filters-actions">
+        @Actions
+    </div>
+
+</div>
+
+<input type="text"
+       class="search-input"
+       placeholder="Meklēt..."
+       @oninput="OnSearch" />
+
+@code {
+    [Parameter] public RenderFragment? RootButtons { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+
+    [Parameter] public IEnumerable<string> Categories { get; set; } = Enumerable.Empty<string>();
+    [Parameter] public bool HasFilters { get; set; }
+
+    [Parameter] public EventCallback<ChangeEventArgs> OnCategoryChanged { get; set; }
+    [Parameter] public EventCallback<ChangeEventArgs> OnSearch { get; set; }
+    [Parameter] public EventCallback OnClear { get; set; }
+}

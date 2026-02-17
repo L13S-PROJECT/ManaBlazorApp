@@ -1,0 +1,36 @@
+@using Syncfusion.Blazor.Grids
+@namespace ManaApp.Components.Products
+@using ManaApp.Pages
+
+<SfGrid CssClass="productsGrid"
+        TValue="ProductRow"
+        DataSource="@Rows"
+        Width="100%"
+        Height="100%"
+        AllowSelection="true"
+        GridLines="GridLine.Both">
+
+    <GridSelectionSettings Type="SelectionType.Single"></GridSelectionSettings>
+    <GridEvents TValue="ProductRow"
+                RowSelected="OnRowSelected"></GridEvents>
+
+    <GridColumns>
+        <GridColumn Field=@nameof(ProductRow.categoryName) HeaderText="Kategorija" Width="150"></GridColumn>
+        <GridColumn Field=@nameof(ProductRow.productName)  HeaderText="Nosaukums"  Width="220"></GridColumn>
+        <GridColumn Field=@nameof(ProductRow.productCode)  HeaderText="Kods"       Width="120"></GridColumn>
+        <GridColumn Field=@nameof(ProductRow.versionName)  HeaderText="Versija"    Width="120"></GridColumn>
+        <GridColumn Field=@nameof(ProductRow.versionDate)  HeaderText="Datums"
+                    Width="140"
+                    Type="ColumnType.Date"
+                    Format="dd.MM.yyyy"
+                    TextAlign="TextAlign.Center">
+        </GridColumn>
+    </GridColumns>
+</SfGrid>
+
+@code {
+    [Parameter] public List<ProductRow> Rows { get; set; } = new();
+    [Parameter] public EventCallback<RowSelectEventArgs<ProductRow>> OnRowSelected { get; set; }
+
+    
+}

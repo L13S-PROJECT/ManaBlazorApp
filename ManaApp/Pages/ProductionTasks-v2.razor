@@ -165,8 +165,13 @@ AllProducts = await Http.GetFromJsonAsync<List<ProductRow>>(
     if (!firstRender || _batchFromUrl <= 0)
         return;
 
-    var batch = await Http.GetFromJsonAsync<ProductBatchRow>(
-        $"http://localhost:5270/api/batches/by-id?batchProductId={_batchFromUrl}");
+    var response = await Http.GetAsync(
+    $"http://localhost:5270/api/batches/by-id?batchProductId={_batchFromUrl}");
+
+if (!response.IsSuccessStatusCode)
+    return;
+
+var batch = await response.Content.ReadFromJsonAsync<ProductBatchRow>();
 
     if (batch == null)
         return;
