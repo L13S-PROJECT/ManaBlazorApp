@@ -1,0 +1,107 @@
+@namespace ManaApp.Components.Products
+@using Syncfusion.Blazor.Popups
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Inputs
+@using ManaApp.Models
+
+<SfDialog Width="520px"
+          ShowCloseIcon="true"
+          IsModal="true"
+          ZIndex="10060"
+          CssClass="newPartDialog"
+          @bind-Visible="Visible">
+
+    <DialogTemplates>
+
+        <Header>Jauna detaļa – @SelectedProductLabel</Header>
+
+        <Content>
+            <div class="newpart-form">
+
+                <label class="newpart-label newpart-label-strong">
+                    Detaļas veids
+                </label>
+
+                <div class="newpart-field">
+                    <SfDropDownList TValue="int?" TItem="TopPartDto"
+                                    CssClass="newpart-ddl"
+                                    DataSource="TopParts"
+                                    Placeholder="-- izvēlies detaļu --"
+                                    @bind-Value="Model.TopPartId"
+                                    AllowFiltering="true"
+                                    Width="100%">
+                        <DropDownListFieldSettings Text="Display" Value="Id" />
+                    </SfDropDownList>
+                </div>
+
+                <label class="newpart-label newpart-label-strong">
+                    Daudzums uz izstrādājumu
+                </label>
+
+                <div class="newpart-field">
+                    <SfNumericTextBox TValue="int"
+                                      CssClass="newpart-num"
+                                      @bind-Value="Model.QtyPerProduct"
+                                      Min="1"
+                                      Step="1"
+                                      Width="140px" />
+                </div>
+
+            </div>
+        </Content>
+
+        <FooterTemplate>
+            <div class="newpart-footer">
+
+                <button type="button"
+                        class="action-btn action-btn-sm action-btn-primary"
+                        disabled="@Invalid"
+                        @onclick="Save">
+                    Saglabāt
+                </button>
+
+                <button type="button"
+                        class="action-btn action-btn-sm"
+                        @onclick="Close">
+                    Aizvērt
+                </button>
+
+            </div>
+        </FooterTemplate>
+
+    </DialogTemplates>
+
+</SfDialog>
+
+@code {
+
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+
+    [Parameter] public string SelectedProductLabel { get; set; } = "";
+
+    [Parameter] public List<TopPartDto> TopParts { get; set; } = new();
+
+    [Parameter] public NewPartVm Model { get; set; } = new();
+
+    [Parameter] public EventCallback<NewPartVm> OnSave { get; set; }
+
+    private bool Invalid =>
+        Model is null
+        || Model.TopPartId is null
+        || Model.QtyPerProduct < 1;
+
+    private async Task Save()
+    {
+        if (OnSave.HasDelegate)
+            await OnSave.InvokeAsync(Model);
+
+        await Close();
+    }
+
+    private async Task Close()
+    {
+        Visible = false;
+        await VisibleChanged.InvokeAsync(false);
+    }
+}

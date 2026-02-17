@@ -1,0 +1,107 @@
+@using ManaApp.Models
+@using Syncfusion.Blazor.Popups
+@namespace ManaApp.Components.Products
+
+<SfDialog Width="520px"
+          ShowCloseIcon="true"
+          IsModal="true"
+          ZIndex="10070"
+          Header="Darba centri"
+          @bind-Visible="Visible">
+
+    <DialogTemplates>
+        <Content>
+
+            <div class="manage-toolbar">
+                <input class="manage-input-small"
+                       type="text"
+                       placeholder="Jauns nosaukums"
+                       @bind="NewName" />
+
+                <button type="button"
+                        class="action-btn action-btn-sm"
+                        @onclick="OnAdd">
+                    Pievienot
+                </button>
+            </div>
+
+            <table class="manage-table">
+                <thead>
+                    <tr>
+                        <th>Nosaukums</th>
+                        <th style="width:120px;"></th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @foreach (var it in Items ?? Enumerable.Empty<WorkCenterManageDto>())
+                    {
+                        <tr>
+                            <td>
+                                @if (EditId == it.Id)
+                                {
+                                    <input class="manage-input-small"
+                                           type="text"
+                                           @bind="EditName" />
+                                }
+                                else
+                                {
+                                    @it.WorkCentr_Name
+                                }
+                            </td>
+
+                            <td class="manage-actions">
+                                @if (EditId == it.Id)
+                                {
+                                    <button class="action-btn action-btn-xs"
+                                            @onclick="OnSaveEdit">
+                                        Saglabāt
+                                    </button>
+
+                                    <button class="action-btn action-btn-xs"
+                                            @onclick="OnCancelEdit">
+                                        Atcelt
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button class="action-btn action-btn-xs"
+                                            @onclick="() => OnBeginEdit.InvokeAsync(it)">
+                                        Labot
+                                    </button>
+
+                                    @if (it.IsActive)
+                                    {
+                                        <button class="icon-btn"
+                                                @onclick="() => OnDelete.InvokeAsync(it.Id)">
+                                            🗑
+                                        </button>
+                                    }
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+        </Content>
+    </DialogTemplates>
+
+</SfDialog>
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+
+    [Parameter] public List<WorkCenterManageDto>? Items { get; set; }
+    [Parameter] public string NewName { get; set; } = "";
+    [Parameter] public int? EditId { get; set; }
+    [Parameter] public string EditName { get; set; } = "";
+
+    [Parameter] public EventCallback OnAdd { get; set; }
+    [Parameter] public EventCallback OnSaveEdit { get; set; }
+    [Parameter] public EventCallback OnCancelEdit { get; set; }
+
+    [Parameter] public EventCallback<WorkCenterManageDto> OnBeginEdit { get; set; }
+    [Parameter] public EventCallback<int> OnDelete { get; set; }
+}

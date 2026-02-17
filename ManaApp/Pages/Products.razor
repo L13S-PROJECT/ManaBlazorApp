@@ -99,7 +99,8 @@
     SelectedPartDetails="selectedPartDetails"
     WorksByParts="worksByParts"
     OnAddPart="OpenNewPartDialog"
-    OnOpenSteps="OpenStepsForPart">
+    OnOpenSteps="OpenStepsForPart"
+    OnDeletePart="DeletePartByCode">
 </ProductTechnologyBox>
 
         </div>
@@ -114,7 +115,8 @@
     IsModal="true"
     ZIndex="10000"
     Header="@(isEdit ? "Labot preci" : "Jauna prece")"
-    @bind-Visible="isDialogVisible">
+    Visible="IsProductDialogOpen"
+    VisibleChanged="@(v => SetMainDialog(v ? "Product" : null))">
 
     <DialogTemplates>
         <Content>
@@ -258,323 +260,59 @@
 
 <!-- === TEHNOLOĢIJAS SOĻI dialogs === -->
 <ProductStepsDialog
-    @bind-Visible="isStepsDialogVisible"
+    Visible="IsStepsOpen"
+    VisibleChanged="@(v => SetMainDialog(v ? "Steps" : null))"
     Steps="editingSteps"
     StepTypes="stepTypes"
     WorkCenters="workCenters"
     OnMoveUp="MoveUp"
     OnMoveDown="MoveDown"
     OnDelete="DeleteStepAsync"
-    OnSetFinal="SetFinalStep">
-
-<ChildContent>
-
-<div class="steps-dialog-actions">
-    <button type="button"
-            class="action-btn action-btn-sm"
-            title="Pārvaldīt tehnoloģijas soļu tipus"
-            @onclick="OpenStepTypeDialogAsync">
-        ⚙ Soļu tipi
-    </button>
-
-    <button type="button"
-            class="action-btn action-btn-sm"
-            title="Pārvaldīt darba centrus"
-            @onclick="OpenWorkCenterDialogAsync">
-        🏭 Darba centri
-    </button>
-</div>
-
-</ChildContent>
-
-<FooterContent>
-  <div class="steps-footer">
-    <button type="button"
-        class="action-btn action-btn-sm"
-        title="Pievieno jaunu tehnoloģijas soli šai detaļai"
-        @onclick="AddStep">
-    + Pievienot soli
-</button>
-
-<button type="button"
-        class="action-btn action-btn-sm action-btn-primary"
-        title="Saglabāt"
-        @onclick="SaveStepsAsync">
-    Saglabāt
-</button>
-
-<button type="button"
-        class="action-btn action-btn-sm"
-        title="Aizvērt logu"
-        @onclick="CloseStepsDialog">
-    Aizvērt
-</button>
-
-  </div>
-
-</FooterContent>
-
-</ProductStepsDialog>
+    OnSetFinal="SetFinalStep"
+    OnOpenStepTypes="OpenStepTypeDialogAsync"
+    OnOpenWorkCenters="OpenWorkCenterDialogAsync"
+    OnAddStep="AddStep"
+    OnSave="SaveStepsAsync"
+    OnClose="CloseStepsDialog" />
 
 <!-- === labots līdz šai vietai === -->
 
-  <SfDialog Width="520px"
-          ShowCloseIcon="true"
-          IsModal="true"
-          ZIndex="10060"
-          Header="Soļu tipu vārdnīca"
-          @bind-Visible="isStepTypeDialogVisible">
-  <DialogTemplates>
-    <Content>
-   <div class="manage-toolbar">
-    <input class="manage-input-small"
-           type="text"
-           placeholder="Jauns nosaukums"
-           @bind="newStepTypeName" />
+    <StepTypesDialog
+    Visible="isStepTypesOpen"
+    VisibleChanged="@(v => isStepTypesOpen = v)"
+    Items="manageStepTypes"
+    NewName="@newStepTypeName"
+    EditId="@editStepTypeId"
+    EditName="@editStepTypeName"
+    OnAdd="AddStepTypeAsync"
+    OnSaveEdit="SaveEditStepTypeAsync"
+    OnCancelEdit="CancelEditStepType"
+    OnBeginEdit="BeginEditStepType"
+    OnDelete="DeleteStepTypeAsync">
+</StepTypesDialog>
 
-    <button type="button"
-            class="action-btn action-btn-sm"
-            title="Pievienot jaunu soļa tipu"
-            @onclick="AddStepTypeAsync">
-        Pievienot
-    </button>
-</div>
-
-
-
-      <table class="steps-table">
-
-        <thead>
-          <tr><th style="text-align:left;">Nosaukums</th><th style="text-align:left; width:120px;"></th></tr>
-        </thead>
-        <tbody>
-         @foreach (var t in manageStepTypes)
-{
-    <tr style="border-bottom:1px solid #eee;">
-        <td>
-            @if (editStepTypeId == t.Id)
-{
-    <input class="manage-input-small"
-           type="text"
-           @bind="editStepTypeName" />
-}
-else
-{
-    @t.Name
-}
-
-        </td>
-<td class="manage-actions">
-    @if (editStepTypeId == t.Id)
-    {
-        <button type="button"
-                class="action-btn action-btn-xs"
-                title="Saglabāt izmaiņas"
-                @onclick="SaveEditStepTypeAsync">
-            Saglabāt
-        </button>
-
-        <button type="button"
-                class="action-btn action-btn-xs"
-                title="Atcelt rediģēšanu"
-                @onclick="CancelEditStepType">
-            Atcelt
-        </button>
-    }
-    else
-    {
-        <button type="button"
-                class="action-btn action-btn-xs"
-                title="Labot soļa tipu"
-                @onclick="() => BeginEditStepType(t.Id, t.Name)">
-            Labot
-        </button>
-
-        @if (t.IsActive)
-        {
-            <button type="button"
-                    class="icon-btn"
-                    title="Dzēst soļa tipu"
-                    aria-label="Dzēst soļa tipu"
-                    @onclick="() => DeleteStepTypeAsync(t.Id)">
-                🗑
-            </button>
-        }
-    }
-</td>
-
-    </tr>
-}
-
-        </tbody>
-      </table>
-
-      
-    </Content>
-  </DialogTemplates>
-</SfDialog>
-
-<SfDialog Width="520px"
-          ShowCloseIcon="true"
-          IsModal="true"
-          ZIndex="10070"
-          Header="Darba centri"
-          @bind-Visible="isWorkCenterDialogVisible">
-  <DialogTemplates>
-    <Content>
-
-  <div class="manage-toolbar">
-
-    <input class="manage-input-small"
-           type="text"
-           placeholder="Jauns nosaukums"
-           @bind="newWorkCenterName" />
-
-    <button type="button"
-            class="action-btn action-btn-sm"
-            title="Pievienot darba centru"
-            @onclick="AddWorkCenterAsync">
-      Pievienot
-    </button>
-  </div>
-
-  <table class="manage-table">
-    <thead>
-      <tr>
-        <th>Nosaukums</th>
-        <th style="width:120px;"></th>
-      </tr>
-    </thead>
-    <tbody>
-      @foreach (var it in manageWorkCenters)
-      {
-        <tr>
-          <td>
-            @if (editWorkCenterId == it.Id)
-            {
-              <input class="manage-input-small"
-                     type="text"
-                     @bind="editWorkCenterName" />
-            }
-            else
-            {
-              @it.WorkCentr_Name
-            }
-          </td>
-
-          <td class="manage-actions">
-            @if (editWorkCenterId == it.Id)
-            {
-              <button type="button"
-                      class="action-btn action-btn-xs"
-                      title="Saglabāt"
-                      @onclick="SaveEditWorkCenterAsync">
-                Saglabāt
-              </button>
-
-              <button type="button"
-                      class="action-btn action-btn-xs"
-                      title="Atcelt"
-                      @onclick="CancelEditWorkCenter">
-                Atcelt
-              </button>
-            }
-            else
-            {
-              <button type="button"
-                      class="action-btn action-btn-xs"
-                      title="Labot darba centru"
-                      @onclick="() => BeginEditWorkCenter(it.Id, it.WorkCentr_Name)">
-                Labot
-              </button>
-
-              @if (it.IsActive)
-              {
-                <button type="button"
-                        class="icon-btn"
-                        title="Dzēst darba centru"
-                        aria-label="Dzēst darba centru"
-                        @onclick="() => DeleteWorkCenterAsync(it.Id)">
-                  🗑
-                </button>
-              }
-            }
-          </td>
-        </tr>
-      }
-    </tbody>
-  </table>
-
-</Content>
-
-  </DialogTemplates>
-</SfDialog>
-
+    <WorkCentersDialog
+    Visible="isWorkCentersOpen"
+    VisibleChanged="@(v => isWorkCentersOpen = v)"
+    Items="manageWorkCenters"
+    NewName="newWorkCenterName"
+    EditId="editWorkCenterId"
+    EditName="editWorkCenterName"
+    OnAdd="AddWorkCenterAsync"
+    OnSaveEdit="SaveEditWorkCenterAsync"
+    OnCancelEdit="CancelEditWorkCenter"
+    OnBeginEdit="BeginEditWorkCenter"
+    OnDelete="DeleteWorkCenterAsync" >
+</WorkCentersDialog>
 
 <!-- === JAUNA DETAĻA dialogs === -->
-<SfDialog
-    Width="520px"
-    ShowCloseIcon="true"
-    IsModal="true"
-    ZIndex="10060"
-    CssClass="newPartDialog"
-    @bind-Visible="isNewPartDialogVisible">
-
-  <DialogTemplates>
-    <Header>Jauna detaļa – @SelectedProductLabel</Header>
-    <Content>
-  <div class="newpart-form">
-    <label class="newpart-label newpart-label-strong">Detaļas veids</label>
-
-    <div class="newpart-field">
-      <SfDropDownList TValue="int?" TItem="TopPartDto"
-                CssClass="newpart-ddl"
-                DataSource="topParts"
-                Placeholder="-- izvēlies detaļu --"
-                @bind-Value="newPart.TopPartId"
-                AllowFiltering="true"
-                Width="100%">
-  <DropDownListFieldSettings Text="Display" Value="Id"></DropDownListFieldSettings>
-</SfDropDownList>
-
-    </div>
-
-    <label class="newpart-label newpart-label-strong">Daudzums uz izstrādājumu</label>
-    <div class="newpart-field">
-      <SfNumericTextBox TValue="int"
-      IncrementTitle="Palielināt"
-    DecrementTitle="Samazināt"
-                  CssClass="newpart-num"
-                  @bind-Value="newPart.QtyPerProduct"
-                  Min="1"
-                  Step="1"
-                  Width="140px">
-</SfNumericTextBox>
-
-
-    </div>
-  </div>
-</Content>
-
-   <FooterTemplate>
-  <div class="newpart-footer">
-    <button type="button"
-            @onclick="SaveNewPart"
-            disabled="@NewPartInvalid"
-            class="action-btn action-btn-sm action-btn-primary">
-      Saglabāt
-    </button>
-
-    <button type="button"
-            @onclick="CloseNewPartDialog"
-            class="action-btn action-btn-sm">
-      Aizvērt
-    </button>
-  </div>
-</FooterTemplate>
-
-  </DialogTemplates>
-</SfDialog>
+<NewPartDialog
+    Visible="IsNewPartOpen"
+    VisibleChanged="@(v => SetMainDialog(v ? "NewPart" : null))"
+    SelectedProductLabel="SelectedProductLabel"
+    TopParts="topParts"
+    Model="newPart"
+    OnSave="HandleNewPartSave" />
 
 
 @code {
@@ -584,8 +322,13 @@ else
         selected is null ? string.Empty : $"{selected.productName} ({selected.productCode})";
 
     // ===== Modeļi (UI pusē) =====
-    
+    private string? activeMainDialog = null;
 
+    private bool IsStepsOpen => activeMainDialog == "Steps";
+    private bool IsNewPartOpen => activeMainDialog == "NewPart";
+
+    private bool isStepTypesOpen = false;
+    private bool isWorkCentersOpen = false;
     public class CategoryDto
     {
         public int Id { get; set; }
@@ -607,8 +350,6 @@ else
     private ProductContentDto? selectedDetails;
     private bool loadingDetails = false;
     private HashSet<string> openParts = new();
-
-    private bool isDialogVisible;
 
     // Režīmi dialogam
     bool isEdit = false;
@@ -797,7 +538,7 @@ catch { stepTypes = new List<StepTypeDto>(); }
         newVersionDate = null;
         newVersionComment = null;
 
-        isDialogVisible = true;
+        SetMainDialog("Product");
     }
 
     
@@ -826,12 +567,12 @@ catch { stepTypes = new List<StepTypeDto>(); }
     newVersionDate     = selectedDetails.VersionDate;
 
     showValidation = false;
-    isDialogVisible = true;
+    SetMainDialog("Product");
 }
 
 private void CloseDialog()
 {
-    isDialogVisible = false;
+    SetMainDialog(null);
     isEdit = false;
     createNewVersion = false;
     copyTechnologySteps = false; // ✅ PIEVIENO ŠO
@@ -1021,7 +762,6 @@ StateHasChanged();
     }
 
     // ===== Soļi (dialogs) =====
-    private bool isStepsDialogVisible = false;
     private List<ManaApp.Models.PartStepDto> editingSteps = new();
 
     private string? stepsError;
@@ -1041,7 +781,7 @@ StateHasChanged();
     }
 
     private async Task OpenStepsForPart(string? topPartCode)
-    {
+    {       
         stepsError = null;
         
         if (string.IsNullOrWhiteSpace(topPartCode) || selectedPartDetails is null) return;
@@ -1056,17 +796,18 @@ editingSteps = await LoadStepsAsync(detail.ProductToPartId);
 await LoadActiveWorkCentersAsync();
 await LoadActiveStepTypesAsync();
 
-isStepsDialogVisible = true;
-StateHasChanged();
+        SetMainDialog("Steps");
 
         StateHasChanged();
     }
 
 private async Task CloseStepsDialog()
 {
+    isStepTypesOpen = false;
+    isWorkCentersOpen = false;
+
     stepsError = null;
-    
-    isStepsDialogVisible = false;
+    SetMainDialog(null);
 
     // Pēc soļu rediģēšanas/dzēšanas atsvaidzini labo pusi (“Tehnoloģija” sarakstu)
     if (selected is not null)
@@ -1286,20 +1027,10 @@ await CloseStepsDialog();
     }
 
     // ===== Jaunas detaļas dialogs =====
-    private bool isNewPartDialogVisible = false;
-
-private class NewPartVm
-{
-    public int? TopPartId { get; set; }
-    public int QtyPerProduct { get; set; } = 1;
-}
-
-    private NewPartVm newPart = new();
+   private NewPartVm newPart = new();
     private List<PartStepDto> newPartSteps = new();
 
-    
-
-    private void CloseNewPartDialog() => isNewPartDialogVisible = false;
+    private void CloseNewPartDialog() => SetMainDialog(null);
 
 private async Task SaveNewPart()
 {
@@ -1328,20 +1059,10 @@ selectedPartDetails = await Http.GetFromJsonAsync<List<ProductDetailDto>>(
 worksByParts = await Http.GetFromJsonAsync<List<WorksByPartDto>>(
     $"http://localhost:5270/api/products/works-by-product?id={selected!.id}") ?? new();
 
-isNewPartDialogVisible = false;
+SetMainDialog(null);
 
 openParts.Clear(); // ✅ aizver visus atvērtos pēc soļu saglabāšanas/dzēšanas
 StateHasChanged();
-}
-
-
-
-    private class TopPartDto
-{
-    public int Id { get; set; }
-    public string TopPartName { get; set; } = "";
-    public string TopPartCode { get; set; } = "";
-    public string Display => $"{TopPartCode} — {TopPartName}";
 }
 
 private List<TopPartDto> topParts = new();
@@ -1364,16 +1085,8 @@ private async Task DeletePartByCode(string? topPartCode)
 private List<StepTypeDto> stepTypes = new();
 
 // pārvaldības dialogs
-private bool isStepTypeDialogVisible = false;
-
 private string newStepTypeName = "";
 
-private class StepTypeRow
-{
-    public int Id { get; set; }
-    public string Name { get; set; } = "";
-    public bool IsActive { get; set; }
-}
 private List<StepTypeRow> manageStepTypes = new();
 
 private int? editStepTypeId = null;
@@ -1395,8 +1108,8 @@ private async Task OpenStepTypeDialogAsync()
     // notīrām jebkuru iepriekšējo rediģēšanas stāvokli
     editStepTypeId = null;
     editStepTypeName = "";
-
-    isStepTypeDialogVisible = true;
+    isWorkCentersOpen = false;
+    isStepTypesOpen = true;
     StateHasChanged();
 }
 
@@ -1429,10 +1142,10 @@ private async Task AddStepTypeAsync()
     StateHasChanged();
 }
 
-private void BeginEditStepType(int id, string current)
+private void BeginEditStepType(StepTypeRow row)
 {
-    editStepTypeId = id;
-    editStepTypeName = current;
+    editStepTypeId = row.Id;
+    editStepTypeName = row.Name;
 }
 
 private void CancelEditStepType()
@@ -1480,25 +1193,16 @@ private async Task DeleteStepTypeAsync(int id)
 
 // dropdown atsvaidzināšanai
 
-private bool isWorkCenterDialogVisible = false;
 private List<WorkCenterManageDto> manageWorkCenters = new();
-
-private class WorkCenterManageDto
-{
-    public int Id { get; set; }
-    public string WorkCentr_Name { get; set; } = "";
-    public bool IsActive { get; set; }
-}
 
 private async Task OpenWorkCenterDialogAsync()
 {
     manageWorkCenters = (await Http.GetFromJsonAsync<List<WorkCenterManageDto>>(
-    "http://localhost:5270/api/workcenters/manage") ?? new())
-    .Where(x => x.IsActive)                   // ← slēpjam neaktīvos
-    .ToList();
-isWorkCenterDialogVisible = true;
-StateHasChanged();
-
+        "http://localhost:5270/api/workcenters/manage") ?? new())
+        .Where(x => x.IsActive)
+        .ToList();
+    isStepTypesOpen = false;
+    isWorkCentersOpen = true;
 }
 
 private string newWorkCenterName = "";
@@ -1537,10 +1241,6 @@ var resp = await Http.PostAsJsonAsync("http://localhost:5270/api/workcenters/add
 
 }
 
-private void BeginEditWorkCenter(int id, string current)
-{
-    editWorkCenterId = id; editWorkCenterName = current;
-}
 
 private void CancelEditWorkCenter()
 {
@@ -1647,7 +1347,32 @@ private void OpenNewPartDialog()
 {
     newPart = new NewPartVm { TopPartId = null, QtyPerProduct = 1 };
     newPartSteps = new List<ManaApp.Models.PartStepDto>();
-    isNewPartDialogVisible = true;
+    SetMainDialog("NewPart");
+}
+
+private Task HandleBeginEditStepType(StepTypeRow row)
+{
+    editStepTypeId = row.Id;
+    editStepTypeName = row.Name;
+    return Task.CompletedTask;
+}
+
+private void BeginEditWorkCenter(WorkCenterManageDto it)
+{
+    editWorkCenterId = it.Id;
+    editWorkCenterName = it.WorkCentr_Name;
+}
+
+private async Task HandleNewPartSave(NewPartVm model)
+{
+    await SaveNewPart();
+}
+
+private bool IsProductDialogOpen => activeMainDialog == "Product";
+private void SetMainDialog(string? dialog)
+{
+    activeMainDialog = dialog;
+    StateHasChanged();
 }
 
 }

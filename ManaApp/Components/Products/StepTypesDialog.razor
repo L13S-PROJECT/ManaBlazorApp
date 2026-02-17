@@ -1,0 +1,108 @@
+@using ManaApp.Models
+@using Syncfusion.Blazor.Popups
+
+<SfDialog Width="520px"
+          ShowCloseIcon="true"
+          IsModal="true"
+          ZIndex="10060"
+          Header="Soļu tipu vārdnīca"
+          @bind-Visible="Visible">
+
+    <DialogTemplates>
+        <Content>
+
+            <div class="manage-toolbar">
+                <input class="manage-input-small"
+                       type="text"
+                       placeholder="Jauns nosaukums"
+                       @bind="NewName" />
+
+                <button type="button"
+                        class="action-btn action-btn-sm"
+                        @onclick="OnAdd">
+                    Pievienot
+                </button>
+            </div>
+
+            <table class="steps-table">
+                <thead>
+                    <tr>
+                        <th>Nosaukums</th>
+                        <th style="width:120px;"></th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @foreach (var t in Items ?? Enumerable.Empty<StepTypeRow>())
+                    {
+                        <tr>
+                            <td>
+                                @if (EditId == t.Id)
+                                {
+                                    <input class="manage-input-small"
+                                           type="text"
+                                           @bind="EditName" />
+                                }
+                                else
+                                {
+                                    @t.Name
+                                }
+                            </td>
+
+                            <td class="manage-actions">
+                                @if (EditId == t.Id)
+                                {
+                                    <button class="action-btn action-btn-xs"
+                                            @onclick="OnSaveEdit">
+                                        Saglabāt
+                                    </button>
+
+                                    <button class="action-btn action-btn-xs"
+                                            @onclick="OnCancelEdit">
+                                        Atcelt
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button class="action-btn action-btn-xs"
+                                            @onclick="() => OnBeginEdit.InvokeAsync(t)">
+                                        Labot
+                                    </button>
+
+                                    @if (t.IsActive)
+                                    {
+                                        <button class="icon-btn"
+                                                @onclick="() => OnDelete.InvokeAsync(t.Id)">
+                                            🗑
+                                        </button>
+                                    }
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+        </Content>
+    </DialogTemplates>
+
+</SfDialog>
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+
+    [Parameter] public List<StepTypeRow>? Items { get; set; }
+    [Parameter] public string NewName { get; set; } = "";
+    [Parameter] public int? EditId { get; set; }
+    [Parameter] public string EditName { get; set; } = "";
+
+    [Parameter] public EventCallback OnAdd { get; set; }
+    [Parameter] public EventCallback OnSaveEdit { get; set; }
+    [Parameter] public EventCallback OnCancelEdit { get; set; }
+
+    [Parameter] public EventCallback<StepTypeRow> OnBeginEdit { get; set; }
+    [Parameter] public EventCallback<int> OnDelete { get; set; }
+
+
+}

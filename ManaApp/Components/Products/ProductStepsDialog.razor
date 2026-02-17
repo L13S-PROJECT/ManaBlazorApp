@@ -14,6 +14,20 @@
 
 <DialogTemplates>
 <Content>
+        <div class="steps-dialog-actions">
+            <button type="button"
+                    class="action-btn action-btn-sm"
+                    @onclick="() => OnOpenStepTypes.InvokeAsync()">
+                ⚙ Soļu tipi
+            </button>
+
+            <button type="button"
+                    class="action-btn action-btn-sm"
+                    @onclick="() => OnOpenWorkCenters.InvokeAsync()">
+                🏭 Darba centri
+            </button>
+        </div>
+
     @if (Steps is null || Steps.Count == 0)
     {
         <div style="opacity:.7">Šai detaļai soļu nav.</div>
@@ -114,18 +128,41 @@
     }
 </Content>
 
-    <FooterTemplate>
-        @FooterContent
-    </FooterTemplate>
+<FooterTemplate>
+    <div class="steps-footer">
+
+        <button type="button"
+                class="action-btn action-btn-sm"
+                title="Pievieno jaunu tehnoloģijas soli šai detaļai"
+                @onclick="OnAddStep">
+            + Pievienot soli
+        </button>
+
+        <button type="button"
+                class="action-btn action-btn-sm action-btn-primary"
+                title="Saglabāt"
+                @onclick="OnSave">
+            Saglabāt
+        </button>
+
+        <button type="button"
+                class="action-btn action-btn-sm"
+                title="Aizvērt logu"
+                @onclick="OnClose">
+            Aizvērt
+        </button>
+
+    </div>
+</FooterTemplate>
 </DialogTemplates>
 
 </SfDialog>
+
 
 @code {
     [Parameter] public bool Visible { get; set; }
     [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
-    [Parameter] public RenderFragment? FooterContent { get; set; }
     [Parameter] public List<PartStepDto>? Steps { get; set; }
     [Parameter] public IEnumerable<StepTypeDto>? StepTypes { get; set; }
     [Parameter] public IEnumerable<WorkCenter>? WorkCenters { get; set; }
@@ -142,5 +179,10 @@ private bool IsLastStep(PartStepDto s)
         var maxOrder = Steps.Max(x => x.StepOrder);
         return s.StepOrder == maxOrder;
     }
+[Parameter] public EventCallback OnOpenStepTypes { get; set; }
+[Parameter] public EventCallback OnOpenWorkCenters { get; set; }
 
+[Parameter] public EventCallback OnAddStep { get; set; }
+[Parameter] public EventCallback OnSave { get; set; }
+[Parameter] public EventCallback OnClose { get; set; }
 }
