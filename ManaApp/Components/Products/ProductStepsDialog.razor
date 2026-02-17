@@ -1,5 +1,9 @@
-@namespace ManaApp.Components.Products
 @using ManaApp.Models
+@using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Popups
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Inputs
+
 
 <SfDialog Width="720px"
           ShowCloseIcon="true"
@@ -8,17 +12,135 @@
           Header="Tehnoloģijas soļi"
           @bind-Visible="Visible">
 
-    <DialogTemplates>
-        <Content>
-            @ChildContent
-        </Content>
-    </DialogTemplates>
+<DialogTemplates>
+<Content>
+    @if (Steps is null || Steps.Count == 0)
+    {
+        <div style="opacity:.7">Šai detaļai soļu nav.</div>
+    }
+    else
+    {
+    <table class="steps-table">
+            <thead>
+                    <tr class="steps-table-head">
+                    <th class="steps-th steps-th-order">Secība</th>
+                    <th class="steps-th">Nosaukums</th>
+                    <th class="steps-th steps-th-steptype">Step Type</th>
+                    <th class="steps-th steps-th-workcenter">Darba centrs</th>
+
+
+                    <th class="steps-th steps-th-flags">Statuss</th>
+
+                    <th class="steps-th">Komentārs</th>
+                    <th class="steps-th steps-th-actions"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in Steps!)
+                {
+                    <tr class="steps-tr">
+                        <td class="steps-order-cell">
+                            <button type="button"
+                                    class="steps-order-btn up"
+                                    @onclick="() => OnMoveUp.InvokeAsync(s)">
+                            </button>
+
+                            <button type="button"
+                                    class="steps-order-btn down"
+                                    @onclick="() => OnMoveDown.InvokeAsync(s)">
+                            </button>
+                        </td>
+                        <td>
+                            <input class="steps-input steps-input-pill"
+                                type="text"
+                                @bind="s.StepName"
+                                @bind:event="oninput" />
+                        </td>
+                        <td>
+                            <SfDropDownList TValue="int"
+                                        TItem="StepTypeDto"
+                                        CssClass="steps-ddl"
+                                        PopupCssClass="steps-ddl-popup-small"
+                                        DataSource="StepTypes"
+                                        @bind-Value="s.StepType"
+                                        Width="100%">
+                            <DropDownListFieldSettings Text="StepTypeName" Value="Id" />
+                        </SfDropDownList>
+                        </td>
+
+                        <td>
+                        <SfDropDownList TValue="int"
+                                        TItem="WorkCenter"
+                                        CssClass="steps-ddl"
+                                        PopupCssClass="steps-ddl-popup-small"
+                                        DataSource="WorkCenters"
+                                        @bind-Value="s.WorkCentrId"
+                                        Width="100%">
+                            <DropDownListFieldSettings Text="WorkCentr_Name" Value="Id" />
+                        </SfDropDownList>
+                        </td>
+                        <td class="steps-flags-cell">
+                            <label class="steps-flag" title="Paralēls solis">
+                                <input type="checkbox" @bind="s.IsParallel" />
+                                <span class="flag-icon parallel"></span>
+                            </label>
+
+                            <label class="steps-flag" title="Pēdējais (Final) solis">
+                                <input type="checkbox"
+                                    checked="@s.IsFinal"
+                                    disabled="@( !IsLastStep(s) )"
+                                    @onchange="() => OnSetFinal.InvokeAsync(s)" />
+                                <span class="flag-icon final"></span>
+                            </label>
+                        </td>
+                        <td>
+                            <input class="steps-input steps-input-pill"
+                                type="text"
+                                value="@s.Comments"
+                                @onchange="e => s.Comments = e.Value?.ToString()" />
+                        </td>
+                        <td class="steps-td-right">
+                        <button type="button"
+                                class="steps-btn"
+                                @onclick="() => OnDelete.InvokeAsync(s)"
+                                title="Dzēst">
+                            🗑
+                        </button>
+</td>
+                    </tr>
+                }
+            </tbody>
+    </table>
+    }
+</Content>
+
+    <FooterTemplate>
+        @FooterContent
+    </FooterTemplate>
+</DialogTemplates>
 
 </SfDialog>
 
 @code {
     [Parameter] public bool Visible { get; set; }
     [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
-
     [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? FooterContent { get; set; }
+    [Parameter] public List<PartStepDto>? Steps { get; set; }
+    [Parameter] public IEnumerable<StepTypeDto>? StepTypes { get; set; }
+    [Parameter] public IEnumerable<WorkCenter>? WorkCenters { get; set; }
+    [Parameter] public EventCallback<PartStepDto> OnMoveUp { get; set; }
+    [Parameter] public EventCallback<PartStepDto> OnMoveDown { get; set; }
+    [Parameter] public EventCallback<PartStepDto> OnDelete { get; set; }
+    [Parameter] public EventCallback<PartStepDto> OnSetFinal { get; set; }
+
+private bool IsLastStep(PartStepDto s)
+    {
+        if (Steps is null || Steps.Count == 0)
+            return false;
+
+        var maxOrder = Steps.Max(x => x.StepOrder);
+        return s.StepOrder == maxOrder;
+    }
+
 }

@@ -27,4 +27,18 @@ namespace ManaApp.Models
             set => ParallelGroup = value ? 1 : 0;
         }
     }
+
+    public class StepTypeDto
+        {
+            public int Id { get; set; }
+            public string StepTypeName { get; set; } = "";
+            public bool IsActive { get; set; }
+        }
+    
+    public class WorkCenter
+        {
+            public int Id { get; set; }
+            public string WorkCentr_Name { get; set; } = "";
+            public bool IsActive { get; set; }
+        }
 }

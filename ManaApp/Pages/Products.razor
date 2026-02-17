@@ -177,7 +177,6 @@
                     }
                 </div>
 
-                @if (isEdit)
 @if (isEdit)
 {
   <div class="form-check my-2" style="margin-top:.25rem;">
@@ -258,15 +257,17 @@
 </SfDialog>
 
 <!-- === TEHNOLOĢIJAS SOĻI dialogs === -->
-<SfDialog Width="720px"
-          ShowCloseIcon="true"
-          IsModal="true"
-          ZIndex="10050"
-          Header="Tehnoloģijas soļi"
-          @bind-Visible="isStepsDialogVisible">
-  <DialogTemplates>
+<ProductStepsDialog
+    @bind-Visible="isStepsDialogVisible"
+    Steps="editingSteps"
+    StepTypes="stepTypes"
+    WorkCenters="workCenters"
+    OnMoveUp="MoveUp"
+    OnMoveDown="MoveDown"
+    OnDelete="DeleteStepAsync"
+    OnSetFinal="SetFinalStep">
 
-    <Content>
+<ChildContent>
 
 <div class="steps-dialog-actions">
     <button type="button"
@@ -284,120 +285,9 @@
     </button>
 </div>
 
+</ChildContent>
 
-@if (!string.IsNullOrWhiteSpace(stepsError))
-{
-    <div class="alert alert-danger" role="alert" style="margin-bottom:10px;">
-        @stepsError
-    </div>
-}
-
-
-      @if (editingSteps is null || editingSteps.Count == 0)
-      {
-          <div style="opacity:.7">Šai detaļai soļu nav.</div>
-      }
-      else
-      {
-          <table class="steps-table">
-
-            <thead>
-  <tr class="steps-table-head">
-    <th class="steps-th steps-th-order">Secība</th>
-    <th class="steps-th">Nosaukums</th>
-  <th class="steps-th steps-th-steptype">Step Type</th>
-<th class="steps-th steps-th-workcenter">Darba centrs</th>
-
-
-    <th class="steps-th steps-th-flags">Statuss</th>
-
-    <th class="steps-th">Komentārs</th>
-    <th class="steps-th steps-th-actions"></th>
-  </tr>
-</thead>
-
-            <tbody>
-              @foreach (var s in editingSteps)
-              {
-                <tr class="steps-tr">
-
-                  <td class="steps-order-cell">
-  <button type="button"
-          class="steps-order-btn up"
-          title="Pārvietot augšup"
-          @onclick="() => MoveUp(s)">
-  </button>
-
-  <button type="button"
-          class="steps-order-btn down"
-          title="Pārvietot lejup"
-          @onclick="() => MoveDown(s)">
-  </button>
-</td>
-
-                  
-<td><input class="steps-input steps-input-pill" type="text" @bind="s.StepName" @bind:event="oninput" /></td>
-
-
-<td>
-    <SfDropDownList TValue="int" TItem="StepTypeDto"
-                CssClass="steps-ddl"
-                PopupCssClass="steps-ddl-popup-small"
-                DataSource="@stepTypes"
-                @bind-Value="s.StepType"
-                Width="100%">
-    <DropDownListFieldSettings Text="StepTypeName" Value="Id"></DropDownListFieldSettings>
-</SfDropDownList>
-
-</td>
-
-<td>
-    <SfDropDownList TValue="int" TItem="WorkCenter"
-                CssClass="steps-ddl"
-                PopupCssClass="steps-ddl-popup-small"
-                DataSource="@workCenters"
-                @bind-Value="s.WorkCentrId"
-                Width="100%">
-    <DropDownListFieldSettings Text="WorkCentr_Name" Value="Id"></DropDownListFieldSettings>
-</SfDropDownList>
-
-</td>
-
-
-<td class="steps-flags-cell">
-  <label class="steps-flag" title="Paralēls solis">
-    <input type="checkbox" @bind="s.IsParallel" />
-    <span class="flag-icon parallel"></span>
-  </label>
-
-  <label class="steps-flag" title="Pēdējais (Final) solis">
-    <input type="checkbox"
-       checked="@s.IsFinal"
-       disabled="@( !IsLastStep(s) )"
-       @onchange="() => SetFinalStep(s)" />
-
-    <span class="flag-icon final"></span>
-  </label>
-
-  <label class="steps-flag" title="Obligāts solis">
-    <input type="checkbox" @bind="s.IsMandatory" />
-    <span class="flag-icon mandatory"></span>
-  </label>
-</td>
-
-<td><input class="steps-input steps-input-pill" type="text" value="@s.Comments" @onchange="e => s.Comments = e.Value?.ToString()" /></td>
-
-
-                  <td class="steps-td-right">
-                    <button type="button" class="steps-btn" @onclick="() => DeleteStepAsync(s)" title="Dzēst">🗑</button>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-      }
-    </Content>
-<FooterTemplate>
+<FooterContent>
   <div class="steps-footer">
     <button type="button"
         class="action-btn action-btn-sm"
@@ -421,9 +311,12 @@
 </button>
 
   </div>
-</FooterTemplate>
 
-  </DialogTemplates>
+</FooterContent>
+
+</ProductStepsDialog>
+
+<!-- === labots līdz šai vietai === -->
 
   <SfDialog Width="520px"
           ShowCloseIcon="true"
@@ -617,7 +510,6 @@ else
   </DialogTemplates>
 </SfDialog>
 
-</SfDialog>
 
 <!-- === JAUNA DETAĻA dialogs === -->
 <SfDialog
@@ -701,13 +593,6 @@ else
         public int? ParentId { get; set; }
         public bool IsActive { get; set; }
     }
-
-    public class WorkCenter
-    {
-        public int Id { get; set; }
-        public string WorkCentr_Name { get; set; } = "";
-    }
-
     // ===== Stāvoklis =====
     private List<ProductRow> allRows = new();
     private List<ProductRow> rows = new();
@@ -1177,7 +1062,7 @@ StateHasChanged();
         StateHasChanged();
     }
 
-    private async void CloseStepsDialog()
+private async Task CloseStepsDialog()
 {
     stepsError = null;
     
@@ -1397,7 +1282,7 @@ return;
             }
         }
 
-        CloseStepsDialog();
+await CloseStepsDialog();
     }
 
     // ===== Jaunas detaļas dialogs =====
@@ -1474,13 +1359,6 @@ private async Task DeletePartByCode(string? topPartCode)
     }
 
     await DeletePartAsync(detail.ProductToPartId);
-}
-
-private class StepTypeDto
-{
-    public int Id { get; set; }
-    public string StepTypeName { get; set; } = "";
-    public bool IsActive { get; set; }
 }
 
 private List<StepTypeDto> stepTypes = new();
