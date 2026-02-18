@@ -1,27 +1,36 @@
+/* ProductionTasks-v2.razor */
 .ptv2-root {
     display: grid;
     grid-template-columns: 150px 380px 1fr;
     grid-template-rows: 320px auto;
     gap: 16px;
 
-    height: calc(100vh - 60px - 12px);
-    padding-bottom: 8px;
+    height: 100%;
     box-sizing: border-box;
+
+    background: #B9C9E3;
 }
 
+
+.ptv2-root > * {
+    margin: 12px;
+}
 
 
 .ptv2-left {
     width: 150px;
     min-width: 150px;
+    height: 100%;
 }
-
 
 
 .ptv2-right {
-    display: contents;
+    grid-column: 2 / 4;
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    grid-template-rows: 320px auto;
+    gap: 16px;
 }
-
 
 
 .ptv2-box {
@@ -35,6 +44,9 @@
     height: 100%;
 }
 
+.ptv2-box-batches {
+    padding: 0;   /* noņem ārējo padding tikai 3.box */
+}
 
 .ptv2-category-list {
     list-style: none;
@@ -99,11 +111,12 @@
 .ptv2-parent-tabs {
     position: relative;
     display: flex;
-    border: 1px solid #374151;
     border-radius: 6px;
     overflow: hidden;
     margin-bottom: 12px;
-    background: #1E293B;
+    background: #ffffff;
+    border: 1px solid #2563EB;
+
 }
 
 .ptv2-parent-tabs::after {
@@ -132,8 +145,8 @@
     cursor: pointer;
 
     background: transparent;
-    color: #D1D5DB;
-    border-right: 1px solid #374151;
+    color: #111827;
+    border-right: 1px solid #E5E7EB;
     transition: background .15s ease;
 
     position: relative;
@@ -159,10 +172,15 @@
 }
 
 .ptv2-products {
-    border: 1px solid #B7C6DC;
-    border-radius: 8px;
+    border: 2px solid #2563EB;   /* tāds pats kā left */
+    border-radius: 6px;
+    background: #F4F8FF;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
 }
+
 
 
 .ptv2-products-header {
@@ -171,8 +189,10 @@
     padding: 6px 8px;
     font-weight: 600;
     font-size: 12px;
-    background: #f3f4f6;
+    background: #2563EB;
+    color: #040404;
 }
+
 
 
 .ptv2-product-row {
@@ -258,13 +278,6 @@
     margin-left: 16px; /* ← atstarpe starp 2 un 3 box */
 }
 
-/* 3.box */
-.ptv2-box-detail {
-    flex: 1;
-    min-width: 0;
-}
-
-
 /* 4.box (apakšējais) */
 .ptv2-box-tasks {
     flex: 1;
@@ -293,16 +306,11 @@
 
 .ptv2-box-batches {
     flex: 1;        /* ← PĀRĒJO PLATUMU */
-    background: #CFDBEE;          /* izteiktāks zilais nekā 2.box */
+    background: transparent;
+
     border: 1px solid #9FB6D8;
     border-radius: 14px;
     box-shadow: 0 6px 18px rgba(37, 99, 235, 0.10);
-}
-
-.ptv2-box.ptv2-box-batches {
-    background: #D6E1F2;     /* ārējais 3.box tonis */
-    border: 1px solid #9FB6D8;
-    border-radius: 14px;
 }
 
 
@@ -321,27 +329,37 @@
 }
 
 .ptv2-box-left {
-    background: #F3F6FB;          /* ļoti viegls zilgans */
-    border: 1px solid #B6C3DA;    /* skaidra kontūra */
-    box-shadow: none;             /* noņem lieko miglu */
+    background: #F3F6FB;
+    border: 2px solid #2563EB;   /* spilgti zilā kontūra */
+    box-shadow: none;
 }
 
 .ptv2-products-placeholder {
     padding: 20px 8px;
     font-style: italic;
-    color: #94A3B8;
-    background: #F1F5FB;
+    color: #64748B;
+    background: transparent;   /* lai fons ir tas pats kas box */
     text-align: center;
 }
 
+
 .ptv2-products-title {
-    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    height: 36px;
     font-weight: 600;
-    text-align: center;
-    background: #C7D5EA;
-    border-top: 1px solid #B6C3DA;
-    border-bottom: 1px solid #B6C3DA;
+    font-size: 13px;
+
+    background: #3B82F6;
+    color: #ffffff;
+
+    border: 1px solid #ffffff;
+
 }
+
+
 
 .ptv2-top-wrapper {
     background: #B9C9E3;

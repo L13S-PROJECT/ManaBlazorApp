@@ -11,7 +11,7 @@
 
 .ptv2-modal {
     background: #ffffff;
-    border-radius: 14px;
+    border-radius: 8px;
     padding: 16px;
     width: 420px;
     max-width: 90%;
@@ -50,13 +50,14 @@
 }
 
 .ptv2-btn-primary {
-    background: #22c55e;
+    background: #2563EB;
     color: #ffffff;
 }
 
 .ptv2-btn-primary:hover {
-    background: #16a34a;
+    background: #1D4ED8;
 }
+
 
 .ptv2-btn-secondary {
     background: #f3f4f6;

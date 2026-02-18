@@ -4,22 +4,7 @@
 
 <div class="ptv2-box ptv2-box-detail ptv2-box-batches">
 
-  
-    @if (SelectedProduct == null)
-    {
-        <div class="ptv2-detail-placeholder">
-            Izvēlies preci, lai atvērtu ražošanas sarakstu(-s)
-        </div>
-    }
-    else if (ProductBatches.Count == 0)
-    {
-        <div class="ptv2-detail-placeholder">
-            Nav ražošanas saraksts
-        </div>
-    }
-    else
-    {
-        <div class="ptv2-batches">
+<div class="ptv2-batches">
 
             <div class="ptv2-batches-topbar">
                 <label class="ptv2-archive-toggle">
@@ -40,8 +25,21 @@
             <div>Datums</div>
             <div>Komentārs</div>
         </div>
-
-
+  
+    @if (SelectedProduct == null)
+    {
+        <div class="ptv2-detail-placeholder">
+            Izvēlies preci, lai atvērtu ražošanas sarakstu(-s)
+        </div>
+    }
+    else if (ProductBatches.Count == 0)
+    {
+        <div class="ptv2-detail-placeholder">
+            Nav ražošanas saraksts
+        </div>
+    }
+else
+{
             <!-- ROWS -->
                 @foreach (var b in ProductBatches
                     .Where(b => ShowArchived || !IsArchived(b)))
@@ -83,10 +81,10 @@
 
                 </div>
             }
-        </div>
+        
     }
 </div>
-
+</div>
 @if (IsCommentDialogOpen)
 {
 <BatchCommentDialog
