@@ -5,15 +5,14 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 
-<PageHeader Title="Ražošanas plānošana" />
-
 <div class="ptv2-root">
+
 
     <!-- LEFT -->
     <div class="ptv2-left">
-        <div class="ptv2-box">
-
-            <div class="ptv2-parent-tabs">
+        <div class="ptv2-box ptv2-box-left">
+    <div class="ptv2-left-header">
+            <div class="ptv2-parent-tabs @(SelectedParentId == Categories.FirstOrDefault(x => x.ParentId == null && x.CategoryName == "Kauss")?.Id ? "left" : "right")">
                 @foreach (var p in Categories
                     .Where(x => x.ParentId == null)
                     .OrderByDescending(x => x.CategoryName == "Kauss"))
@@ -24,6 +23,7 @@
                     </div>
                 }
             </div>
+        </div>
 
             <ul class="ptv2-category-list">
                 @foreach (var c in Categories.Where(x => x.ParentId == SelectedParentId))
@@ -36,7 +36,8 @@
             </ul>
 
         </div>
-    </div>
+     </div>
+
 
 <!-- RIGHT -->
 <div class="ptv2-right">
@@ -46,50 +47,51 @@
 
         <!-- 2. BOX -->
 
-<div class="ptv2-box ptv2-box-products">
-    @if (SelectedCategory != null)
+<div class="ptv2-products">
+
+    <div class="ptv2-products-header">
+        <div>NOSAUKUMS</div>
+        <div>KODS</div>
+        <div class="num">PLĀNOTS</div>
+        <div class="num">PROCESĀ</div>
+    </div>
+
+    @if (SelectedCategory == null)
     {
-        <h3>@SelectedCategory.CategoryName</h3>
-
-        @if (Products.Count == 0)
-        {
-            <div>Nav datu</div>
-        }
-        else
-        {
-            <div class="ptv2-products">
-
-                <div class="ptv2-products-header">
-                    <div>NOSAUKUMS</div>
-                    <div>KODS</div>
-                    <div class="num">PLĀNOTS</div>
-                    <div class="num">PROCESĀ</div>
-                </div>
-
-                @foreach (var p in Products)
-                {
-                    <div class="ptv2-product-row @(SelectedProduct?.productCode == p.productCode ? "active" : "")"
-                         @onclick="() => SelectProduct(p)">
-                        <div>@p.productName</div>
-                        <div>@p.productCode</div>
-                        <div class="num">@p.Planned</div>
-                        <div class="num">
-                            @(p.DetailedInProgress
-                              + p.DetailedFinish
-                              + p.AssemblyINProgress
-                              + p.AssemblyFinish
-                              + p.FinishingInProgress)
-                        </div>
-                    </div>
-                }
-
-            </div>
-        }
+        <div class="ptv2-products-placeholder">
+            Izvēlies kategoriju
+        </div>
+    }
+    else if (Products.Count == 0)
+    {
+        <div class="ptv2-products-placeholder">
+            Nav datu
+        </div>
     }
     else
     {
-        <h3>Izvēlies kategoriju</h3>
+        <div class="ptv2-products-title">
+            @SelectedCategory.CategoryName
+        </div>
+
+        @foreach (var p in Products)
+        {
+            <div class="ptv2-product-row @(SelectedProduct?.productCode == p.productCode ? "active" : "")"
+                 @onclick="() => SelectProduct(p)">
+                <div>@p.productName</div>
+                <div>@p.productCode</div>
+                <div class="num">@p.Planned</div>
+                <div class="num">
+                    @(p.DetailedInProgress
+                      + p.DetailedFinish
+                      + p.AssemblyINProgress
+                      + p.AssemblyFinish
+                      + p.FinishingInProgress)
+                </div>
+            </div>
+        }
     }
+
 </div>
 
 <!-- 3. BOX -->

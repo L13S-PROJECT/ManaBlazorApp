@@ -1,22 +1,20 @@
 .app-sidebar-title{
   text-align: center;
-  margin: 10px 8px 22px 8px;
-  padding: 10px 6px;
+  margin: 16px 12px 24px 12px;
+  padding: 12px 8px;
 
-  font-size: 28px;
-  font-weight: 800;
-  letter-spacing: 2px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 1px;
 
-  color: #f8f4e6;
+  color: #F9FAFB;
 
-  border: 1px solid rgba(241,211,91,.55);
-  border-left: 3px solid #f1d35b;
-  border-right: 3px solid #f1d35b;
+  border-bottom: 1px solid #374151;
 
  
   text-shadow:
-    0 0 4px rgba(241,211,91,.9),
-    0 0 10px rgba(255,140,0,.45);
+    0 0 4px rgba(91, 191, 241, 0.9),
+    0 0 10px rgba(98, 0, 255, 0.45);
 }
 
 /* === KREISĀ SIDEBAR PLATUMS === */
@@ -25,9 +23,10 @@
   flex: 0 0 220px;
   height: 100vh;
 
-  background: #2f2f2f;      /* tumšs, ne pilnīgi melns */
+  background: #2f2f2f;
   border-right: 1px solid #1f1f1f;
 }
+
 
 
 .app-nav{
@@ -47,7 +46,7 @@
   border-radius: 6px;
 
   background: transparent;
-  color: #f1d35b;            /* dzelteni burti */
+  color: #D1D5DB;   /* secondary text */
   font-size: 14px;
   font-weight: 500;
 
@@ -59,23 +58,24 @@
 
 /* Hover – dzeltenes + melns teksts */
 .app-nav-link:hover{
-  background: #f3e7b3;       /* banāna dzeltens */
-  color: #1a1a1a;            /* melni burti */
+  background: #2563EB;   /* primary blue */
+  color: #F9FAFB;        /* gaišs teksts */
 }
+
 
 /* Active – “es esmu ŠEIT” efekts */
 
 .app-nav-link.active{
-  background: #f5e9b8;
-  color: #1a1a1a;
+  background: #1D4ED8;   /* active blue */
+  color: #F9FAFB;
 
   font-weight: 700;
 
-  transform: translateX(6px) scale(1.04);
+  transform: translateX(6px);
   box-shadow:
-    0 4px 10px rgba(0,0,0,.25),
-    inset 0 1px 0 rgba(255,255,255,.6);
+    0 4px 12px rgba(0,0,0,.35);
 }
+
 
 /* Aktīvajam NEPIELIETOT hover krāsu */
 
@@ -88,9 +88,8 @@
 ::deep .app-nav-link,
 ::deep .app-nav-link:visited {
   text-decoration: none !important;
-  color: #f1d35b;
+  color: #D1D5DB;
 }
-
 
 
 /* NavLink hover/active – caur CSS isolation */
@@ -101,31 +100,30 @@
 
 /* ACTIVE – acīmredzams, izbīdīts, ERP industriāls */
 ::deep .app-nav-link.active {
-  background: #f5e9b8;
-  color: #2f2f2f;
+  background: #93C5FD;   /* ļoti gaišs zils */
+  color: #0F172A;        /* tumšs teksts */
+
 
   font-weight: 700;
   font-size: 15px;
 
-  transform: translateX(8px) scale(1.08);
+  transform: translateX(10px) scale(1.05);
 
-  border-left: 4px solid #c9a400;
-  border-right: 4px solid #c9a400;
+  border-left: 4px solid #2563EB;
 
   box-shadow:
-    0 6px 14px rgba(0,0,0,.35),
-    0 0 8px rgba(241,211,91,.7),
-    inset 0 1px 0 rgba(255,255,255,.6);
+    0 6px 14px rgba(0,0,0,.4);
 
-  padding-left: 10px;
+  padding-left: 14px;
   padding-right: 18px;
-
 }
+
 
 
 /* HOVER – ERP / industriāls */
 ::deep .app-nav-link:hover:not(.active){
-  background: #f1d35b;
-  color: #2f2f2f;
-  font-weight: 700;
+  background: #1E40AF;   /* tumšāks zils */
+  color: #F9FAFB;
+  font-weight: 600;
 }
+

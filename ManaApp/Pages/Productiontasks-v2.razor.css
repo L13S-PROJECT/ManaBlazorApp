@@ -1,62 +1,61 @@
 .ptv2-root {
-    display: flex;
-    height: calc(100vh - 60px - 12px); /* 60px header + margin-bottom */
+    display: grid;
+    grid-template-columns: 150px 380px 1fr;
+    grid-template-rows: 320px auto;
     gap: 16px;
-    padding: 0 0px 8px 0px;         /* noņem augšējo padding */
+
+    height: calc(100vh - 60px - 12px);
+    padding-bottom: 8px;
     box-sizing: border-box;
 }
 
+
+
 .ptv2-left {
     width: 150px;
-    min-width: 150px;   /* ← ŠIS TRŪKA */
-    flex-shrink: 0;
+    min-width: 150px;
 }
+
 
 
 .ptv2-right {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    height: 100%;
+    display: contents;
 }
+
 
 
 .ptv2-box {
     background: #fff;
-    border-radius: 12px;
+    border-radius: 6px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     padding: 8px;
     width: 100%;
-    height: 100%;
-    overflow: hidden; 
     display: flex;
     flex-direction: column;
+    height: 100%;
 }
+
 
 .ptv2-category-list {
     list-style: none;
     padding: 0;
     margin: 0;
+    flex: 1;
+    overflow-y: auto;
 }
 
-.ptv2-category-item {
-    padding: 6px 8px;
-    border-radius: 6px;
-    cursor: default;
-}
 
 /* 1 box stils */
 .ptv2-category-item {
-    padding: 6px 8px;      /* ← mazāk */
-    margin-bottom: 6px;
-    border-radius: 8px;
-
+    padding: 5px 8px;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    cursor: default;
     border: 1px solid #d1d5db;
     background: #ffffff;
 
     cursor: pointer;
-    font-size: 13px;       /* ← mazāks teksts */
+    font-size: 12px;       /* ← mazāks teksts */
     color: #1f2937;
 
     transition: background .15s ease,
@@ -65,17 +64,24 @@
 }
 
 .ptv2-category-item:hover {
-    background: #eafff1;
-    border-color: #22c55e;
+    background: #1E40AF;   /* Hover */
+    border-color: #1E40AF;
+    color: #F9FAFB;
 }
 
 
 .ptv2-category-item.active {
-    background: #22c55e;
-    border-color: #22c55e;
-    color: #ffffff;
+    background: #ffffff;
+    border-color: #2563EB;
+    color: #111827;
     font-weight: 600;
+
+    border-left: 4px solid #2563EB;
+    padding-left: 6px;
 }
+
+
+
 
 
 .ptv2-left ul {
@@ -91,27 +97,59 @@
 }
 
 .ptv2-parent-tabs {
+    position: relative;
     display: flex;
-    border: 1px solid #555;
-    border-style: solid;
-    border-radius: 10px;
+    border: 1px solid #374151;
+    border-radius: 6px;
     overflow: hidden;
     margin-bottom: 12px;
+    background: #1E293B;
+}
+
+.ptv2-parent-tabs::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 50%;
+    background: #93C5FD;   /* Active gaišais */
+    transition: transform .28s cubic-bezier(.4,0,.2,1);
+    z-index: 0;
+}
+
+
+.ptv2-parent-tabs.right::after {
+    transform: translateX(100%);
 }
 
 .ptv2-parent-tab {
     flex: 1;
-    padding: 6px 4px;      /* ← mazāks */
-    font-size: 13px;       /* ← mazāks teksts */
-    font-weight: 700;
+    padding: 4px 4px;
+    font-size: 12px;
+    font-weight: 600;
     text-align: center;
     cursor: pointer;
+
+    background: transparent;
+    color: #D1D5DB;
+    border-right: 1px solid #374151;
+    transition: background .15s ease;
+
+    position: relative;
+    z-index: 1;
 }
 
+.ptv2-parent-tab:hover {
+    background: #1E40AF;   /* Hover tumšāks zilais */
+    color: #F9FAFB;
+}
 
 .ptv2-parent-tab.active {
-    background: #8ee69a;
+    background: #2563EB;          /* Primary */
+    color: #0F172A;   /* tumšs teksts uz gaiša active */
 }
+
 
 .ptv2-child-item {
     padding: 8px 10px;
@@ -121,10 +159,11 @@
 }
 
 .ptv2-products {
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
+    border: 1px solid #B7C6DC;
+    border-radius: 8px;
     overflow: hidden;
 }
+
 
 .ptv2-products-header {
     display: grid;
@@ -148,16 +187,22 @@
 
 
 .ptv2-product-row:hover {
-    background: #eafff1;
+    background: #E8F0FE;     /* gaišs zilais */
 }
+
 
 .ptv2-product-row.active {
-    background: #22c55e;
-    color: #fff;
+    background: #FFFFFF;
+    font-weight: 600;
+
+    border-left: 4px solid #2563EB;   /* biezā līnija sānā */
+    border-top: 1px solid #2563EB;
+    border-bottom: 1px solid #2563EB;
 }
 
+
 .ptv2-products .num {
-    text-align: right;
+    text-align: center;
 }
 
 .ptv2-detail-placeholder {
@@ -202,11 +247,7 @@
     opacity: .6;
 }
 
-/* 2.box – produktu saraksts (šaurāks) */
-.ptv2-box-products {
-    max-width: 420px;
-    flex-shrink: 0;
-}
+
 
 /* Labā puse: 3 + 4 box kolonna */
 .ptv2-right-main {
@@ -232,26 +273,83 @@
 }
 
 .ptv2-right-top {
-    display: flex;
-    gap: 16px;
-    flex: 0 0 37%;   /* ← augšējā daļa aizņem ~45% ekrāna */
-    min-height: 280px;
-    align-items: stretch; /* ← ŠIS IR IZŠĶIROŠAIS */
+    display: contents;
 }
 
+
+/* 2.box – produktu saraksts (šaurāks) */
+
+
 .ptv2-box-products {
+    max-width: 420px;
+    flex-shrink: 0;
     flex: 0 0 38%;   /* ← ŠAURĀKS */
     min-width: 360px;
+    background: #D6E1F2;
+    border: 1px solid #B6C3DA;
+    border-radius: 8px;
+    box-shadow: none;
 }
 
 .ptv2-box-batches {
     flex: 1;        /* ← PĀRĒJO PLATUMU */
+    background: #CFDBEE;          /* izteiktāks zilais nekā 2.box */
+    border: 1px solid #9FB6D8;
+    border-radius: 14px;
+    box-shadow: 0 6px 18px rgba(37, 99, 235, 0.10);
 }
 
-.ptv2-right-bottom {
-    flex: 1;
-    min-height: 0;      /* ← KRITISKI */
-    display: flex;
+.ptv2-box.ptv2-box-batches {
+    background: #D6E1F2;     /* ārējais 3.box tonis */
+    border: 1px solid #9FB6D8;
+    border-radius: 14px;
 }
+
+
+.ptv2-right-bottom {
+    grid-column: 1 / 4;
+}
+
+
+
+.ptv2-left-header {
+    margin-bottom: 18px;
+}
+
+.ptv2-box-top {
+    background: #DCE7F5;   /* ļoti maigi zilgans */
+}
+
+.ptv2-box-left {
+    background: #F3F6FB;          /* ļoti viegls zilgans */
+    border: 1px solid #B6C3DA;    /* skaidra kontūra */
+    box-shadow: none;             /* noņem lieko miglu */
+}
+
+.ptv2-products-placeholder {
+    padding: 20px 8px;
+    font-style: italic;
+    color: #94A3B8;
+    background: #F1F5FB;
+    text-align: center;
+}
+
+.ptv2-products-title {
+    padding: 8px;
+    font-weight: 600;
+    text-align: center;
+    background: #C7D5EA;
+    border-top: 1px solid #B6C3DA;
+    border-bottom: 1px solid #B6C3DA;
+}
+
+.ptv2-top-wrapper {
+    background: #B9C9E3;
+    padding: 16px;
+    border-radius: 6px;
+}
+
+
+
 
 

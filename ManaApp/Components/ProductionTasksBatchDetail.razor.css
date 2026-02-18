@@ -45,14 +45,10 @@
 /* 3.box tabulas formatēšana */
 
 /* ===== 3. BOX – BATCH TABLE ===== */
-
 .ptv2-batches {
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    overflow-y: auto;   /* iekšējais scroll */
-    max-height: 100%;   /* pakļaujas box augstumam */
+    width: 100%;
+    overflow-y: auto;
 }
-
 
 .ptv2-batches-header,
 .ptv2-batch-row {
@@ -102,9 +98,10 @@
 
 
 .ptv2-batches-header {
+    background: #E4EDF9;
     font-weight: 600;
-    background: #f3f4f6;
 }
+
 
 /* RINDA */
 .ptv2-batch-row {
@@ -114,13 +111,18 @@
 }
 
 .ptv2-batch-row:hover {
-    background: #eafff1;
+    background: #EAF1FF;
 }
 
+
 .ptv2-batch-row.active {
-    background: #22c55e;
-    color: #ffffff;
+    background: #ffffff;
+    border: 2px solid #2563EB;
+    border-left: 6px solid #1D4ED8;
+    border-radius: 8px;
+    font-weight: 600;
 }
+
 
 .ptv2-batch-row .num {
     text-align: right;
@@ -197,22 +199,25 @@
 }
 
 .ptv2-batch-row.archived {
-    background: #f9fafb;
-    color: #9ca3af;
+    background: #EEF2F7;
+    color: #94a3b8;
     font-style: italic;
 }
 
-/* green toggle */
+
+/* blue toggle */
 .ptv2-toggle {
     appearance: none;
     width: 34px;
     height: 18px;
     background: #e5e7eb;
-    border-radius: 999px;
+    border-radius: 12px;
     position: relative;
     cursor: pointer;
     transition: background .2s ease;
+    border: none;
 }
+
 
 .ptv2-toggle::after {
     content: "";
@@ -227,9 +232,34 @@
 }
 
 .ptv2-toggle:checked {
-    background: #22c55e; /* TAVS zaļais */
+    background: #2563EB;   /* tas pats zilais kas active */
 }
+
 
 .ptv2-toggle:checked::after {
     transform: translateX(16px);
+}
+
+.ptv2-box-detail .ptv2-box-header {
+    background: #C9D8EE;
+    padding: 10px 14px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+}
+
+.ptv2-box-detail h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.ptv2-archive-text {
+    font-size: 11px;
+    color: #94a3b8;
+}
+
+.ptv2-batches-topbar {
+    display: flex;
+    justify-content: flex-end;
+    padding: 6px 8px;
 }

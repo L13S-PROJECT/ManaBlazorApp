@@ -4,23 +4,7 @@
 
 <div class="ptv2-box ptv2-box-detail ptv2-box-batches">
 
-        <div class="ptv2-box-header">
-            <h3>
-                @(SelectedProduct == null
-                    ? "Izvēlies preci"
-                    : SelectedProduct.productName)
-            </h3>
-
-            <label class="ptv2-archive-toggle">
-                <input type="checkbox"
-                    class="ptv2-toggle"
-                    @bind="ShowArchived" />
-                <span>Rādīt arhīvu</span>
-            </label>
-
-        </div>
-
-   
+  
     @if (SelectedProduct == null)
     {
         <div class="ptv2-detail-placeholder">
@@ -37,18 +21,26 @@
     {
         <div class="ptv2-batches">
 
+            <div class="ptv2-batches-topbar">
+                <label class="ptv2-archive-toggle">
+                    <span class="ptv2-archive-text">Rādīt arhīvu</span>
+                    <input type="checkbox"
+                        class="ptv2-toggle"
+                        @bind="ShowArchived" />
+                </label>
+            </div>
 
            <!-- HEADER -->
-            <div class="ptv2-batches-header">
-                <div>Raž.kods</div>
-                <div>Versija</div>
-                <div class="num">Apjoms</div>
-                <div class="num">SOLD</div> 
-                <div class="num">Done</div>
-                <div>Datums</div>
-                <div>Komentārs</div>
-                <div></div>
-            </div>
+        <div class="ptv2-batches-header">
+            <div>Raž.kods</div>
+            <div>Versija</div>
+            <div class="num">Apjoms</div>
+            <div class="num">SOLD</div> 
+            <div class="num">Done</div>
+            <div>Datums</div>
+            <div>Komentārs</div>
+        </div>
+
 
             <!-- ROWS -->
                 @foreach (var b in ProductBatches
