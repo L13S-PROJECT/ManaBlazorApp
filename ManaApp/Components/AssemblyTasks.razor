@@ -13,7 +13,7 @@
 
 @foreach (var p in Parts)
 {
-    <div class="ptv2-tasks-row">
+    <div class="ptv2-tasks-row assembly">
         <!-- 1. Nosaukums -->
         <div class="ptv2-part-name" title="@p.TopPartName">
             <span class="ptv2-part-indicator state-@(
@@ -72,7 +72,7 @@
 {
     @foreach (var t in tasks)
     {
-        <div class="ptv2-tasks-row sub task">
+        <div class="ptv2-tasks-row assembly sub task">
 <div title="@step.StepName">
     @step.StepName
 </div>

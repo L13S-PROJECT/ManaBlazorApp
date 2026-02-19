@@ -2,18 +2,16 @@
 .ptv2-root {
     display: grid;
     grid-template-columns: 150px 380px 1fr;
-    grid-template-rows: 320px auto;
+    grid-template-rows: 320px 1fr;
     gap: 16px;
 
-    height: 100%;
+    height: 100vh;
+    width: 100%;
     box-sizing: border-box;
 
-    background: #B9C9E3;
-}
+    background: #AFC1DE;
 
-
-.ptv2-root > * {
-    margin: 12px;
+    padding: 12px;
 }
 
 
@@ -280,10 +278,23 @@
 
 /* 4.box (apakšējais) */
 .ptv2-box-tasks {
-    flex: 1;
-    min-height: 200px; /* lai jau redzams kā bloks */
+    height: 100%;
     width: 100%;
+    grid-column: 1 / -1;
+
+    overflow-x: auto;
+    overflow-y: auto;
+
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #B7C8E6;
+
+    box-shadow:
+    inset 0 3px 4px rgba(0,0,0,0.35),
+    inset 0 -2px 3px rgba(0,0,0,0.25);
 }
+
+
 
 .ptv2-right-top {
     display: contents;
@@ -298,19 +309,19 @@
     flex-shrink: 0;
     flex: 0 0 38%;   /* ← ŠAURĀKS */
     min-width: 360px;
-    background: #D6E1F2;
-    border: 1px solid #B6C3DA;
-    border-radius: 8px;
+    background: #C9D8EE;
+    border: 1px solid #A9BEE0;
+    border-radius: 6px;
     box-shadow: none;
 }
 
 .ptv2-box-batches {
     flex: 1;        /* ← PĀRĒJO PLATUMU */
-    background: transparent;
-
+    background: #DCE7F5;
     border: 1px solid #9FB6D8;
-    border-radius: 14px;
-    box-shadow: 0 6px 18px rgba(37, 99, 235, 0.10);
+    border-radius: 6px;
+    box-shadow:
+        0 10px 28px rgba(37, 99, 235, 0.12);
 }
 
 
@@ -329,7 +340,7 @@
 }
 
 .ptv2-box-left {
-    background: #F3F6FB;
+    background: #E6EDF7;
     border: 2px solid #2563EB;   /* spilgti zilā kontūra */
     box-shadow: none;
 }
@@ -366,8 +377,4 @@
     padding: 16px;
     border-radius: 6px;
 }
-
-
-
-
 

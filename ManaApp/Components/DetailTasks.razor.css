@@ -57,7 +57,8 @@
     font-size: 13px;
     font-weight: 600;
     color: #1e2024;   /* gaiši pelēks */
-    background: #dcdedc;
+    background: #e5e7eb;
+
 }
 
 /* STEP rindas – atdalītas un “elpo” */
@@ -105,14 +106,11 @@
 /* Hover efekts STEP rindām */
 /* Hover uz TASK (step) rindām */
 .ptv2-tasks-row.sub.task:hover {
-    background: #eef7ef;
+    background: #EEF4FF;
     cursor: pointer;
-}
+    border-top: 1px solid #93C5FD;
+    border-bottom: 1px solid #93C5FD;
 
-/* Asāki borderi hover laikā */
-.ptv2-tasks-row.sub.task:hover {
-    border-top: 1px solid #88f472;
-    border-bottom: 1px solid #88f472;
 }
 
 /* GATAVS poga – TIKAI detaļas (PART) rindām, 2. kolonna */
@@ -124,8 +122,9 @@
 
 /* DONE checkbox – zaļš, saglabā native checkbox */
 .ptv2-done-checkbox {
-    accent-color: #14d65e;
+    accent-color: #2563EB;
 }
+
 
 /* Komentāra ievades lauks – STEP/TASK rindām */
 .ptv2-tasks-row.sub .ptv2-comment-input {
@@ -214,8 +213,9 @@
 
 /* ON */
 .ptv2-switch:checked {
-    background: #14d65e;          /* TĀ PATS zaļais */
+    background: #2563EB;
 }
+
 
 .ptv2-switch:checked::before {
     transform: translateX(16px);
@@ -282,13 +282,14 @@
     min-width: 320px;
     max-width: 420px;
 
-    border: 1px solid #86efac; /* maiga zaļa kontūra */
+    border: 1px solid #2563EB; /* zilā kontūra */
     box-shadow:
-        0 8px 20px rgba(0,0,0,0.12),
-        0 0 0 2px rgba(34,197,94,0.15); /* zaļš “glow” */
+        0 8px 20px rgba(0,0,0,0.12);
 
     animation: popupFadeIn 0.15s ease-out;
 }
+
+/* textarea */
 .ptv2-popup textarea {
     width: 100%;
     min-height: 90px;
@@ -303,10 +304,11 @@
 
 .ptv2-popup textarea:focus {
     outline: none;
-    border-color: #22c55e;
-    box-shadow: 0 0 0 2px rgba(34,197,94,0.25);
+    border-color: #2563EB;
+    box-shadow: 0 0 0 2px rgba(37,99,235,0.25);
 }
 
+/* kopīgs pogām */
 .ptv2-popup button {
     border-radius: 8px;
     padding: 6px 14px;
@@ -318,18 +320,20 @@
 .ptv2-popup button:first-child {
     background: #f3f4f6;
     border: 1px solid #d1d5db;
+    color: #374151;
 }
 
 /* OK */
 .ptv2-popup button:last-child {
-    background: #22c55e;
-    border: 1px solid #16a34a;
+    background: #2563EB;
+    border: 1px solid #1d4ed8;
     color: white;
 }
 
 .ptv2-popup button:last-child:hover {
-    background: #16a34a;
+    background: #1d4ed8;
 }
+
 
 @keyframes popupFadeIn {
     from {

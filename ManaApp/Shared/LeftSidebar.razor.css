@@ -63,19 +63,6 @@
 }
 
 
-/* Active – “es esmu ŠEIT” efekts */
-
-.app-nav-link.active{
-  background: #1D4ED8;   /* active blue */
-  color: #F9FAFB;
-
-  font-weight: 700;
-
-  transform: translateX(6px);
-  box-shadow:
-    0 4px 12px rgba(0,0,0,.35);
-}
-
 
 /* Aktīvajam NEPIELIETOT hover krāsu */
 

@@ -26,7 +26,8 @@
     grid-template-columns: inherit;
     grid-column: 1 / -1;
 
-    background: #14d65e;          /* tumši pelēks */
+    background: #2563EB;   /* tas pats kā 2.box */
+    color: #ffffff;
     border-bottom: 1px solid #171718;
     border-radius: 10px 10px 0 0; /* noapaļoti ārējie stūri */
 
@@ -54,28 +55,24 @@
     display: flex;
     flex-direction: column;
 
-    flex: 1;
-    min-height: 0;
+    height: 100%;
+    min-height: 100%;
+
     overflow-y: auto;
-    overflow-x: visible;
+    overflow-x: auto;
 
     grid-column: 1 / -1;
-}
-
-
-.ptv2-tasks-header {
-    display: grid;
-    grid-template-columns: inherit;
 }
 
 
 .ptv2-tasks-subheader {
     grid-column: 1 / -1;
 
-    background: #c9f3c9;          /* gaišāks par header */
-    color: #1f2c1d;
+    background: #EFF6FF;   /* ļoti gaišs zils */
+    font-weight: 600;
+    border-left: 4px solid #2563EB;
+    color: #1E3A8A;
 
-    font-weight: 500;
     font-size: 12px;
 
     padding: 4px 4px;
@@ -99,4 +96,31 @@
     justify-self: end;
     padding-right: 0;
     text-align: right;
+}
+
+/* ===== Iekšējās sekcijas 4.box ===== */
+
+.ptv2-section {
+    margin: 12px 0;
+    padding: 8px 10px;
+
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+
+    background: #f8fafc;
+}
+
+.ptv2-section .ptv2-tasks-subheader {
+    background: transparent;
+    border: none;
+
+    font-weight: 600;
+    color: #2563EB;
+
+    padding: 4px 0 8px 0;
+}
+
+.ptv2-section + .ptv2-section {
+    border-top: 2px solid #2563EB;
+    padding-top: 16px;
 }

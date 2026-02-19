@@ -14,7 +14,7 @@
 
 @foreach (var p in Parts)
 {
-    <div class="ptv2-tasks-row">
+    <div class="ptv2-tasks-row ptv2-finishing-main">
         <!-- 1. Nosaukums -->
         <div class="ptv2-part-name" title="@p.PartName">
             <span class="ptv2-part-indicator state-@(
@@ -28,9 +28,10 @@
             <input type="checkbox"
                 class="ptv2-switch"
                 checked="@IsFinishingSwitchOn"
-                disabled="@AssemblyNotFinished"
+                disabled="@IsFinishingSwitchDisabled"
                 @onclick:preventDefault="true"
                 @onclick="OnFinishingSwitchClicked" />
+
         </div>
 
         <!-- 3. Apjoms -->
