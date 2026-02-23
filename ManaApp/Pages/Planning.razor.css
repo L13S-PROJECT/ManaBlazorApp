@@ -21,7 +21,7 @@
   flex-direction:column;
   min-height:0;
   overflow:hidden;   /* bija auto */
-  height:100%;
+  
 }
 
 
@@ -217,14 +217,14 @@
 
 /* Planning: tāds pats “galvas bloks” kā Products */
 .planning-header-card{
-  background:#ffffff;
-  border:1px solid #d1d5db;
-  border-radius:12px;
-  box-shadow:0 1px 2px rgba(0,0,0,.08);
-
-  padding:8px;
-  margin-bottom:12px; /* tā pati atstarpe zem virsraksta kā Products */
+  background: transparent;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  padding: 0;   /* ✅ */
+  display: flex;
+  flex-direction: column;
 }
+
 
 /* ja gribi, lai toolbar iekšā izskatās stingri kā Products */
 .planning-header-card .planning-toolbar{
@@ -365,21 +365,45 @@
 }
 
 .planning-content {
-    display: grid;
-    grid-template-columns: 1fr 380px;
+    display: flex;
     gap: 12px;
-    height: 100%;
+    align-items: stretch;
+    flex: 1;
 }
 
-.planning-left {
+.planning-main {
     min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
+
 
 .planning-right {
-    background: #ffffff;
-    border: 1px solid #d1d5db;
-    border-radius: 12px;
     padding: 12px;
+    width: 380px;        /* fiksēts platums kā bija grid */
+    flex: 0 0 380px;     /* neizstiepjas */
+    background: #AFC1DE;
+    border: 2px solid #1e40af;
+    border-radius: 6px;
+
+    display: flex;
+    flex-direction: column;
+
+    padding: 0;        /*  obligāti 0 */
+    overflow: hidden;  /* lai header iegriežas radiusā */
+}
+
+.planning-section-body {
+    padding: 12px;
+    background: #e2e8f3;
+
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+
+    min-height: 0;      /* ļauj bērnam sarauties */
+    overflow: hidden;   /* lai scroll būtu tikai iekšā */
 }
 
 .batch-items {
@@ -416,8 +440,36 @@
 }
 
 /* ierobežo PlanningTable platumu kā Products */
-.planning-container {
-    max-width: 1400px;
-    margin: 0 auto;
+
+
+.planning-page-root {
+    background: #AFC1DE;
+    min-height: 100vh;
+    padding: 12px;
+
+    display: flex;          /* ⬅️ PIEVIENO */
+    flex-direction: column; /* ⬅️ PIEVIENO */
+}
+
+.planning-main-block {
+    background: #ffffff;
+    border-radius: 6px;
+    border: 2px solid #1e40af;   /* tumšāks zils */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    padding: 0px;
+
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.planning-section-header {
+    background: #1e40af;
+    color: #ffffff;
+    font-weight: 600;
+    text-align: center;
+    padding: 10px 14px;
+
+    margin: 0;              /* noņemam negatīvo margin */
 }
 

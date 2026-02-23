@@ -18,12 +18,14 @@
         }
 
         <div class="modal-actions">
-            <button class="panel-btn" @onclick="Cancel">Atcelt</button>
-
-            <button class="btn btn-primary"
+            <button class="panel-btn primary"
                     disabled="@string.IsNullOrWhiteSpace(planCode)"
                     @onclick="Confirm">
                 Apstiprināt
+            </button>
+
+            <button class="panel-btn outline" @onclick="Cancel">
+                Atcelt
             </button>
         </div>
 
@@ -46,4 +48,22 @@
     {
         await OnCancel.InvokeAsync();
     }
+
+[Inject] private IJSRuntime JS { get; set; } = default!;
+private DotNetObjectReference<CreatePlanDialog>? objRef;
+
+protected override async Task OnAfterRenderAsync(bool firstRender)
+{
+    if (firstRender)
+    {
+        objRef = DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("createPlanDialogEsc", objRef);
+    }
+}
+
+[JSInvokable]
+public async Task CloseFromEsc()
+{
+    await OnCancel.InvokeAsync();
+}
 }

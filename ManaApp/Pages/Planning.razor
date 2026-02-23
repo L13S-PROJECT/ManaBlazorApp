@@ -10,15 +10,18 @@
 @using ManaApp.Models
 @using ManaApp.Components
 
-
-<PageHeader Title="Plānošana" />
+<div class="planning-page-root">
 
   <div class="planning-header-card">  
 
     <div class="planning-content">
                            <!-- Šeit sākas preču saraksts -->
         <div class="planning-main">
-            <div class="planning-panel">
+           
+           <div class="planning-panel planning-main-block">
+            <div class="planning-section-header">
+                Ražošanas plānošana
+            </div>
 
 <PlanningToolbar
     SearchText="@searchText"
@@ -31,7 +34,8 @@
 
 <PlanningTable
     Groups="@FilteredRows"
-    PlannedPlus="OnPlannedPlus" />
+    PlannedPlus="OnPlannedPlus"
+    DraftVersionIds="batchItems.Select(x => x.VersionId).ToList()" />
 
            @if (selected is not null && Summary is not null)
            {
@@ -71,20 +75,28 @@
         </div>
         <!-- LABĀ PUSE: jaunais Batch panelis -->
 
-        <div class="planning-right">
+<div class="planning-right">
 
-<PlanningBatchPanel
-    Items="batchItems"
-    SalesItems="salesItems"
-    BatchId="draftBatchId"
-    OnSold="OnSalesSold"
-    EditSalesRequested="OpenEditSalesPopup"
-    @ref="batchPanelRef"
-    OnCreateConfirmed="CreatePlanAsync"
-    OnDeleteDraft="DeleteDraftAsync" />
+    <div class="planning-section-header">
+        Jauns ražošanas plāns
+    </div>
+
+    <div class="planning-section-body">
+        <PlanningBatchPanel
+            Items="batchItems"
+            SalesItems="salesItems"
+            BatchId="draftBatchId"
+            OnSold="OnSalesSold"
+            EditSalesRequested="OpenEditSalesPopup"
+            @ref="batchPanelRef"
+            OnCreateConfirmed="CreatePlanAsync"
+            OnDeleteDraft="DeleteDraftAsync" />
+    </div>
 
 </div>
     
+</div>
+
 </div>
 
 </div>
@@ -136,6 +148,8 @@
     OnSave="OnEditSalesSaved" />
 
 }
+
+
 
 @code {
    
@@ -869,6 +883,8 @@ private async Task DeleteDraftAsync()
 
     batchPanelRef?.SetComment(null);
     batchPanelRef?.Refresh();
+
+    await ReloadPlanningDataAsync();   
     StateHasChanged();
 }
 

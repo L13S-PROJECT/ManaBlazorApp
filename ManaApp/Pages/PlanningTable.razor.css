@@ -17,10 +17,13 @@
     position: sticky;
     top: 0;
     z-index: 5;
-
-    background: #4b5563;
-    color: white;
+    font-weight: 600;
+    background: #2F6FED;      /* spilgts, enerģisks zilais */
+    color: #ffffff;
+    border-bottom: 1px solid #1E4FCC;
 }
+
+
 
 .excel-table {
     border-collapse: separate;
@@ -28,16 +31,20 @@
 }
 
 
-/* KATEGORIJU ATDALĪTĀJS – KLUSS, ŠAURS */
+/* KATEGORIJU ATDALĪTĀJS  */
 .excel-category td {
-    padding: 2px 6px;          /* ⬅️ ļoti šaura rinda */
-    height: 20px;
+    padding: 6px 8px;
+    height: 28px;
 
-    background: #f1f3f5;       /* ⬅️ ļoti viegls pelēks */
-    color: #374151;            /* tumši pelēks, ne melns */
-    font-weight: 500;          /* nevis 600 */
+    background: #E8F0FF;     /* ļoti gaišs */
+    color: #1E3A8A;          /* tumši zils */
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 
-    text-align: left;
+    text-align: center;      /* ⬅️ svarīgais */
+    border-top: 2px solid #2F6FED;
+    border-bottom: 1px solid #C7D7F7;
 }
 
 
@@ -58,9 +65,12 @@
     background: #e5e7eb;
 }
 
-.excel-detail {
-    background: #fafafa;
-    font-size: 12px;
+/* DETAIL RINDA */
+
+
+/* kreisais iekšējais akcents, lai redz saistību */
+.excel-detail td:first-child {
+    border-left: 3px solid #2F6FED;
 }
 
 .detail-name {
@@ -169,46 +179,63 @@
     padding-top: 2px;
     padding-bottom: 2px;
     height: 26px;
+background: #ffffff;
 }
 
+
 /* KOMPAKTAS detail (versiju) rindas */
+/* DETAIL rinda – iegrimis efekts */
 .excel-detail td {
-    padding-top: 0;
-    padding-bottom: 0;
+    background: #F2F9FF;   /* ļoti gaiša debeszila */
+    padding-top: 1px;
+    padding-bottom: 1px;
+    height: 16px;   /* šaurāka nekā galvenā */
+    border-left: none !important;
+    border-right: none !important;
+    border-top: none;
+    border-bottom: 2px solid #33D6FF;   /* neon apakšējais border */
+    font-size: 10px;
+}
 
-    font-size: 11px;
-    line-height: 14px;        /* ⬅️ šeit rodas “šaurāka rinda” */
+/* gaiši debess zils akcents */
+.excel-row.is-open + .excel-detail td:first-child {
+    border-left: 5px solid #4DA3FF !important;
+}
 
-    vertical-align: middle;
+/* Un tikai pirmajai šūnai iedod akcents */
+.excel-row.is-open + .excel-detail td:first-child {
+    border-left: 5px solid #33D6FF !important;
 }
 
 /* === ATVĒRTA GALVENĀ RINDA === */
-.excel-row.is-open {
-    background: #e9f7ef;   /* viegli spilgti zaļš */
-}
 
-/* hover tikai ja atvērta */
-.excel-row.is-open:hover {
-    background: #dff3ea;
-}
+/* ========== SELECTED RINDA (TĪRS ZILAIS) ========== */
 
-/* bultiņa atvērtam stāvoklim */
-.excel-row.is-open .chevron {
-    color: #166534;        /* tumši zaļš */
-    font-weight: bold;
-}
-
-/* 1. AKTĪVĀ (ATVĒRTĀ) GALVENĀ RINDA */
-.excel-row.is-expanded {
-    background: #ecfdf3;        /* gaiši zaļš */
+/* 1.rinda – spilgti gaiši debeszila */
+.excel-row.is-open td {
+    background: #BFE4FF;   /* spilgtāka debeszila */
     font-weight: 600;
+    border-top: none;
+    border-bottom: none;
+    border-top: 2px solid #33D6FF;
+
 }
+
+
+
+/* Kreisā mala iet cauri visam blokam */
+.excel-row.is-open td:first-child,
+.excel-detail td:first-child {
+border-left: 5px solid #33D6FF;   /* neon gaiši zils */
+}
+
+/* Chevron arī zilā tonī */
+.excel-row.is-open .chevron {
+    color: #2F6FED;
+}
+
 
 /* 2. DETAIL / VERSIJU RINDAS */
-.excel-detail {
-    background: #f9fafb;
-}
-
 
 .excel-detail .detail-name {
     padding-left: 36px;
@@ -257,9 +284,10 @@
 
 /* ŠŪNA kā poga */
 .plus-cell {
-    background: #ffffff;
-    border: 2px solid #27b05c;              /* spilgti zaļš */
-    border-radius: 6px;
+    background: #c2eaf9;
+    border: 1px solid #1E3A8A;   /* tumši zils */
+    border-radius: 4px;       /* ne 6px */
+    box-shadow: none;
 
     box-shadow: 0 1px 3px rgba(46, 210, 109, 0.35);
 
@@ -270,8 +298,8 @@
 
 /* hover uz VISAS šūnas */
 .plus-cell:hover {
-    background: #26c663;
-    box-shadow: 0 3px 6px rgba(22, 101, 52, 0.45);
+    background: #1E3A8A;   /* tumši zils hover */
+    border: 1px solid #ffffff;   /* balts */
 }
 
 /* nospiesta sajūta */
@@ -284,7 +312,7 @@
     all: unset;                /* noņem “pogas” izskatu */
     font-weight: 700;
     font-size: 14px;
-    color: #166534;
+    color: #1E3A8A;
     cursor: pointer;
 }
 
@@ -343,62 +371,28 @@
 
 /* GALVENAIS PLANNING BOX */
 .planning-container {
-    height: calc(100vh - 120px);   /* pielāgo, ja augšā ir headeris */
+    height: calc(100vh - 120px);
     width: 100%;
 
-    overflow: auto;               /* ⬅️ sānu + vertikālais scroll */
-    
-    border-radius: 12px;          /* ⬅️ noapaļotas malas */
-    border: 1px solid #d1d5db;
+    overflow: auto;
 
+    border-radius: 6px;                 /* bija 12px */
+    border: 1px solid #B7C8E6;           /* tāds pats kā planning-main-block */
     background: #ffffff;
+
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
-/* atvērta galvenā rinda – viss teksts bold */
-.excel-row.is-open td {
-    font-weight: 600;
-}
-
-/* noņem iekšējos horizontālos borderus starp atvērtām rindām */
-/* VISAI ATVĒRTAJAI GRUPAI – KREISĀ & LABĀ MALA */
-.excel-row.is-open td,
-.excel-detail td {
-    border-left: 2px solid transparent;
-    border-right: 2px solid transparent;
-}
-
-/* kreisā mala */
-.excel-row.is-open td:first-child,
-.excel-detail td:first-child {
-    border-left-color: #22c55e;
-}
-
-/* labā mala */
-.excel-row.is-open td:last-child,
-.excel-detail td:last-child {
-    border-right-color: #22c55e;
-}
-
-/* AUGŠA – tikai galvenajai rindai */
-.excel-row.is-open td {
-    border-top: 2px solid #22c55e;
-}
-
-/* APAKŠA – tikai pēdējai detail rindai */
-.excel-detail.last-detail td {
-    border-bottom: 2px solid #22c55e;
-}
-
-/* NOŅEM IEKŠĒJOS HORIZONTĀLOS BORDERUS */
-.excel-row.is-open td,
-.excel-detail td {
-    border-top-width: 0;
-}
 
 /* RINDAS HOVER – bet NE pogu kolonnas */
 .excel-row:hover td:not(.plus-cell):not(.minus-cell):not([class*="cell-"]) {
-    background: #e1e5ea;
+    background: #EAF2FF;
 }
+
+.excel-row:hover td:first-child {
+    box-shadow: inset 4px 0 0 #2563EB;
+}
+
 
 /* vispārējs */
 .cell-val {
@@ -436,4 +430,13 @@
 /* Finishing */
 .cell-fin-ip {
     background-color: #cac1ff;
+}
+
+.plus-cell.is-draft-cell {
+    background: #2563eb;
+}
+
+.plus-cell.is-draft-cell .planned-btn {
+    color: #ffffff;
+    font-weight: 700;
 }

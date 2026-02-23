@@ -50,14 +50,13 @@
                     <span class="planned-value">@grp.Planned</span>
                 </td>
 
-                <td class="plus-cell">
+                <td class="plus-cell @(IsInDraft(grp) ? "is-draft-cell" : "")">
                     <button type="button"
-                        class="planned-btn"
-                        @onclick:stopPropagation="true"
-                        @onclick="() => OnPlannedPlus(grp)">
+                            class="planned-btn"
+                            @onclick:stopPropagation="true"
+                            @onclick="() => OnPlannedPlus(grp)">
                         +
                     </button>
-
                 </td>
 
                 <td>@grp.DetailedInProgress</td>
@@ -123,6 +122,8 @@
     [Parameter] 
     public EventCallback<ProductGroupRow> PlannedPlus { get; set; }
 
+    [Parameter]
+    public List<int> DraftVersionIds { get; set; } = new();
     private async Task OnPlannedPlus(ProductGroupRow row)
     {
         if (PlannedPlus.HasDelegate)
@@ -138,6 +139,14 @@ private async Task OnPlannedMinus(ProductRow row)
         await PlannedMinus.InvokeAsync(row);
 }
 
+private bool IsInDraft(ProductGroupRow grp)
+{
+    var ver = grp.Versions?.FirstOrDefault();
+    if (ver?.VersionId is not int v)
+        return false;
+
+    return DraftVersionIds.Contains(v);
+}
 
 }
 

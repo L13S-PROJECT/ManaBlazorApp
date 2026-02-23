@@ -4,21 +4,6 @@
 
 <div class="products-toolbar">
 
-    <div class="products-search-wrap">
-        <input class="products-search"
-               type="text"
-               placeholder="Meklēt..."
-               value="@SearchText"
-               @oninput="e => SearchTextChanged.InvokeAsync(e.Value?.ToString())" />
-
-        <button type="button"
-                class="products-clear"
-                title="Notīrīt"
-                @onclick="() => SearchTextChanged.InvokeAsync(string.Empty)">
-            ✕
-        </button>
-    </div>
-
     <div class="root-switch">
     <div class="root-switch-track">
         <div class="root-switch-thumb @(SelectedView == ProductViewType.Adapteris ? "right" : "")"></div>
@@ -36,6 +21,21 @@
         </button>
     </div>
 </div>
+
+    <div class="products-search-wrap">
+        <input class="products-search"
+               type="text"
+               placeholder="Meklēt..."
+               value="@SearchText"
+               @oninput="e => SearchTextChanged.InvokeAsync(e.Value?.ToString())" />
+
+        <button type="button"
+                class="products-clear"
+                title="Notīrīt"
+                @onclick="() => SearchTextChanged.InvokeAsync(string.Empty)">
+            ✕
+        </button>
+    </div>
 
 
     <button type="button"

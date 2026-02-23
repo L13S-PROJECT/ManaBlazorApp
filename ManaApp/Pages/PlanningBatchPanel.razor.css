@@ -19,9 +19,20 @@
 }
 
 .draft-title {
-    background-color: #f3f4f6;   /* gaiši pelēks */
-    color: #4b5563;              /* tumši pelēks teksts */
-    cursor: not-allowed;
+    background-color: #ffffff;      /* balts fons */
+    border: 1px solid #bfdbfe;      /* gaiši zils border */
+    border-bottom: 2px solid #1e40af; /* tumšāks apakšējais akcents */
+    color: #081232;                 /* tumši zils teksts */
+
+    text-align: center;
+    width: 100%;
+    border-radius: 4px;
+
+    font-weight: 600;
+    font-size: 16px;
+
+    cursor: default;                /* vairs ne "not-allowed" */
+    box-shadow: 0 3px 8px rgba(30, 64, 175, 0.35);
 }
 
 .sales-info-row {
@@ -81,25 +92,59 @@
 
 .batch-row {
     display: grid;
-    grid-template-columns: 2fr 1fr 70px 2fr 80px;
-    gap: 8px;
+    grid-template-columns: 1fr auto;  /* nosaukums | labais bloks */
     align-items: center;
-    padding: 6px 0;
-    border-bottom: 1px solid #e5e7eb;
+    column-gap: 14px;                /* vienīgā vizuālā atstarpe */
+
+    background: #ffffff;
+    border: 1px solid #bfdbfe;
+    border-bottom: 2px solid #1e40af;
+    border-radius: 4px;
+
+    padding: 4px 10px;
+    margin-bottom: 6px;
+}
+
+.batch-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;          /* KOMPAKTI starp kodu/qty/pogām */
+    white-space: nowrap;
+}
+
+.batch-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+}
+.batch-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
 }
 
 .batch-name {
     font-weight: 500;
+    font-size: 14px;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .batch-code {
     font-size: 12px;
     opacity: 0.7;
+    text-align: center;
 }
 
 .batch-qty {
     text-align: right;
     font-weight: 500;
+    font-size: 13px;
+    padding: 0 3px; 
+    text-align: center;  
 }
 
 .batch-comment {
@@ -110,5 +155,135 @@
 .batch-actions {
     display: flex;
     justify-content: flex-end;
+    display: flex;
+    justify-content: flex-end;
     gap: 6px;
+    flex-wrap: nowrap;     /* pogas nekad nelūzt jaunā rindā */
+}
+
+.planning-section {
+    background: #ffffff;
+    border: 2px solid #1E40AF;   /* tumši zils */
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.planning-section-header {
+    background: #1E40AF;         /* tas pats zilais kā kreisajā */
+    color: #ffffff;
+    font-weight: 600;
+    padding: 10px 14px;
+    font-size: 15px;
+}
+
+
+.planning-batch-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #e2e8f3;   /* tas pats iekšējais tonis */
+}
+
+.planning-batch-panel hr {
+    margin: 6px 0;   /* bija lielāks */
+}
+
+.draft-title-wrap {
+    display: flex;
+    justify-content: center;   /* horizontāli */
+    align-items: center;       /* vertikāli */
+    margin-top: 6px;
+    width: 100%;
+}
+
+.panel-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    resize: none;
+    min-height: 90px;
+
+    border: 1px solid #2563eb;   /* zila kontūra */
+    border-radius: 4px;
+
+    font-size: 12px;             /* mazāks teksts */
+    padding: 8px;
+}
+
+/* Kopējais pogu stils */
+.panel-btn {
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* Primārā (zilā) poga */
+.panel-btn.primary {
+    background: #2563eb;       /* spilgtāks zils */
+    border: 1px solid #2563eb;
+    color: #ffffff;
+}
+
+.panel-btn.primary:hover {
+    background: #3b82f6;       /* vēl spilgtāks hover */
+    border-color: #3b82f6;
+}
+
+/* Outline poga */
+.panel-btn.outline {
+    background: #ffffff;
+    border: 1px solid #2563eb;
+    color: #2563eb;
+}
+
+.panel-btn.outline:hover {
+    background: #eef2ff;
+}
+
+.panel-actions {
+    display: flex;
+    justify-content: flex-end;  /* pabīda pa labi */
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.panel-subtitle {
+    font-size: 15px;
+    font-weight: 600;
+    text-align: center;          /* pa vidu */
+    color: #081232;              /* tumši zilais tonis */
+    margin: 4px 0 6px 0;
+}
+
+
+
+.icon-btn {
+    background: transparent;   /* bez fona */
+    border: none;              /* bez rāmja */
+    font-size: 14px;           /* mazāks izmērs */
+    padding: 2px 4px;
+    cursor: pointer;
+    color: #050c21;            /* tumši zilais */
+}
+
+.icon-btn:hover {
+    color: #2563eb;
+}
+
+.batch-dropzone {
+    background: #f8fbff;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+
+    padding: 10px;
+    margin-top: 6px;
+
+    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.15);
+
+    flex: 1;                 /* stiepjas uz leju */
+    display: flex;
+    flex-direction: column;
+
+    overflow-y: auto;        /* vertikālais scroll ja vajag */
+    min-height: 0;           /* svarīgi flex konteinerim */
 }

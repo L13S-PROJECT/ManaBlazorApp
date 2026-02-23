@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
 <link href="_content/Syncfusion.Blazor.Themes/fluent.css" rel="stylesheet" />
 
-<link rel="stylesheet" href="css/app.css?v=fix44" />
+<link rel="stylesheet" href="css/app.css?v=fix45" />
 
 <link href="ManaApp.styles.css" rel="stylesheet" />
 
@@ -36,6 +36,20 @@
   <script src="_content/Syncfusion.Blazor/scripts/syncfusion-blazor.min.js"></script>
 
   <script src="_framework/blazor.webassembly.js"></script>
+
+  <script>
+    window.createPlanDialogEsc = function (dotnetRef) {
+
+        function handler(e) {
+            if (e.key === "Escape") {
+                dotnetRef.invokeMethodAsync("CloseFromEsc");
+            }
+        }
+
+        document.addEventListener("keydown", handler);
+    };
+</script>
+
 </body>
 </html>
 
@@ -49,3 +63,4 @@
         XLSX.writeFile(wb, "pavadzime.xlsx");
     };
 </script>
+

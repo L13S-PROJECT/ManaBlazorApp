@@ -7,15 +7,8 @@
 @if (activeSheet == BatchPanelSheet.Production)
 {
 
-    <h3 class="panel-title">
-        Jauns ražošanas plāns
-    </h3>
-
     <div class="panel-field">
-        <label class="panel-label">
-            Pagaidu nosaukums:
-        </label>
-        
+       
         <input type="text"
        class="panel-input draft-title"
        value="@DraftTitle"
@@ -26,9 +19,9 @@
     </div>
 
     <div class="panel-field">
-        <label class="panel-label">
-            Komentārs
-        </label>
+<label class="panel-label">
+    Piezīmes:
+</label>
 
 <textarea class="panel-textarea"
           placeholder="Komentārs"
@@ -43,25 +36,26 @@
     <hr class="panel-separator" />
 
 <div class="panel-actions">
-<button type="button"
-        class="panel-btn danger"
-        disabled="@(Model.BatchId == null)"
-        @onclick="DeleteDraftClicked">
-    Dzēst melnrakstu
-</button>
-
-
     <button type="button"
-        class="panel-btn primary"
-        disabled="@(Items.Count == 0)"
-        @onclick="OpenCreateDialog">
-    IZVEIDOT
-</button>
+            class="panel-btn outline"
+            title="Dzēst visus ierakstus"
+            disabled="@(Model.BatchId == null)"
+            @onclick="DeleteDraftClicked">
+        Dzēst melnrakstu
+    </button>
 
+     <button type="button"
+            class="panel-btn primary"
+            title="Apstiprināt ražošanas plānu"
+            disabled="@(Items.Count == 0)"
+            @onclick="OpenCreateDialog">
+        Apstiprināt
+    </button>
 </div>
 
-
     <hr />
+
+<div class="batch-dropzone">
 
 <h4 class="panel-subtitle">Pievienotās preces</h4>
 
@@ -74,31 +68,29 @@ else
     <div style="margin-top:12px;">
         @foreach (var it in Items)
 {
-    <div class="batch-row">
-        <div class="batch-name">@it.Name</div>
+<div class="batch-row">
+    <div class="batch-name">@it.Name</div>
+
+    <div class="batch-right">
         <div class="batch-code">@it.Code</div>
         <div class="batch-qty">@it.Qty</div>
-        <div class="batch-comment">@it.Comment</div>
 
         <div class="batch-actions">
             <button class="icon-btn"
                     title="Labot"
-                    @onclick="() => OpenEdit(it)">
-                ✎
-            </button>
+                    @onclick="() => OpenEdit(it)">✎</button>
 
             <button class="icon-btn"
                     title="Dzēst preci"
-                    @onclick="() => DeleteItem(it)">
-                🗑️
-            </button>
-
+                    @onclick="() => DeleteItem(it)">🗑️</button>
         </div>
     </div>
+</div>
 }
 
     </div>
 }
+</div>
 }
     </div>
 
@@ -298,7 +290,7 @@ private async Task DeleteItem(BatchCartItem it)
 {
     var ok = await JS.InvokeAsync<bool>(
         "confirm",
-        "Vai tiešām dzēst preci no melnraksta?"
+        "Vai dzēst preci no melnraksta?"
     );
 
     if (!ok)
