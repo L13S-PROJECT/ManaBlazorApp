@@ -70,7 +70,7 @@
 
 /* kreisais iekšējais akcents, lai redz saistību */
 .excel-detail td:first-child {
-    border-left: 3px solid #2F6FED;
+    border-left: 4px solid #2563EB;
 }
 
 .detail-name {
@@ -186,14 +186,14 @@ background: #ffffff;
 /* KOMPAKTAS detail (versiju) rindas */
 /* DETAIL rinda – iegrimis efekts */
 .excel-detail td {
-    background: #F2F9FF;   /* ļoti gaiša debeszila */
+    background: #F6F3E8 !important;  /* ļoti gaiša debeszila */
     padding-top: 1px;
     padding-bottom: 1px;
     height: 16px;   /* šaurāka nekā galvenā */
     border-left: none !important;
     border-right: none !important;
     border-top: none;
-    border-bottom: 2px solid #33D6FF;   /* neon apakšējais border */
+    border-bottom: 1px solid #E2E8F0;
     font-size: 10px;
 }
 
@@ -436,7 +436,31 @@ border-left: 5px solid #33D6FF;   /* neon gaiši zils */
     background: #2563eb;
 }
 
-.plus-cell.is-draft-cell .planned-btn {
-    color: #ffffff;
+
+.excel-table td.cell-stock {
+    background: #99E9F2 !important;   /* tumšāks par Plan */
+    color: #0b4f6c !important;        /* tumši zils */
+    font-weight: 600;
+}
+
+.excel-table td.cell-zero {
+    color: #9ca3af !important;
+}
+
+.excel-table td.cell-plan-strong {
+    background: #C6FCFF !important;   /* tavs tonis */
+    color: #1d4ed8 !important;        /* zili cipari */
     font-weight: 700;
+}
+
+.excel-table td.cell-inprogress {
+    background: #dbeafe !important;   /* ļoti gaišs zils */
+    color: #1e3a8a !important;
+    font-weight: 600;
+}
+
+.excel-table td.cell-finished {
+    background: #93c5fd !important;   /* tumšāks nekā in-progress */
+    color: #0f172a !important;
+    font-weight: 600;
 }

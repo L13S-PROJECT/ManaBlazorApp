@@ -42,12 +42,12 @@
                     </span>
                 </td>
 
-                <td class="@(grp.InStock > 0 ? "cell-instock" : "")">
+                <td class="@(grp.InStock > 0 ? "cell-stock" : "cell-zero")">
                     @grp.InStock
                 </td>
 
-                <td class="planned-cell @(grp.Planned > 0 ? "cell-plan" : "")">
-                    <span class="planned-value">@grp.Planned</span>
+                <td class="@(grp.Planned > 0 ? "cell-plan-strong" : "cell-zero")">
+                    @grp.Planned
                 </td>
 
                 <td class="plus-cell @(IsInDraft(grp) ? "is-draft-cell" : "")">
@@ -59,11 +59,21 @@
                     </button>
                 </td>
 
-                <td>@grp.DetailedInProgress</td>
-                <td>@grp.DetailedFinish</td>
-                <td>@grp.AssemblyINProgress</td>
-                <td>@grp.AssemblyFinish</td>
-                <td>@grp.FinishingInProgress</td>
+                <td class="@(grp.DetailedInProgress > 0 ? "cell-inprogress" : "cell-zero")">
+                    @grp.DetailedInProgress
+                </td>
+                <td class="@(grp.DetailedFinish > 0 ? "cell-finished" : "cell-zero")">
+                    @grp.DetailedFinish
+                </td>
+                <td class="@(grp.AssemblyINProgress > 0 ? "cell-inprogress" : "cell-zero")">
+                    @grp.AssemblyINProgress
+                </td>
+                <td class="@(grp.AssemblyFinish > 0 ? "cell-finished" : "cell-zero")">
+                    @grp.AssemblyFinish
+                </td>
+                <td class="@(grp.FinishingInProgress > 0 ? "cell-inprogress" : "cell-zero")">
+                    @grp.FinishingInProgress
+                </td>
             </tr>
 
 @if (grp.Versions is not null && grp.IsExpanded)
