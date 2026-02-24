@@ -14,7 +14,7 @@
 
     <DialogTemplates>
 
-        <Header>Jauna detaļa – @SelectedProductLabel</Header>
+        <Header>Jauna detaļa</Header>
 
         <Content>
             <div class="newpart-form">
@@ -53,16 +53,15 @@
 
         <FooterTemplate>
             <div class="newpart-footer">
-
                 <button type="button"
-                        class="action-btn action-btn-sm action-btn-primary"
+                        class="newpart-btn newpart-btn-save"
                         disabled="@Invalid"
                         @onclick="Save">
                     Saglabāt
                 </button>
 
                 <button type="button"
-                        class="action-btn action-btn-sm"
+                        class="newpart-btn newpart-btn-cancel"
                         @onclick="Close">
                     Aizvērt
                 </button>

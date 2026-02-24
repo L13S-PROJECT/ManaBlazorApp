@@ -1,0 +1,84 @@
+.technology-panel{
+  background:#e2e8f3;
+  border:2px solid #1e40af;
+  border-radius:6px;
+  box-shadow:0 2px 8px rgba(0,0,0,.05);
+
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+
+  /* lai labajā kolonnā "Tehnoloģija" korekti skrollojas */
+  min-height:0;
+}
+
+.technology-panel-header{
+  background:#2563eb;   /* tā pati krāsa kā Preces apraksts */
+  color:#ffffff;
+  font-weight:600;
+  text-align:center;
+  padding:6px 12px;     /* šaurāks augstums */
+  font-size:13px;
+}
+
+.technology-panel-body{
+  padding:10px 10px 10px 4px;
+
+  /* šeit ir saturs ar listi, lai var ritināt */
+  overflow:auto;
+  min-height:0;
+}
+
+.technology-header-actions{
+  display:flex;
+  gap:8px;
+
+  justify-content:flex-end;   /* pabīda pa labi */
+  margin-bottom:8px;
+}
+/* pogu rinda tā pati, tikai saskaņota ar paneli */
+.technology-actions{
+  margin:0 0 8px 0;
+}
+
+.tech-add-btn{
+  height:24px;
+  width:100px;
+
+  padding:0 6px;
+
+  border:1px solid #1e40af;
+  border-radius:6px;
+
+  font-size:12px;
+  font-weight:600;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  background:#1e40af;   /* tā pati krāsa kā “Jauns” */
+  color:#ffffff;
+}
+
+.action-btn.tech-manage-btn{
+  height:24px;
+  padding:0 10px;
+
+  border:1px solid #1e40af;   /* zila kontūra */
+  border-radius:6px;
+
+  background:#ffffff;         /* balts fons */
+  color:#1e40af;              /* zili burti */
+
+  font-size:12px;
+  font-weight:600;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.action-btn.tech-manage-btn:hover{
+  background:#e0e7ff;         /* gaiši zils hover */
+}

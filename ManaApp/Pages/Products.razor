@@ -61,16 +61,18 @@
 
             <!-- Tehnoloģija -->
 
-                <ProductTechnologyBox
-                    Selected="selected"
-                    LoadingPartDetails="loadingPartDetails"
-                    LoadingWorks="loadingWorks"
-                    SelectedPartDetails="selectedPartDetails"
-                    WorksByParts="worksByParts"
-                    OnAddPart="OpenNewPartDialog"
-                    OnOpenSteps="OpenStepsForPart"
-                    OnDeletePart="DeletePartByCode">
-                </ProductTechnologyBox>
+        <ProductTechnologyBox
+            Selected="selected"
+            LoadingPartDetails="loadingPartDetails"
+            LoadingWorks="loadingWorks"
+            SelectedPartDetails="selectedPartDetails"
+            WorksByParts="worksByParts"
+            OnAddPart="OpenNewPartDialog"
+            OnOpenSteps="OpenStepsForPart"
+            OnOpenStepTypes="OpenStepTypeDialogAsync"
+            OnOpenWorkCenters="OpenWorkCenterDialogAsync"
+            OnDeletePart="DeletePartByCode">
+        </ProductTechnologyBox>
 
     </div>
 </div>

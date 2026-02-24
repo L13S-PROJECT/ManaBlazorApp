@@ -15,19 +15,6 @@
 
 <DialogTemplates>
 <Content>
-        <div class="steps-dialog-actions">
-            <button type="button"
-                    class="action-btn action-btn-sm"
-                    @onclick="() => OnOpenStepTypes.InvokeAsync()">
-                ⚙ Soļu tipi
-            </button>
-
-            <button type="button"
-                    class="action-btn action-btn-sm"
-                    @onclick="() => OnOpenWorkCenters.InvokeAsync()">
-                🏭 Darba centri
-            </button>
-        </div>
 
     @if (Steps is null || Steps.Count == 0)
     {

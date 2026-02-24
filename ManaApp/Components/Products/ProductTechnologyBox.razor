@@ -1,90 +1,110 @@
 @namespace ManaApp.Components.Products
 @using ManaApp.Models
 
-<div class="technology-box">
+<div class="technology-panel">
 
-<div class="technology-header">
-    <div class="panel-title">Tehnoloģija</div>
-
-    <div class="technology-actions">
-        @if (OnAddPart.HasDelegate)
-        {
-            <button type="button"
-                    class="action-btn action-btn-sm"
-                    disabled="@(Selected is null)"
-                    @onclick="OnAddPart">
-                + pievienot jaunu detaļu
-            </button>
-        }
+    <div class="technology-panel-header">
+        Tehnoloģija
     </div>
-</div>
 
-    @if (Selected is null)
-    {
-        <div style="opacity:.7">Izvēlies rindu kreisajā pusē.</div>
-    }
-    else if (LoadingPartDetails || LoadingWorks)
-    {
-        <div style="opacity:.7">Ielādēju…</div>
-    }
-    else if ((WorksByParts is null || WorksByParts.Count == 0) 
-          && (SelectedPartDetails is null || SelectedPartDetails.Count == 0))
-    {
-        <div style="opacity:.7">Nav detaļu.</div>
-    }
-else
-{
-    @foreach (var part in (WorksByParts ?? new List<WorksByPartDto>()))
-    {
-        <div class="tech-item">
-            <div class="tech-head" @onclick="() => TogglePart(part.TopPartCode)">
-                <span class="tech-toggle">
-                    @(openParts.Contains(part.TopPartCode ?? "") ? "−" : "+")
-                </span>
-                <span class="tech-code">@part.TopPartCode</span>
-                <span class="tech-name">— @part.TopPartName</span>
-                <span class="tech-qty">
-                    @{
-                        var qty = SelectedPartDetails?
-                            .FirstOrDefault(x => x.TopPartCode == part.TopPartCode)?
-                            .Quantity ?? 0;
-                    }
-                    @(qty > 0 ? $"x{qty}" : "")
-                </span>
+    <div class="technology-panel-body">
 
+    @if (Selected is not null)
+    {
+        <div class="technology-header-actions">
+            @if (OnAddPart.HasDelegate)
+            {
                 <button type="button"
-                    class="action-btn action-btn-steps"
-                    @onclick="(e) => OnOpenSteps.InvokeAsync(part.TopPartCode)"
-                    @onclick:stopPropagation="true">
-                    + Soļi
+                        class="action-btn tech-add-btn"
+                        title="Pievienot jaunu detaļu"
+                        @onclick="OnAddPart">
+                    + pievienot
                 </button>
 
                 <button type="button"
-                        class="tech-delete-btn"
-                        title="Dzēst detaļu"
-                        aria-label="Dzēst detaļu"
-                        @onclick="() => OnDeletePart.InvokeAsync(part.TopPartCode)"
-                        @onclick:stopPropagation="true">
-                    🗑
+                        class="action-btn tech-manage-btn"
+                        title="Pārvaldīt soļu tipus"
+                        @onclick="OnOpenStepTypes">
+                    Soļu tipi
                 </button>
 
-            </div>
+                <button type="button"
+                        class="action-btn tech-manage-btn"
+                        title="Pārvaldīt darba centrus"
+                        @onclick="OnOpenWorkCenters">
+                    Darba centri
+                </button>
+            }
         </div>
-
-        @if (openParts.Contains(part.TopPartCode ?? "") && part.Steps?.Any() == true)
-{
-    <ul class="tech-steps">
-        @foreach (var s in part.Steps!)
-        {
-            <li class="tech-step">
-                <span class="tech-step-arrow">➜</span>
-                <span class="tech-step-name">@s.StepName</span>
-            </li>
-        }
-    </ul>
-}
     }
-}
+
+        @if (Selected is null)
+        {
+            <div style="opacity:.7">Izvēlies rindu kreisajā pusē.</div>
+        }
+        else if (LoadingPartDetails || LoadingWorks)
+        {
+            <div style="opacity:.7">Ielādēju…</div>
+        }
+        else if ((WorksByParts is null || WorksByParts.Count == 0)
+              && (SelectedPartDetails is null || SelectedPartDetails.Count == 0))
+        {
+            <div style="opacity:.7">Nav detaļu.</div>
+        }
+        else
+        {
+            @foreach (var part in (WorksByParts ?? new List<WorksByPartDto>()))
+            {
+                <div class="tech-item">
+                    <div class="tech-head" @onclick="() => TogglePart(part.TopPartCode)">
+                        <span class="tech-toggle">
+                            @(openParts.Contains(part.TopPartCode ?? "") ? "−" : "+")
+                        </span>
+                        <span class="tech-code">@part.TopPartCode</span>
+                        <span class="tech-name">— @part.TopPartName</span>
+                        <span class="tech-qty">
+                            @{
+                                var qty = SelectedPartDetails?
+                                    .FirstOrDefault(x => x.TopPartCode == part.TopPartCode)?
+                                    .Quantity ?? 0;
+                            }
+                            @(qty > 0 ? $"x{qty}" : "")
+                        </span>
+
+                        <button type="button"
+                                class="action-btn tech-manage-btn"
+                                @onclick="(e) => OnOpenSteps.InvokeAsync(part.TopPartCode)"
+                                @onclick:stopPropagation="true">
+                            + Soļi
+                        </button>
+
+                        <button type="button"
+                                class="tech-delete-btn"
+                                title="Dzēst detaļu"
+                                aria-label="Dzēst detaļu"
+                                @onclick="() => OnDeletePart.InvokeAsync(part.TopPartCode)"
+                                @onclick:stopPropagation="true">
+                            🗑
+                        </button>
+                    </div>
+                </div>
+
+                @if (openParts.Contains(part.TopPartCode ?? "") && part.Steps?.Any() == true)
+                {
+                    <ul class="tech-steps">
+                        @foreach (var s in part.Steps!)
+                        {
+                            <li class="tech-step">
+                                <span class="tech-step-arrow">➜</span>
+                                <span class="tech-step-name">@s.StepName</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            }
+        }
+
+    </div>
 </div>
 
 @code {
@@ -98,7 +118,9 @@ else
     [Parameter] public EventCallback OnAddPart { get; set; }
     [Parameter] public EventCallback<string?> OnOpenSteps { get; set; }
     [Parameter] public EventCallback<string?> OnDeletePart { get; set; }
-private HashSet<string> openParts = new();
+    [Parameter] public EventCallback OnOpenStepTypes { get; set; }
+    [Parameter] public EventCallback OnOpenWorkCenters { get; set; }
+    private HashSet<string> openParts = new();
 
 private void TogglePart(string? code)
 {

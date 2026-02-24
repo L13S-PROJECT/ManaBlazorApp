@@ -257,122 +257,6 @@ code {
   line-height:18px !important;
 }
 
-/* ===== New Part dialog (global) ===== */
-.e-dialog.newPartDialog{
-  border-radius:16px !important;
-  border:2px solid #22c55e !important;
-  overflow:hidden; /* lai stūri reāli ir apaļi */
-}
-
-.e-dialog.newPartDialog .e-dlg-header-content{
-  border-bottom:1px solid #e5e7eb;
-}
-
-.e-dialog.newPartDialog .e-dlg-content{
-  padding:12px 14px !important;
-}
-
-/* DropDownList pill + ZAĻŠ focus */
-.e-dialog.newPartDialog .newpart-ddl.e-control-wrapper,
-.e-dialog.newPartDialog .newpart-ddl .e-input-group{
-  border-radius:18px !important;
-  border:1px solid #9ca3af !important;
-  box-shadow:0 1px 2px rgba(0,0,0,.08) !important;
-}
-
-.e-dialog.newPartDialog .newpart-ddl.e-input-focus,
-.e-dialog.newPartDialog .newpart-ddl:focus-within,
-.e-dialog.newPartDialog .newpart-ddl .e-input-group.e-input-focus,
-.e-dialog.newPartDialog .newpart-ddl .e-input-group:focus-within{
-  border-color:#22c55e !important;
-  box-shadow:0 0 0 4px rgba(34,197,94,.35) !important;
-}
-
-.e-dialog.newPartDialog .newpart-ddl input.e-input{
-  outline:none !important;
-}
-
-/* Numeric pill + ZAĻŠ focus */
-.e-dialog.newPartDialog .newpart-num.e-control-wrapper,
-.e-dialog.newPartDialog .newpart-num .e-input-group{
-  border-radius:18px !important;
-  border:1px solid #9ca3af !important;
-  box-shadow:0 1px 2px rgba(0,0,0,.08) !important;
-}
-
-.e-dialog.newPartDialog .newpart-num.e-input-focus,
-.e-dialog.newPartDialog .newpart-num:focus-within,
-.e-dialog.newPartDialog .newpart-num .e-input-group.e-input-focus,
-.e-dialog.newPartDialog .newpart-num .e-input-group:focus-within{
-  border-color:#22c55e !important;
-  box-shadow:0 0 0 4px rgba(34,197,94,.35) !important;
-}
-
-
-/* NumericTextBox: cipars centrā + bultiņas centrētas un mazākas */
-.e-dialog.newPartDialog .newpart-num .e-input-group{
-  display:flex !important;
-  align-items:center !important;
-}
-
-.e-dialog.newPartDialog .newpart-num input.e-input{
-  outline:none !important;
-  text-align:center !important;
-
-  flex:1 1 auto !important;   /* <- lai ciparam ir vieta */
-  min-width:0 !important;
-
-  padding-left:10px !important;   /* <- atpakaļ normāli */
-  padding-right:10px !important;  /* <- bultiņas ir savā wrapā */
-  box-sizing:border-box !important;
-}
-
-
-.e-dialog.newPartDialog .newpart-num .e-spin-wrap{
-  width:auto !important;          /* nav atsevišķa laukuma */
-  padding:0 8px 0 0 !important;   /* tikai neliela atkāpe */
-  border:0 !important;            /* ← NOŅEMAM FONU/ATDALĪJUMU */
-
-  display:flex !important;
-  flex-direction:column !important;
-  justify-content:center !important;
-  align-items:center !important;
-  background:transparent !important;
-}
-
-/* === NumericTextBox bultiņas: bez fona, bold uz click === */
-.e-dialog.newPartDialog .newpart-num .e-spin-up,
-.e-dialog.newPartDialog .newpart-num .e-spin-down{
-  background: transparent !important;
-}
-
-.e-dialog.newPartDialog .newpart-num .e-spin-up:hover,
-.e-dialog.newPartDialog .newpart-num .e-spin-down:hover,
-.e-dialog.newPartDialog .newpart-num .e-spin-up:active,
-.e-dialog.newPartDialog .newpart-num .e-spin-down:active{
-  background: transparent !important;
-}
-
-.e-dialog.newPartDialog .newpart-num .e-spin-up:active::before,
-.e-dialog.newPartDialog .newpart-num .e-spin-down:active::before{
-  font-weight: 800;
-  transform: scale(1.15);
-}
-
-
-.e-dialog.newPartDialog .newpart-num .e-spin-up,
-.e-dialog.newPartDialog .newpart-num .e-spin-down{
-  height:14px !important;
-  display:flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-}
-
-.e-dialog.newPartDialog .newpart-num .e-spin-up::before,
-.e-dialog.newPartDialog .newpart-num .e-spin-down::before{
-  font-size:11px !important;
-  color:#374151 !important;
-}
 
 .app-layout{
   display:grid;
@@ -473,3 +357,21 @@ tr[aria-selected="true"] > td.e-rowcell {
 tr[aria-selected="true"] > td.e-rowcell:first-child {
   border-left: 4px solid #2563eb !important;  /* tumši zils akcents */
 }
+
+/* ===== NewPartDialog rounded fix (FINAL) ===== */
+
+.e-dialog.newPartDialog .e-input-group{
+  border-radius:8px !important;
+  overflow:hidden !important;
+}s
+
+.e-dialog.newPartDialog .e-control-wrapper{
+  border-radius:8px !important;
+}
+/* ===== NewPartDialog outer popup rounding ===== */
+
+.e-dialog.newPartDialog{
+  border-radius:12px !important;
+  overflow:hidden !important;   /* lai stūri reāli noapaļojas */
+}
+
