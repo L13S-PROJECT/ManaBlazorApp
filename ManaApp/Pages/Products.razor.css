@@ -33,48 +33,6 @@
   box-sizing:border-box;
 }
 
-/* Syncfusion grid iekšējie elementi — jāliek ar :global, jo CSS isolation */
-.left-grid-box :global(.e-gridheader table caption){
-  display:none !important;
-}
-
-.left-grid-box :global(.e-gridcontent){
-  height:calc(100% - 48px);
-  overflow:auto;
-  box-sizing:border-box;
-}
-
-.left-grid-box :global(.e-grid){
-  height:100% !important;
-}
-
-.left-grid-box :global(.e-grid .e-rowcell){
-  border-bottom:1px solid #e5e7eb;
-}
-
-.left-grid-box :global(.e-grid .e-rowcell + .e-rowcell){
-  border-left:1px solid #f0f0f0;
-}
-
-.left-grid-box :global(.e-grid .e-headercell){
-  border-bottom:1px solid #e5e7eb;
-}
-
-/* 5. līmenis – aktīvā rinda galvenajā tabulā */
-.left-grid-box :global(.e-grid .e-content .e-table tbody tr.e-row.e-selectionbackground td.e-rowcell),
-.left-grid-box :global(.e-grid .e-content .e-table tbody tr.e-row.e-active td.e-rowcell){
-  background-color:#A8ADB3 !important; /* 5. līmenis */
-  color:#111827 !important;
-}
-
-
-.left-grid-box :global(.e-grid .e-content .e-table tbody tr.e-row.e-selectionbackground:hover td.e-rowcell){
-  background-color:#2563eb !important;
-}
-
-.left-grid-box :global(.e-grid .e-content .e-table tbody tr.e-row:not(.e-selectionbackground):hover td.e-rowcell){
-  background-color:#f5f5f5;
-}
 
 /* ===== Preces saturs: virsraksts ===== */
 /* ===== Preces saturs (kompakts, sakārtots) ===== */

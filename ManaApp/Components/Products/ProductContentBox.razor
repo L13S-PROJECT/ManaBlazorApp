@@ -1,9 +1,13 @@
 @namespace ManaApp.Components.Products
 @using ManaApp.Models
 
-<div class="product-content-box">
+<div class="product-content-panel">
 
-    <div class="panel-title">Preces saturs</div>
+    <div class="product-panel-header">
+    Preces apraksts
+</div>
+
+<div class="product-panel-body">
 
     @if (Selected is null)
     {
@@ -21,47 +25,49 @@
     }
     else
     {
-        <div class="pc-card">
-            <div class="pc-grid">
-
-                <div class="pc-field pc-span-2">
-                    <div class="pc-label">Kategorija</div>
-                    <div class="pc-value">@Details.CategoryName</div>
-                </div>
-
-                <div class="pc-field pc-span-2">
-                    <div class="pc-label">Nosaukums</div>
-                    <div class="pc-value">@Details.ProductName</div>
-                </div>
-
-                <div class="pc-field">
-                    <div class="pc-label">Kods</div>
-                    <div class="pc-value">@Details.ProductCode</div>
-                </div>
-
-                <div class="pc-field">
-                    <div class="pc-label">Versija</div>
-                    <div class="pc-value">@Details.VersionName</div>
-                </div>
-
-                <div class="pc-field">
-                    <div class="pc-label">Rasējums</div>
-                    <div class="pc-value">@Details.VersionRasejums</div>
-                </div>
-
-                <div class="pc-field">
-                    <div class="pc-label">Datums</div>
-                    <div class="pc-value">@Details.VersionDate.ToString("dd.MM.yyyy")</div>
-                </div>
-
-                <div class="pc-field pc-span-2">
-                    <div class="pc-label">Komentārs</div>
-                    <div class="pc-value pc-multiline">@Details.VersionComment</div>
-                </div>
-
-            </div>
+    
+        <div class="pc-row-category">
+            <div class="pc-label-fixed">Kategorija</div>
+            <div class="pc-input-flex">@Details.CategoryName</div>
         </div>
+
+        <div class="pc-row-namecode">
+
+            <div class="pc-label-fixed">Nosaukums</div>
+            <div class="pc-input-name">@Details.ProductName</div>
+
+            <div class="pc-label-code">Kods</div>
+            <div class="pc-input-code">@Details.ProductCode</div>
+
+        </div>
+
+        <div class="pc-row-version">
+
+            <div class="pc-label-fixed">Versijas Nr.</div>
+            <div class="pc-input-version">@Details.VersionName</div>
+
+            <div class="pc-label-ras">Rasējuma Nr.</div>
+            <div class="pc-input-ras">@Details.VersionRasejums</div>
+
+        </div>
+
+        <div class="pc-row-date-notes">
+
+            <div class="pc-label-fixed">Piezīmes:</div>
+
+            <div class="pc-label-date">Datums</div>
+            <div class="pc-input-date">
+                @Details.VersionDate.ToString("dd.MM.yyyy")
+            </div>
+
+        </div>
+
+        <div class="pc-notes-box">
+            @Details.VersionComment
+        </div>
+
     }
+</div>
 </div>
 
 @code {

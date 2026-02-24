@@ -1,0 +1,195 @@
+.product-content-panel{
+  background:#e2e8f3;
+  border:2px solid #1e40af;
+  border-radius:6px;
+  box-shadow:0 2px 8px rgba(0,0,0,.05);
+  height: 320px;
+
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+
+.product-panel-header{
+  background:#1e40af;
+  color:#ffffff;
+  font-weight:600;
+  text-align:center;
+  padding:10px 14px;
+}
+
+.product-panel-body{
+  padding:10px 10px 10px 4px;
+}
+
+.pc-form{
+  display:flex;
+  flex-direction:column;
+  gap:20px;
+  height:100%;
+}
+
+/*Kategorija*/
+
+.pc-row-category{
+  display:flex;
+  align-items:center;
+}
+
+.pc-label-fixed{
+  width:100px;
+  text-align:left;
+  font-weight:600;
+  font-size:14px;
+  color:#374151;
+}
+
+.pc-input-flex{
+  flex:1;
+  height:30px;
+  display:flex;
+  align-items:center;
+  padding:0 14px;
+
+  background:#ffffff;
+  border:1px solid #1e40af;
+  border-radius:6px;
+
+  font-size:14px;
+}
+
+/*Nosaukums un Kods*/
+/* Nosaukums + Kods rinda */
+.pc-row-namecode{
+  display:flex;
+  align-items:center;
+}
+
+/* Nosaukuma lauks — plats */
+.pc-input-name{
+  flex:1;
+  height:30px;
+  display:flex;
+  align-items:center;
+  padding:0 14px;
+
+  background:#ffffff;
+  border:1px solid #1e40af;
+  border-radius:6px;
+  font-size:14px;
+}
+
+/* Kods label — tuvāk laukam */
+.pc-label-code{
+  margin-left:12px;
+  font-weight:600;
+  font-size:14px;
+  color:#374151;
+  width:40px;
+}
+
+/* Kods lauks — mazāks */
+.pc-input-code{
+  width:80px;
+  height:30px;
+  display:flex;
+  align-items:center;
+  padding:0 14px;
+
+  background:#ffffff;
+  border:1px solid #1e40af;
+  border-radius:6px;
+  font-size:14px;
+}
+
+/* Versijas + Rasējuma rinda */
+.pc-row-version{
+  display:flex;
+  align-items:center;
+}
+
+/* Versijas lauks — mazāks */
+.pc-input-version{
+  width:60px;
+  height:30px;
+  display:flex;
+  align-items:center;
+  padding:0 14px;
+
+  background:#ffffff;
+  border:1px solid #1e40af;
+  border-radius:6px;
+  font-size:14px;
+}
+
+/* Rasējuma label */
+.pc-label-ras{
+  margin-left:20px;
+  font-weight:600;
+  font-size:14px;
+  color:#374151;
+}
+
+/* Rasējuma lauks — plats */
+.pc-input-ras{
+  flex:1;
+  min-width:0;
+  height:30px;
+  display:flex;
+  align-items:center;
+  padding:0 14px;
+
+  background:#ffffff;
+  border:1px solid #1e40af;
+  border-radius:6px;
+  font-size:14px;
+}
+
+/* Datums + Piezīmes virsrinda */
+.pc-row-date-notes{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:10px;
+}
+
+/* Datuma label */
+.pc-label-date{
+  margin-left:auto;
+  font-weight:600;
+  font-size:14px;
+  color:#374151;
+}
+
+/* Datuma lauks */
+.pc-input-date{
+  width:130px;
+  height: 30px;
+  display:flex;
+  align-items:center;
+  padding:0 14px;
+
+  background:#ffffff;
+  border:1px solid #1e40af;
+  border-radius:6px;
+  font-size:14px;
+}
+
+/* Piezīmju tekstlauks */
+.pc-notes-box{
+  margin-top:0;
+  min-height:90px;
+  padding:12px 14px;
+
+  background:#ffffff;
+  border:1px solid #1e40af;
+  border-radius:6px;
+  font-size:14px;
+}
+
+.pc-row-category,
+.pc-row-namecode,
+.pc-row-version,
+.pc-row-date-notes{
+  margin-bottom:10px;
+}

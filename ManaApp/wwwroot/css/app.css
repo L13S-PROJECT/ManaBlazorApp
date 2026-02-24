@@ -135,38 +135,23 @@ code {
 .e-grid .e-headercell.e-ascending .e-headercelldiv::after { content: "▲"; margin-left: .35rem; }
 .e-grid .e-headercell.e-descending .e-headercelldiv::after { content: "▼"; margin-left: .35rem; }
 
-/* products tabulas virsrakstu formatējums (force override) */
-
-/* Dark header visām Syncfusion tabulām */
-/* FIX: tikai Grid headeriem, ne dialogiem */
-.e-grid:not(.e-dialog) .e-gridheader .e-headercell,
-.e-grid:not(.e-dialog) .e-gridheader .e-stackedheadercell,
-.e-grid:not(.e-dialog) .e-gridheader .e-headercell .e-headercelldiv {
-  background: #4b5563 !important;
-  border-bottom: 1px solid #374151 !important; /* tumši pelēks */
-}
-   
-  
-.e-grid .e-gridheader .e-headertext {
-  color: #fff !important;            /* balts teksts */
-  font-weight: 600 !important;
-}
-
 /* LVL1 (Batch) – gaišs headeris */
-.e-grid.lvl1 .e-gridheader,
-.e-grid.lvl1 .e-gridheader.e-sticky,
-.e-grid.lvl1 .e-gridheader .e-headercontent,
-.e-grid.lvl1 .e-gridheader .e-headercell,
-.e-grid.lvl1 .e-gridheader .e-stackedheadercell,
-.e-grid.lvl1 .e-gridheader .e-headercell .e-headercelldiv {
-  background: #eef2f7 !important;
-  border-bottom: 1px solid #d1d5db !important;
+/* LVL Products – zils headeris */
+.e-grid.lvlProducts .e-gridheader,
+.e-grid.lvlProducts .e-gridheader.e-sticky,
+.e-grid.lvlProducts .e-gridheader .e-headercontent,
+.e-grid.lvlProducts .e-gridheader .e-headercell,
+.e-grid.lvlProducts .e-gridheader .e-stackedheadercell,
+.e-grid.lvlProducts .e-gridheader .e-headercell .e-headercelldiv {
+  background: #93c5fd !important;
+  border-bottom: 1px solid #60a5fa !important;
 }
-.e-grid.lvl1 .e-gridheader .e-headertext {
-  color: #1f2937 !important;
+
+.e-grid.lvlProducts .e-gridheader .e-headertext {
+  color: #0f172a !important;
   font-weight: 600 !important;
-  letter-spacing: .2px;
 }
+
 
 /* =======================================
    LVL0 (galvenais – Product) RINDU stils
@@ -457,3 +442,34 @@ html, body {
   box-shadow:none;
 }
 
+
+/* PRODUCTS GRID – correct selector */
+.e-grid[cssclass*="lvlProducts"] .e-headercell{
+  background-color:#93c5fd !important;
+}
+
+.e-grid[cssclass*="lvlProducts"] .e-headertext{
+  color:#0f172a !important;
+  font-weight:600 !important;
+}
+
+/* PRODUCTS GRID – blue hover */
+.e-grid[cssclass*="lvlProducts"] 
+.e-gridcontent 
+.e-content 
+tr.e-row:hover > td.e-rowcell {
+  background-color: #dbeafe !important;   /* gaiši zils */
+}
+
+/* PRODUCTS GRID – selected row (aria) */
+.e-grid[cssclass*="lvlProducts"] 
+tr[aria-selected="true"] > td.e-rowcell {
+  background-color: #bfdbfe !important;   /* gaišāks par header */
+  color: #0f172a !important;
+  font-weight: 600;
+}
+
+.e-grid[cssclass*="lvlProducts"] 
+tr[aria-selected="true"] > td.e-rowcell:first-child {
+  border-left: 4px solid #2563eb !important;  /* tumši zils akcents */
+}
