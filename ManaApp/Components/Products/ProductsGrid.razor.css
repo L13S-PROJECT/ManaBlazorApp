@@ -1,0 +1,6 @@
+:global(.productsGrid .e-gridheader),
+:global(.productsGrid .e-headercell){
+    background:#60a5fa !important;   /* gaišāks zils */
+    color:#ffffff !important;
+    font-weight:600;
+}

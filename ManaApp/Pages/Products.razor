@@ -14,99 +14,67 @@
 @using ManaApp.Components.Products
 @using ManaApp.Pages
        
-<PageHeader Title="Produkts" />
 
 <div class="products-main">
 
         <!-- vidējā zona: pa kreisi saraksts, pa labi 3 bloki -->
-        <div class="products-content">
+    <div class="products-content">
 
             <!-- KREISĀ PUSE: filtri + grida saraksts -->
-            <div class="products-left">
+        <div class="products-main-block">
 
-                <div @key="filterResetKey">
-<ProductsFilters
-    Categories="filteredCategories"
-    HasFilters="HasAnyFilters"
-    OnCategoryChanged="OnCategoryFilterChanged"
-    OnSearch="OnSearchInput"
-    OnClear="ClearFilters">
-
-    <RootButtons>
-        <button type="button"
-                class="root-pill @(string.IsNullOrWhiteSpace(selectedRoot) ? "active" : "")"
-                @onclick='@(() => SetRootFilter(""))'>
-            Visi
-        </button>
-
-        <button type="button"
-                class="root-pill @(selectedRoot == "KAUSS" ? "active" : "")"
-                @onclick='@(() => SetRootFilter("KAUSS"))'>
-            Kausi
-        </button>
-
-        <button type="button"
-                class="root-pill @(selectedRoot == "ADAPTERIS" ? "active" : "")"
-                @onclick='@(() => SetRootFilter("ADAPTERIS"))'>
-            Adapteri
-        </button>
-    </RootButtons>
-
-    <Actions>
-        <button type="button"
-                class="action-btn"
-                @onclick="OpenDialog">
-            Jauns
-        </button>
-
-        <button type="button"
-                class="action-btn"
-                @onclick="OpenEditDialog"
-                disabled="@(selected is null || selectedDetails is null)">
-            Labot
-        </button>
-
-        <button type="button"
-                class="action-btn"
-                @onclick="SoftDeleteSelected"
-                disabled="@(selected is null)">
-            Dzēst
-        </button>
-    </Actions>
-
-            </ProductsFilters>
-
-            <ProductsGrid
-                Rows="rows"
-                OnRowSelected="Grid_RowSelected" />
+                <div class="products-section-header">
+                    Preču saraksts
                 </div>
- </div>
+
+                <ProductsFilters
+                    Categories="filteredCategories"
+                    HasFilters="HasAnyFilters"
+                    SelectedRoot="@selectedRoot"
+                    OnRootChanged="SetRootFilter"
+                    OnCategoryChanged="OnCategoryFilterChanged"
+                    OnSearch="OnSearchInput"
+                    OnClear="ClearFilters"
+                    SearchText="@searchText"
+                    SearchTextChanged="@(v => searchText = v)"
+                    OnNew="OpenDialog"
+                    OnEdit="OpenEditDialog"
+                    OnDelete="SoftDeleteSelected"
+                    CanEdit="@(selected is not null && selectedDetails is not null)"
+                    CanDelete="@(selected is not null)">
+                </ProductsFilters>
+
+                        <ProductsGrid
+                        Rows="rows"
+                        OnRowSelected="Grid_RowSelected" />
+        </div>
+
+
 
             <!-- LABĀ PUSE: Preces saturs + Tehnoloģija -->
-            <div class="products-right">
+    <div class="products-right">
 
-<ProductContentBox
-    Selected="selected"
-    Details="selectedDetails"
-    Loading="loadingDetails" />
+                <ProductContentBox
+                    Selected="selected"
+                    Details="selectedDetails"
+                    Loading="loadingDetails" />
 
-                <!-- Tehnoloģija -->
+            <!-- Tehnoloģija -->
 
-<ProductTechnologyBox
-    Selected="selected"
-    LoadingPartDetails="loadingPartDetails"
-    LoadingWorks="loadingWorks"
-    SelectedPartDetails="selectedPartDetails"
-    WorksByParts="worksByParts"
-    OnAddPart="OpenNewPartDialog"
-    OnOpenSteps="OpenStepsForPart"
-    OnDeletePart="DeletePartByCode">
-</ProductTechnologyBox>
+                <ProductTechnologyBox
+                    Selected="selected"
+                    LoadingPartDetails="loadingPartDetails"
+                    LoadingWorks="loadingWorks"
+                    SelectedPartDetails="selectedPartDetails"
+                    WorksByParts="worksByParts"
+                    OnAddPart="OpenNewPartDialog"
+                    OnOpenSteps="OpenStepsForPart"
+                    OnDeletePart="DeletePartByCode">
+                </ProductTechnologyBox>
 
-        </div>
     </div>
 </div>
-
+</div>
 
 <!-- === PRECES dialogs (JAUNS/LABOT) === -->
 <SfDialog
@@ -691,10 +659,8 @@ private async Task LoadActiveWorkCentersAsync()
         $"http://localhost:5270/api/products/details-by-product?id={selected!.id}");
     worksByParts = await Http.GetFromJsonAsync<List<WorksByPartDto>>(
         $"http://localhost:5270/api/products/works-by-product?id={selected!.id}");
-
-    openParts.Clear(); // ✅ aizver visus atvērtos pēc soļu saglabāšanas/dzēšanas
-StateHasChanged();
-
+    
+    StateHasChanged();
 }
 
     private async Task OnRowClicked(ProductRow row)
@@ -1061,8 +1027,6 @@ worksByParts = await Http.GetFromJsonAsync<List<WorksByPartDto>>(
 
 SetMainDialog(null);
 
-openParts.Clear(); // ✅ aizver visus atvērtos pēc soļu saglabāšanas/dzēšanas
-StateHasChanged();
 }
 
 private List<TopPartDto> topParts = new();
@@ -1307,6 +1271,7 @@ private void SetRootFilter(string value)
 {
     selectedRoot = value ?? "";
     ApplyFilters();
+    StateHasChanged();
 }
 
 private bool HasAnyFilters =>
