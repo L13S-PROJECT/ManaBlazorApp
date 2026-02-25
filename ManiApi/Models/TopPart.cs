@@ -14,6 +14,9 @@ namespace ManiApi.Models
         [Column("TopPart_Code")]
         public string TopPartCode { get; set; } = "";
 
+        [Column("Stage")]
+        public byte Stage { get; set; }
+
         [Column("IsActive")]
         public bool IsActive { get; set; }
     }

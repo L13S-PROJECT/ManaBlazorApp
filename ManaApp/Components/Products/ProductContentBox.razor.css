@@ -3,7 +3,7 @@
   border:2px solid #1e40af;
   border-radius:6px;
   box-shadow:0 2px 8px rgba(0,0,0,.05);
-  height: 320px;
+  height: 220px;
 
   display:flex;
   flex-direction:column;
@@ -20,7 +20,7 @@
 }
 
 .product-panel-body{
-  padding:10px 10px 10px 4px;
+  padding:6px 8px 6px 4px;
 }
 
 .pc-form{
@@ -47,16 +47,16 @@
 
 .pc-input-flex{
   flex:1;
-  height:30px;
+  height:24px;
   display:flex;
   align-items:center;
-  padding:0 14px;
+  padding:0 8px;
 
   background:#ffffff;
   border:1px solid #1e40af;
   border-radius:6px;
 
-  font-size:14px;
+  font-size:12px;
 }
 
 /*Nosaukums un Kods*/
@@ -69,22 +69,22 @@
 /* Nosaukuma lauks — plats */
 .pc-input-name{
   flex:1;
-  height:30px;
+  height:24px;
   display:flex;
   align-items:center;
-  padding:0 14px;
+  padding:0 8px;
 
   background:#ffffff;
   border:1px solid #1e40af;
   border-radius:6px;
-  font-size:14px;
+  font-size:12px;
 }
 
 /* Kods label — tuvāk laukam */
 .pc-label-code{
   margin-left:12px;
   font-weight:600;
-  font-size:14px;
+  font-size:12px;
   color:#374151;
   width:40px;
 }
@@ -92,15 +92,15 @@
 /* Kods lauks — mazāks */
 .pc-input-code{
   width:80px;
-  height:30px;
+  height:24px;
   display:flex;
   align-items:center;
-  padding:0 14px;
+  padding:0 8px;
 
   background:#ffffff;
   border:1px solid #1e40af;
   border-radius:6px;
-  font-size:14px;
+  font-size:12px;
 }
 
 /* Versijas + Rasējuma rinda */
@@ -112,15 +112,15 @@
 /* Versijas lauks — mazāks */
 .pc-input-version{
   width:60px;
-  height:30px;
+  height:24px;
   display:flex;
   align-items:center;
-  padding:0 14px;
+  padding:0 8px;
 
   background:#ffffff;
   border:1px solid #1e40af;
   border-radius:6px;
-  font-size:14px;
+  font-size:12px;
 }
 
 /* Rasējuma label */
@@ -135,15 +135,15 @@
 .pc-input-ras{
   flex:1;
   min-width:0;
-  height:30px;
+  height: 24px;
   display:flex;
   align-items:center;
-  padding:0 14px;
+  padding:0 8px;
 
   background:#ffffff;
   border:1px solid #1e40af;
   border-radius:6px;
-  font-size:14px;
+  font-size:12px;
 }
 
 /* Datums + Piezīmes virsrinda */
@@ -158,39 +158,42 @@
 .pc-label-date{
   margin-left:auto;
   font-weight:600;
-  font-size:14px;
+  font-size:12px;
   color:#374151;
 }
 
 /* Datuma lauks */
 .pc-input-date{
   width:130px;
-  height: 30px;
+  height: 24px;
   display:flex;
   align-items:center;
-  padding:0 14px;
+  padding:0 8px;
 
   background:#ffffff;
   border:1px solid #1e40af;
   border-radius:6px;
-  font-size:14px;
+  font-size:12px;
 }
 
 /* Piezīmju tekstlauks */
 .pc-notes-box{
   margin-top:0;
-  min-height:90px;
-  padding:12px 14px;
+  min-height:60px;
+  max-height:60px;
+  overflow-y:auto;
+  padding:6px 8px;
 
   background:#ffffff;
   border:1px solid #1e40af;
   border-radius:6px;
-  font-size:14px;
+  font-size:12px;
+  line-height:1.3;
 }
 
 .pc-row-category,
 .pc-row-namecode,
 .pc-row-version,
 .pc-row-date-notes{
-  margin-bottom:10px;
+  margin-bottom:4px;
 }

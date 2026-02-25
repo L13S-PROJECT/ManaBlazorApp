@@ -844,7 +844,8 @@ var map = oldParts
                 {
                     tp.Id,
                     tp.TopPartName,
-                    tp.TopPartCode
+                    tp.TopPartCode,
+                    tp.Stage
                 })
                 .ToListAsync();
             return Ok(rows);
@@ -1169,6 +1170,40 @@ public async Task<IActionResult> SetPriority([FromBody] SetPriorityRequest dto)
         version.Id,
         version.IsPriority
     });
+}
+
+[HttpPut("toggle-part")]
+public async Task<IActionResult> TogglePart([FromBody] TogglePartRequest dto)
+{
+    var entity = await _db.ProductTopParts
+        .FirstOrDefaultAsync(x => x.Id == dto.ProductToPartId);
+
+    if (entity is null)
+        return NotFound("Ieraksts nav atrasts.");
+
+    // 1️⃣ mainām pašas detaļas statusu
+    entity.IsActive = dto.IsActive;
+
+    // 2️⃣ atrodam visus šīs detaļas soļus
+    var steps = await _db.TopPartSteps
+        .Where(s => s.ProductToPartId == entity.Id)
+        .ToListAsync();
+
+    // 3️⃣ sinhronizējam soļus ar detaļas statusu
+    foreach (var step in steps)
+    {
+        step.IsActive = dto.IsActive;
+    }
+
+    await _db.SaveChangesAsync();
+
+    return Ok();
+}
+
+public class TogglePartRequest
+{
+    public int ProductToPartId { get; set; }
+    public bool IsActive { get; set; }
 }
 
 public class ProductListItemDto

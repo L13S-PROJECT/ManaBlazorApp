@@ -3,9 +3,9 @@
   grid-template-rows:auto 1fr;
   gap:8px;
 
-  min-height:100vh;          /* kā Planning */
-  background:#AFC1DE;        /* tas pats zilais tonis */
-  padding:12px;              /* tāds pats kā Planning */
+  height:100vh;
+  background:#AFC1DE;
+  padding:12px;
   box-sizing:border-box;
 }
 
@@ -13,6 +13,8 @@
   display:grid;
   grid-template-columns: minmax(820px, 62%) 1fr;
   gap:8px;
+
+  height:100%;
   min-height:0;
 }
 
@@ -155,8 +157,10 @@
 /* Labā puse: Preces saturs + Tehnoloģija */
 .products-right{
   display:grid;
-  grid-template-rows:auto 1fr;
+  grid-template-rows:220px 1fr; /* 220px = tavs augšējais panelis */
   gap:8px;
+  height:100%;
+  min-height:0;
 }
 
 
@@ -927,9 +931,7 @@
 }
 
 /* 1) ļauj labajai kolonnai sarukt un dot vietu overflow */
-.products-right{
-  min-height: 0;
-}
+
 
 /* 2) svarīgākais: 2. rindai (Tehnoloģija) atļauj sarukt un skrolloties */
 .technology-box{

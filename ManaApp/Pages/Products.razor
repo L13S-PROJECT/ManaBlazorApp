@@ -61,18 +61,20 @@
 
             <!-- Tehnoloģija -->
 
-        <ProductTechnologyBox
-            Selected="selected"
-            LoadingPartDetails="loadingPartDetails"
-            LoadingWorks="loadingWorks"
-            SelectedPartDetails="selectedPartDetails"
-            WorksByParts="worksByParts"
-            OnAddPart="OpenNewPartDialog"
-            OnOpenSteps="OpenStepsForPart"
-            OnOpenStepTypes="OpenStepTypeDialogAsync"
-            OnOpenWorkCenters="OpenWorkCenterDialogAsync"
-            OnDeletePart="DeletePartByCode">
-        </ProductTechnologyBox>
+<ProductTechnologyBox
+    Selected="selected"
+    LoadingPartDetails="loadingPartDetails"
+    LoadingWorks="loadingWorks"
+    SelectedPartDetails="selectedPartDetails"
+    WorksByParts="worksByParts"
+    AllTopParts="topParts"
+    OnAddPart="OpenNewPartDialog"
+    OnOpenSteps="OpenStepsForPart"
+    OnOpenStepTypes="OpenStepTypeDialogAsync"
+    OnOpenWorkCenters="OpenWorkCenterDialogAsync"
+    OnDeletePart="DeletePartByCode"
+    OnToggleTopPart="ToggleTopPartAsync">
+</ProductTechnologyBox>
 
     </div>
 </div>
@@ -1314,7 +1316,7 @@ private async Task LoadActiveStepTypesAsync()
 }
 private bool copyTechnologySteps = false;
 
-private void OpenNewPartDialog()
+private async Task OpenNewPartDialog()
 {
     newPart = new NewPartVm { TopPartId = null, QtyPerProduct = 1 };
     newPartSteps = new List<ManaApp.Models.PartStepDto>();
@@ -1343,6 +1345,79 @@ private bool IsProductDialogOpen => activeMainDialog == "Product";
 private void SetMainDialog(string? dialog)
 {
     activeMainDialog = dialog;
+}
+
+private class AddPartResponse
+{
+    public int Id { get; set; }
+}
+private async Task ToggleTopPartAsync(TopPartDto part)
+{
+    if (selected is null)
+        return;
+
+    selectedPartDetails ??= new List<ProductDetailDto>();
+
+    var existing = selectedPartDetails
+        .FirstOrDefault(x => x.TopPartCode == part.TopPartCode);
+
+    if (existing is null)
+    {
+        // ===== ADD =====
+        var resp = await Http.PostAsJsonAsync(
+            "http://localhost:5270/api/products/add-part",
+            new
+            {
+                productId = selected.id,
+                topPartId = part.Id,
+                qtyPerProduct = 1
+            });
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            await JS.InvokeVoidAsync("alert", await resp.Content.ReadAsStringAsync());
+            return;
+        }
+
+        var result = await resp.Content.ReadFromJsonAsync<AddPartResponse>();
+
+        if (result is null)
+        {
+            await JS.InvokeVoidAsync("alert", "Serveris neatgrieza ID.");
+            return;
+        }
+
+        // 👇 pievienojam lokāli bez reload
+        selectedPartDetails.Add(new ProductDetailDto
+        {
+            ProductToPartId = result.Id,
+            TopPartName = part.TopPartName,
+            TopPartCode = part.TopPartCode,
+            Quantity = 1
+        });
+    }
+    else
+    {
+        // ===== REMOVE =====
+        var resp = await Http.PutAsJsonAsync(
+            "http://localhost:5270/api/products/toggle-part",
+            new
+            {
+                ProductToPartId = existing.ProductToPartId,
+                IsActive = false
+            });
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            await JS.InvokeVoidAsync("alert", await resp.Content.ReadAsStringAsync());
+            return;
+        }
+
+        // 👇 izņemam lokāli bez reload
+        selectedPartDetails.Remove(existing);
+    }
+
+    StateHasChanged();
 }
 
 }

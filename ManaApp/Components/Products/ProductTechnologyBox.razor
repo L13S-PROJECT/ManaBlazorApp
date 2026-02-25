@@ -18,7 +18,7 @@
                         class="action-btn tech-add-btn"
                         title="Pievienot jaunu detaļu"
                         @onclick="OnAddPart">
-                    + pievienot
+                    Detaļas
                 </button>
 
                 <button type="button"
@@ -51,58 +51,110 @@
         {
             <div style="opacity:.7">Nav detaļu.</div>
         }
-        else
-        {
-            @foreach (var part in (WorksByParts ?? new List<WorksByPartDto>()))
-            {
-                <div class="tech-item">
-                    <div class="tech-head" @onclick="() => TogglePart(part.TopPartCode)">
-                        <span class="tech-toggle">
-                            @(openParts.Contains(part.TopPartCode ?? "") ? "−" : "+")
-                        </span>
-                        <span class="tech-code">@part.TopPartCode</span>
-                        <span class="tech-name">— @part.TopPartName</span>
-                        <span class="tech-qty">
-                            @{
-                                var qty = SelectedPartDetails?
-                                    .FirstOrDefault(x => x.TopPartCode == part.TopPartCode)?
-                                    .Quantity ?? 0;
-                            }
-                            @(qty > 0 ? $"x{qty}" : "")
-                        </span>
+else
+{
+    <table class="tech-table">
+        <thead>
+            <tr>
+                <th></th>
+                <th>Kods</th>
+                <th>Nosaukums</th>
+                <th>Skaits</th>
+                <th>+ soļi</th>
+            </tr>
+        </thead>
+            <tbody>
 
-                        <button type="button"
-                                class="action-btn tech-manage-btn"
-                                @onclick="(e) => OnOpenSteps.InvokeAsync(part.TopPartCode)"
-                                @onclick:stopPropagation="true">
-                            + Soļi
-                        </button>
+                    @foreach (var group in (AllTopParts ?? new List<TopPartDto>())
+                                            .OrderBy(x => x.Stage)
+                                            .GroupBy(x => x.Stage))
+                    {
+                        <tr class="tech-stage-row">
+                            <td colspan="5">
+                                <strong>
+                                    @(group.Key == 1 ? "DETAIL"
+                                    : group.Key == 2 ? "ASSEMBLY"
+                                    : "FINISHING")
+                                </strong>
+                            </td>
+                        </tr>
 
-                        <button type="button"
-                                class="tech-delete-btn"
-                                title="Dzēst detaļu"
-                                aria-label="Dzēst detaļu"
-                                @onclick="() => OnDeletePart.InvokeAsync(part.TopPartCode)"
-                                @onclick:stopPropagation="true">
-                            🗑
-                        </button>
-                    </div>
-                </div>
-
-                @if (openParts.Contains(part.TopPartCode ?? "") && part.Steps?.Any() == true)
-                {
-                    <ul class="tech-steps">
-                        @foreach (var s in part.Steps!)
+@foreach (var part in group)
                         {
-                            <li class="tech-step">
-                                <span class="tech-step-arrow">➜</span>
-                                <span class="tech-step-name">@s.StepName</span>
-                            </li>
-                        }
-                    </ul>
-                }
+                            <tr>
+                                <td>
+                                    <input type="checkbox"
+                                        checked="@IsPartSelected(part)"
+                                        @onchange="e => OnTogglePart(part, e.Value)" />
+                                </td>
+                                <td>@part.TopPartCode</td>
+                                <td>@part.TopPartName</td>
+                                <td>
+                                    <input type="number"
+                                        min="1"
+                                        value="@GetQty(part)"
+                                        disabled="@(!IsPartSelected(part))" />
+                                </td>
+                                <td>
+                                    <button type="button"
+                                        class="action-btn tech-step-btn"
+                                        title="Pievienot darba soļus"
+                                        disabled="@(!IsPartSelected(part))"
+                                        @onclick="() => OnOpenSteps.InvokeAsync(part.TopPartCode)">
+                                        +
+                                    </button>
+                                </td>
+                            </tr>
+
+                    @if (IsPartSelected(part))
+                    {
+                        var detail = SelectedPartDetails?
+                            .FirstOrDefault(x => x.TopPartCode == part.TopPartCode);
+
+                        var workItem = WorksByParts?
+                            .FirstOrDefault(w => w.TopPartCode == part.TopPartCode);
+
+                        <tr class="tech-steps-row">
+                            <td></td>
+                            <td colspan="4">
+
+                                @if (workItem?.Steps != null && workItem.Steps.Any())
+                                {
+                                    <div class="steps-container">
+@foreach (var stepWithIndex in workItem.Steps
+                                       .OrderBy(s => s.StepOrder)
+                                       .Select((step, index) => new { step, index }))
+            {
+                <div class="step-row">
+                    <span class="step-order">
+                        @(stepWithIndex.index + 1).
+                    </span>
+
+                    <span class="step-name">
+                        @stepWithIndex.step.StepName
+                    </span>
+
+                    <span class="step-wc">
+                        @stepWithIndex.step.WorkCenter
+                    </span>
+                </div>
             }
-        }
+        </div>
+                                }
+                                else
+                                {
+                                    <div class="no-steps">Nav tehnoloģijas soļu</div>
+                                }
+
+                            </td>
+                        </tr>
+                    }
+                        }
+                    }
+
+            </tbody>
+    </table>
+}
 
     </div>
 </div>
@@ -113,13 +165,14 @@
     [Parameter] public bool LoadingWorks { get; set; }
     [Parameter] public List<ProductDetailDto>? SelectedPartDetails { get; set; }
     [Parameter] public List<WorksByPartDto>? WorksByParts { get; set; }
-
+    [Parameter] public List<TopPartDto>? AllTopParts { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public EventCallback OnAddPart { get; set; }
     [Parameter] public EventCallback<string?> OnOpenSteps { get; set; }
     [Parameter] public EventCallback<string?> OnDeletePart { get; set; }
     [Parameter] public EventCallback OnOpenStepTypes { get; set; }
     [Parameter] public EventCallback OnOpenWorkCenters { get; set; }
+    [Parameter] public EventCallback<TopPartDto> OnToggleTopPart { get; set; }
     private HashSet<string> openParts = new();
 
 private void TogglePart(string? code)
@@ -129,4 +182,27 @@ private void TogglePart(string? code)
     if (!openParts.Add(code))
         openParts.Remove(code);
 }
+
+private bool IsPartSelected(TopPartDto part)
+{
+    return SelectedPartDetails?.Any(x => x.TopPartCode == part.TopPartCode) == true;
+}
+
+private async Task OnTogglePart(TopPartDto part, object? value)
+{
+    var isChecked = value is bool b && b;
+
+if (OnToggleTopPart.HasDelegate)
+{
+    await OnToggleTopPart.InvokeAsync(part);
+}
+}
+
+private int GetQty(TopPartDto part)
+{
+    return SelectedPartDetails?
+        .FirstOrDefault(x => x.TopPartCode == part.TopPartCode)?
+        .Quantity ?? 1;
+}
+
 }
