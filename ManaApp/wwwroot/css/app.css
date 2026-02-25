@@ -375,3 +375,18 @@ tr[aria-selected="true"] > td.e-rowcell:first-child {
   overflow:hidden !important;   /* lai stūri reāli noapaļojas */
 }
 
+/* ===== StepTypesDialog custom size ===== */
+
+.e-dialog.stepTypesDialog{
+  width:410px !important;
+  border-radius:12px !important;
+  overflow:hidden !important;
+}
+
+/* ===== WorkCentersDialog custom size ===== */
+
+.e-dialog.workCentersDialog{
+  width:410px !important;
+  border-radius:12px !important;
+  overflow:hidden !important;
+}

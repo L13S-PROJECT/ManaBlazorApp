@@ -2,7 +2,8 @@
 @using Syncfusion.Blazor.Popups
 @namespace ManaApp.Components.Products
 
-<SfDialog Width="520px"
+<SfDialog Width="420px"
+          CssClass="workCentersDialog"
           ShowCloseIcon="true"
           IsModal="true"
           ZIndex="10070"
@@ -14,13 +15,14 @@
         <Content>
 
             <div class="manage-toolbar">
-                <input class="manage-input-small"
-                       type="text"
-                       placeholder="Jauns nosaukums"
-                       @bind="NewName" />
+                <input class="manage-input-small wc-input"
+                    type="text"
+                    placeholder="Pievienot jaunu darba centru"
+                    @bind="NewName" />
 
                 <button type="button"
-                        class="action-btn action-btn-sm"
+                        class="wc-add-btn"
+                        title="Pievienot jaunu darba centru"
                         @onclick="OnAdd">
                     Pievienot
                 </button>
@@ -37,50 +39,57 @@
                 <tbody>
                     @foreach (var it in Items ?? Enumerable.Empty<WorkCenterManageDto>())
                     {
-                        <tr>
-                            <td>
+            <tr class="@(EditId == it.Id ? "wc-row-edit" : "")">
+                <td colspan="2">
+                    <div class="wc-row">
+                            <span class="wc-name">
                                 @if (EditId == it.Id)
                                 {
-                                    <input class="manage-input-small"
-                                           type="text"
-                                           @bind="EditName" />
+                                <input class="manage-input-small"
+                                    type="text"
+                                    value="@EditName"
+                                    @oninput="e => EditNameChanged.InvokeAsync(e.Value?.ToString())" />
                                 }
                                 else
                                 {
                                     @it.WorkCentr_Name
                                 }
-                            </td>
+                            </span>
 
-                            <td class="manage-actions">
-                                @if (EditId == it.Id)
-                                {
-                                    <button class="action-btn action-btn-xs"
-                                            @onclick="OnSaveEdit">
-                                        Saglabāt
-                                    </button>
+            <span class="wc-actions">
+                @if (EditId == it.Id)
+                {
+                    <button class="wc-save-btn"
+                            @onclick="OnSaveEdit">
+                        Saglabāt
+                    </button>
 
-                                    <button class="action-btn action-btn-xs"
-                                            @onclick="OnCancelEdit">
-                                        Atcelt
-                                    </button>
-                                }
-                                else
-                                {
-                                    <button class="action-btn action-btn-xs"
-                                            @onclick="() => OnBeginEdit.InvokeAsync(it)">
-                                        Labot
-                                    </button>
+                    <button class="wc-cancel-btn"
+                            @onclick="OnCancelEdit">
+                        Atcelt
+                    </button>
+                }
+                else
+                {
+                    <button class="wc-icon-edit"
+                                title="Labot"
+                                @onclick="() => OnBeginEdit.InvokeAsync(it)">
+                            ✎
+                        </button>
 
-                                    @if (it.IsActive)
-                                    {
-                                        <button class="icon-btn"
-                                                @onclick="() => OnDelete.InvokeAsync(it.Id)">
-                                            🗑
-                                        </button>
-                                    }
-                                }
-                            </td>
-                        </tr>
+                        @if (it.IsActive)
+                        {
+                            <button class="wc-icon-delete"
+                                    title="Dzēst"
+                                    @onclick="() => OnDelete.InvokeAsync(it.Id)">
+                                🗑
+                            </button>
+                        }
+                }
+            </span>
+        </div>
+    </td>
+</tr>
                     }
                 </tbody>
             </table>
@@ -96,9 +105,10 @@
 
     [Parameter] public List<WorkCenterManageDto>? Items { get; set; }
     [Parameter] public string NewName { get; set; } = "";
+    
     [Parameter] public int? EditId { get; set; }
     [Parameter] public string EditName { get; set; } = "";
-
+    [Parameter] public EventCallback<string> EditNameChanged { get; set; }
     [Parameter] public EventCallback OnAdd { get; set; }
     [Parameter] public EventCallback OnSaveEdit { get; set; }
     [Parameter] public EventCallback OnCancelEdit { get; set; }

@@ -247,13 +247,13 @@
 
 <!-- === labots līdz šai vietai === -->
 
-    <StepTypesDialog
+<StepTypesDialog
     Visible="isStepTypesOpen"
     VisibleChanged="@(v => isStepTypesOpen = v)"
     Items="manageStepTypes"
     NewName="@newStepTypeName"
     EditId="@editStepTypeId"
-    EditName="@editStepTypeName"
+    @bind-EditName="editStepTypeName"
     OnAdd="AddStepTypeAsync"
     OnSaveEdit="SaveEditStepTypeAsync"
     OnCancelEdit="CancelEditStepType"
@@ -261,13 +261,13 @@
     OnDelete="DeleteStepTypeAsync">
 </StepTypesDialog>
 
-    <WorkCentersDialog
+<WorkCentersDialog
     Visible="isWorkCentersOpen"
     VisibleChanged="@(v => isWorkCentersOpen = v)"
     Items="manageWorkCenters"
-    NewName="newWorkCenterName"
+    NewName="@newWorkCenterName"
     EditId="editWorkCenterId"
-    EditName="editWorkCenterName"
+    @bind-EditName="editWorkCenterName"
     OnAdd="AddWorkCenterAsync"
     OnSaveEdit="SaveEditWorkCenterAsync"
     OnCancelEdit="CancelEditWorkCenter"
@@ -1163,10 +1163,13 @@ private List<WorkCenterManageDto> manageWorkCenters = new();
 
 private async Task OpenWorkCenterDialogAsync()
 {
+    newWorkCenterName = "";   
+
     manageWorkCenters = (await Http.GetFromJsonAsync<List<WorkCenterManageDto>>(
         "http://localhost:5270/api/workcenters/manage") ?? new())
         .Where(x => x.IsActive)
         .ToList();
+
     isStepTypesOpen = false;
     isWorkCentersOpen = true;
 }
@@ -1215,7 +1218,8 @@ private void CancelEditWorkCenter()
 
 private async Task SaveEditWorkCenterAsync()
 {
-    if (editWorkCenterId is null) return;
+      if (editWorkCenterId is null) return;
+    
     var name = (editWorkCenterName ?? "").Trim();
     if (string.IsNullOrWhiteSpace(name)) { await JS.InvokeVoidAsync("alert","Ievadi nosaukumu."); return; }
 

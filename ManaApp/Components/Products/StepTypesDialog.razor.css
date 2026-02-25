@@ -1,52 +1,150 @@
-/* ===== Step Types Dialog ===== */
-
-.e-dialog.stepTypesDialog{
-  border-radius:16px !important;
-  overflow:hidden !important;
-  border:2px solid #1e40af;
-  box-shadow:0 8px 24px rgba(0,0,0,.15);
-}
-
-/* Header */
-.e-dialog.stepTypesDialog .e-dlg-header-content{
-  background:#1e40af;
-  color:#ffffff;
-  font-weight:600;
-  padding:10px 14px;
-}
-
-/* Toolbar */
-.stepTypesDialog .manage-toolbar{
-  display:flex;
-  gap:10px;
-  margin-bottom:14px;
-}
-
-/* Input */
-.stepTypesDialog .manage-input-small{
-  height:34px;
+.step-type-input{
+  width:260px;        /* garāks */
+  height:32px;
   padding:0 12px;
+
+  border-radius:6px;  /* mazāks rādiuss */
+  border:1px solid #9ca3af;
+
+  background:#fff;
+  font-size:13px;
+  font-style: italic;
+}
+
+.step-type-add-btn{
+  height:32px;                 /* vienāds ar input */
+  padding:0 16px;
+
+  border-radius:6px;
   border:1px solid #1e40af;
-  border-radius:8px;
-  font-size:13px;
-  box-shadow:0 1px 2px rgba(0,0,0,.08);
-}
 
-/* Table */
-.stepTypesDialog .steps-table{
-  width:100%;
-  border-collapse:collapse;
-  font-size:13px;
-}
+  background:#1e40af;          /* tumši zils */
+  color:#ffffff;
 
-.stepTypesDialog .steps-table th{
-  text-align:left;
-  padding:6px 4px;
   font-weight:600;
-  border-bottom:1px solid #e5e7eb;
+  cursor:pointer;
 }
 
-.stepTypesDialog .steps-table td{
-  padding:8px 4px;
-  border-bottom:1px solid #f1f5f9;
+.step-type-add-btn:hover{
+  background:#2563eb;          /* gaišāks zils */
+  border-color:#2563eb;
+}
+
+.manage-toolbar{
+  margin-bottom:14px;   /* bija mazāks — dodam vairāk atstarpi */
+}
+
+.step-type-row td{
+  padding:8px 12px;
+}
+
+.step-type-row{
+  display:block;
+  margin-bottom:8px;
+}
+.step-type-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+
+  height:32px;
+  width:100%;                 /* aizņem visu dialoga platumu */
+  box-sizing:border-box;
+
+  padding:0 12px;
+  margin-bottom:8px;
+
+  background:#ffffff;
+  border:1px solid #d1d5db;
+  border-radius:6px;
+
+  box-shadow:0 1px 2px rgba(0,0,0,.06);
+}
+
+.steps-table{
+  width:100%;
+}
+
+.step-type-name{
+  font-weight:500;
+}
+
+.step-type-actions{
+  display:flex;
+  gap:8px;
+}
+
+.icon-edit-btn{
+  border:none;            /* noņem rāmi */
+  background:transparent; /* bez fona */
+  box-shadow:none;
+  color:#6b7280;
+}
+
+.icon-edit-btn:hover{
+  color:#1e40af;          /* zils hover */
+  background:transparent;
+}
+
+.icon-delete-btn{
+  border:none;
+  background:transparent;
+  box-shadow:none;
+  color:#6b7280;
+  cursor:pointer;
+}
+
+.icon-delete-btn:hover{
+  color:#dc2626;   /* sarkans hover */
+}
+
+.step-type-row-edit .step-type-row{
+  background:#eef4ff;
+  border:1px solid #2563eb;
+}
+
+.step-type-row-edit input.manage-input-small{
+  border:1px solid #2563eb;
+  background:#ffffff;
+}
+
+.step-type-row-edit input.manage-input-small:focus{
+  box-shadow:none !important;
+  outline:none !important;
+}
+
+.edit-save-btn{
+  height:28px;
+  padding:0 14px;
+
+  border-radius:6px;
+  border:1px solid #2563eb;
+
+  background:#2563eb;
+  color:#ffffff;
+
+  font-weight:600;
+  cursor:pointer;
+}
+
+.edit-save-btn:hover{
+  background:#1e40af;
+}
+
+.edit-cancel-btn{
+  height:28px;
+  padding:0 14px;
+
+  border-radius:6px;
+  border:1px solid #2563eb;
+
+  background:#ffffff;
+  color:#2563eb;
+
+  font-weight:600;
+  cursor:pointer;
+}
+
+.edit-cancel-btn:hover{
+  background:#eef4ff;
 }

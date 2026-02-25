@@ -1,7 +1,8 @@
 @using ManaApp.Models
 @using Syncfusion.Blazor.Popups
 
-<SfDialog Width="520px"
+<SfDialog Width="460px"
+          CssClass="stepTypesDialog"
           ShowCloseIcon="true"
           IsModal="true"
           ZIndex="10060"
@@ -13,13 +14,14 @@
         <Content>
 
             <div class="manage-toolbar">
-                <input class="manage-input-small"
-                       type="text"
-                       placeholder="Jauns nosaukums"
-                       @bind="NewName" />
+                <input class="manage-input-small step-type-input"
+                    type="text"
+                    placeholder="Pievienot jaunu nosaukumu"
+                    @bind="NewName" />
 
                 <button type="button"
-                        class="action-btn action-btn-sm"
+                        class="step-type-add-btn"
+                        title="Pievienot jaunu darba soļa tipu"
                         @onclick="OnAdd">
                     Pievienot
                 </button>
@@ -36,50 +38,57 @@
                 <tbody>
                     @foreach (var t in Items ?? Enumerable.Empty<StepTypeRow>())
                     {
-                        <tr>
-                            <td>
-                                @if (EditId == t.Id)
-                                {
-                                    <input class="manage-input-small"
-                                           type="text"
-                                           @bind="EditName" />
-                                }
-                                else
-                                {
-                                    @t.Name
-                                }
-                            </td>
+            <tr class="@(EditId == t.Id ? "step-type-row-edit" : "")">
+                <td colspan="2">
+                    <div class="step-type-row">
+            <span class="step-type-name">
+                @if (EditId == t.Id)
+                {
+                    <input class="manage-input-small"
+                        type="text"
+                        value="@EditName"
+                        @oninput="e => EditNameChanged.InvokeAsync(e.Value?.ToString())" />
+                }
+                else
+                {
+                    @t.Name
+                }
+            </span>
 
-                            <td class="manage-actions">
-                                @if (EditId == t.Id)
-                                {
-                                    <button class="action-btn action-btn-xs"
-                                            @onclick="OnSaveEdit">
-                                        Saglabāt
-                                    </button>
+            <span class="step-type-actions">
+                @if (EditId == t.Id)
+                {
+                    <button class="edit-save-btn"
+                            @onclick="OnSaveEdit">
+                        Saglabāt
+                    </button>
 
-                                    <button class="action-btn action-btn-xs"
-                                            @onclick="OnCancelEdit">
-                                        Atcelt
-                                    </button>
-                                }
-                                else
-                                {
-                                    <button class="action-btn action-btn-xs"
-                                            @onclick="() => OnBeginEdit.InvokeAsync(t)">
-                                        Labot
-                                    </button>
+                    <button class="edit-cancel-btn"
+                            @onclick="OnCancelEdit">
+                        Atcelt
+                    </button>
+                }
+                else
+                {
+                        <button class="icon-btn icon-edit-btn"
+                                title="Labot"
+                                @onclick="() => OnBeginEdit.InvokeAsync(t)">
+                            ✎
+                        </button>
 
-                                    @if (t.IsActive)
-                                    {
-                                        <button class="icon-btn"
-                                                @onclick="() => OnDelete.InvokeAsync(t.Id)">
-                                            🗑
-                                        </button>
-                                    }
-                                }
-                            </td>
-                        </tr>
+                    @if (t.IsActive)
+                    {
+                        <button class="icon-delete-btn"
+                                title="Dzēst"
+                                @onclick="() => OnDelete.InvokeAsync(t.Id)">
+                            🗑
+                        </button>
+                    }
+                }
+            </span>
+        </div>
+    </td>
+</tr>
                     }
                 </tbody>
             </table>
@@ -97,6 +106,7 @@
     [Parameter] public string NewName { get; set; } = "";
     [Parameter] public int? EditId { get; set; }
     [Parameter] public string EditName { get; set; } = "";
+    [Parameter] public EventCallback<string> EditNameChanged { get; set; }
 
     [Parameter] public EventCallback OnAdd { get; set; }
     [Parameter] public EventCallback OnSaveEdit { get; set; }

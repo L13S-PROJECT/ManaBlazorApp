@@ -1,0 +1,125 @@
+.wc-input{
+  height:32px;
+  width:260px;          /* ← garāks */
+  padding:0 12px;
+
+  border-radius:6px;
+  border:1px solid #d1d5db;
+  background:#ffffff;
+  font-size:13px;
+}
+
+.wc-input::placeholder{
+  color:#9ca3af;
+  font-style:italic;
+}
+
+.wc-add-btn{
+  height:32px;
+  padding:0 16px;
+
+  border-radius:6px;
+  border:1px solid #2563eb;
+
+  background:#2563eb;
+  color:#ffffff;
+
+  font-weight:600;
+  cursor:pointer;
+}
+
+.wc-add-btn:hover{
+  background:#1e40af;
+}
+
+.wc-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+
+  height:32px;
+  width:100%;
+  box-sizing:border-box;
+
+  padding:0 12px;
+  margin-bottom:8px;
+
+  background:#ffffff;
+  border:1px solid #d1d5db;
+  border-radius:6px;
+
+  box-shadow:0 1px 2px rgba(0,0,0,.06);
+}
+
+.wc-actions{
+  display:flex;
+  gap:8px;
+}
+
+.manage-table{
+  width:100%;
+  border-collapse:separate;
+}
+
+.manage-table td{
+  padding:0 !important;
+}
+
+.wc-icon-edit,
+.wc-icon-delete{
+  border:none;
+  background:transparent;
+  box-shadow:none;
+  cursor:pointer;
+  font-size:14px;
+  color:#6b7280;
+}
+
+.wc-icon-edit:hover{
+  color:#2563eb;
+}
+
+.wc-icon-delete:hover{
+  color:#dc2626;
+}
+
+.wc-save-btn{
+  height:28px;
+  padding:0 14px;
+
+  border-radius:6px;
+  border:1px solid #2563eb;
+
+  background:#2563eb;
+  color:#ffffff;
+
+  font-weight:600;
+  cursor:pointer;
+}
+
+.wc-save-btn:hover{
+  background:#1e40af;
+}
+
+.wc-cancel-btn{
+  height:28px;
+  padding:0 14px;
+
+  border-radius:6px;
+  border:1px solid #2563eb;
+
+  background:#ffffff;
+  color:#2563eb;
+
+  font-weight:600;
+  cursor:pointer;
+}
+
+.wc-cancel-btn:hover{
+  background:#eef4ff;
+}
+
+.wc-row-edit .wc-row{
+  background:#eef4ff;
+  border:1px solid #2563eb;
+}
