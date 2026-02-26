@@ -1,122 +1,138 @@
-/* ===== Dialog rāmis ===== */
-
-:global(.newPartDialog .e-dialog){
-  border-radius:6px;
-  border:2px solid #1e40af;
-  box-shadow:0 6px 18px rgba(0,0,0,.15);
-  border-radius:12px;
-  overflow:hidden;   /* lai stūri reāli ir apaļi */
+.dialog-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
 }
 
-/* ===== Header ===== */
-
-:global(.newPartDialog .e-dlg-header-content){
-  background:#2563eb;
-  color:#ffffff;
-  font-weight:600;
-  padding:8px 14px;
-  border-radius:10px !important;
-
-  display:flex;
-  justify-content:center;   /* centrē horizontāli */
-  align-items:center;       /* centrē vertikāli */
+.dialog-title {
+    font-weight: 600;
+    font-size: 18px;
+    color: #1e40af; /* ERP tumši zils */
 }
 
-:global(.newPartDialog .e-dlg-header){
-  width:100%;
-  text-align:center;
+.dialog-new-btn {
+    background: #2563eb;
+    border: none;
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: background .15s ease, box-shadow .15s ease;
 }
 
-/* ===== Forma ===== */
-
-.newpart-form{
-  display:grid;
-  grid-template-columns: 170px 1fr;
-  gap:14px 16px;
-  align-items:center;
-  padding:8px 4px 4px 4px;
+.dialog-new-btn:hover {
+    background: #1d4ed8;
+    box-shadow: 0 2px 6px rgba(37,99,235,.25);
 }
 
-.newpart-label{
-  font-size:13px;
-  font-weight:600;
-  color:#090909;
+.erp-select {
+    width: 100%;
+    padding: 6px 10px;
+
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+
+    background: #fff;
+    outline: none;
+
+    font-size: 14px;
+
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+
+    background-image: url("data:image/svg+xml;utf8,<svg fill='%231e40af' height='20' viewBox='0 0 20 20' width='20' xmlns='http://www.w3.org/2000/svg'><path d='M5 7l5 5 5-5z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 18px;
 }
 
-.newpart-label-strong{
-  font-weight:600;
+.erp-select:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37,99,235,.08);
 }
 
-.newpart-field{
-  min-width:0;
+.erp-input {
+    width: 100%;
+    padding: 6px 10px;
+
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+
+    background: #fff;
+    outline: none;
+
+    font-size: 14px;
+
+    transition: border-color .15s ease,
+                box-shadow .15s ease;
 }
 
-/* ===== Footer ===== */
-
-.newpart-footer{
-  display:flex;
-  justify-content:flex-end;
-  gap:10px;
-  padding:8px 4px 4px 4px;
+.erp-input:hover {
+    border-color: #d1d5db;
 }
 
-/* ===== Dialog buttons ===== */
-
-.newpart-btn{
-  height:32px;
-  padding:0 16px;
-
-  border-radius:6px;
-  font-weight:600;
-  font-size:13px;
-
-  cursor:pointer;
-  transition:all .15s ease;
+.erp-input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37,99,235,.08);
 }
 
-/* --- Saglabāt (aktīva) --- */
-
-.newpart-btn-save{
-  background:#2563eb;
-  color:#ffffff;
-  border:1px solid #2563eb;
+.topPartManageDialog .e-dlg-content {
+    padding: 18px 20px !important;
 }
 
-.newpart-btn-save:hover:not(:disabled){
-  background:#1d4ed8;
-  border-color:#1d4ed8;
+
+.topPartManageDialog .e-dialog {
+    border-radius: 16px !important;
+    overflow: hidden;
 }
 
-.newpart-btn-save:disabled{
-  background:#e5e7eb;
-  border:1px solid #d1d5db;
-  color:#9ca3af;
-  cursor:not-allowed;
+.topPartManageDialog .e-dlg-content {
+    border-radius: 0 0 16px 16px;
 }
 
-/* --- Aizvērt --- */
-
-.newpart-btn-cancel{
-  background:#ffffff;
-  color:#2563eb;
-  border:1px solid #2563eb;
+.topPartManageDialog .e-dlg-header-content {
+    border-radius: 16px 16px 0 0;
+    padding: 14px 20px !important;
+    justify-content: center !important;
 }
 
-.newpart-btn-cancel:hover{
-  background:#e0e7ff;
+.topPartManageDialog .e-dlg-header {
+    width: 100%;
+    text-align: center;
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e40af;
+    letter-spacing: .4px;
+
+    text-shadow: 0 2px 6px rgba(37,99,235,.25);
 }
 
-/* ===== Rounded inputs – clean version ===== */
-
-/* DropDown un Numeric wrapper */
-:global(.newPartDialog .e-input-group){
-  border-radius:12px !important;
-  overflow:hidden !important;
+/* Stage virsraksti */
+.topPartManageDialog .stage-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin: 10px 0 6px 0;
+    letter-spacing: .4px;
 }
 
-/* FINAL simple rounded style */
+/* Checkbox rinda */
+.topPartManageDialog .stage-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 4px;
+    font-size: 14px;
+    border-radius: 6px;
+    transition: background .12s ease;
+}
 
-:global(.newPartDialog .e-control-wrapper){
-  border-radius:12px !important;
-  overflow:hidden !important;
+.topPartManageDialog .stage-item:hover {
+    background: #f1f5f9;
+}
+
+.topPartManageDialog .stage-item input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
 }

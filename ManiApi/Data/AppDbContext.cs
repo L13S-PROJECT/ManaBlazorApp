@@ -24,7 +24,11 @@ namespace ManiApi.Data
         public DbSet<ManiApi.Models.WorkCenter> WorkCentrs { get; set; }
 
         public DbSet<ManiApi.Models.StockMovement> StockMovements { get; set; }
+
+        public DbSet<StageStepTypeMap> StageStepTypeMaps { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
+
+        
 {
     base.OnModelCreating(modelBuilder);
 
@@ -34,10 +38,29 @@ namespace ManiApi.Data
     modelBuilder.Entity<StockMovement>()
         .Property(sm => sm.Move_Type)
         .HasConversion<string>();
+    modelBuilder.Entity<StageStepTypeMap>(entity =>
+{
+    entity.ToTable("stage_step_type_map");
+
+    entity.HasKey(e => e.Stage);
+
+    entity.Property(e => e.Step_Type_ID)
+        .HasColumnName("Step_Type_ID");
+
+    entity.Property(e => e.IsActive)
+        .HasColumnName("IsActive");
+
+    entity.HasOne(e => e.StepType)
+        .WithMany()
+        .HasForeignKey(e => e.Step_Type_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+});
+    
 }
     public DbSet<BatchProduct> BatchProducts { get; set; }
 
     }
+
 
 }
 

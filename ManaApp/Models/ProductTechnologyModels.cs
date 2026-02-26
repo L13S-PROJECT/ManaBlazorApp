@@ -6,6 +6,7 @@ namespace ManaApp.Models
         public string? TopPartCode { get; set; }
         public int Quantity { get; set; }
         public int ProductToPartId { get; set; }
+        public int Stage { get; set; }
     }
 
     public class PartStepDto

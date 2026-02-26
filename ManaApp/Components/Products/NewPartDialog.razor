@@ -1,73 +1,155 @@
 @namespace ManaApp.Components.Products
 @using Syncfusion.Blazor.Popups
-@using Syncfusion.Blazor.DropDowns
-@using Syncfusion.Blazor.Inputs
 @using ManaApp.Models
+@inject HttpClient Http
+@inject IJSRuntime JS
 
-<SfDialog Width="520px"
+<SfDialog Width="760px"
+          Height="520px"
           ShowCloseIcon="true"
           IsModal="true"
           ZIndex="10060"
-          CssClass="newPartDialog"
+          CssClass="topPartManageDialog"
           Visible="Visible"
-        VisibleChanged="VisibleChanged">
+          VisibleChanged="VisibleChanged">
 
     <DialogTemplates>
 
-        <Header>Jauna detaļa</Header>
+        <Header>
+            Detaļu veidu pārvaldība
+        </Header>
 
         <Content>
-            <div class="newpart-form">
 
-                <label class="newpart-label newpart-label-strong">
-                    Detaļas veids
-                </label>
+            <div style="display:flex; gap:18px; height:100%; overflow:hidden;">
 
-                <div class="newpart-field">
-                    <SfDropDownList TValue="int?" TItem="TopPartDto"
-                                    CssClass="newpart-ddl"
-                                    DataSource="TopParts"
-                                    Placeholder="-- izvēlies detaļu --"
-                                    @bind-Value="Model.TopPartId"
-                                    AllowFiltering="true"
-                                    Width="100%">
-                        <DropDownListFieldSettings Text="Display" Value="Id" />
-                    </SfDropDownList>
+<!-- KREISĀ PUSE -->
+<div style="flex:1; border-right:1px solid #ddd; padding-right:15px; overflow:auto;">
+
+    @if (topParts is null || topParts.Count == 0)
+    {
+        <div>Nav datu</div>
+    }
+    else
+    {
+        @foreach (var group in topParts
+                                .OrderBy(x => x.Stage)
+                                .GroupBy(x => x.Stage))
+        {
+            <div style="margin-bottom:15px;">
+
+                <div class="stage-title">
+                    @(group.Key == 1 ? "DETAĻU SAGATAVOŠANAS POSMS"
+                    : group.Key == 2 ? "KOMPLEKTĒŠANAS POSMS"
+                    : "KRĀSOŠANAS POSMS")
                 </div>
 
-                <label class="newpart-label newpart-label-strong">
-                    Daudzums uz izstrādājumu
-                </label>
-
-                <div class="newpart-field">
-                    <SfNumericTextBox TValue="int"
-                                      CssClass="newpart-num"
-                                      @bind-Value="Model.QtyPerProduct"
-                                      Min="1"
-                                      Step="1"
-                                      Width="140px" />
-                </div>
+                @foreach (var part in group)
+                {
+                    <div class="stage-item">
+                        <input type="checkbox"
+                            checked="@(selectedPart?.Id == part.Id)"
+                            @onchange="() => SelectPart(part)" />
+                        @part.TopPartName
+                    </div>
+                }
 
             </div>
+        }
+    }
+
+</div>
+
+                <!-- LABĀ PUSE -->
+<div style="flex:1; padding-left:15px;">
+
+<div class="dialog-header-row">
+
+    <div class="dialog-title">
+        @(isNewMode
+            ? "Jaunas detaļas pievienošana"
+            : selectedPart is not null
+                ? "Detaļas labošana"
+                : "")
+    </div>
+
+<button class="dialog-new-btn"
+        @onclick="StartNew">
+    + Jauns
+</button>
+
+</div>
+
+@if (isNewMode)
+{
+    <div style="margin-bottom:10px;">
+        <label>Posms</label>
+            <select class="erp-select"
+                    @bind="newStage">
+                <option value="1">DETAĻAS</option>
+                <option value="2">KOMPLEKTĒŠANA</option>
+                <option value="3">KRĀSOŠANA</option>
+            </select>
+    </div>
+
+    <div style="margin-bottom:10px;">
+        <label>Nosaukums</label>
+        <input class="erp-input"
+               @bind="editName" />
+    </div>
+
+    <div style="margin-bottom:10px;">
+        <label>Kods (3 simboli)</label>
+        <input class="erp-input"
+       maxlength="3"
+       style="text-transform:uppercase"
+       @bind="editCode"
+       @bind:event="oninput" />
+    </div>
+
+    <button class="btn btn-primary"
+            @onclick="SaveNew">
+        Saglabāt
+    </button>
+}
+else if (selectedPart is null)
+{
+    <div>Izvēlies detaļu kreisajā pusē.</div>
+}
+else
+{
+        <div style="margin-bottom:10px;">
+            <strong>Posms:</strong>
+            @(selectedPart.Stage == 1 ? "DETAĻAS"
+            : selectedPart.Stage == 2 ? "KOMPLEKTĒŠANA"
+            : "KRĀSOŠANA")
+        </div>
+
+        <div style="margin-bottom:10px;">
+            <label>Nosaukums</label>
+            <input class="erp-input"
+                   @bind="editName" />
+        </div>
+
+        <div style="margin-bottom:10px;">
+            <label>Kods (3 simboli)</label>
+            <input class="erp-input"
+                maxlength="3"
+                @bind="editCode" />
+        </div>
+
+        <button class="btn btn-primary"
+                @onclick="SaveEdit">
+            Saglabāt
+        </button>
+
+    }
+
+</div>
+
+            </div>
+
         </Content>
-
-        <FooterTemplate>
-            <div class="newpart-footer">
-                <button type="button"
-                        class="newpart-btn newpart-btn-save"
-                        disabled="@Invalid"
-                        @onclick="Save">
-                    Saglabāt
-                </button>
-
-                <button type="button"
-                        class="newpart-btn newpart-btn-cancel"
-                        @onclick="Close">
-                    Aizvērt
-                </button>
-
-            </div>
-        </FooterTemplate>
 
     </DialogTemplates>
 
@@ -77,31 +159,130 @@
 
     [Parameter] public bool Visible { get; set; }
     [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+private string _editCode = "";
 
-    [Parameter] public string SelectedProductLabel { get; set; } = "";
+private string editCode
+{
+    get => _editCode;
+    set => _editCode = (value ?? "").ToUpper();
+}
+private List<TopPartDto> topParts = new();
 
-    [Parameter] public List<TopPartDto> TopParts { get; set; } = new();
-
-    [Parameter] public NewPartVm Model { get; set; } = new();
-
-    [Parameter] public EventCallback<NewPartVm> OnSave { get; set; }
-
-    private bool Invalid =>
-        Model is null
-        || Model.TopPartId is null
-        || Model.QtyPerProduct < 1;
-
-    private async Task Save()
+protected override async Task OnParametersSetAsync()
+{
+    if (Visible)
     {
-        if (OnSave.HasDelegate)
-            await OnSave.InvokeAsync(Model);
+        topParts = await Http.GetFromJsonAsync<List<TopPartDto>>(
+            "http://localhost:5270/api/topparts") ?? new();
+    }
+}
 
-        await Close();
+private TopPartDto? selectedPart;
+private string editName = "";
+
+private void SelectPart(TopPartDto part)
+{
+    if (selectedPart?.Id == part.Id)
+    {
+        // ja nospiež to pašu vēlreiz → noņem atlasi
+        selectedPart = null;
+        editName = "";
+        editCode = "";
+        return;
     }
 
-    private async Task Close()
+    isNewMode = false;
+    selectedPart = part;
+    editName = part.TopPartName;
+    editCode = part.TopPartCode;
+}
+private async Task SaveEdit()
+{
+    if (selectedPart is null)
+        return;
+
+    if (string.IsNullOrWhiteSpace(editName))
+        return;
+
+    if (string.IsNullOrWhiteSpace(editCode) || editCode.Length != 3)
+        return;
+
+    var resp = await Http.PutAsJsonAsync(
+        "http://localhost:5270/api/topparts",
+        new
+        {
+            Id = selectedPart.Id,
+            TopPartName = editName,
+            TopPartCode = editCode
+        });
+
+    if (resp.IsSuccessStatusCode)
     {
-        Visible = false;
-        await VisibleChanged.InvokeAsync(false);
+        selectedPart.TopPartName = editName;
+        selectedPart.TopPartCode = editCode;
+
+        selectedPart = null;
+        editName = "";
+        editCode = "";
     }
+}
+
+private bool isNewMode = false;
+private int newStage = 1;
+
+private void StartNew()
+{
+    selectedPart = null;
+    editName = "";
+    newStage = 1;
+    editCode = "";
+    isNewMode = true;
+}
+
+private async Task SaveNew()
+{
+    if (string.IsNullOrWhiteSpace(editName))
+    {
+        await JS.InvokeVoidAsync("alert", "Nosaukums ir obligāts.");
+        return;
+    }
+
+    if (string.IsNullOrWhiteSpace(editCode) || editCode.Length != 3)
+    {
+        await JS.InvokeVoidAsync("alert", "Kods obligāts un jābūt tieši 3 simboliem.");
+        return;
+    }
+
+    var ok = await JS.InvokeAsync<bool>(
+        "confirm",
+        "Vai pievienot jaunu detaļas veidu?");
+    if (!ok) return;
+
+    var resp = await Http.PostAsJsonAsync(
+        "http://localhost:5270/api/topparts",
+        new
+        {
+            TopPartName = editName,
+            TopPartCode = editCode,
+            Stage = newStage
+        });
+
+    if (resp.IsSuccessStatusCode)
+    {
+        var created = await resp.Content.ReadFromJsonAsync<TopPartDto>();
+
+        if (created != null)
+            topParts.Add(created);
+
+        isNewMode = false;
+        editName = "";
+        editCode = "";
+    }
+    else
+    {
+        var error = await resp.Content.ReadAsStringAsync();
+        await JS.InvokeVoidAsync("alert", error);
+    }
+}
+
 }

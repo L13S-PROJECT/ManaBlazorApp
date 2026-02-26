@@ -278,14 +278,10 @@
 </WorkCentersDialog>
 
 <!-- === JAUNA DETAĻA dialogs === -->
+
 <NewPartDialog
     Visible="IsNewPartOpen"
-    VisibleChanged="@(v => SetMainDialog(v ? "NewPart" : null))"
-    SelectedProductLabel="SelectedProductLabel"
-    TopParts="topParts"
-    Model="newPart"
-    OnSave="HandleNewPartSave" />
-
+    VisibleChanged="@(v => SetMainDialog(v ? "NewPart" : null))" />
 
 @code {
     // ===== Palīg-īpašības izvēlētajai PRECEI (no 'selected') =====
@@ -365,6 +361,14 @@ private bool createNewVersion
     private string newName = "";
     private string newCode = "";
     private bool showValidation = false;
+    private List<StageStepTypeMapDto> stageStepTypeMap = new();
+
+    public class StageStepTypeMapDto
+{
+    public int Stage { get; set; }
+    public int Step_Type_ID { get; set; }
+    public bool IsActive { get; set; }
+}
 
     // ===== Palīg-funkcijas =====
     private void TogglePart(string? code)
@@ -393,14 +397,23 @@ private bool createNewVersion
         }
         catch { workCenters = new List<WorkCenter>(); }
 
-            // 2b) ielādē soļu tipus (ja 404/500 — turpinām bez tiem)
-try
-{
-    stepTypes = await Http.GetFromJsonAsync<List<StepTypeDto>>("http://localhost:5270/api/steptypes")
-               ?? new();
-}
-catch { stepTypes = new List<StepTypeDto>(); }
+// 2b) ielādē soļu tipus
+            try
+            {
+                stepTypes = await Http.GetFromJsonAsync<List<StepTypeDto>>(
+                    "http://localhost:5270/api/steptypes")
+                    ?? new();
+            }
+            catch { stepTypes = new List<StepTypeDto>(); }
 
+// 2c) ielādē stage → stepType mapping
+            try
+            {
+                stageStepTypeMap = await Http.GetFromJsonAsync<List<StageStepTypeMapDto>>(
+                    "http://localhost:5270/api/products/stage-step-type-map")
+                    ?? new();
+            }
+            catch { stageStepTypeMap = new List<StageStepTypeMapDto>(); }
 
         // 3) ielādē kategorijas (ja 404/500 — turpinām bez tām)
         try
@@ -793,31 +806,39 @@ private async Task CloseStepsDialog()
 }
 
     private void AddStep()
-    {
-        if (currentStepsPartId == 0) return;
-        editingSteps ??= new();
-
-        var nextOrder = editingSteps.Count > 0 ? editingSteps.Max(x => x.StepOrder) + 1 : 1;
-
-        // paņem noklusētos no ielādētajiem sarakstiem (ja ir)
-var defaultStepTypeId = stepTypes?.FirstOrDefault()?.Id ?? 0;
-var defaultWcId       = workCenters?.FirstOrDefault()?.Id ?? 0;
-
-editingSteps.Add(new ManaApp.Models.PartStepDto
 {
-    Id = 0,
-    ProductToPartId = currentStepsPartId,
-    StepOrder = nextOrder,
-    StepName = "",
-    StepType = defaultStepTypeId, // ← vairs nav 0
-    WorkCentrId = defaultWcId,    // ← vairs nav 0
-    ParallelGroup = 0,
-    IsMandatory = false,
-    IsFinal = false,
-    Comments = ""
-});
+    if (currentStepsPartId == 0) return;
+    editingSteps ??= new();
 
-    }
+    var nextOrder = editingSteps.Count > 0
+        ? editingSteps.Max(x => x.StepOrder) + 10
+        : 10;
+
+    var detail = selectedPartDetails?
+        .FirstOrDefault(x => x.ProductToPartId == currentStepsPartId);
+
+    var stage = detail?.Stage ?? 0;
+
+    var defaultStepTypeId = stageStepTypeMap
+        .FirstOrDefault(x => x.Stage == stage && x.IsActive)?
+        .Step_Type_ID ?? 0;
+
+    var defaultWcId = workCenters?.FirstOrDefault()?.Id ?? 0;
+
+    editingSteps.Add(new PartStepDto
+    {
+        Id = 0,
+        ProductToPartId = currentStepsPartId,
+        StepOrder = nextOrder,
+        StepName = "",
+        StepType = defaultStepTypeId,
+        WorkCentrId = defaultWcId,
+        ParallelGroup = 0,
+        IsMandatory = false,
+        IsFinal = false,
+        Comments = ""
+    });
+}
 
     private void MoveUp(PartStepDto s)
     {

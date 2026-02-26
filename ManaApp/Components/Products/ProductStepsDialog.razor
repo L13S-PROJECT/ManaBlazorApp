@@ -13,7 +13,7 @@
           Header="Tehnoloģijas soļi"
           Visible="Visible"
         VisibleChanged="VisibleChanged">
-
+<DialogEvents Opened="@( (Syncfusion.Blazor.Popups.OpenEventArgs args) => OnDialogOpened(args) )" />
 <DialogTemplates>
 <Content>
 <div class="steps-dialog">
@@ -27,7 +27,6 @@
     <div class="steps-table-head steps-grid">
         <div class="steps-th steps-th-order">Secība</div>
         <div class="steps-th">Nosaukums</div>
-        <div class="steps-th steps-th-steptype">Step Type</div>
         <div class="steps-th steps-th-workcenter">Darba centrs</div>
         <div class="steps-th steps-th-flags">Statuss</div>
         <div class="steps-th">Komentārs</div>
@@ -41,33 +40,23 @@
                 var index = i;
 
 <div @key="s"
-     class="steps-tr steps-grid 
-            @( _selectedIndex == index ? "dragging" : "" )
-            @( _hoverIndex == index && _selectedIndex != null ? "drop-target" : "" )"
-     @onmouseenter="() => SetHover(index)">
+     class="steps-tr steps-grid @( _selectedIndex == index ? "dragging" : "" ) 
+     @( _hoverIndex == index && _isDragging && _selectedIndex != index ? "drop-target" : "" )"
+     @onmouseenter="() => OnDragEnter(index)"
+     @onmouseup="EndDrag">
               
                 <div class="steps-order-cell">
                     <span class="steps-drag-handle"
-                        @onclick="() => SelectForMove(index)"
+                        @onmousedown="() => StartDrag(index)"
                         title="Pārvietot">⋮⋮</span>
                 </div>
 
                 <div>
-                    <input class="steps-input steps-input-pill"
-                           type="text"
-                           @bind="s.StepName"
-                           @bind:event="oninput" />
-                </div>
-
-                <div>
-                    <SfDropDownList TValue="int" TItem="StepTypeDto"
-                                    CssClass="steps-ddl"
-                                    PopupCssClass="steps-ddl-popup-small"
-                                    DataSource="StepTypes"
-                                    @bind-Value="s.StepType"
-                                    Width="100%">
-                        <DropDownListFieldSettings Text="StepTypeName" Value="Id" />
-                    </SfDropDownList>
+                    <input class="steps-input"
+                        type="text"
+                        @bind="s.StepName"
+                        @bind:event="oninput"
+                        placeholder="Pievienot nosaukumu" />
                 </div>
 
                 <div>
@@ -213,6 +202,50 @@ private void SetHover(int index)
 {
     if (_selectedIndex != null)
         _hoverIndex = index;
+}
+
+private bool _isDragging = false;
+
+private void StartDrag(int index)
+{
+    _selectedIndex = index;
+    _hoverIndex = index;
+    _isDragging = true;
+    StateHasChanged();
+}
+
+private void OnDragEnter(int index)
+{
+    if (!_isDragging || _selectedIndex == null || Steps == null)
+        return;
+
+    if (index == _selectedIndex)
+        return;
+
+    var item = Steps[_selectedIndex.Value];
+    Steps.RemoveAt(_selectedIndex.Value);
+    Steps.Insert(index, item);
+
+    _selectedIndex = index;
+    _hoverIndex = index;
+
+    for (int i = 0; i < Steps.Count; i++)
+        Steps[i].StepOrder = (i + 1) * 10;
+
+    StateHasChanged();
+}
+
+private void EndDrag()
+{
+    _isDragging = false;
+    _selectedIndex = null;
+    _hoverIndex = null;
+    StateHasChanged();
+}
+
+private void OnDialogOpened(Syncfusion.Blazor.Popups.OpenEventArgs args)
+{
+    args.PreventFocus = true;
 }
 
 }

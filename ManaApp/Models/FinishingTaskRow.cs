@@ -13,6 +13,7 @@ public sealed class FinishingTaskRow
     public DateTime? StartedAt { get; set; }
     public DateTime? FinishedAt { get; set; }
     public string? Comment { get; set; }
+
     public bool IsCommentForEmployee { get; set; }
 
 }

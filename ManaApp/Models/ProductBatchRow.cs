@@ -21,6 +21,6 @@ public sealed class ProductBatchRow
     public string? VersionName { get; set; }
 
     public string ProductCode { get; set; } = "";
-public string CategoryName { get; set; } = "";
+    public string CategoryName { get; set; } = "";
 }
 

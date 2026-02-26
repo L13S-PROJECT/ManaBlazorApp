@@ -39,7 +39,7 @@
 /* GRID layout soļu rindām */
 .steps-dialog .steps-grid{
   display:grid;
-  grid-template-columns: 44px 1.5fr 1fr 1fr 110px 1.5fr 50px;
+  grid-template-columns: 44px 1.5fr 1fr 110px 1.5fr 50px;
   align-items:center;
   gap:8px;
 }
@@ -53,11 +53,9 @@
 .steps-dialog .steps-tr{
   padding:6px 0;
   border-bottom:1px solid #f1f5f9;
-}
-
-.steps-dialog .dragging {
-    background: #eef2ff;
-    border-left: 4px solid #2563eb;
+  transition: transform 0.16s ease,
+              background 0.16s ease,
+              box-shadow 0.16s ease;
 }
 
 .steps-dialog .drop-target {
@@ -67,10 +65,60 @@
 .steps-dialog .drop-target::before {
     content: "";
     position: absolute;
-    top: -4px;
+    top: -2px;
     left: 0;
     right: 0;
     height: 2px;
     background: #2563eb;
-    border-radius: 2px;
+}
+
+.steps-dialog .steps-tr.dragging {
+    background: #eef2ff !important;
+    border-left: 4px solid #2563eb !important;
+
+ box-shadow:
+    inset 0 1px 0 #bfdbfe,
+    inset 0 -1px 0 #bfdbfe,
+    0 1px 3px rgba(0,0,0,0.18),
+    0 6px 12px rgba(0,0,0,0.12);
+
+    transform: scale(1.015);
+    z-index: 10;
+    position: relative;
+    cursor: grabbing;
+}
+
+/* fotmatešāna"*/ 
+
+/* Nosaukums input noapaļošana */
+
+.steps-dialog .steps-input{
+  width:100%;
+  padding:6px 10px;
+
+  border:1px solid #e5e7eb;   /* ļoti viegls pelēks */
+  border-radius:6px;
+
+  background:#fff;
+  outline:none;
+
+  transition:border-color .15s ease,
+             box-shadow .15s ease;
+}
+
+/* Hover – tikai nedaudz tumšāks pelēks */
+.steps-dialog .steps-input:hover{
+  border-color:#d1d5db;
+}
+
+/* Focus – zils tikai klikšķinot */
+.steps-dialog .steps-input:focus{
+  border-color:#2563eb;
+  box-shadow:0 0 0 2px rgba(37,99,235,.08);
+}
+
+/* Placeholder */
+.steps-dialog .steps-input::placeholder{
+  color:#9ca3af;
+  font-style:italic;
 }

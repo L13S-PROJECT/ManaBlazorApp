@@ -341,6 +341,7 @@ public async Task<IActionResult> GetTopPartSteps(
                       {
                           tp.TopPartName,
                           tp.TopPartCode,
+                          tp.Stage,
                           Quantity = pt.QtyPerProduct,
                           ProductToPartId = pt.Id
                       })
@@ -349,6 +350,23 @@ public async Task<IActionResult> GetTopPartSteps(
             return Ok(rows);
 
         }
+
+[HttpGet("stage-step-type-map")]
+public async Task<IActionResult> GetStageStepTypeMap()
+{
+    var rows = await _db.StageStepTypeMaps
+        .Where(x => x.IsActive)
+        .Select(x => new
+        {
+            x.Stage,
+            x.Step_Type_ID,
+            x.IsActive
+        })
+        .ToListAsync();
+
+    return Ok(rows);
+}
+
         [HttpGet("works-by-product")]
         public async Task<IActionResult> GetWorksByProduct([FromQuery] int id)
         {
@@ -700,7 +718,7 @@ var map = oldParts
         {
             if (dto.ProductToPartId <= 0) return BadRequest("ProductToPartId is required.");
             if (string.IsNullOrWhiteSpace(dto.StepName)) return BadRequest("StepName is required.");
-            if (dto.WorkCentrId <= 0 || dto.StepType <= 0) return BadRequest("WorkCentrId/StepType required.");
+           if (dto.WorkCentrId <= 0) return BadRequest("WorkCentrId required.");
 
             // 1) Part must be active and belong to an ACTIVE version
             var ptp = await _db.ProductTopParts
@@ -715,6 +733,22 @@ var map = oldParts
 
             if (!versionActive)
                 return BadRequest("Steps can be edited only for active version.");
+        // ja UI nav atsūtījis StepType (vai 0) -> piešķiram pēc TopPart.Stage
+if (dto.StepType <= 0)
+{
+    var stage = await _db.TopParts
+        .Where(tp => tp.Id == ptp.TopPartId && tp.IsActive)
+        .Select(tp => tp.Stage)
+        .FirstOrDefaultAsync();
+
+dto.StepType = (int)await _db.StageStepTypeMaps
+    .Where(m => m.IsActive && m.Stage == stage)
+    .Select(m => m.Step_Type_ID)
+    .FirstOrDefaultAsync();
+
+    if (dto.StepType <= 0)
+        return BadRequest($"Nav konfigurēts StepType priekš Stage={stage}.");
+}
 
             // 2) StepOrder: ja 0, piešķiram max+10
             if (dto.StepOrder == 0)
@@ -762,7 +796,7 @@ var map = oldParts
         {
             if (dto.Id <= 0) return BadRequest("Id is required.");
             if (string.IsNullOrWhiteSpace(dto.StepName)) return BadRequest("StepName is required.");
-            if (dto.WorkCentrId <= 0 || dto.StepType <= 0) return BadRequest("WorkCentrId/StepType required.");
+           if (dto.WorkCentrId <= 0) return BadRequest("WorkCentrId required.");
 
             var step = await _db.TopPartSteps.FirstOrDefaultAsync(s => s.Id == dto.Id && s.IsActive);
             if (step is null) return NotFound("Step not found or inactive.");
@@ -774,6 +808,21 @@ var map = oldParts
             var versionActive = await _db.ProductVersions.AnyAsync(v => v.Id == ptp.VersionId && v.IsActive);
             if (!versionActive) return BadRequest("Steps can be edited only for active version.");
 
+if (dto.StepType <= 0)
+{
+    var stage = await _db.TopParts
+        .Where(tp => tp.Id == ptp.TopPartId && tp.IsActive)
+        .Select(tp => tp.Stage)
+        .FirstOrDefaultAsync();
+
+dto.StepType = (int)await _db.StageStepTypeMaps
+    .Where(m => m.IsActive && m.Stage == stage)
+    .Select(m => m.Step_Type_ID)
+    .FirstOrDefaultAsync();
+
+    if (dto.StepType <= 0)
+        return BadRequest($"Nav konfigurēts StepType priekš Stage={stage}.");
+}
             // StepOrder
             if (dto.StepOrder <= 0) dto.StepOrder = step.StepOrder;
 
@@ -833,25 +882,7 @@ var map = oldParts
             return Ok(rows);
         }
 
-        [HttpGet("/api/topparts")]
-        public async Task<IActionResult> GetTopParts([FromServices] ManiApi.Data.AppDbContext db)
-        {
-            var rows = await db.TopParts
-                .AsNoTracking()
-                .Where(tp => tp.IsActive)
-                .OrderBy(tp => tp.TopPartCode)
-                .Select(tp => new
-                {
-                    tp.Id,
-                    tp.TopPartName,
-                    tp.TopPartCode,
-                    tp.Stage
-                })
-                .ToListAsync();
-            return Ok(rows);
-        }
-
-        // DTO
+          // DTO
         public sealed class AddPartRequest
         {
             public int productId { get; set; }      // Produkta Id
@@ -1220,6 +1251,22 @@ public class ProductListItemDto
     public bool IsPriority { get; set; }
 
     public int GroupType { get; set; }   
+}
+
+[HttpGet("/api/stage-step-map")]
+public async Task<IActionResult> GetStageStepMap(
+    [FromServices] AppDbContext db)
+{
+    var rows = await db.StageStepTypeMaps
+        .Where(x => x.IsActive)
+        .Select(x => new
+        {
+            x.Stage,
+            x.Step_Type_ID
+        })
+        .ToListAsync();
+
+    return Ok(rows);
 }
 
 

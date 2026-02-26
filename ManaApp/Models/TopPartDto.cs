@@ -8,3 +8,9 @@ public class TopPartDto
     public byte Stage { get; set; }
     public string Display => $"{TopPartCode} — {TopPartName}";
 }
+
+public class StageStepMapDto
+{
+    public int Stage { get; set; }
+    public int StepTypeId { get; set; }
+}

@@ -390,3 +390,27 @@ tr[aria-selected="true"] > td.e-rowcell:first-child {
   border-radius:12px !important;
   overflow:hidden !important;
 }
+
+/* ===== TopPartManageDialog HEADER ===== */
+
+.e-dialog.topPartManageDialog .e-dlg-header-content{
+    justify-content:center !important;
+    text-align:center !important;
+}
+
+.e-dialog.topPartManageDialog .e-dlg-header{
+    width:100%;
+    font-size:18px;
+    font-weight:600;
+    color:#1e40af;
+    letter-spacing:.4px;
+
+    text-shadow:0 2px 8px rgba(37,99,235,.35);
+}
+
+/* ===== TopPartManageDialog outer rounding ===== */
+
+.e-dialog.topPartManageDialog{
+    border-radius:10px !important;
+    overflow:hidden !important;
+}
