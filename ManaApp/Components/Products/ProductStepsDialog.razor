@@ -3,6 +3,7 @@
 @using Syncfusion.Blazor.Popups
 @using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Inputs
+@inject IJSRuntime JS
 
 
 <SfDialog Width="720px"
@@ -15,105 +16,106 @@
 
 <DialogTemplates>
 <Content>
-
+<div class="steps-dialog">
     @if (Steps is null || Steps.Count == 0)
     {
         <div style="opacity:.7">Šai detaļai soļu nav.</div>
     }
     else
     {
-    <table class="steps-table">
-            <thead>
-                    <tr class="steps-table-head">
-                    <th class="steps-th steps-th-order">Secība</th>
-                    <th class="steps-th">Nosaukums</th>
-                    <th class="steps-th steps-th-steptype">Step Type</th>
-                    <th class="steps-th steps-th-workcenter">Darba centrs</th>
+    <div class="steps-table">
+    <div class="steps-table-head steps-grid">
+        <div class="steps-th steps-th-order">Secība</div>
+        <div class="steps-th">Nosaukums</div>
+        <div class="steps-th steps-th-steptype">Step Type</div>
+        <div class="steps-th steps-th-workcenter">Darba centrs</div>
+        <div class="steps-th steps-th-flags">Statuss</div>
+        <div class="steps-th">Komentārs</div>
+        <div class="steps-th steps-th-actions"></div>
+    </div>
 
+    <div class="steps-table-body">
+            @for (int i = 0; i < Steps!.Count; i++)
+            {
+                var s = Steps[i];
+                var index = i;
 
-                    <th class="steps-th steps-th-flags">Statuss</th>
+<div @key="s"
+     class="steps-tr steps-grid 
+            @( _selectedIndex == index ? "dragging" : "" )
+            @( _hoverIndex == index && _selectedIndex != null ? "drop-target" : "" )"
+     @onmouseenter="() => SetHover(index)">
+              
+                <div class="steps-order-cell">
+                    <span class="steps-drag-handle"
+                        @onclick="() => SelectForMove(index)"
+                        title="Pārvietot">⋮⋮</span>
+                </div>
 
-                    <th class="steps-th">Komentārs</th>
-                    <th class="steps-th steps-th-actions"></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var s in Steps!)
-                {
-                    <tr class="steps-tr">
-                        <td class="steps-order-cell">
-                            <button type="button"
-                                    class="steps-order-btn up"
-                                    @onclick="() => OnMoveUp.InvokeAsync(s)">
-                            </button>
+                <div>
+                    <input class="steps-input steps-input-pill"
+                           type="text"
+                           @bind="s.StepName"
+                           @bind:event="oninput" />
+                </div>
 
-                            <button type="button"
-                                    class="steps-order-btn down"
-                                    @onclick="() => OnMoveDown.InvokeAsync(s)">
-                            </button>
-                        </td>
-                        <td>
-                            <input class="steps-input steps-input-pill"
-                                type="text"
-                                @bind="s.StepName"
-                                @bind:event="oninput" />
-                        </td>
-                        <td>
-                            <SfDropDownList TValue="int"
-                                        TItem="StepTypeDto"
-                                        CssClass="steps-ddl"
-                                        PopupCssClass="steps-ddl-popup-small"
-                                        DataSource="StepTypes"
-                                        @bind-Value="s.StepType"
-                                        Width="100%">
-                            <DropDownListFieldSettings Text="StepTypeName" Value="Id" />
-                        </SfDropDownList>
-                        </td>
+                <div>
+                    <SfDropDownList TValue="int" TItem="StepTypeDto"
+                                    CssClass="steps-ddl"
+                                    PopupCssClass="steps-ddl-popup-small"
+                                    DataSource="StepTypes"
+                                    @bind-Value="s.StepType"
+                                    Width="100%">
+                        <DropDownListFieldSettings Text="StepTypeName" Value="Id" />
+                    </SfDropDownList>
+                </div>
 
-                        <td>
-                        <SfDropDownList TValue="int"
-                                        TItem="WorkCenter"
-                                        CssClass="steps-ddl"
-                                        PopupCssClass="steps-ddl-popup-small"
-                                        DataSource="WorkCenters"
-                                        @bind-Value="s.WorkCentrId"
-                                        Width="100%">
-                            <DropDownListFieldSettings Text="WorkCentr_Name" Value="Id" />
-                        </SfDropDownList>
-                        </td>
-                        <td class="steps-flags-cell">
-                            <label class="steps-flag" title="Paralēls solis">
-                                <input type="checkbox" @bind="s.IsParallel" />
-                                <span class="flag-icon parallel"></span>
-                            </label>
+                <div>
+                    <SfDropDownList TValue="int" TItem="WorkCenter"
+                                    CssClass="steps-ddl"
+                                    PopupCssClass="steps-ddl-popup-small"
+                                    DataSource="WorkCenters"
+                                    @bind-Value="s.WorkCentrId"
+                                    Width="100%">
+                        <DropDownListFieldSettings Text="WorkCentr_Name" Value="Id" />
+                    </SfDropDownList>
+                </div>
 
-                            <label class="steps-flag" title="Pēdējais (Final) solis">
-                                <input type="checkbox"
-                                    checked="@s.IsFinal"
-                                    disabled="@( !IsLastStep(s) )"
-                                    @onchange="() => OnSetFinal.InvokeAsync(s)" />
-                                <span class="flag-icon final"></span>
-                            </label>
-                        </td>
-                        <td>
-                            <input class="steps-input steps-input-pill"
-                                type="text"
-                                value="@s.Comments"
-                                @onchange="e => s.Comments = e.Value?.ToString()" />
-                        </td>
-                        <td class="steps-td-right">
-                        <button type="button"
-                                class="steps-btn"
-                                @onclick="() => OnDelete.InvokeAsync(s)"
-                                title="Dzēst">
-                            🗑
-                        </button>
-</td>
-                    </tr>
-                }
-            </tbody>
-    </table>
+                <div class="steps-flags-cell">
+                    <label class="steps-flag" title="Paralēls solis">
+                        <input type="checkbox" @bind="s.IsParallel" />
+                        <span class="flag-icon parallel"></span>
+                    </label>
+
+                    <label class="steps-flag" title="Pēdējais (Final) solis">
+                        <input type="checkbox"
+                               checked="@s.IsFinal"
+                               disabled="@( !IsLastStep(s) )"
+                               @onchange="() => OnSetFinal.InvokeAsync(s)" />
+                        <span class="flag-icon final"></span>
+                    </label>
+                </div>
+
+                <div>
+                    <input class="steps-input steps-input-pill"
+                           type="text"
+                           value="@s.Comments"
+                           @onchange="e => s.Comments = e.Value?.ToString()" />
+                </div>
+
+                <div class="steps-td-right">
+                    <button type="button"
+                            class="steps-btn"
+                            @onclick="() => OnDelete.InvokeAsync(s)"
+                            title="Dzēst">🗑</button>
+                </div>
+            </div>
+        }
+                        
+    </div>
+</div>
     }
+</div>
 </Content>
 
 <FooterTemplate>
@@ -173,4 +175,44 @@ private bool IsLastStep(PartStepDto s)
 [Parameter] public EventCallback OnAddStep { get; set; }
 [Parameter] public EventCallback OnSave { get; set; }
 [Parameter] public EventCallback OnClose { get; set; }
+
+private int? _dragIndex = null;
+
+private int? _selectedIndex = null;
+
+private void SelectForMove(int index)
+{   
+        if (_selectedIndex is null)
+        {
+            _selectedIndex = index;
+            StateHasChanged();
+            return;
+        }
+
+        if (_selectedIndex == index)
+        {
+            _selectedIndex = null;
+            StateHasChanged();
+            return;
+        }
+
+    var item = Steps![_selectedIndex.Value];
+    Steps.RemoveAt(_selectedIndex.Value);
+    Steps.Insert(index, item);
+
+    _selectedIndex = null;
+
+    for (int i = 0; i < Steps.Count; i++)
+        Steps[i].StepOrder = (i + 1) * 10;
+
+    StateHasChanged();
+}
+private int? _hoverIndex = null;
+
+private void SetHover(int index)
+{
+    if (_selectedIndex != null)
+        _hoverIndex = index;
+}
+
 }

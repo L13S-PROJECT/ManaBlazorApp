@@ -1,0 +1,76 @@
+/* Drag handle (grip) – kompakts, zilā ERP tonī */
+.steps-dialog .steps-order-cell{
+  width:44px;
+  text-align:center;
+  vertical-align:middle;
+}
+
+.steps-dialog .steps-drag-handle{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+
+  width:28px;
+  height:28px;
+
+  border:1px solid #cbd5e1;
+  border-radius:10px;
+  background:#fff;
+
+  color:#1e40af;                 /* tumši zils */
+  font-size:16px;
+  line-height:1;
+
+  cursor:grab;
+  user-select:none;
+
+  box-shadow:0 1px 1px rgba(0,0,0,.06);
+}
+
+.steps-dialog .steps-drag-handle:hover{
+  border-color:#2563eb;
+  background:#eff6ff;
+}
+
+.steps-dialog tr[draggable="true"]:active .steps-drag-handle{
+  cursor:grabbing;
+}
+
+/* GRID layout soļu rindām */
+.steps-dialog .steps-grid{
+  display:grid;
+  grid-template-columns: 44px 1.5fr 1fr 1fr 110px 1.5fr 50px;
+  align-items:center;
+  gap:8px;
+}
+
+.steps-dialog .steps-table-head{
+  font-weight:600;
+  padding-bottom:6px;
+  border-bottom:1px solid #e5e7eb;
+}
+
+.steps-dialog .steps-tr{
+  padding:6px 0;
+  border-bottom:1px solid #f1f5f9;
+}
+
+.steps-dialog .dragging {
+    background: #eef2ff;
+    border-left: 4px solid #2563eb;
+}
+
+.steps-dialog .drop-target {
+    position: relative;
+}
+
+.steps-dialog .drop-target::before {
+    content: "";
+    position: absolute;
+    top: -4px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #2563eb;
+    border-radius: 2px;
+}

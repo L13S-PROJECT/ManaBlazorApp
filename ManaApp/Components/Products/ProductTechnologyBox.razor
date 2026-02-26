@@ -106,14 +106,11 @@ else
                                 </td>
                             </tr>
 
-                    @if (IsPartSelected(part))
+                    var workItem = WorksByParts?
+                        .FirstOrDefault(w => w.TopPartCode == part.TopPartCode);
+
+                    @if (IsPartSelected(part) || (workItem?.Steps?.Any() == true))
                     {
-                        var detail = SelectedPartDetails?
-                            .FirstOrDefault(x => x.TopPartCode == part.TopPartCode);
-
-                        var workItem = WorksByParts?
-                            .FirstOrDefault(w => w.TopPartCode == part.TopPartCode);
-
                         <tr class="tech-steps-row">
                             <td></td>
                             <td colspan="4">
