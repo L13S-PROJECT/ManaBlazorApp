@@ -221,13 +221,13 @@ code {
 
 .steps-table .steps-ddl.e-control-wrapper.e-input-focus,
 .steps-table .steps-ddl.e-control-wrapper:focus-within{
-  border-color:#22c55e !important;
-  box-shadow:0 0 0 3px rgba(34,197,94,.25) !important;
+  border-color:#2563eb !important;
+  box-shadow:0 0 0 2px rgba(37,99,235,.15) !important;
 }
 
 .e-control-wrapper.steps-ddl{
   height:28px;
-  border-radius:10px;
+  border-radius:6px;
 }
 
 /* Step Type + Darba centrs – mazāks teksts pašā input */
@@ -337,20 +337,22 @@ html, body {
   font-weight:600 !important;
 }
 
-/* PRODUCTS GRID – blue hover */
-.e-grid[cssclass*="lvlProducts"] 
-.e-gridcontent 
-.e-content 
-tr.e-row:hover > td.e-rowcell {
-  background-color: #dbeafe !important;   /* gaiši zils */
-}
+
 
 /* PRODUCTS GRID – selected row (aria) */
+
 .e-grid[cssclass*="lvlProducts"] 
-tr[aria-selected="true"] > td.e-rowcell {
-  background-color: #bfdbfe !important;   /* gaišāks par header */
-  color: #0f172a !important;
-  font-weight: 600;
+tr[aria-selected="true"]:not(.archived-row) > td.e-rowcell{
+  background-color:#bfdbfe !important;
+  color:#0f172a !important;
+  font-weight:600;
+}
+
+.e-grid[cssclass*="lvlProducts"]
+tr.archived-row[aria-selected="true"] > td.e-rowcell{
+  background-color:#f3f4f6 !important;
+  color:#9ca3af !important;
+  font-weight:400 !important;
 }
 
 .e-grid[cssclass*="lvlProducts"] 
@@ -413,4 +415,116 @@ tr[aria-selected="true"] > td.e-rowcell:first-child {
 .e-dialog.topPartManageDialog{
     border-radius:10px !important;
     overflow:hidden !important;
+}
+
+.steps-dialog .steps-ddl .e-input-group{
+  border:none !important;
+  box-shadow:none !important;
+}
+
+.steps-dialog .steps-ddl.e-control-wrapper,
+.steps-dialog .steps-ddl.e-control-wrapper.e-input-focus,
+.steps-dialog .steps-ddl.e-control-wrapper:focus-within{
+  border-radius:6px !important;
+  overflow:hidden !important;
+}
+
+.steps-dialog .steps-ddl.e-control-wrapper:hover{
+  border-color:#2563eb !important;
+}
+
+/* ===== FIX dropdown double hover ===== */
+
+/* Noņem Syncfusion default hover */
+.steps-ddl-popup-small .e-list-item:hover,
+.steps-ddl-popup-small .e-list-item.e-hover{
+  background:#dbeafe !important;
+  color:#0f172a !important;
+}
+
+/* Izvēlētais */
+.steps-ddl-popup-small .e-list-item.e-active,
+.steps-ddl-popup-small .e-list-item.e-selected{
+  background:#bfdbfe !important;
+  color:#0f172a !important;
+}
+
+/* Noņem visus papildus shadow */
+.steps-ddl-popup-small .e-list-item{
+  box-shadow:none !important;
+}
+
+/* ===== StepsDialog popup styling ===== */
+
+.e-dialog.stepsDialog{
+  border-radius:12px !important;
+  overflow:hidden !important;
+}
+
+/* Header zona */
+.e-dialog.stepsDialog .e-dlg-header-content{
+  justify-content:center !important;
+  text-align:center !important;
+  background:#f8fafc;
+}
+
+/* Virsraksts */
+.e-dialog.stepsDialog .e-dlg-header{
+  width:100%;
+  font-size:18px;
+  font-weight:600;
+  color:#1e40af;
+  letter-spacing:.4px;
+
+  text-shadow:0 2px 8px rgba(37,99,235,.35);
+}
+
+/* Close poga paliek labajā pusē */
+.e-dialog.stepsDialog .e-dlg-closeicon-btn{
+  position:absolute;
+  right:16px;
+}
+
+/* ===== Archived product version rows ===== */
+
+.e-grid.lvlProducts 
+.e-gridcontent 
+.e-content 
+tr.e-row.archived-row > td {
+    background-color:#f3f4f6 !important;
+    color:#9ca3af !important;
+    font-weight:400 !important;
+}
+
+.e-grid.lvlProducts td.archived-cell{
+  background-color:#f3f4f6 !important;
+  color:#9ca3af !important;
+  font-weight:400 !important;
+}
+
+.e-grid.lvlProducts td.archived-cell.e-selectionbackground{
+  background-color:#f3f4f6 !important;
+  color:#9ca3af !important;
+  font-weight:400 !important;
+}
+
+.e-grid.lvlProducts td.archived-cell.e-active{
+    background-color:#f3f4f6 !important;
+    color:#9ca3af !important;
+    font-weight:400 !important;
+}
+
+/* PRODUCTS: archived rows must stay grey even when selected (Syncfusion fluent.css uses td.e-active) */
+.e-grid.lvlProducts tr.archived-row td.e-active,
+.e-grid.lvlProducts tr.archived-row td.e-rowcell{
+  background-color:#f3f4f6 !important;
+  color:#9ca3af !important;
+  font-weight:400 !important;
+}
+
+/* Archived rows always grey (not only when selected) */
+.e-grid[cssclass*="lvlProducts"] tr.archived-row > td.e-rowcell{
+  background-color:#f3f4f6 !important;
+  color:#9ca3af !important;
+  font-weight:400 !important;
 }

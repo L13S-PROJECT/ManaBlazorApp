@@ -71,86 +71,62 @@ public class UpdateStepRequest
         private readonly AppDbContext _db;
         public ProductsController(AppDbContext db) => _db = db;
 
-        [HttpGet("test")]
-        public string Test() => "API strādā!";
 
 [HttpGet("list")]
 [ProducesResponseType(typeof(IEnumerable<ProductListItemDto>), StatusCodes.Status200OK)]
 public async Task<ActionResult<IEnumerable<ProductListItemDto>>> GetList()
 
 {
-    var rows = await _db.Products
-        .AsNoTracking()
-        .Where(p => p.IsActive)
-        .Select(p => new
-        {
-            p.Id,
-            p.ProductCode,
-            p.ProductName,
+var rows = await (
+    from p in _db.Products.AsNoTracking()
+    join v in _db.ProductVersions on p.Id equals v.ProductId
+    join c in _db.Categories on p.CategoryId equals c.Id
+    join pc in _db.Categories on c.ParentId equals pc.Id into parentJoin
+    from pc in parentJoin.DefaultIfEmpty()
+    select new
+    {
+        p.Id,
+        p.ProductCode,
+        p.ProductName,
+        p.IsActive,
 
-            CategoryName = _db.Categories
-                .Where(c => c.Id == p.CategoryId && c.IsActive)
-                .Select(c => c.CategoryName)
-                .FirstOrDefault(),
+        CategoryName = c.IsActive ? c.CategoryName : null,
+        RootName = c.ParentId == null
+            ? c.CategoryName
+            : (pc != null && pc.IsActive ? pc.CategoryName : null),
 
-            RootName = _db.Categories
-                .Where(c => c.Id == p.CategoryId && c.IsActive)
-                .Select(c =>
-                    c.ParentId == null
-                        ? c.CategoryName
-                        : _db.Categories
-                            .Where(pc => pc.Id == c.ParentId && pc.IsActive)
-                            .Select(pc => pc.CategoryName)
-                            .FirstOrDefault()
-                )
-                .FirstOrDefault(),
+        VersionName = v.VersionName,
+        VersionDate = v.VersionDate,
+        IsPriority = v.IsPriority,
+        Version_Id = v.Id,
+        VersionIsActive = v.IsActive
+    }
+)
+.OrderBy(x => x.RootName)
+.ThenBy(x => x.CategoryName)
+.ThenBy(x => x.ProductName)
+.ThenByDescending(x => x.VersionDate)
+.ToListAsync();
 
-            Version = _db.ProductVersions
-                .Where(v =>
-                    v.ProductId == p.Id &&
-                    _db.Tasks.Any(t =>
-                        t.IsActive &&
-                       _db.TopPartSteps.Any(s =>
-                            s.Id == t.TopPartStep_ID &&   // ← OK
-                            s.IsActive &&
-                            _db.ProductTopParts.Any(pt =>
-                                pt.Id == s.ProductToPartId &&
-                                pt.VersionId == v.Id &&
-                                pt.IsActive
-                            )
-                        )
+var result = rows.Select(x => new ProductListItemDto
+{
+    Id = x.Id,
+    ProductCode = x.ProductCode,
+    ProductName = x.ProductName,
+    CategoryName = x.CategoryName,
+    RootName = x.RootName,
+    VersionId = x.Version_Id,
+    VersionName = x.VersionName,
+    VersionDate = x.VersionDate,
+    IsPriority = x.IsPriority,
 
-                    )
-                )
+    IsActive = x.IsActive,
+    VersionIsActive = x.VersionIsActive,
 
-                .OrderByDescending(v => v.VersionDate)
-                .Select(v => new
-                {
-                    v.VersionName,
-                    v.VersionDate,
-                    v.IsPriority
-                })
-                .FirstOrDefault()
-
-        })
-        .ToListAsync();
-
-        var result = rows.Select(x => new ProductListItemDto
-        {
-            Id = x.Id,
-            ProductCode = x.ProductCode,
-            ProductName = x.ProductName,
-            CategoryName = x.CategoryName,
-            RootName = x.RootName,
-
-            VersionName = x.Version?.VersionName,
-            VersionDate = x.Version?.VersionDate,
-            IsPriority = x.Version?.IsPriority ?? false,
-
-            GroupType =
-                string.Equals(x.RootName, "KAUSS", StringComparison.OrdinalIgnoreCase) ? 1 :
-                string.Equals(x.RootName, "ADAPTERIS", StringComparison.OrdinalIgnoreCase) ? 2 : 0
-        });
+    GroupType =
+        string.Equals(x.RootName, "KAUSS", StringComparison.OrdinalIgnoreCase) ? 1 :
+        string.Equals(x.RootName, "ADAPTERIS", StringComparison.OrdinalIgnoreCase) ? 2 : 0
+});
 
 
     return Ok(result);
@@ -186,57 +162,58 @@ public async Task<IActionResult> GetListSimple()
 }
 
         // JAUNĀ METODE: GET /api/products/content?id={id}
-
-        [HttpGet("content")]
-
-        public async Task<IActionResult> GetContent([FromQuery] int id)
+[HttpGet("content")]
+public async Task<IActionResult> GetContent([FromQuery] int versionId)
+{
+    var version = await _db.ProductVersions
+        .AsNoTracking()
+        .Where(v => v.Id == versionId)
+        .Select(v => new
         {
-            // produkts (aktīvs)
-            var product = await _db.Products.AsNoTracking()
-                .Where(p => p.Id == id && p.IsActive)
-                .Select(p => new { p.Id, p.ProductName, p.ProductCode, p.CategoryId })
-                .FirstOrDefaultAsync();
+            v.Id,
+            v.VersionName,
+            v.VersionRasejums,
+            v.VersionDate,
+            v.VersionComment,
+            v.ProductId
+        })
+        .FirstOrDefaultAsync();
 
-            if (product is null)
-                return NotFound();
+    if (version is null)
+        return NotFound();
 
-            // kategorijas nosaukums (child)
-            var categoryName = await _db.Categories.AsNoTracking()
-                .Where(c => c.Id == product.CategoryId && c.IsActive)
-                .Select(c => c.CategoryName)
-                .FirstOrDefaultAsync();
+    var product = await _db.Products
+        .AsNoTracking()
+        .Where(p => p.Id == version.ProductId)
+        .Select(p => new
+        {
+            p.ProductName,
+            p.ProductCode,
+            p.CategoryId
+        })
+        .FirstOrDefaultAsync();
 
-            // jaunākā aktīvā versija
-            var version = await _db.ProductVersions.AsNoTracking()
-     .Where(v => v.ProductId == product.Id && v.IsActive)
-     .OrderByDescending(v => v.VersionDate)
-     .Select(v => new
-     {
-         v.Id,
-         v.VersionName,
-         v.VersionRasejums,
-         v.VersionDate,
-         v.VersionComment
-     })
-     .FirstOrDefaultAsync();
+    if (product is null)
+        return NotFound();
 
-            if (version is null)
-                return NotFound();
+    var categoryName = await _db.Categories
+        .AsNoTracking()
+        .Where(c => c.Id == product.CategoryId && c.IsActive)
+        .Select(c => c.CategoryName)
+        .FirstOrDefaultAsync();
 
-            var response = new
-            {
-                CategoryName = categoryName,
-                ProductName = product.ProductName,
-                ProductCode = product.ProductCode,
-                VersionId = version.Id,            // ← pievienots
-                VersionName = version.VersionName,
-                VersionRasejums = version.VersionRasejums,
-                VersionDate = version.VersionDate,
-                VersionComment = version.VersionComment
-            };
-
-            return Ok(response);
-        } // ← beidzas GetContent()
+    return Ok(new
+    {
+        VersionId = version.Id,
+        CategoryName = categoryName,
+        ProductName = product.ProductName,
+        ProductCode = product.ProductCode,
+        VersionName = version.VersionName,
+        VersionRasejums = version.VersionRasejums,
+        VersionDate = version.VersionDate,
+        VersionComment = version.VersionComment
+    });
+}
 
         [HttpGet("details")]
 public async Task<IActionResult> GetDetails(
@@ -314,7 +291,7 @@ public async Task<IActionResult> GetTopPartSteps(
         {
             // 1) aktīvs produkts
             var product = await _db.Products.AsNoTracking()
-                .Where(p => p.Id == id && p.IsActive)
+                .Where(p => p.Id == id)
                 .Select(p => new { p.Id })
                 .FirstOrDefaultAsync();
 
@@ -323,7 +300,7 @@ public async Task<IActionResult> GetTopPartSteps(
 
             // 2) jaunākā aktīvā versija šim produktam
             var versionId = await _db.ProductVersions.AsNoTracking()
-                .Where(v => v.ProductId == product.Id && v.IsActive)
+                .Where(v => v.ProductId == product.Id)
                 .OrderByDescending(v => v.VersionDate)
                 .Select(v => v.Id)
                 .FirstOrDefaultAsync();
@@ -372,7 +349,7 @@ public async Task<IActionResult> GetStageStepTypeMap()
         {
             // atrodam aktīvu produktu
             var product = await _db.Products.AsNoTracking()
-                .Where(p => p.Id == id && p.IsActive)
+                .Where(p => p.Id == id)
                 .Select(p => new { p.Id })
                 .FirstOrDefaultAsync();
 
@@ -381,7 +358,7 @@ public async Task<IActionResult> GetStageStepTypeMap()
 
             // atrodam jaunāko aktīvo versiju
             var versionId = await _db.ProductVersions.AsNoTracking()
-                .Where(v => v.ProductId == product.Id && v.IsActive)
+                .Where(v => v.ProductId == product.Id)
                 .OrderByDescending(v => v.VersionDate)
                 .Select(v => v.Id)
                 .FirstOrDefaultAsync();
@@ -427,7 +404,45 @@ public async Task<IActionResult> GetStageStepTypeMap()
             return Ok(result);
         }
 
+[HttpGet("works-by-version")]
+public async Task<IActionResult> GetWorksByVersion([FromQuery] int versionId)
+{
+    var result = await _db.ProductTopParts.AsNoTracking()
+        .Where(pt => pt.VersionId == versionId && pt.IsActive)
+        .Join(_db.TopParts.Where(tp => tp.IsActive),
+              pt => pt.TopPartId,
+              tp => tp.Id,
+              (pt, tp) => new { pt, tp })
+        .Select(x => new
+        {
+            x.tp.TopPartName,
+            x.tp.TopPartCode,
+            Steps = _db.TopPartSteps
+                .Where(s => s.ProductToPartId == x.pt.Id && s.IsActive)
+                .OrderBy(s => s.StepOrder)
+                .Join(_db.StepTypes.Where(st => st.IsActive),
+                      s => s.StepType,
+                      st => st.Id,
+                      (s, st) => new { s, StepTypeName = st.StepTypeName })
+                .Join(_db.WorkCentrs.Where(wc => wc.IsActive),
+                      temp => temp.s.WorkCentrId,
+                      wc => wc.Id,
+                      (temp, wc) => new
+                      {
+                          temp.s.StepOrder,
+                          temp.s.StepName,
+                          StepType = temp.StepTypeName,
+                          WorkCenter = wc.WorkCentr_Name,
+                          temp.s.IsFinal,
+                          temp.s.IsMandatory,
+                          temp.s.Comments
+                      })
+                .ToList()
+        })
+        .ToListAsync();
 
+    return Ok(result);
+}
         // JAUNA METODE: POST /api/products/create        
 
         [HttpPost("create")]
@@ -1059,14 +1074,6 @@ if (string.IsNullOrWhiteSpace(dto.WorkCentr_Code))
         .Replace(" ", "_");
 }
 
-if (string.IsNullOrWhiteSpace(dto.WorkCentr_Code))
-{
-    dto.WorkCentr_Code = (dto.WorkCentr_Name ?? "")
-        .Trim()
-        .ToUpper()
-        .Replace(" ", "_");
-}
-
 dto.IsActive = true;
 db.WorkCentrs.Add(dto);
 await db.SaveChangesAsync();
@@ -1244,13 +1251,14 @@ public class ProductListItemDto
     public string ProductName { get; set; } = "";
     public string? CategoryName { get; set; }
     public string? RootName { get; set; }
-
+    public int VersionId { get; set; }
     public string? VersionName { get; set; }
     public DateOnly? VersionDate { get; set; }
-
+    public bool VersionIsActive { get; set; }
     public bool IsPriority { get; set; }
 
-    public int GroupType { get; set; }   
+    public int GroupType { get; set; }  
+    public bool IsActive { get; set; } 
 }
 
 [HttpGet("/api/stage-step-map")]

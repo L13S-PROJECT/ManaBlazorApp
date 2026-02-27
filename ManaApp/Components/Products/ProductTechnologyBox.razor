@@ -46,11 +46,10 @@
         {
             <div style="opacity:.7">Ielādēju…</div>
         }
-        else if ((WorksByParts is null || WorksByParts.Count == 0)
-              && (SelectedPartDetails is null || SelectedPartDetails.Count == 0))
-        {
-            <div style="opacity:.7">Nav detaļu.</div>
-        }
+else if (AllTopParts is null || AllTopParts.Count == 0)
+{
+    <div style="opacity:.7">Nav detaļu.</div>
+}
 else
 {
     <table class="tech-table">

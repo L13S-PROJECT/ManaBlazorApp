@@ -24,7 +24,16 @@
         <div class="products-main-block">
 
                 <div class="products-section-header">
-                    Preču saraksts
+                    
+                    <div class="products-header-title">
+                        Preču saraksts
+                    </div>
+
+                    <label class="archived-switch">
+                        <input type="checkbox" @bind="ShowArchived" />
+                        <span class="slider"></span>
+                    </label>
+
                 </div>
 
                 <ProductsFilters
@@ -472,6 +481,11 @@ private bool createNewVersion
     {
         IEnumerable<ProductRow> q = allRows;
 
+        if (!ShowArchived)
+        {
+            q = q.Where(r => r.IsActive && r.VersionIsActive);
+        }
+
         if (!string.IsNullOrWhiteSpace(selectedRoot))
         {
             var stem = selectedRoot.Length > 1 ? selectedRoot[..^1] : selectedRoot;
@@ -629,8 +643,8 @@ private void CloseDialog()
                 resp.EnsureSuccessStatusCode();
             }
 
-            rows = await Http.GetFromJsonAsync<List<ProductRow>>("http://localhost:5270/api/products/list") ?? new();
-            allRows = new List<ProductRow>(rows);
+            allRows = await Http.GetFromJsonAsync<List<ProductRow>>("http://localhost:5270/api/products/list") ?? new();
+            ApplyFilters();
 
             if (selected is not null)
             {
@@ -681,38 +695,46 @@ private async Task LoadActiveWorkCentersAsync()
 }
 
     private async Task OnRowClicked(ProductRow row)
+{
+if (row.VersionId == null || row.VersionId == 0)
+{
+    Console.WriteLine("VersionId is NULL!");
+    return;
+}
+
+    selected = row;
+
+    Console.WriteLine($"Clicked VersionId = {row.VersionId}");
+
+    openParts.Clear();
+
+    selectedDetails = null;
+    selectedPartDetails = null;
+    worksByParts = null;
+
+    loadingDetails = true;
+    loadingPartDetails = true;
+    loadingWorks = true;
+
+    try
     {
-        selected = row;
+        selectedDetails = await Http.GetFromJsonAsync<ProductContentDto>(
+            $"http://localhost:5270/api/products/content?versionId={row.VersionId}");
 
-        openParts.Clear();
+        selectedPartDetails = await Http.GetFromJsonAsync<List<ProductDetailDto>>(
+    $"http://localhost:5270/api/products/details?versionId={row.VersionId}&stepType=1");
 
-        selectedDetails = null;
-        selectedPartDetails = null;
-        worksByParts = null;
-
-        loadingDetails = true;
-        loadingPartDetails = true;
-        loadingWorks = true;
-
-        try
-        {
-            selectedDetails = await Http.GetFromJsonAsync<ProductContentDto>(
-                $"http://localhost:5270/api/products/content?id={row.id}");
-
-            selectedPartDetails = await Http.GetFromJsonAsync<List<ProductDetailDto>>(
-                $"http://localhost:5270/api/products/details-by-product?id={row.id}");
-
-            worksByParts = await Http.GetFromJsonAsync<List<WorksByPartDto>>(
-                $"http://localhost:5270/api/products/works-by-product?id={row.id}");
-        }
-        finally
-        {
-            loadingDetails = false;
-            loadingPartDetails = false;
-            loadingWorks = false;
-            StateHasChanged();
-        }
+worksByParts = await Http.GetFromJsonAsync<List<WorksByPartDto>>(
+    $"http://localhost:5270/api/products/works-by-version?versionId={row.VersionId}");
     }
+    finally
+    {
+        loadingDetails = false;
+        loadingPartDetails = false;
+        loadingWorks = false;
+        StateHasChanged();
+    }
+}
 
     private async Task SoftDeleteSelected()
     {
@@ -822,7 +844,7 @@ private async Task CloseStepsDialog()
     var defaultStepTypeId = stageStepTypeMap
         .FirstOrDefault(x => x.Stage == stage && x.IsActive)?
         .Step_Type_ID ?? 0;
-
+    
     var defaultWcId = workCenters?.FirstOrDefault()?.Id ?? 0;
 
     editingSteps.Add(new PartStepDto
@@ -838,6 +860,8 @@ private async Task CloseStepsDialog()
         IsFinal = false,
         Comments = ""
     });
+
+    StateHasChanged();
 }
 
     private void MoveUp(PartStepDto s)
@@ -1439,6 +1463,25 @@ private async Task ToggleTopPartAsync(TopPartDto part)
     }
 
     StateHasChanged();
+}
+
+private bool _showArchived;
+
+private bool ShowArchived
+{
+    get => _showArchived;
+    set
+    {
+        if (_showArchived == value) return;
+
+        _showArchived = value;
+        ApplyFilters();
+    }
+}
+
+private void OnArchivedChanged(ChangeEventArgs e)
+{
+    ApplyFilters();
 }
 
 }

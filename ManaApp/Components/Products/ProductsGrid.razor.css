@@ -10,3 +10,11 @@
     color:#0f172a !important;
     font-weight:600 !important;
 }
+
+body {
+    background:red !important;
+}
+
+:global(.productsGrid) td.archived-cell{
+    background-color:#f3f4f6 !important;
+}

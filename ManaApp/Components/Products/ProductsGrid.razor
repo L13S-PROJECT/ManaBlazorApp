@@ -2,7 +2,7 @@
 @namespace ManaApp.Components.Products
 @using ManaApp.Pages
 
-<SfGrid CssClass="productsGrid lvlProducts"
+<SfGrid CssClass="lvlProducts productsGrid"
         TValue="ProductRow"
         DataSource="@Rows"
         Width="100%"
@@ -11,8 +11,11 @@
         GridLines="GridLine.Both">
 
     <GridSelectionSettings Type="SelectionType.Single"></GridSelectionSettings>
-    <GridEvents TValue="ProductRow"
-                RowSelected="OnRowSelected"></GridEvents>
+        <GridEvents TValue="ProductRow"
+                    RowSelected="OnRowSelected"
+                    QueryCellInfo="OnQueryCellInfo"
+                    RowDataBound="OnRowDataBound">
+        </GridEvents>
 
     <GridColumns>
         <GridColumn Field=@nameof(ProductRow.categoryName) HeaderText="Kategorija" Width="150"></GridColumn>
@@ -32,5 +35,20 @@
     [Parameter] public List<ProductRow> Rows { get; set; } = new();
     [Parameter] public EventCallback<RowSelectEventArgs<ProductRow>> OnRowSelected { get; set; }
 
-    
+private void OnRowDataBound(RowDataBoundEventArgs<ProductRow> args)
+    {
+        if (!args.Data.VersionIsActive)
+        {
+            args.Row.AddClass(new[] { "archived-row" });
+        }
+    }
+
+private void OnQueryCellInfo(QueryCellInfoEventArgs<ProductRow> args)
+{
+    if (!args.Data.IsActive || !args.Data.VersionIsActive)
+    {
+        args.Cell.AddClass(new[] { "archived-cell" });
+    }
+}
+
 }

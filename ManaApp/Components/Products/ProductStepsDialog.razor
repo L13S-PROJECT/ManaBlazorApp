@@ -6,7 +6,8 @@
 @inject IJSRuntime JS
 
 
-<SfDialog Width="720px"
+<SfDialog Width="900px"
+            CssClass="stepsDialog"
           ShowCloseIcon="true"
           IsModal="true"
           ZIndex="10050"
@@ -111,21 +112,21 @@
     <div class="steps-footer">
 
         <button type="button"
-                class="action-btn action-btn-sm"
+                class="steps-btn-add"
                 title="Pievieno jaunu tehnoloģijas soli šai detaļai"
                 @onclick="OnAddStep">
             + Pievienot soli
         </button>
 
         <button type="button"
-                class="action-btn action-btn-sm action-btn-primary"
+                class="steps-btn-save"
                 title="Saglabāt"
-                @onclick="OnSave">
+                @onclick="async () => await OnSave.InvokeAsync()">
             Saglabāt
         </button>
 
         <button type="button"
-                class="action-btn action-btn-sm"
+                class="steps-btn-close"
                 title="Aizvērt logu"
                 @onclick="OnClose">
             Aizvērt

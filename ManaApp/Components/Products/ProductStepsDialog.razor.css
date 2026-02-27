@@ -39,9 +39,9 @@
 /* GRID layout soļu rindām */
 .steps-dialog .steps-grid{
   display:grid;
-  grid-template-columns: 44px 1.5fr 1fr 110px 1.5fr 50px;
+  grid-template-columns: 44px 1.9fr 1.1fr 100px 2.3fr 50px;
   align-items:center;
-  gap:8px;
+  gap:10px;
 }
 
 .steps-dialog .steps-table-head{
@@ -121,4 +121,103 @@
 .steps-dialog .steps-input::placeholder{
   color:#9ca3af;
   font-style:italic;
+}
+
+/* WorkCenter dropdown kompaktāks */
+.steps-dialog .steps-ddl .e-control{
+  border-radius:6px !important;
+  height:30px !important;
+  font-size:13px;
+}
+
+.steps-dialog .steps-ddl .e-input-group{
+  border-radius:6px !important;
+}
+
+.steps-dialog .steps-ddl .e-input{
+  padding:4px 8px !important;
+}
+
+.steps-dialog .steps-flags-cell{
+  display:flex;
+  align-items:center;     /* vertikāli pa vidu */
+  justify-content:center; /* horizontāli pa vidu */
+  gap:10px;
+}
+
+/* Dzēšanas poga – elegants icon only */
+.steps-dialog .steps-btn{
+  background:transparent;
+  border:none;
+  box-shadow:none;
+  padding:4px;
+  font-size:16px;
+  color:#6b7280;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.steps-dialog .steps-btn:hover{
+  color:#dc2626;           /* sarkans hover */
+  background:transparent;
+}
+
+.steps-dialog .steps-btn:focus{
+  outline:none;
+  box-shadow:none;
+}
+
+/* ===== Steps footer layout ===== */
+
+.steps-footer{
+  display:flex;
+  gap:12px;
+  justify-content:flex-end;
+}
+
+/* Kopīgais pogu stils */
+.steps-footer button{
+  height:32px;
+  padding:0 16px;
+  border-radius:8px;
+  font-size:13px;
+  font-weight:600;
+  cursor:pointer;
+  transition:all .15s ease;
+}
+
+/* 1️⃣ + Pievienot – tumši zils */
+.steps-btn-add{
+  background:#2563eb;
+  border:1px solid #2563eb;
+  color:#ffffff;
+}
+
+.steps-btn-add:hover{
+  background:#1e40af;
+  border-color:#1e40af;
+}
+
+/* 2️⃣ Saglabāt – gaiši zils */
+.steps-btn-save{
+  background:#dbeafe;
+  border:1px solid #2563eb;
+  color:#1e40af;
+}
+
+.steps-btn-save:hover{
+  background:#bfdbfe;
+}
+
+/* 3️⃣ Aizvērt – balts ar zilu rāmi */
+.steps-btn-close{
+  background:#ffffff;
+  border:1px solid #2563eb;
+  color:#1e40af;
+}
+
+.steps-btn-close:hover{
+  background:#eff6ff;
 }

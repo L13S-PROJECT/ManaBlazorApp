@@ -12,10 +12,11 @@ public sealed class ProductRow
     public string rootName { get; set; } = "";
     public string versionName { get; set; } = "";
     public string versionDate { get; set; } = "";
-
-    [JsonPropertyName("Version_Id")]
     public int? VersionId { get; set; }
+    public bool IsActive { get; set; }
 
+    [JsonPropertyName("versionIsActive")]
+    public bool VersionIsActive { get; set; }
     public int InStock { get; set; }
     public int Planned { get; set; }
     public int DetailedInProgress { get; set; }
