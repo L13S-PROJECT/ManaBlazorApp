@@ -63,15 +63,17 @@
             <!-- LABĀ PUSE: Preces saturs + Tehnoloģija -->
     <div class="products-right">
 
-                <ProductContentBox
-                    Selected="selected"
-                    Details="selectedDetails"
-                    Loading="loadingDetails" />
+<ProductContentBox
+    Selected="selected"
+    Details="selectedDetails"
+    Loading="loadingDetails"
+    IsReadOnly="@(selected is not null && (!selected.IsActive || !selected.VersionIsActive))" />
 
             <!-- Tehnoloģija -->
 
 <ProductTechnologyBox
     Selected="selected"
+    IsReadOnly="@(selected is not null && (!selected.IsActive || !selected.VersionIsActive))"
     LoadingPartDetails="loadingPartDetails"
     LoadingWorks="loadingWorks"
     SelectedPartDetails="selectedPartDetails"

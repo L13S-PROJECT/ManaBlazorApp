@@ -1,7 +1,7 @@
 @namespace ManaApp.Components.Products
 @using ManaApp.Models
 
-<div class="product-content-panel">
+<div class="product-content-panel @(IsReadOnly ? "readonly-panel" : "")">
 
     <div class="product-panel-header">
     Preces apraksts
@@ -74,4 +74,5 @@
     [Parameter] public ProductRow? Selected { get; set; }
     [Parameter] public ProductContentDto? Details { get; set; }
     [Parameter] public bool Loading { get; set; }
+    [Parameter] public bool IsReadOnly { get; set; }
 }

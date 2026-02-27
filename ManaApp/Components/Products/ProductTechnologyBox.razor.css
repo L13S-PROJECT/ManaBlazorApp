@@ -280,3 +280,28 @@
     background:#e5e7eb;   /* viegli tumšāks pelēks */
     color:#4b5563;        /* tumši pelēks teksts */
 }
+
+/* ===== ReadOnly režīms (arhivēta rinda) ===== */
+
+/* header NEIETEKMĒJAM */
+.readonly-panel .technology-panel-header{
+  color:#ffffff;
+}
+
+.readonly-panel .technology-header-actions button,
+.readonly-panel input,
+.readonly-panel .tech-step-btn{
+  pointer-events:none;
+  opacity:.6;
+}
+
+.readonly-panel .tech-table,
+.readonly-panel .tech-table td,
+.readonly-panel .tech-table th{
+  color:#9ca3af;
+}
+
+.readonly-panel .tech-stage-row td{
+  background:#e5e7eb;
+  color:#6b7280;
+}

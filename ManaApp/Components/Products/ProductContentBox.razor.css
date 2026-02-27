@@ -197,3 +197,26 @@
 .pc-row-date-notes{
   margin-bottom:4px;
 }
+
+/* ===== ReadOnly režīms ===== */
+
+
+
+.readonly-panel .pc-label-fixed,
+.readonly-panel .pc-label-code,
+.readonly-panel .pc-label-ras,
+.readonly-panel .pc-label-date{
+  color:#9ca3af;
+}
+
+.readonly-panel .pc-input-flex,
+.readonly-panel .pc-input-name,
+.readonly-panel .pc-input-code,
+.readonly-panel .pc-input-version,
+.readonly-panel .pc-input-ras,
+.readonly-panel .pc-input-date,
+.readonly-panel .pc-notes-box{
+  background:#f1f5f9;
+  border-color:#cbd5e1;
+  color:#9ca3af;
+}

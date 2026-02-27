@@ -1,7 +1,7 @@
 @namespace ManaApp.Components.Products
 @using ManaApp.Models
 
-<div class="technology-panel">
+<div class="technology-panel @(IsReadOnly ? "readonly-panel" : "")">
 
     <div class="technology-panel-header">
         Tehnoloģija
@@ -169,6 +169,7 @@ else
     [Parameter] public EventCallback OnOpenStepTypes { get; set; }
     [Parameter] public EventCallback OnOpenWorkCenters { get; set; }
     [Parameter] public EventCallback<TopPartDto> OnToggleTopPart { get; set; }
+    [Parameter] public bool IsReadOnly { get; set; }
     private HashSet<string> openParts = new();
 
 private void TogglePart(string? code)
