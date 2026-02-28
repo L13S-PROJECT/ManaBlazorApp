@@ -1,0 +1,72 @@
+/* ===== Priority grid layout ===== */
+
+.priority-grid{
+    display:grid;
+    grid-template-columns: 
+        40px      /* drag */
+        90px      /* batch */
+        90px      /* kods */
+        1.4fr     /* nosaukums */
+        1fr       /* kategorija */
+        100px     /* versija */
+        110px     /* apjoms */
+        1.6fr     /* detailed */
+        120px     /* assembly */
+        160px     /* finishing */
+        70px      /* detalizācija */
+        90px;     /* prioritāte */
+    align-items:center;
+    gap:10px;
+}
+
+.priority-head{
+    font-weight:600;
+    padding-bottom:6px;
+    border-bottom:1px solid #e5e7eb;
+}
+
+.priority-row{
+    padding:6px 0;
+    border-bottom:1px solid #f1f5f9;
+    transition:
+    background .18s ease,
+    box-shadow .18s ease,
+    transform .12s ease;
+}
+
+.priority-row.dragging{
+    background:#eef2ff;
+    border-left:4px solid #2563eb;
+
+    position:relative;
+    z-index:5;
+
+box-shadow:
+    0 12px 28px rgba(37,99,235,0.25),
+    0 4px 10px rgba(0,0,0,0.08);
+
+    transform: scale(1.01);
+}
+
+.priority-drag-cell{
+    cursor:grab;
+    user-select:none;
+}
+
+.priority-row.drop-target{
+    position:relative;
+}
+
+.priority-row.drop-target::before{
+    content:"";
+    position:absolute;
+    top:-2px;
+    left:0;
+    right:0;
+    height:2px;
+    background:#2563eb;
+}
+
+.priority-row.dragging .priority-drag-cell {
+    cursor: grabbing;
+}

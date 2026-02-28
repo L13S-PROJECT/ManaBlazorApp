@@ -18,4 +18,6 @@ public class BatchProduct
     public bool IsActive { get; set; }
 
     public bool is_priority { get; set; }
+
+    public byte Priority { get; set; }
 }

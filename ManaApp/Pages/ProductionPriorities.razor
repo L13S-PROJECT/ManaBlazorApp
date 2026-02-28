@@ -19,38 +19,47 @@ else
 </button>
     
 <h5>Prioritārie produkti</h5>
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Batch</th>
-                <th>Kods</th>
-                <th>Nosaukums</th>
-                <th>Kategorija</th>
-                <th>Versija</th>
-                <th>Apjoms</th>
-                <th>Detailed</th>
-                <th>Assembly</th>
-                <th>Finishing</th>
-                <th>Detalizācija</th>
-                <th>Prioritāte</th>
-            </tr>
-        </thead>
-        <tbody>
 
-            
+<div class="priority-table">
+        <div class="priority-head priority-grid">
+            <div style="width:40px;"></div>
+            <div>Batch</div>
+            <div>Kods</div>
+            <div>Nosaukums</div>
+            <div>Kategorija</div>
+            <div>Versija</div>
+            <div>Apjoms</div>
+            <div>Detailed</div>
+            <div>Assembly</div>
+            <div>Finishing</div>
+            <div>Detalizācija</div>
+            <div>Prioritāte</div>
+        </div>
 
-            @foreach (var p in PriorityProducts)
+<div class="priority-body"
+     @onmouseup="EndDrag">
 
-                {
+@for (int i = 0; i < _priorityList.Count; i++)
+{
+    var p = _priorityList[i];
+        {
                    
-                    <tr>
-                        <td>@p.BatchCode</td>
-                        <td>@p.ProductCode</td>
-                        <td>@p.ProductName</td>
-                        <td>@p.CategoryName</td>
-                        <td>@p.VersionName</td>
-                        <td>@p.Done / @p.Planned</td>
-                        <td>
+                    <div @key="p.BatchProductId"
+                        class="priority-row priority-grid
+                            @( _selectedId == p.BatchProductId ? "dragging" : "" )"
+                       @onmousemove="() => OnDragEnter(p)">
+                        <div class="priority-drag-cell"
+                            @onmousedown="() => StartDrag(p)"
+                            @onmousedown:preventDefault="true">
+                            ⋮⋮
+                        </div>
+                        <div>@p.BatchCode</div>
+                        <div>@p.ProductCode</div>
+                        <div>@p.ProductName</div>
+                        <div>@p.CategoryName</div>
+                        <div>@p.VersionName</div>
+                        <div>@p.Done / @p.Planned</div>
+                        <div>
                             <div>@p.DetailedX / @p.DetailedY</div>
 
                             <div class="d-flex align-items-center gap-2 mt-1">
@@ -64,9 +73,9 @@ else
                                     </div>
                                 </div>
                             </div>
-                        </td>
+                        </div>
 
-                        <td>
+                        <div>
                             <div>@GetAssemblyStatus(p)</div>
 
                             <div class="progress mt-1" style="height:6px;">
@@ -74,9 +83,9 @@ else
                                     style="width:100%">
                                 </div>
                             </div>
-                        </td>
+                        </div>
 
-                        <td>
+                        <div>
                             <div class="d-flex justify-content-center gap-3">
 
                                 <!-- ASSEMBLY (zilais) -->
@@ -110,22 +119,23 @@ else
                                 </div>
 
                             </div>
-                        </td>
+                        </div>
 
-                        <td>
+                        <div>
     <span style="cursor:pointer;"
           @onclick="() => GoToBatch(p.BatchProductId)">
         🔎
     </span>
-</td>
-                        <td>
+</div>
+                        <div>
                             <input type="checkbox"
                              @bind="p.IsPriority" />
-                        </td>
-                    </tr>
+                        </div>
+                    </div>
                 }
-        </tbody>
-    </table>
+}
+        </div>
+        </div>
 
     <h5 class="mt-4">Parastie produkti</h5>
 
@@ -228,13 +238,15 @@ else
 @code {
     private List<ProductRow>? products;
     
-    private IEnumerable<ProductRow> PriorityProducts =>
-    products?.Where(p => p.IsPriority) ?? Enumerable.Empty<ProductRow>();
+private List<ProductRow> PriorityProducts =>
+    products?.Where(p => p.IsPriority).ToList()
+    ?? new List<ProductRow>();
 
     private IEnumerable<ProductRow> NormalProducts =>
     products?.Where(p => !p.IsPriority) ?? Enumerable.Empty<ProductRow>();
 
-    
+ private List<ProductRow> _priorityList = new();
+
 protected override async Task OnInitializedAsync()
 {
     await LoadProducts();
@@ -244,6 +256,11 @@ private async Task LoadProducts()
 {
     products = await Http.GetFromJsonAsync<List<ProductRow>>(
     "http://localhost:5270/api/production-priorities");
+
+    _priorityList = products?
+    .Where(p => p.IsPriority)
+    .ToList()
+    ?? new List<ProductRow>();
 
 }
 
@@ -313,7 +330,7 @@ private class ProductRow
     public string VersionName { get; set; } = "";   // ← TE
 
     public bool IsPriority { get; set; }
-
+    public int Priority { get; set; }
     public int Planned { get; set; }
     public int DetailedInProgress { get; set; }
     public int DetailedFinish { get; set; }
@@ -338,13 +355,25 @@ private async Task SavePriorities()
 {
     if (products == null)
         return;
+    var priorityList = products
+    .Where(p => p.IsPriority)
+    .ToList();
+
+for (int i = 0; i < priorityList.Count; i++)
+{
+    priorityList[i].Priority = i + 1;
+}
 
     foreach (var p in products)
     {
         await Http.PutAsJsonAsync(
-            $"http://localhost:5270/api/production-priorities/{p.BatchProductId}",
-            p.IsPriority
-        );
+    $"http://localhost:5270/api/production-priorities/{p.BatchProductId}",
+    new
+    {
+        IsPriority = p.IsPriority,
+        Priority = p.Priority
+    }
+);
     }
 
     await LoadProducts();
@@ -356,9 +385,45 @@ StateHasChanged();
 }
 private PriorityImpactSummary? impactSummary;
 
+private bool _isDragging = false;
+
+private int? _selectedId = null;
+
 private void GoToBatch(int batchProductId)
 {
     Nav.NavigateTo($"/productiontasks-v2?batchProductId={batchProductId}");
+}
+
+private void StartDrag(ProductRow item)
+{
+    _selectedId = item.BatchProductId;
+    _isDragging = true;
+    StateHasChanged();
+}
+
+private void OnDragEnter(ProductRow target)
+{
+    if (!_isDragging || _selectedId == null)
+        return;
+
+    var currentIndex = _priorityList.FindIndex(x => x.BatchProductId == _selectedId);
+    var newIndex = _priorityList.FindIndex(x => x.BatchProductId == target.BatchProductId);
+
+    if (currentIndex == -1 || newIndex == -1 || currentIndex == newIndex)
+        return;
+
+    var item = _priorityList[currentIndex];
+
+    _priorityList.RemoveAt(currentIndex);
+    _priorityList.Insert(newIndex, item);
+
+    StateHasChanged();
+}
+
+private void EndDrag()
+{
+    _isDragging = false;
+    _selectedId = null;
 }
 
 }

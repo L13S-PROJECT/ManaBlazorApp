@@ -16,6 +16,12 @@ public class ProductionPrioritiesController : ControllerBase
                 _db = db;
             }
 
+public class UpdatePriorityRequest
+{
+    public bool IsPriority { get; set; }
+    public int Priority { get; set; }
+}
+
 [HttpGet]
 public async Task<IActionResult> Get()
     {
@@ -37,6 +43,7 @@ public async Task<IActionResult> Get()
                 v.Version_Name   AS VersionName,
                 bp.Planned_Qty   AS Planned,
                 bp.is_priority   AS IsPriority,
+                bp.Priority      AS Priority,
 
                 -- Detailed Y = cik detaļu šim BatchProduct (no taskiem)
                 (
@@ -286,22 +293,22 @@ public async Task<IActionResult> Get()
                     VersionName         = reader.GetString(6),
                     Planned             = reader.GetInt32(7),
                     IsPriority          = reader.GetBoolean(8),
+                    Priority = Convert.ToInt32(reader.GetValue(9)),
+                    DetailedY = reader.GetInt32(10),
+                    DetailedX = reader.GetInt32(11),
+                    DetailedStartedX    = reader.GetInt32(12),
+                    DetailedDoneX       = reader.GetInt32(13),
+                    DetailedHasStarted  = reader.GetBoolean(14),
+                    DetailedIsDone      = reader.GetBoolean(15),
 
-                    DetailedY = reader.GetInt32(9),
-                    DetailedX = reader.GetInt32(10),
-                    DetailedStartedX    = reader.GetInt32(11),
-                    DetailedDoneX       = reader.GetInt32(12),
-                    DetailedHasStarted  = reader.GetBoolean(13),
-                    DetailedIsDone      = reader.GetBoolean(14),
-
-                    DetailedInProgress  = reader.GetInt32(15),
-                    DetailedFinish      = reader.GetInt32(16),
-                    Assembly            = reader.GetInt32(17),
-                    Done                = reader.GetInt32(18),
-                    FinishingX          = reader.GetInt32(19),
-                    FinishingY          = reader.GetInt32(20),
-                    FinishingDone       = reader.GetInt32(21),
-                    FinishingInProgress = reader.GetInt32(22),
+                    DetailedInProgress  = reader.GetInt32(16),
+                    DetailedFinish      = reader.GetInt32(17),
+                    Assembly            = reader.GetInt32(18),
+                    Done                = reader.GetInt32(19),
+                    FinishingX          = reader.GetInt32(20),
+                    FinishingY          = reader.GetInt32(21),
+                    FinishingDone       = reader.GetInt32(22),
+                    FinishingInProgress = reader.GetInt32(23),
 
                 });
 
@@ -312,7 +319,7 @@ public async Task<IActionResult> Get()
     }
 
             [HttpPut("{batchProductId}")]
-        public async Task<IActionResult> Put(int batchProductId, [FromBody] bool isPriority)
+        public async Task<IActionResult> Put(int batchProductId, [FromBody] UpdatePriorityRequest request)
         {
             var bp = await _db.BatchProducts
                 .FirstOrDefaultAsync(x => x.ID == batchProductId);
@@ -320,7 +327,8 @@ public async Task<IActionResult> Get()
             if (bp == null)
                 return NotFound();
 
-            bp.is_priority = isPriority;
+            bp.is_priority = request.IsPriority;
+            bp.Priority = (byte)request.Priority;
 
             await _db.SaveChangesAsync();
 
