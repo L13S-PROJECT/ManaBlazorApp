@@ -19,5 +19,5 @@ public class BatchProduct
 
     public bool is_priority { get; set; }
 
-    public byte Priority { get; set; }
+    public int Priority { get; set; }
 }

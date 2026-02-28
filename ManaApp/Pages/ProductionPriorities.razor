@@ -128,8 +128,9 @@ else
     </span>
 </div>
                         <div>
-                            <input type="checkbox"
-                             @bind="p.IsPriority" />
+                        <input type="checkbox"
+                            checked="@p.IsPriority"
+                            @onchange="(e) => OnPriorityToggled(p, e)" />
                         </div>
                     </div>
                 }
@@ -223,7 +224,8 @@ else
 </td>
                         <td>
                             <input type="checkbox"
-                             @bind="p.IsPriority" />
+                                checked="@p.IsPriority"
+                                @onchange="(e) => OnPriorityToggled(p, e)" />
                         </td>
                     </tr>
         }
@@ -353,35 +355,47 @@ private class ProductRow
 
 private async Task SavePriorities()
 {
+    Console.WriteLine("SAVE CLICKED");
+
     if (products == null)
         return;
-    var priorityList = products
-    .Where(p => p.IsPriority)
-    .ToList();
 
-for (int i = 0; i < priorityList.Count; i++)
-{
-    priorityList[i].Priority = i + 1;
-}
+
+    // 1️⃣ Piešķiram secību pēc UI kārtības
+    for (int i = 0; i < _priorityList.Count; i++)
+    {
+        _priorityList[i].Priority = i + 1;
+    }
 
     foreach (var p in products)
+{
+    int newPriority = 0;
+
+    if (p.IsPriority)
     {
-        await Http.PutAsJsonAsync(
-    $"http://localhost:5270/api/production-priorities/{p.BatchProductId}",
-    new
-    {
-        IsPriority = p.IsPriority,
-        Priority = p.Priority
+        var index = _priorityList
+            .FindIndex(x => x.BatchProductId == p.BatchProductId);
+
+        if (index >= 0)
+            newPriority = index + 1;
     }
-);
-    }
+
+    await Http.PutAsJsonAsync(
+        $"http://localhost:5270/api/production-priorities/{p.BatchProductId}",
+        new
+        {
+            IsPriority = p.IsPriority,
+            Priority = newPriority
+        }
+    );
+}
 
     await LoadProducts();
 
-if (impactSummary != null)
-    await impactSummary.Reload();
+    if (impactSummary != null)
+        await impactSummary.Reload();
 
-StateHasChanged();
+    StateHasChanged();
 }
 private PriorityImpactSummary? impactSummary;
 
@@ -424,6 +438,25 @@ private void EndDrag()
 {
     _isDragging = false;
     _selectedId = null;
+}
+
+private void OnPriorityToggled(ProductRow p, ChangeEventArgs e)
+{
+    var isChecked = e?.Value is bool b && b;
+    p.IsPriority = isChecked;
+
+    if (isChecked)
+    {
+        // ja atzīmē par prioritāru -> pievieno saraksta beigās
+        if (!_priorityList.Any(x => x.BatchProductId == p.BatchProductId))
+            _priorityList.Add(p);
+    }
+    else
+    {
+        // ja noņem ķeksi -> izņem no prioritārajiem
+        _priorityList.RemoveAll(x => x.BatchProductId == p.BatchProductId);
+        p.Priority = 0;
+    }
 }
 
 }

@@ -277,7 +277,8 @@ public async Task<IActionResult> Get()
                     WHERE t.BatchProduct_ID = bp.ID
                     AND t.IsActive = 1
                     AND t.Tasks_Status <> 3
-                );";
+                )
+                ORDER BY bp.is_priority DESC, bp.Priority ASC;";
 
                 await using var reader = await cmd.ExecuteReaderAsync();
                 while (await reader.ReadAsync())
@@ -328,7 +329,9 @@ public async Task<IActionResult> Get()
                 return NotFound();
 
             bp.is_priority = request.IsPriority;
-            bp.Priority = (byte)request.Priority;
+            bp.Priority = request.Priority;
+
+Console.WriteLine($"UPDATE: {batchProductId} -> {request.Priority}");
 
             await _db.SaveChangesAsync();
 
