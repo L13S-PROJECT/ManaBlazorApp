@@ -215,16 +215,8 @@ private async Task LoadSummariesForRows(IEnumerable<ProductRow> targetRows)
         {
             var eligible = targetRows.Count(r => r.VersionId.HasValue && r.VersionId > 0);
 
-            if (r.VersionId is null || r.VersionId <= 0)
-{
-    var c = await Http.GetFromJsonAsync<ProductContentDto>(
-        $"http://localhost:5270/api/products/content?id={r.id}");
-    r.VersionId = c?.VersionId;
-    if (!string.IsNullOrWhiteSpace(c?.VersionName))
-    r.versionName = c!.VersionName!;
-
-    if (r.VersionId is null || r.VersionId <= 0) continue;
-}
+        if (r.VersionId is null || r.VersionId <= 0)
+            continue;
 
         var sum = await Http.GetFromJsonAsync<StockSummary>(
             $"http://localhost:5270/api/stockmovements/summary?versionId={r.VersionId}");
@@ -582,7 +574,7 @@ private async Task OnAddSaved(ProductionTasks.BatchLine line)
 if (addProductId.HasValue)
 {
     product = await Http.GetFromJsonAsync<ProductContentDto>(
-        $"http://localhost:5270/api/products/content?id={addProductId.Value}");
+    $"http://localhost:5270/api/products/content?versionId={addProductId.Value}");
 };
     
     if (line.Planned <= 0)

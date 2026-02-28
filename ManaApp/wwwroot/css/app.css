@@ -528,3 +528,16 @@ tr.e-row.archived-row > td {
   color:#9ca3af !important;
   font-weight:400 !important;
 }
+
+
+/* ===== All Syncfusion dialogs rounded ===== */
+
+.e-dialog{
+    border-radius:12px !important;
+}
+
+.e-dialog .e-dlg-header,
+.e-dialog .e-dlg-content,
+.e-dialog .e-footer-content{
+    border-radius:12px !important;
+}

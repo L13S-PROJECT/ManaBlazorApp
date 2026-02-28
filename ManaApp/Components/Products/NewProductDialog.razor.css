@@ -1,0 +1,209 @@
+/* ===== VEIDS select ===== */
+
+.np-select{
+    width:100%;
+    height:34px;
+
+    padding:0 10px;
+
+    border:2px solid #2563eb;
+    border-radius:6px;
+
+    background:#ffffff;
+    color:#0f172a;
+
+    font-size:13px;
+    font-weight:600;
+
+    outline:none;
+    box-sizing:border-box;
+
+    appearance:none;
+    -webkit-appearance:none;
+    -moz-appearance:none;
+
+    cursor:pointer;
+}
+
+/* hover */
+.np-select:hover{
+    border-color:#1d4ed8;
+}
+
+/* focus */
+.np-select:focus{
+    box-shadow:0 0 0 3px rgba(37,99,235,.20);
+}
+
+/* disabled (LABOT režīms) */
+.np-select:disabled{
+    background:#f3f4f6;
+    border-color:#cbd5e1;
+    color:#6b7280;
+    cursor:not-allowed;
+}
+
+.np-input input::placeholder{
+    color:#9ca3af;
+    font-style:italic;
+}
+
+/* ===== Nosaukums input – vienots pill stils ===== */
+
+.np-input{
+    width:100%;
+    height:34px;
+
+    padding:0 12px;
+
+    border:2px solid #2563eb;
+    border-radius:6px;
+
+    background:#ffffff;
+    color:#0f172a;
+
+    font-size:13px;
+    font-weight:600;
+
+    outline:none;
+    box-sizing:border-box;
+}
+
+.np-input:focus{
+    box-shadow:0 0 0 3px rgba(37,99,235,.20);
+}
+
+.np-input::placeholder{
+    color:#9ca3af;
+    font-style:italic;
+}
+
+/* ===== Date input fix ===== */
+
+.np-input[type="date"]{
+    appearance:none;
+    -webkit-appearance:none;
+
+    padding-right:10px;
+}
+
+/* kalendāra ikonas neliels vizuāls sakārtojums */
+.np-input[type="date"]::-webkit-calendar-picker-indicator{
+    cursor:pointer;
+    opacity:0.7;
+}
+
+/* ===== Force date input same style ===== */
+
+.np-input[type="date"]{
+    border:2px solid #2563eb;
+    border-radius:6px;
+    background:#ffffff;
+    color:#0f172a;
+
+    height:38px;
+    padding:0 12px;
+
+    box-sizing:border-box;
+}
+
+.np-input[type="date"]:focus{
+    box-shadow:0 0 0 3px rgba(37,99,235,.20);
+}
+
+/* ===== Textarea bigger height ===== */
+
+.np-textarea{
+    min-height:110px;
+    padding:10px 12px;
+    resize:vertical;
+}
+
+/* ===== Footer layout ===== */
+
+.np-footer{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    padding:.5rem .75rem .75rem;
+}
+
+/* ===== Base button ===== */
+
+.np-btn{
+    min-width:90px;
+    height:34px;
+    padding:0 16px;
+
+    border-radius:6px;
+    font-size:13px;
+    font-weight:600;
+
+    cursor:pointer;
+    transition:all .15s ease;
+}
+
+/* ===== Primary (Saglabāt) ===== */
+
+.np-btn-primary{
+    background:#2563eb;
+    color:#ffffff;
+    border:2px solid #2563eb;
+}
+
+.np-btn-primary:hover{
+    background:#1d4ed8;
+    border-color:#1d4ed8;
+}
+
+/* ===== Outline (Atcelt) ===== */
+
+.np-btn-outline{
+    background:#ffffff;
+    color:#2563eb;
+    border:2px solid #2563eb;
+}
+
+.np-btn-outline:hover{
+    background:#eff6ff;
+}
+
+/* ===== Form compact layout ===== */
+
+.np-form{
+    display:grid;
+    gap:.5rem;          /* mazāk vertikālā gaisa */
+    padding:.4rem;      /* mazāk iekšējās malas */
+}
+
+/* mazāk vietas zem label */
+.np-form label{
+    margin-bottom:.2rem !important;
+}
+
+/* nedaudz kompaktāki inputi */
+.np-input{
+    height:34px;
+}
+
+/* ===== Custom dialog header ===== */
+
+.e-dialog .np-dialog-header{
+    font-size:18px;
+    font-weight:700;
+
+    text-align:center;
+
+    padding:16px 18px;
+
+    border-top-left-radius:12px;
+    border-top-right-radius:12px;
+
+    background:#ffffff;
+}
+
+/* noņem Syncfusion default header līniju */
+.e-dialog .e-dlg-header-content{
+    padding:0 !important;
+    border-bottom:none !important;
+}

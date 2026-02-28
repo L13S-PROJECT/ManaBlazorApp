@@ -697,7 +697,7 @@ private readonly Dictionary<int, int> _versionByBatchId = new();
             try
             {
                 var c = await Http.GetFromJsonAsync<ProductContentDto>(
-    $"http://localhost:5270/api/products/content?id={r.Id}");
+    $"http://localhost:5270/api/products/content?versionid={r.Id}");
 
 if (c is not null)
 {

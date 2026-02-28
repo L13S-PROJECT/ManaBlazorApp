@@ -573,9 +573,10 @@ public async Task<IActionResult> GetWorksByVersion([FromQuery] int versionId)
 if (dto.CopyTechnologySteps && prev is not null)
 {
     // 1) paņem visas aktīvās detaļas no iepriekšējās versijas
-    var oldParts = await _db.ProductTopParts
-        .Where(x => x.VersionId == prev.Id && x.IsActive)
-        .ToListAsync();
+var oldParts = await _db.ProductTopParts
+    .Where(x => x.VersionId == prev.Id && x.IsActive)
+    .OrderBy(x => x.Id)
+    .ToListAsync();
 
 // 2) izveido detaļas jaunajai versijai (vienā reizē) + uztaisa map: oldPartId -> newPartId
 var newParts = oldParts.Select(op => new ProductTopPart
@@ -1173,7 +1174,7 @@ var list = new List<object>();
             ProductName = r.GetString(2),
             CategoryName = r.IsDBNull(3) ? "" : r.GetString(3),
             RootName = r.IsDBNull(4) ? "" : r.GetString(4),
-            Version_Id = r.GetInt32(5),
+            VersionId = r.GetInt32(5),
             VersionName = r.IsDBNull(6) ? null : r.GetString(6),
             VersionDate = r.IsDBNull(7) ? null : r.GetValue(7)?.ToString()
         });

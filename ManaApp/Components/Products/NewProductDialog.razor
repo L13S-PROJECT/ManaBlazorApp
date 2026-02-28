@@ -1,0 +1,291 @@
+@using Syncfusion.Blazor.Popups
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Inputs
+@using static ManaApp.Pages.Products
+
+<SfDialog
+    Width="620px"
+    ShowCloseIcon="true"
+    IsModal="true"
+    ZIndex="10000"
+    CssClass="np-dialog"
+    Visible="Visible"
+    VisibleChanged="VisibleChanged">
+
+    
+<DialogTemplates>
+    
+        <Header>
+            <div class="np-dialog-header">
+                @Header
+            </div>
+        </Header>
+
+        <Content>
+
+            <div class="np-form">
+                <!-- Vecākkategorija -->
+                <div>
+                    <label style="font-weight:600; display:block; margin-bottom:.25rem;">Veids</label>
+                        <select class="np-select"
+                                value="@(SelectedParentId?.ToString() ?? "")"
+                                @onchange="OnParentChanged"
+                                disabled="@IsEdit">
+
+                            <option value="" disabled>-- izvēlies ... --</option>
+
+                            @foreach (var item in ParentOptions)
+                            {
+                                <option value="@item.Id">@item.CategoryName</option>
+                            }
+                        </select>
+
+                    @if (ShowValidation && !IsEdit && (!SelectedParentId.HasValue || SelectedParentId <= 0))
+                    {
+                        <div style="color:#b91c1c; font-size:.9em;">Obligāti jāizvēlas.</div>
+                    }
+                </div>
+
+                <!-- Bērnkategorija -->
+                <div>
+                    <label style="font-weight:600; display:block; margin-bottom:.25rem;">Kategorija</label>
+
+                    @if (IsEdit)
+                    {
+                        <input class="np-select"
+                            value="@ChildOptions.FirstOrDefault(x => x.Id == SelectedChildId)?.CategoryName"
+                            disabled />
+                    }
+                    else
+                    {
+                        <select class="np-select"
+                                value="@(SelectedChildId?.ToString() ?? "")"
+                                @onchange="OnChildChanged"
+                                disabled="@(SelectedParentId is null)">
+
+                            <option value="">-- izvēlies kategoriju --</option>
+
+                            @foreach (var item in ChildOptions)
+                            {
+                                <option value="@item.Id">@item.CategoryName</option>
+                            }
+                        </select>
+                    }
+
+                    @if (ShowValidation && (SelectedChildId is null || SelectedChildId <= 0))
+                    {
+                        <div style="color:#b91c1c; font-size:.9em;">Obligāti jāizvēlas.</div>
+                    }
+                </div>
+
+                <!-- Nosaukums -->
+                <div>
+                    <label style="font-weight:600; display:block; margin-bottom:.25rem;">Nosaukums</label>
+                        <input class="np-input"
+                            value="@NewName"
+                            @oninput="e => NewNameChanged.InvokeAsync(e.Value?.ToString())"
+                            placeholder="@(IsEdit ? "" : "Ievadi nosaukumu")" />
+                    @if (ShowValidation && string.IsNullOrWhiteSpace(NewName))
+                    {
+                        <div style="color:#b91c1c; font-size:.9em;">Obligāts lauks.</div>
+                    }
+                </div>
+
+                <!-- Kods -->
+                <div>
+                    <label style="font-weight:600; display:block; margin-bottom:.25rem;">Kods</label>
+                    <input class="np-input"
+                        value="@NewCode"
+                        @oninput="e => NewCodeChanged.InvokeAsync(e.Value?.ToString())"
+                        placeholder="@(IsEdit ? "" : "Pievienot kodu")" />
+                    @if (ShowValidation && string.IsNullOrWhiteSpace(NewCode))
+                    {
+                        <div style="color:#b91c1c; font-size:.9em;">Obligāts lauks.</div>
+                    }
+                </div>
+
+                    @if (IsEdit)
+                    {
+                        <div style="display:flex; align-items:center; gap:18px; margin-top:.25rem;">
+                            <div class="form-check my-2" style="margin:0;">
+                                <input class="form-check-input" type="checkbox" id="chkNewVersion"
+                                    checked="@CreateNewVersion"
+                                    @onchange="OnCreateNewVersionChanged" />
+                                <label class="form-check-label" for="chkNewVersion">
+                                    Izveidot jaunu versiju
+                                </label>
+                            </div>
+
+                            <div class="form-check my-2" style="margin:0;">
+                                <input class="form-check-input" type="checkbox" id="chkCopyTech"
+                                    checked="@CopyTechnologySteps"
+                                    disabled="@(!CreateNewVersion)"
+                                    @onchange="OnCopyTechnologyStepsChanged" />
+                                <label class="form-check-label" for="chkCopyTech">
+                                    Kopēt tehnoloģiju
+                                </label>
+                            </div>
+                        </div>
+                    }
+
+                <!-- Versija (obligāts) -->
+                <div>
+                    <label style="font-weight:600; display:block; margin-bottom:.25rem;">Versija</label>
+                        <input class="np-input"
+                            value="@NewVersionName"
+                            @oninput="e => NewVersionNameChanged.InvokeAsync(e.Value?.ToString())"
+                            placeholder="@(IsEdit ? "" : "Pievienot versiju")"
+                            disabled="@(IsEdit && !CreateNewVersion)" />
+
+                    @if (IsEdit && !CreateNewVersion)
+                    {
+                        <div style="font-size:.85em; opacity:.75;">Aktīvās versijas nosaukumu nevar mainīt. Atzīmē “Izveidot jaunu versiju”, lai ievadītu jaunu.</div>
+                    }
+                    @if (ShowValidation && (!IsEdit || CreateNewVersion) && string.IsNullOrWhiteSpace(NewVersionName))
+                    {
+                        <div style="color:#b91c1c; font-size:.9em;">Obligāts lauks.</div>
+                    }
+                </div>
+
+                <!-- Rasējums (neobligāts) -->
+                <div>
+                    <label style="font-weight:600; display:block; margin-bottom:.25rem;">Rasējums</label>
+                    <input class="np-input"
+                        value="@NewVersionRasejums"
+                        @oninput="e => NewVersionRasejumsChanged.InvokeAsync(e.Value?.ToString())"
+                        placeholder="@(IsEdit ? "" : "Pievienot rasējuma numuru")" />
+                </div>
+
+                <!-- Datums (obligāts "Jauns" vai "Jauna versija") -->
+                <div>
+                    <label style="font-weight:600; display:block; margin-bottom:.25rem;">Datums</label>
+                <input type="date"
+                    class="np-input"
+                    value="@(NewVersionDate?.ToString("yyyy-MM-dd"))"
+                    @oninput="e => NewVersionDate = 
+                        DateOnly.TryParse(e.Value?.ToString(), out var d) ? d : null"
+                    disabled="@(IsEdit && !CreateNewVersion)" />
+
+                    @if (IsEdit && !CreateNewVersion)
+                    {
+                        <div style="font-size:.85em; opacity:.75;">Aktīvās versijas datumu nevar mainīt. Ja vajag jaunu datumu — izveido jaunu versiju.</div>
+                    }
+                    @if (ShowValidation && (!IsEdit || CreateNewVersion) && NewVersionDate is null)
+                    {
+                        <div style="color:#b91c1c; font-size:.9em;">Obligāts lauks.</div>
+                    }
+                </div>
+
+                <!-- Komentārs (neobligāts) -->
+                <div>
+                    <label style="font-weight:600; display:block; margin-bottom:.25rem;">Komentārs</label>
+                    <textarea class="np-input np-textarea"
+                        rows="3"
+                        @oninput="e => NewVersionCommentChanged.InvokeAsync(e.Value?.ToString())"
+                        placeholder="@(IsEdit ? "" : "Pievienot komentāru")"
+                        disabled="@(IsEdit && !CreateNewVersion)">@NewVersionComment</textarea>
+                </div>
+            </div>
+
+        </Content>
+
+        <FooterTemplate>
+            <div class="np-footer">
+                <button type="button" class="np-btn np-btn-primary" @onclick="OnSave">
+                    Saglabāt
+                </button>
+
+                <button type="button" class="np-btn np-btn-outline" @onclick="OnCancel">
+                    Atcelt
+                </button>
+            </div>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    // ---- DTO (tāds pats kā Products.razor) ----
+
+    // ---- Dialog state ----
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+
+    [Parameter] public string Header { get; set; } = "Jauna prece";
+    [Parameter] public bool IsEdit { get; set; }
+    [Parameter] public bool ShowValidation { get; set; }
+
+    // ---- Dropdown sources ----
+    [Parameter] public List<CategoryDto> ParentOptions { get; set; } = new();
+    [Parameter] public List<CategoryDto> ChildOptions { get; set; } = new();
+    // ---- Fields (2-way caur ValueChanged) ----
+    [Parameter] public int? SelectedParentId { get; set; }
+    [Parameter] public EventCallback<int?> SelectedParentIdChanged { get; set; }
+
+    [Parameter] public int? SelectedChildId { get; set; }
+    [Parameter] public EventCallback<int?> SelectedChildIdChanged { get; set; }
+
+    [Parameter] public string NewName { get; set; } = "";
+    [Parameter] public EventCallback<string> NewNameChanged { get; set; }
+    
+    [Parameter] public string NewCode { get; set; } = "";
+    [Parameter] public EventCallback<string> NewCodeChanged { get; set; }
+
+    [Parameter] public string? NewVersionName { get; set; }
+    [Parameter] public EventCallback<string?> NewVersionNameChanged { get; set; }
+
+    [Parameter] public string? NewVersionRasejums { get; set; }
+    [Parameter] public EventCallback<string?> NewVersionRasejumsChanged { get; set; }
+
+    [Parameter] public DateOnly? NewVersionDate { get; set; }
+    
+    [Parameter] public string? NewVersionComment { get; set; }
+    [Parameter] public EventCallback<string?> NewVersionCommentChanged { get; set; }
+
+    // ---- Edit-only flags ----
+    [Parameter] public bool CreateNewVersion { get; set; }
+    [Parameter] public EventCallback<bool> CreateNewVersionChanged { get; set; }
+
+    [Parameter] public bool CopyTechnologySteps { get; set; }
+    [Parameter] public EventCallback<bool> CopyTechnologyStepsChanged { get; set; }
+
+    // ---- Actions ----
+    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private async Task OnCreateNewVersionChanged(ChangeEventArgs e)
+    {
+        var v = e?.Value is bool b && b;
+        await CreateNewVersionChanged.InvokeAsync(v);
+    }
+
+    private async Task OnCopyTechnologyStepsChanged(ChangeEventArgs e)
+    {
+        var v = e?.Value is bool b && b;
+        await CopyTechnologyStepsChanged.InvokeAsync(v);
+    }
+
+private async Task OnParentChanged(ChangeEventArgs e)
+{
+    int? id = null;
+
+    if (e?.Value is string s && int.TryParse(s, out var v))
+        id = v;
+
+    // 1️⃣ Paziņojam vecākam par jauno VEIDS
+    await SelectedParentIdChanged.InvokeAsync(id);
+
+    // 2️⃣ Resetojam bērna kategoriju
+    await SelectedChildIdChanged.InvokeAsync(null);
+}
+
+private async Task OnChildChanged(ChangeEventArgs e)
+{
+    int? id = null;
+
+    if (e?.Value is string s && int.TryParse(s, out var v))
+        id = v;
+
+    await SelectedChildIdChanged.InvokeAsync(id);
+}
+
+}
