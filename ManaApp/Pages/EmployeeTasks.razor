@@ -29,7 +29,8 @@
                             StatusText="StatusText"
                             CanStart="CanStart"
                             OnSelect="SelectTask"
-                            OnOpen="OpenTaskDialog" />
+                            OnOpen="OpenTaskDialog"
+                            AvailableTask="FirstAvailableTask" />
             }
 
             @if (normalTasks.Any())
@@ -39,7 +40,8 @@
                             StatusText="StatusText"
                             CanStart="CanStart"
                             OnSelect="SelectTask"
-                            OnOpen="OpenTaskDialog" />
+                            OnOpen="OpenTaskDialog" 
+                            AvailableTask="FirstAvailableTask"/>
 }
 
         }
@@ -49,11 +51,12 @@
 
     <div class="right-panel">
         <ActiveTaskPanel ActiveTask="_activeTask"
-                    OnFinish="FinishTask"
-                    StatusText="StatusText"
-                    OnStart="OpenTaskDialog"
-                    OnFinishConfirm="OpenFinishDialog" />
-
+                OnFinish="FinishTask"
+                StatusText="StatusText"
+                OnStart="OpenTaskDialog"
+                OnFinishConfirm="OpenFinishDialog"
+                AvailableTask="FirstAvailableTask"
+                HasActiveTask="tasks.Any(t => t.Status == 2)" />
     </div>
 
     </div>
@@ -81,11 +84,15 @@
     private List<TaskRow> tasks = new();
     
 private List<TaskRow> priorityTasks =>
-    tasks?.Where(t => t.PriorityLevel > 0).ToList() ?? new();
+    tasks?
+        .Where(t => t.BatchPriority)   // tikai BatchProduct priority
+        .ToList() ?? new();
 
 
 private List<TaskRow> normalTasks =>
-    tasks?.Where(t => t.Priority == 0).ToList() ?? new();
+    tasks?
+        .Where(t => !t.BatchPriority)
+        .ToList() ?? new();
 
 
 protected override async Task OnInitializedAsync()
@@ -130,17 +137,14 @@ tasks = await Http.GetFromJsonAsync<List<TaskRow>>(
 ) ?? new();
 
 
-Console.WriteLine($"TASKS COUNT = {tasks.Count}");
-
 _activeTask = tasks.FirstOrDefault(t => t.Status == 2);
 
-Console.WriteLine($"ACTIVE = {_activeTask?.TaskId}, STATUS = {_activeTask?.Status}");
 
 StateHasChanged(); // 
 
 }
-
-
+private TaskRow? FirstAvailableTask =>
+    tasks.FirstOrDefault(t => t.Status == 1);
 
 private async Task FinishTask(TaskRow task)
 {

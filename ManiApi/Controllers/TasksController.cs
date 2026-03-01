@@ -34,6 +34,7 @@ SELECT
   t.ID,                      -- 0 TaskId
   t.Tasks_Priority,          -- 1 Priority
   bp.is_priority AS BatchPriority,
+  bp.Priority AS BatchOrder,
   t.Tasks_Status,            -- 2 Status
   CASE
     WHEN bp.is_priority = 1 AND t.Tasks_Priority = 1 THEN 3
@@ -58,13 +59,6 @@ END AS PriorityLevel,
   ts.Step_Name,              -- 9 StepName
   b.Batches_Code,            -- 10 BatchCode
 
-
- CASE 
-    WHEN ts.Step_Type IN (1,2) THEN bp.Planned_Qty * ptp.Qty_Per_product
-    WHEN ts.Step_Type = 3      THEN t.Qty_Done
-    ELSE bp.Planned_Qty
-END AS PlannedForTask,        -- 9 Planned
-
   COALESCE(t.Qty_Done, 0) AS DoneForTask, -- 10 Done
 
   COALESCE(ts.Step_Order, 0) AS StepOrder, -- 11 soļa secība    
@@ -85,12 +79,18 @@ WHERE t.IsActive = 1
   AND (
     (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To = 0))
  OR (@empId = 0 AND (t.Assigned_To IS NULL OR t.Assigned_To = 0))
-);
+)
+
 ORDER BY
-  PriorityLevel DESC,
-  t.Tasks_Status,
-  ts.Step_Order,
-  t.ID DESC;
+  CASE 
+      WHEN bp.is_priority = 1 AND t.Tasks_Priority = 1 THEN 4
+      WHEN bp.is_priority = 1 THEN 3
+      WHEN t.Tasks_Priority = 1 THEN 2
+      ELSE 1
+  END DESC,
+  bp.Priority ASC,
+  b.Batches_Code ASC,
+  ts.Step_Order ASC;
 ";
 
 
@@ -110,32 +110,34 @@ ORDER BY
     while (await r.ReadAsync())
     {
             list.Add(new
-                {
-                    TaskId      = r.GetInt32(0),
-                    Priority    = r.IsDBNull(1) ? (byte)0 : r.GetByte(1),
-                    BatchPriority = r.GetBoolean(2),
-                    Status        = r.GetInt32(3),
-                    PriorityLevel = r.IsDBNull(4) ? 0 : r.GetInt32(4),
-                    StartedAt   = r.IsDBNull(5) ? (DateTime?)null : r.GetDateTime(5 ),
-                    FinishedAt  = r.IsDBNull(6) ? (DateTime?)null : r.GetDateTime(6),
+{
+    TaskId      = r.GetInt32(0),
+    Priority    = r.IsDBNull(1) ? (byte)0 : r.GetByte(1),
+    BatchPriority = r.GetBoolean(2),
 
-                    IsCommentForEmployee = !r.IsDBNull(7) && r.GetBoolean(7),
-                    Comment     = r.IsDBNull(8) ? null : r.GetString(8),
+    Status        = r.GetInt32(4),                 // bija 3
+    PriorityLevel = r.IsDBNull(5) ? 0 : r.GetInt32(5), // bija 4
 
-                    ProductName = r.IsDBNull(9) ? null : r.GetString(9),
-                    PartName    = r.IsDBNull(10) ? null : r.GetString(10),
-                    StepName    = r.IsDBNull(11) ? null : r.GetString(11),
-                    BatchCode   = r.IsDBNull(12) ? null : r.GetString(12),
+    StartedAt   = r.IsDBNull(6) ? (DateTime?)null : r.GetDateTime(6),
+    FinishedAt  = r.IsDBNull(7) ? (DateTime?)null : r.GetDateTime(7),
 
-                    Planned     = r.IsDBNull(13) ? 0 : r.GetInt32(13),
-                    Done        = r.IsDBNull(14) ? 0 : r.GetInt32(14),
-                    StepOrder   = r.IsDBNull(15) ? 0 : r.GetInt32(15),
+    IsCommentForEmployee = !r.IsDBNull(8) && r.GetBoolean(8),
+    Comment     = r.IsDBNull(9) ? null : r.GetString(9),
 
-                    StepType       = r.IsDBNull(16) ? 0 : r.GetInt32(16),
-                    BatchId        = r.IsDBNull(17) ? 0 : r.GetInt32(17),
-                    VersionId      = r.IsDBNull(18) ? 0 : r.GetInt32(18),
-                    BatchProductId = r.IsDBNull(19) ? 0 : r.GetInt32(19)
-                });
+    ProductName = r.IsDBNull(10) ? null : r.GetString(10),
+    PartName    = r.IsDBNull(11) ? null : r.GetString(11),
+    StepName    = r.IsDBNull(12) ? null : r.GetString(12),
+    BatchCode   = r.IsDBNull(13) ? null : r.GetString(13),
+
+    Planned = 0,
+    Done        = r.IsDBNull(14) ? 0 : r.GetInt32(14),
+    StepOrder   = r.IsDBNull(15) ? 0 : r.GetInt32(15),
+
+    StepType       = r.IsDBNull(16) ? 0 : r.GetInt32(16),
+    BatchId        = r.IsDBNull(17) ? 0 : r.GetInt32(17),
+    VersionId      = r.IsDBNull(18) ? 0 : r.GetInt32(18),
+    BatchProductId = r.IsDBNull(19) ? 0 : r.GetInt32(19)
+    });
     }
    }
    
@@ -177,6 +179,95 @@ WHERE Claimed_By = @emp
             return Conflict("Jau ir iesākts cits darbs.");
         }
     }
+
+    int currentIsPriority = 0;
+int currentBatchOrder = 0;
+int currentStepOrder = 0;
+
+await using (var cur = conn.CreateCommand())
+{
+    cur.Transaction = tx;
+    cur.CommandText = @"
+SELECT 
+    bp.is_priority,
+    bp.Priority,
+    ts.Step_Order
+FROM tasks t
+JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+WHERE t.ID = @id;";
+
+    var p = cur.CreateParameter();
+    p.ParameterName = "@id";
+    p.Value = dto.TaskId;
+    cur.Parameters.Add(p);
+
+    await using var r = await cur.ExecuteReaderAsync();
+    if (await r.ReadAsync())
+    {
+        currentIsPriority = r.GetBoolean(0) ? 1 : 0;
+        currentBatchOrder = r.GetInt32(1);
+        currentStepOrder = r.GetInt32(2);
+    }
+}
+
+await using (var checkOrder = conn.CreateCommand())
+{
+    checkOrder.Transaction = tx;
+
+    checkOrder.CommandText = @"
+SELECT 1
+FROM tasks t
+JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+WHERE t.IsActive = 1
+  AND bp.IsActive = 1
+  AND t.Tasks_Status = 1
+  AND t.ID <> @taskId
+  AND t.Assigned_To = @emp
+  AND (
+        (bp.is_priority = 1 AND @curIsPriority = 0)
+
+     OR (bp.is_priority = @curIsPriority 
+         AND bp.Priority = @curBatchOrder 
+         AND ts.Step_Order < @curStepOrder)
+  )
+LIMIT 1;";
+
+    var pTask = checkOrder.CreateParameter();
+    pTask.ParameterName = "@taskId";
+    pTask.Value = dto.TaskId;
+    checkOrder.Parameters.Add(pTask);
+
+    var pEmp = checkOrder.CreateParameter();
+    pEmp.ParameterName = "@emp";
+    pEmp.Value = dto.EmpId;
+    checkOrder.Parameters.Add(pEmp);
+
+    var p1 = checkOrder.CreateParameter();
+    p1.ParameterName = "@curIsPriority";
+    p1.Value = currentIsPriority;
+    checkOrder.Parameters.Add(p1);
+
+    var p2 = checkOrder.CreateParameter();
+    p2.ParameterName = "@curBatchOrder";
+    p2.Value = currentBatchOrder;
+    checkOrder.Parameters.Add(p2);
+
+    var p3 = checkOrder.CreateParameter();
+    p3.ParameterName = "@curStepOrder";
+    p3.Value = currentStepOrder;
+    checkOrder.Parameters.Add(p3);
+
+    var higherExists = await checkOrder.ExecuteScalarAsync() != null;
+
+if (higherExists)
+{
+    Console.WriteLine("BLOCKED BY PRIORITY RULE");
+    await tx.RollbackAsync();
+    return Conflict("Ir augstākas prioritātes darbs.");
+}
+}
 
     // 2) Pārejam uz statusu 2 šim taskam
     await using (var upd = conn.CreateCommand())
@@ -1811,7 +1902,12 @@ JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
 JOIN toppart tp ON tp.ID = ptp.TopPart_ID
 WHERE t.IsActive = 1
   AND t.Tasks_Status = 2
-  AND t.Claimed_By = @empId;
+  AND t.Claimed_By = @empId
+ORDER BY
+  bp.is_priority DESC,
+  bp.Priority ASC,
+  t.Tasks_Priority DESC,
+  ts.Step_Order ASC;
 ";
 
     cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@empId", empId));
@@ -1876,10 +1972,14 @@ JOIN toppart tp ON tp.ID = ptp.TopPart_ID
 WHERE t.IsActive = 1
   AND t.Tasks_Status = 1
   AND bp.is_priority = 1
-  AND (
-    (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To = 0))
+AND (
+    (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To = 0 OR t.Assigned_To IS NULL))
  OR (@empId = 0 AND (t.Assigned_To IS NULL OR t.Assigned_To = 0))
-);
+)
+ORDER BY
+  t.Tasks_Priority DESC,
+  bp.Priority ASC,
+  ts.Step_Order ASC;
 ";
 
 cmd2.Parameters.Add(new MySqlConnector.MySqlParameter("@empId", empId));
@@ -1946,7 +2046,11 @@ WHERE t.IsActive = 1
   AND (
     (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To = 0))
  OR (@empId = 0 AND (t.Assigned_To IS NULL OR t.Assigned_To = 0))
-);
+)
+ORDER BY
+  t.Tasks_Priority DESC,
+  bp.Priority ASC,
+  ts.Step_Order ASC;
 ";
 
 cmd3.Parameters.Add(new MySqlConnector.MySqlParameter("@empId", empId));

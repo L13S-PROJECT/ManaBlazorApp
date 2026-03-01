@@ -23,4 +23,6 @@ public sealed class TaskRow
 
     public string? Comment { get; set; }
     public bool IsCommentForEmployee { get; set; }
+
+    public bool BatchPriority { get; set; }
 }

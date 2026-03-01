@@ -32,3 +32,15 @@
     background: #f1e6c8;   /* silts, bet ne “banāns” */
     border-left: 6px solid #b08a00;
 }
+
+/* Nav atļauts sākt */
+.table tbody tr.task-disabled {
+    background: #eeeeee;
+    color: #777;
+}
+
+/* Vienīgais atļautais starts */
+.table tbody tr.task-available {
+    background: #dbeafe;              /* gaiši zils */
+    border-left: 6px solid #1e40af;   /* tumši zila mala */
+}

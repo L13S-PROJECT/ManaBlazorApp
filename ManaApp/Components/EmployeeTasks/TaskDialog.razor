@@ -1,6 +1,8 @@
 @using ManaApp.Models
 
-@if (IsOpen && SelectedTask is not null)
+@if (IsOpen 
+      && SelectedTask is not null 
+      && (IsFinish || CanStart(SelectedTask)))
 {
     <div class="dialog-backdrop">
         <div class="dialog">

@@ -6,11 +6,6 @@
 }
 else
 {
-    var orderedTasks = Tasks
-    .OrderByDescending(t => t.PriorityLevel)
-    .ThenBy(t => t.Status)
-    .ThenBy(t => t.StepOrder);
-
 
     <table class="table">
         <thead>
@@ -27,10 +22,10 @@ else
         </thead>
 
         <tbody>
-            @foreach (var t in orderedTasks)
+            @foreach (var t in Tasks)
             {
-    <tr class="@(t.Status == 2 ? "table-warning" : (t.Status == 3 ? "table-success" : ""))"
-    style="cursor: @(CanStart(t) ? "pointer" : "not-allowed")"
+<tr class="@GetRowClass(t)"
+    style="cursor: @(CanStart(t) ? "pointer" : "default")"
     @onclick="() => { if (CanStart(t)) OnSelect.InvokeAsync(t); }">
                     <td>@t.BatchCode</td>
                     <td>@t.ProductName</td>
@@ -68,6 +63,23 @@ else
     [Parameter] public Func<TaskRow, bool> CanStart { get; set; } = default!;
     [Parameter] public EventCallback<TaskRow> OnOpen { get; set; }
     [Parameter] public EventCallback<TaskRow> OnSelect { get; set; }
+    [Parameter] public TaskRow? AvailableTask { get; set; }
+    private string GetRowClass(TaskRow t)
+        {
+            if (t.Status == 2)
+                return "table-warning";
+
+            if (t.Status == 3)
+                return "table-success";
+
+            if (AvailableTask != null && t.TaskId == AvailableTask.TaskId)
+                return "task-available";
+
+            return "task-disabled";
+        }
+
+private TaskRow? FirstStartable =>
+    Tasks.FirstOrDefault(t => t.Status == 1);
 
 }
 
