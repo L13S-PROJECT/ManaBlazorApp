@@ -14,7 +14,7 @@ namespace ManiApi.Controllers
         public TasksController(AppDbContext db) => _db = db;
 
         // GET: /api/tasks/for-employee?empId=101
-        // Rāda: Prioritārie (Tasks_Priority=1) ar statusu 1 (nav iesākts) + paša iesāktie (statuss=2)
+// Rāda: Prioritārie (Tasks_Priority=1) ar statusu 1 (nav iesākts) + paša iesāktie (statuss=2)
 // GET: /api/tasks/for-employee?empId=101
 
 
@@ -76,20 +76,30 @@ JOIN producttopparts  ptp  ON ptp.ID = ts.ProductToPart_ID
 JOIN toppart          tp   ON tp.ID  = ptp.TopPart_ID
 WHERE t.IsActive = 1
   AND t.Tasks_Status IN (1,2)
+AND NOT EXISTS (
+    SELECT 1
+    FROM tasks t2
+    JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+    WHERE t2.BatchProduct_ID = t.BatchProduct_ID
+      AND ts2.ProductToPart_ID = ts.ProductToPart_ID
+      AND ts2.Step_Order < ts.Step_Order
+      AND t2.Tasks_Status <> 3
+      AND t2.IsActive = 1
+)
   AND (
     (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To = 0))
  OR (@empId = 0 AND (t.Assigned_To IS NULL OR t.Assigned_To = 0))
 )
 
 ORDER BY
-  CASE 
-      WHEN bp.is_priority = 1 AND t.Tasks_Priority = 1 THEN 4
-      WHEN bp.is_priority = 1 THEN 3
-      WHEN t.Tasks_Priority = 1 THEN 2
-      ELSE 1
-  END DESC,
+  CASE
+      WHEN bp.is_priority = 1 AND t.Tasks_Priority = 1 THEN 1
+      WHEN bp.is_priority = 1 THEN 2
+      WHEN bp.is_priority = 0 AND t.Tasks_Priority = 1 THEN 3
+      ELSE 4
+  END ASC,
   bp.Priority ASC,
-  b.Batches_Code ASC,
+  bp.ID ASC,
   ts.Step_Order ASC;
 ";
 

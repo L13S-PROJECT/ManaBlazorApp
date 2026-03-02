@@ -3,20 +3,22 @@
 .priority-grid{
     display:grid;
     grid-template-columns: 
-        40px      /* drag */
-        90px      /* batch */
-        90px      /* kods */
-        1.4fr     /* nosaukums */
-        1fr       /* kategorija */
-        100px     /* versija */
-        110px     /* apjoms */
-        1.6fr     /* detailed */
-        120px     /* assembly */
-        160px     /* finishing */
-        70px      /* detalizācija */
-        90px;     /* prioritāte */
+    24px
+    50px
+    50px
+    1.2fr
+    1fr
+    50px
+    60px
+    70px
+    1.1fr
+    75px
+    1.1fr
+    32px
+    40px;
     align-items:center;
     gap:10px;
+    white-space: nowrap;
 }
 
 .priority-head{
@@ -26,7 +28,7 @@
 }
 
 .priority-row{
-    padding:6px 0;
+    padding:3px 0;
     border-bottom:1px solid #f1f5f9;
     transition:
     background .18s ease,
@@ -69,4 +71,119 @@ box-shadow:
 
 .priority-row.dragging .priority-drag-cell {
     cursor: grabbing;
+}
+
+/* ===== OUTER BOX ===== */
+
+.pp-box {
+    height: 60vh;
+    max-height: 60vh;
+
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #f8fafc;
+
+    display: flex;
+    flex-direction: column;
+
+    overflow: hidden;
+}
+
+.pp-box-header {
+    background: #2563EB;
+    color: #ffffff;
+
+    font-weight: 600;
+    font-size: 12px;
+
+    padding: 4px 10px;
+}
+
+.pp-box-body {
+    padding: 8px;        /* mazāks padding */
+    overflow-y: auto;    /* scroll iekšpusē */
+}
+
+/* ===== INNER SECTIONS ===== */
+
+.pp-section {
+    border: 1px solid #e5e7eb;      /* pelēks border */
+    border-radius: 8px;
+    background: #ffffff;           /* balts fons */
+    overflow: hidden;
+}
+
+.pp-section-header {
+    background: #EFF6FF;           /* gaiši zils */
+    color: #1E3A8A;
+
+    font-weight: 600;
+    font-size: 13px;
+
+    padding: 6px 10px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.pp-section-body {
+    padding: 4px 6px;
+}
+
+/* UPDATE button zona */
+
+.pp-box-body > .btn {
+    padding: 3px 8px;
+    font-size: 12px;
+}
+
+.pp-box-body {
+    padding: 3px 8px;   /* vēl mazāks */
+}
+
+/* UPDATE button – kompaktāks un tumšāks */
+
+.pp-box-body .btn-primary {
+    background-color: #1E40AF;   /* tumšāks zils */
+    border-color: #1E40AF;
+
+    padding: 3px 8px;            /* mazāks */
+    font-size: 11.5px;
+    font-weight: 600;
+}
+
+.pp-box-body .btn-primary:hover {
+    background-color: #1D4ED8;
+    border-color: #1D4ED8;
+}
+
+/* ===== GLOBAL COLUMN HEADER ===== */
+
+.pp-columns-header {
+    font-weight: 700;
+    font-size: 13px;
+
+    padding: 2px 6px 1px 6px;
+
+    border-bottom: 1px solid #d1d5db;
+
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: #f8fafc;
+}
+
+.pp-columns-header > div {
+    padding: 0 4px;          /* mazāk iekšējais */
+}
+
+/* ===== STICKY HEADER (button + columns) ===== */
+
+.pp-sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+
+    background: #f8fafc;
+
+    display: flex;
+    flex-direction: column;   /* svarīgais */
 }

@@ -12,29 +12,46 @@
 }
 else
 {
-    <h3>Ražošanas prioritātes</h3>
-    <button class="btn btn-primary mb-3"
-        @onclick="SavePriorities">
-    ATJAUNOT
-</button>
-    
-<h5>Prioritārie produkti</h5>
+<div class="pp-box">
+            <div class="pp-box-header">
+                Ražošanas prioritātes
+            </div>
+            <div class="pp-box-body">
+
+<div class="pp-sticky-header">
+
+    <div class="d-flex justify-content-end" style="margin-bottom:2px;">
+        <button class="btn btn-primary"
+                @onclick="SavePriorities">
+            ATJAUNOT
+        </button>
+    </div>
+
+    <div class="pp-columns-header priority-grid">
+        <div></div>
+        <div>Batch</div>
+        <div>Kods</div>
+        <div>Nosaukums</div>
+        <div>Kategorija</div>
+        <div>Versija</div>
+        <div>Apjoms</div>
+        <div>Det. Gatavs</div>
+        <div>Det. Procesā</div>
+        <div>Assembly</div>
+        <div>Finishing</div>
+        <div title="Detalizācija">🔎</div>
+        <div title="Prioritāte">★</div>
+    </div>
+
+</div>
+<div class="pp-section">
+    <div class="pp-section-header">
+        Prioritārie produkti
+    </div>
+    <div class="pp-section-body">
 
 <div class="priority-table">
-        <div class="priority-head priority-grid">
-            <div style="width:40px;"></div>
-            <div>Batch</div>
-            <div>Kods</div>
-            <div>Nosaukums</div>
-            <div>Kategorija</div>
-            <div>Versija</div>
-            <div>Apjoms</div>
-            <div>Detailed</div>
-            <div>Assembly</div>
-            <div>Finishing</div>
-            <div>Detalizācija</div>
-            <div>Prioritāte</div>
-        </div>
+
 
 <div class="priority-body"
      @onmouseup="EndDrag">
@@ -59,18 +76,18 @@ else
                         <div>@p.CategoryName</div>
                         <div>@p.VersionName</div>
                         <div>@p.Done / @p.Planned</div>
+                        <!-- Det. Gatavs -->
                         <div>
-                            <div>@p.DetailedX / @p.DetailedY</div>
+                            @p.DetailedDoneX / @p.DetailedY
+                        </div>
 
-                            <div class="d-flex align-items-center gap-2 mt-1">
-                                <span class="text-muted" style="font-size:12px;">
-                                    @p.DetailedDoneX / @p.DetailedY
-                                </span>
+                        <!-- Det. Procesā -->
+                        <div>
+                            <div>@p.DetailedStartedX / @p.DetailedY</div>
 
-                                <div class="progress flex-grow-1" style="height:6px;">
-                                    <div class="progress-bar @GetDetailedBarClass(p)"
-                                        style="width:@(p.DetailedY == 0 ? 0 : (p.DetailedStartedX * 100 / p.DetailedY))%">
-                                    </div>
+                            <div class="progress mt-1" style="height:5px;">
+                                <div class="progress-bar @GetDetailedBarClass(p)"
+                                    style="width:@(p.DetailedY == 0 ? 0 : (p.DetailedStartedX * 100 / p.DetailedY))%">
                                 </div>
                             </div>
                         </div>
@@ -135,10 +152,16 @@ else
                     </div>
                 }
 }
+            </div>
         </div>
-        </div>
+    </div>
+</div>
 
-    <h5 class="mt-4">Parastie produkti</h5>
+    <div class="pp-section mt-4">
+    <div class="pp-section-header">
+        Parastie produkti
+    </div>
+    <div class="pp-section-body">
 
 <table class="table">
     <thead>
@@ -231,8 +254,12 @@ else
         }
     </tbody>
 </table>
-
+            </div>
+        </div>
+    </div>
+</div>
 }
+            
 
 <PriorityImpactSummary @ref="impactSummary" />
 

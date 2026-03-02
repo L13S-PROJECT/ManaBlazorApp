@@ -136,6 +136,10 @@ tasks = await Http.GetFromJsonAsync<List<TaskRow>>(
     "api/tasks/for-employee"
 ) ?? new();
 
+foreach (var t in tasks)
+{
+    Console.WriteLine($"BatchPrio={t.BatchPriority} | TaskPrio={t.Priority} | Step={t.StepOrder} | BatchCode={t.BatchCode}");
+}
 
 _activeTask = tasks.FirstOrDefault(t => t.Status == 2);
 
