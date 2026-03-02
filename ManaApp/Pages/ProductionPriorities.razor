@@ -20,12 +20,32 @@ else
 
 <div class="pp-sticky-header">
 
-    <div class="d-flex justify-content-end" style="margin-bottom:2px;">
-        <button class="btn btn-primary"
-                @onclick="SavePriorities">
-            ATJAUNOT
-        </button>
-    </div>
+<div class="d-flex justify-content-between align-items-center" style="margin-bottom:2px; gap:8px;">
+
+<div class="pp-search-wrapper">
+
+    <input type="text"
+           class="form-control form-control-sm"
+           placeholder="Meklēt..."
+           @bind="_searchText"
+           @bind:event="oninput" />
+
+    @if (!string.IsNullOrWhiteSpace(_searchText))
+    {
+       <span class="pp-search-clear"
+            @onclick="ClearSearch">
+            ✕
+        </span>
+    }
+
+</div>
+
+    <button class="btn btn-primary pp-update-btn"
+        @onclick="SavePriorities">
+    ATJAUNOT
+</button>
+
+</div>
 
     <div class="pp-columns-header priority-grid">
         <div></div>
@@ -56,9 +76,9 @@ else
 <div class="priority-body"
      @onmouseup="EndDrag">
 
-@for (int i = 0; i < _priorityList.Count; i++)
+@foreach (var p in _priorityList.Where(FilterProduct).ToList())
 {
-    var p = _priorityList[i];
+    
         {
                    
                     <div @key="p.BatchProductId"
@@ -106,32 +126,38 @@ else
                             <div class="d-flex justify-content-center gap-3">
 
                                 <!-- ASSEMBLY (zilais) -->
+                                @{
+                                    var blue = p.FinishingStock;   // kopā gatavs krāsošanai = Assembly stock atlikums
+                                    if (blue < 0) blue = 0;
+                                }
+
+                                <!-- ZILS = status 1 (stock atlikums) -->
                                 <div class="text-center">
                                     <div class="text-muted" style="font-size:12px;">
-                                        @p.FinishingY
+                                        @blue
                                     </div>
                                     <div class="rounded-pill bg-primary mt-1"
-                                        style="height:6px; width:28px;">
+                                        style="height:6px; width:24px;">
                                     </div>
                                 </div>
 
-                                <!-- FINISHING procesā (dzeltens) -->
+                                <!-- DZELTENS = status 2 -->
                                 <div class="text-center">
                                     <div class="text-muted" style="font-size:12px;">
-                                        @(p.FinishingX - p.FinishingDone)
+                                        @p.FinishingStatus2
                                     </div>
                                     <div class="rounded-pill bg-warning mt-1"
-                                        style="height:6px; width:28px;">
+                                        style="height:6px; width:24px;">
                                     </div>
                                 </div>
 
-                                <!-- PABEIGTS (zaļš) -->
+                                <!-- ZAĻŠ = status 3 -->
                                 <div class="text-center">
                                     <div class="text-muted" style="font-size:12px;">
-                                        @p.FinishingDone
+                                        @p.FinishingStatus3
                                     </div>
                                     <div class="rounded-pill bg-success mt-1"
-                                        style="height:6px; width:28px;">
+                                        style="height:6px; width:24px;">
                                     </div>
                                 </div>
 
@@ -163,97 +189,103 @@ else
     </div>
     <div class="pp-section-body">
 
-<table class="table">
-    <thead>
-        <!-- NOKOPĒ esošo thead -->
-    </thead>
-    <tbody>
-        @foreach (var p in NormalProducts)
-        {
-            <tr>
-                        <td>@p.BatchCode</td>
-                        <td>@p.ProductCode</td>
-                        <td>@p.ProductName</td>
-                        <td>@p.CategoryName</td>
-                        <td>@p.VersionName</td>
-                        <td>@p.Done / @p.Planned</td>
-                        <td>
-                            <div>@p.DetailedX / @p.DetailedY</div>
+<div class="priority-body">
 
-                            <div class="d-flex align-items-center gap-2 mt-1">
-                                <span class="text-muted" style="font-size:12px;">
-                                    @p.DetailedDoneX / @p.DetailedY
-                                </span>
+@foreach (var p in NormalProducts)
+{
+    <div @key="p.BatchProductId"
+         class="priority-row priority-grid">
 
-                                <div class="progress flex-grow-1" style="height:6px;">
-                                    <div class="progress-bar @GetDetailedBarClass(p)"
-                                        style="width:@(p.DetailedY == 0 ? 0 : (p.DetailedStartedX * 100 / p.DetailedY))%">
-                                    </div>
-                                </div>
+                <!-- tukšā drag kolonna -->
+                <div></div>
+
+                <div>@p.BatchCode</div>
+                <div>@p.ProductCode</div>
+                <div>@p.ProductName</div>
+                <div>@p.CategoryName</div>
+                <div>@p.VersionName</div>
+                <div>@p.Done / @p.Planned</div>
+
+                <!-- Det. Gatavs -->
+                <div>
+                    @p.DetailedDoneX / @p.DetailedY
+                </div>
+
+                <!-- Det. Procesā -->
+                <div>
+                    <div>@p.DetailedStartedX / @p.DetailedY</div>
+                        <div class="progress mt-1" style="height:5px;">
+                            <div class="progress-bar @GetDetailedBarClass(p)"
+                                style="width:@(p.DetailedY == 0 ? 0 : (p.DetailedStartedX * 100 / p.DetailedY))%">
                             </div>
-                        </td>
+                        </div>
+                    </div>
 
-                        <td>
-                            <div>@GetAssemblyStatus(p)</div>
+                    <div>
+                        <div>@GetAssemblyStatus(p)</div>
 
-                            <div class="progress mt-1" style="height:6px;">
-                                <div class="progress-bar @GetAssemblyBarClass(p)"
-                                    style="width:100%">
-                                </div>
+                        <div class="progress mt-1" style="height:6px;">
+                            <div class="progress-bar @GetAssemblyBarClass(p)"
+                                style="width:100%">
                             </div>
-                        </td>
+                        </div>
+                    </div>
 
-                        <td>
-                            <div class="d-flex justify-content-center gap-3">
+                <div>
+                    <div class="d-flex justify-content-center gap-3">
+                        @{
+                            var blue = p.FinishingStock;   // kopā gatavs krāsošanai = Assembly stock atlikums
+                            if (blue < 0) blue = 0;
+                        }
 
-                                <!-- ASSEMBLY (zilais) -->
-                                <div class="text-center">
-                                    <div class="text-muted" style="font-size:12px;">
-                                        @p.FinishingY
-                                    </div>
-                                    <div class="rounded-pill bg-primary mt-1"
-                                        style="height:6px; width:28px;">
-                                    </div>
-                                </div>
+<!-- ZILS = status 1 (stock atlikums) -->
+<div class="text-center">
+    <div class="text-muted" style="font-size:12px;">
+        @blue
+    </div>
+    <div class="rounded-pill bg-primary mt-1"
+         style="height:6px; width:24px;">
+    </div>
+</div>
 
-                                <!-- FINISHING procesā (dzeltens) -->
-                                <div class="text-center">
-                                    <div class="text-muted" style="font-size:12px;">
-                                        @(p.FinishingX - p.FinishingDone)
-                                    </div>
-                                    <div class="rounded-pill bg-warning mt-1"
-                                        style="height:6px; width:28px;">
-                                    </div>
-                                </div>
+<!-- DZELTENS = status 2 -->
+<div class="text-center">
+    <div class="text-muted" style="font-size:12px;">
+        @p.FinishingStatus2
+    </div>
+    <div class="rounded-pill bg-warning mt-1"
+         style="height:6px; width:24px;">
+    </div>
+</div>
 
-                                <!-- PABEIGTS (zaļš) -->
-                                <div class="text-center">
-                                    <div class="text-muted" style="font-size:12px;">
-                                        @p.FinishingDone
-                                    </div>
-                                    <div class="rounded-pill bg-success mt-1"
-                                        style="height:6px; width:28px;">
-                                    </div>
-                                </div>
+<!-- ZAĻŠ = status 3 -->
+<div class="text-center">
+    <div class="text-muted" style="font-size:12px;">
+        @p.FinishingStatus3
+    </div>
+    <div class="rounded-pill bg-success mt-1"
+         style="height:6px; width:24px;">
+    </div>
+</div>
+                    </div>
+                </div>
 
-                            </div>
-                        </td>
+                <div>
+                    <span style="cursor:pointer;"
+                        @onclick="() => GoToBatch(p.BatchProductId)">
+                        🔎
+                    </span>
+                </div>
 
-                        <td>
-    <span style="cursor:pointer;"
-          @onclick="() => GoToBatch(p.BatchProductId)">
-        🔎
-    </span>
-</td>
-                        <td>
-                            <input type="checkbox"
-                                checked="@p.IsPriority"
-                                @onchange="(e) => OnPriorityToggled(p, e)" />
-                        </td>
-                    </tr>
+                <div>
+                    <input type="checkbox"
+                        checked="@p.IsPriority"
+                        @onchange="(e) => OnPriorityToggled(p, e)" />
+                </div>
+
+            </div>
         }
-    </tbody>
-</table>
+</div>
             </div>
         </div>
     </div>
@@ -267,12 +299,17 @@ else
 @code {
     private List<ProductRow>? products;
     
-private List<ProductRow> PriorityProducts =>
-    products?.Where(p => p.IsPriority).ToList()
-    ?? new List<ProductRow>();
+private IEnumerable<ProductRow> PriorityProducts =>
+    products?
+        .Where(p => p.IsPriority)
+        .Where(FilterProduct)
+    ?? Enumerable.Empty<ProductRow>();
 
-    private IEnumerable<ProductRow> NormalProducts =>
-    products?.Where(p => !p.IsPriority) ?? Enumerable.Empty<ProductRow>();
+private IEnumerable<ProductRow> NormalProducts =>
+    products?
+        .Where(p => !p.IsPriority)
+        .Where(FilterProduct)
+    ?? Enumerable.Empty<ProductRow>();
 
  private List<ProductRow> _priorityList = new();
 
@@ -288,6 +325,7 @@ private async Task LoadProducts()
 
     _priorityList = products?
     .Where(p => p.IsPriority)
+    .OrderBy(p => p.Priority)
     .ToList()
     ?? new List<ProductRow>();
 
@@ -338,10 +376,12 @@ private string GetAssemblyBarClass(ProductRow p)
     return "bg-light";         // Not started
 }
 
-
 private string GetFinishingStatus(ProductRow p)
 {
-    if (p.FinishingInProgress > 0)
+    if (p.FinishingStatus3 > 0 && p.FinishingStatus2 == 0)
+        return "Done";
+
+    if (p.FinishingStatus2 > 0)
         return "In progress";
 
     return "Not started";
@@ -364,7 +404,6 @@ private class ProductRow
     public int DetailedInProgress { get; set; }
     public int DetailedFinish { get; set; }
     public int Assembly { get; set; }
-    public int FinishingInProgress { get; set; }
     public int Done { get; set; }
     public int DetailedX { get; set; }
     public int DetailedY { get; set; }
@@ -374,9 +413,10 @@ private class ProductRow
     public bool DetailedHasStarted { get; set; }
     public bool DetailedIsDone { get; set; }
 
-    public int FinishingX { get; set; }
-    public int FinishingY { get; set; }
-    public int FinishingDone { get; set; }
+    public int FinishingStock { get; set; }
+    public int FinishingStatus2 { get; set; }
+    public int FinishingStatus3 { get; set; }
+    public int FinishingStatus1 { get; set; }
 
 }
 
@@ -470,20 +510,45 @@ private void EndDrag()
 private void OnPriorityToggled(ProductRow p, ChangeEventArgs e)
 {
     var isChecked = e?.Value is bool b && b;
-    p.IsPriority = isChecked;
+
+    // Atrodam īsto produktu no kopējā saraksta
+    var item = products?.FirstOrDefault(x => x.BatchProductId == p.BatchProductId);
+    if (item == null)
+        return;
+
+    item.IsPriority = isChecked;
 
     if (isChecked)
     {
-        // ja atzīmē par prioritāru -> pievieno saraksta beigās
-        if (!_priorityList.Any(x => x.BatchProductId == p.BatchProductId))
-            _priorityList.Add(p);
+        if (!_priorityList.Any(x => x.BatchProductId == item.BatchProductId))
+        {
+            _priorityList.Add(item);
+        }
     }
     else
     {
-        // ja noņem ķeksi -> izņem no prioritārajiem
-        _priorityList.RemoveAll(x => x.BatchProductId == p.BatchProductId);
-        p.Priority = 0;
+        _priorityList.RemoveAll(x => x.BatchProductId == item.BatchProductId);
+        item.Priority = 0;
     }
+}
+
+private string _searchText = "";
+private void ClearSearch()
+{
+    _searchText = "";
+}
+
+private bool FilterProduct(ProductRow p)
+{
+    if (string.IsNullOrWhiteSpace(_searchText))
+        return true;
+
+    var s = _searchText.Trim().ToLower();
+
+    return
+        (p.BatchCode?.ToLower().Contains(s) ?? false) ||
+        (p.ProductCode?.ToLower().Contains(s) ?? false) ||
+        (p.ProductName?.ToLower().Contains(s) ?? false);
 }
 
 }

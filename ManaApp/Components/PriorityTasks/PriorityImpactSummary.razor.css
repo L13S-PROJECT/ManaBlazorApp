@@ -1,0 +1,105 @@
+/* ===== Outer Impact Box ===== */
+
+.priority-impact-box{
+    border: 1px solid #2563eb;
+    border-top: 2px solid #1d4ed8;
+    border-radius: 10px;
+    background: #f8fafc;
+
+    padding: 8px;
+    overflow: auto; /* lai sticky strādā korekti */
+}
+
+.priority-impact-box h5 {
+    font-weight: 600;
+    margin-top: 8px;
+    margin-bottom: 6px;
+}
+
+.priority-impact-box table {
+    margin-bottom: 18px;
+}
+
+/* ===== Inner Sections ===== */
+
+.impact-section {
+    background: #ffffff;
+
+    border: 1px solid #2563eb;
+    border-top: 2px solid #1d4ed8;
+
+    border-radius: 8px;
+
+    padding: 6px 12px;
+    margin-top: 8px;
+}
+
+.impact-section-header{
+    background: #eff6ff;
+    color: #1e3a8a;
+    font-weight: 500;
+
+    padding: 6px 8px;
+    margin: -6px -12px 8px -12px;
+
+    border-bottom: 1px solid #dbeafe;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+
+}
+
+/* ===== Sticky Column Header ===== */
+
+.impact-columns-header {
+    background: #eff6ff;
+
+    border-left: 1px solid #2563eb;
+    border-right: 1px solid #2563eb;
+    border-top: 3px solid #1d4ed8;
+    border-radius: 8px;
+    padding: 6px 6px;
+
+    position: sticky;
+    top: 0;
+    z-index: 30;
+}
+
+.impact-section {
+    background: #ffffff;
+
+    border-left: 1px solid #2563eb;
+    border-right: 1px solid #2563eb;
+    border-bottom: 1px solid #2563eb;
+
+    padding: 8px 8px;
+    margin-bottom: 8px;
+}
+
+.impact-columns-grid {
+    display: grid;
+    grid-template-columns: 180px repeat(var(--emp-count), 1fr);
+}
+
+/* ===== Impact Rows Grid ===== */
+
+.impact-rows {
+    display: flex;
+    flex-direction: column;
+}
+
+.impact-row {
+    display: grid;
+    grid-template-columns: 180px repeat(var(--emp-count), 1fr);
+    align-items: center;
+
+    padding: 4px 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.impact-cell {
+    padding: 2px 8px;
+}
+
+.impact-wc {
+    font-weight: 500;
+}

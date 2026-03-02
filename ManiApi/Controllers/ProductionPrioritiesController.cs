@@ -221,49 +221,48 @@ public async Task<IActionResult> Get()
                 ) AS Done,
 
                 -- Finishin X = cik detaļu ir procesā (šim BatchProduct)
-                (
-                    SELECT COALESCE(SUM(t.Qty_Done), 0)
-                    FROM tasks t
-                    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-                    WHERE t.BatchProduct_ID = bp.ID
-                    AND t.IsActive = 1
-                    AND ts.Step_Type = 3
-                    AND t.Tasks_Status IN (1,2,3)
-                ) AS FinishingX,
+-- Finishing STATUS 2 (procesā)
+(
+    SELECT COALESCE(SUM(t.Qty_Done), 0)
+    FROM tasks t
+    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+    WHERE t.BatchProduct_ID = bp.ID
+      AND t.IsActive = 1
+      AND ts.Step_Type = 3
+      AND t.Tasks_Status = 2
+) AS FinishingStatus2,
 
-                -- Finishing Y = cik detaļu ir DONE (šim BatchProduct)
+-- Finishing STATUS 3 (pabeigts)
+(
+    SELECT COALESCE(SUM(t.Qty_Done), 0)
+    FROM tasks t
+    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+    WHERE t.BatchProduct_ID = bp.ID
+      AND t.IsActive = 1
+      AND ts.Step_Type = 3
+      AND t.Tasks_Status = 3
+) AS FinishingStatus3,
 
-                (
-                    SELECT COALESCE(SUM(sm.Stock_Qty), 0)
-                    FROM stock_movements sm
-                    WHERE sm.IsActive = 1
-                    AND sm.BatchProduct_ID = bp.ID
-                    AND sm.Move_Type = 'ASSEMBLY'
-                ) AS FinishingY,
+-- Finishing STOCK (no Assembly)
+(
+    SELECT COALESCE(SUM(sm.Stock_Qty), 0)
+    FROM stock_movements sm
+    WHERE sm.IsActive = 1
+      AND sm.BatchProduct_ID = bp.ID
+      AND sm.Move_Type = 'ASSEMBLY'
+) AS FinishingStock,
 
-                -- Finishing FINISHED = pabeigtie (status = 3)
-                (
-                    SELECT COALESCE(SUM(t.Qty_Done), 0)
-                    FROM tasks t
-                    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-                    WHERE t.BatchProduct_ID = bp.ID
-                    AND t.IsActive = 1
-                    AND ts.Step_Type = 3
-                    AND t.Tasks_Status = 3
-                ) AS FinishingDone,
-
-
-                -- Finishing IN PROGRESS
-                (
-                    SELECT COALESCE(SUM(t.Qty_Done),0)
-                    FROM tasks t
-                    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-                    WHERE t.BatchProduct_ID = bp.ID
-                    AND t.IsActive = 1
-                    AND ts.Step_Type = 3
-                    AND t.Tasks_Status = 2
-                ) AS FinishingInProgress
-
+-- Finishing STATUS 1 (rezervēts, nav sācies)
+(
+    SELECT COALESCE(SUM(t.Qty_Done), 0)
+    FROM tasks t
+    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+    WHERE t.BatchProduct_ID = bp.ID
+      AND t.IsActive = 1
+      AND ts.Step_Type = 3
+      AND t.Tasks_Status = 1
+      AND COALESCE(t.Qty_Done, 0) > 0
+) AS FinishingStatus1
             FROM batches_products bp
             JOIN batches b ON b.ID = bp.Batch_Id
             JOIN versions v   ON v.ID = bp.Version_Id
@@ -281,7 +280,8 @@ public async Task<IActionResult> Get()
                 ORDER BY bp.is_priority DESC, bp.Priority ASC;";
 
                 await using var reader = await cmd.ExecuteReaderAsync();
-                while (await reader.ReadAsync())
+
+           while (await reader.ReadAsync())
                 {
                     list.Add(new
                 {
@@ -306,10 +306,10 @@ public async Task<IActionResult> Get()
                     DetailedFinish      = reader.GetInt32(17),
                     Assembly            = reader.GetInt32(18),
                     Done                = reader.GetInt32(19),
-                    FinishingX          = reader.GetInt32(20),
-                    FinishingY          = reader.GetInt32(21),
-                    FinishingDone       = reader.GetInt32(22),
-                    FinishingInProgress = reader.GetInt32(23),
+                    FinishingStatus2 = reader.GetInt32(20),
+                    FinishingStatus3 = reader.GetInt32(21),
+                    FinishingStock   = reader.GetInt32(22),
+                    FinishingStatus1 = reader.GetInt32(23),
 
                 });
 
@@ -413,26 +413,23 @@ public async Task<IActionResult> GetPriorityImpact()
             cmd.CommandText = @"
 SELECT
     wc.WorkCentr_Name AS WorkCenter,
+    COALESCE(wc.Step_Type_ID, 99) AS SortStepType,
     e.ID AS EmployeeId,
-COALESCE(e.Employee_Name, 'Nav piešķirts') AS EmployeeName,
+    e.Employee_Name AS EmployeeName,
 
-    SUM(
-        CASE 
-            WHEN t.ID IS NOT NULL 
-             AND bp.is_priority = 1 
-            THEN 1 ELSE 0 
-        END
-    ) AS PriorityCount,
-
-    SUM(
-        CASE 
-            WHEN t.ID IS NOT NULL 
-             AND bp.is_priority = 0 
-            THEN 1 ELSE 0 
-        END
-    ) AS NormalCount
+    SUM(CASE WHEN bp.is_priority = 1 AND t.ID IS NOT NULL THEN 1 ELSE 0 END) AS PriorityCount,
+    SUM(CASE WHEN bp.is_priority = 0 AND t.ID IS NOT NULL THEN 1 ELSE 0 END) AS NormalCount
 
 FROM workcentr_type wc
+
+CROSS JOIN (
+    SELECT ID, Employee_Name
+    FROM employees
+    WHERE IsActive = 1
+
+    UNION ALL
+    SELECT 0 AS ID, 'Nav piešķirts' AS Employee_Name
+) e
 
 LEFT JOIN toppartsteps s
     ON s.WorkCentr_ID = wc.ID
@@ -442,20 +439,24 @@ LEFT JOIN tasks t
     ON t.TopPartStep_ID = s.ID
     AND t.IsActive = 1
     AND t.Tasks_Status IN (1,2)
+    AND IFNULL(t.Assigned_To, 0) = e.ID
 
 LEFT JOIN batches_products bp
     ON bp.ID = t.BatchProduct_ID
     AND bp.IsActive = 1
 
-LEFT JOIN employees e
-    ON e.ID = t.Assigned_To
-
 WHERE wc.IsActive = 1
 
-GROUP BY wc.WorkCentr_Name, e.ID, e.Employee_Name
-HAVING PriorityCount > 0 OR NormalCount > 0
+GROUP BY
+    wc.WorkCentr_Name,
+    wc.Step_Type_ID,
+    e.ID,
+    e.Employee_Name
 
-ORDER BY wc.WorkCentr_Name, EmployeeName;
+ORDER BY
+    SortStepType ASC,
+    wc.WorkCentr_Name ASC,
+    EmployeeName ASC;
 
             ";
 
@@ -463,20 +464,33 @@ ORDER BY wc.WorkCentr_Name, EmployeeName;
         while (await reader.ReadAsync())
         {
             result.Add(new
-            {
-                WorkCenter   = reader.GetString(0),
-                EmployeeId   = reader.IsDBNull(1) ? 0 : reader.GetInt32(1),
-                EmployeeName = reader.GetString(2),
-                PriorityCount = reader.IsDBNull(3) ? 0 : reader.GetInt32(3),
-                NormalCount   = reader.IsDBNull(4) ? 0 : reader.GetInt32(4)
-            });
-
+                {
+                    WorkCenter   = reader.GetString(0),
+                    SortStepType = reader.IsDBNull(1) ? 99 : reader.GetInt32(1),
+                    EmployeeId   = reader.IsDBNull(2) ? 0 : reader.GetInt32(2),
+                    EmployeeName = reader.GetString(3),
+                    PriorityCount = reader.IsDBNull(4) ? 0 : reader.GetInt32(4),
+                    NormalCount   = reader.IsDBNull(5) ? 0 : reader.GetInt32(5)
+                });
         }
     }
 
     return Ok(result);
 }
 
+// GET: api/workcenters/list
+[HttpGet("/api/workcenters/list")]
+public async Task<IActionResult> GetWorkCenters()
+{
+    var list = await _db.Set<WorkCenter>()
+        .AsNoTracking()
+        .Where(w => w.IsActive)
+        .OrderBy(w => w.WorkCentr_Name)
+        .Select(w => w.WorkCentr_Name)
+        .ToListAsync();
+
+    return Ok(list);
+}
 
 }
 

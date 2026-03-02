@@ -18,34 +18,46 @@ else
             .ToList();
 
         var workCenters = rows
-            .Select(r => r.WorkCenter)
-            .Distinct()
-            .OrderBy(w => w)
+            .GroupBy(r => r.WorkCenter)
+            .Select(g => new { Name = g.Key, Sort = g.Min(x => x.SortStepType) })
+            .OrderBy(x => x.Sort)
+            .ThenBy(x => x.Name)
+            .Select(x => x.Name)
             .ToList();
     
+<div class="priority-impact-box">
 
-    <h5>Prioritārie darbi</h5>
+<div class="impact-columns-header">
+   <div class="impact-columns-grid"
+     style="--emp-count:@employees.Count">
+        <div><strong>Workcentrs</strong></div>
 
-    <table class="table table-sm">
-        <thead>
-            <tr>
-                <th>Workcentrs</th>
-                @foreach (var emp in employees)
-                {
-                    <th>
-                        <span style="cursor:pointer"
-                            @onclick="() => OpenPopup(emp)">
-                            @emp
-                        </span>
-                    </th>
-                }
-            </tr>
-        </thead>
-        <tbody>
+        @foreach (var emp in employees)
+        {
+            <div>
+                <span style="cursor:pointer"
+                      @onclick="() => OpenPopup(emp)">
+                    <strong>@emp</strong>
+                </span>
+            </div>
+        }
+    </div>
+</div>
+
+    <div class="impact-section">
+    <div class="impact-section-header">
+        Prioritārie darbi
+    </div>
+
+    <div class="impact-rows"
+     style="--emp-count:@employees.Count">
+
             @foreach (var wc in workCenters)
             {
-                <tr>
-                    <td><strong>@wc</strong></td>
+                <div class="impact-row">
+                    <div class="impact-cell impact-wc">
+                        <strong>@wc</strong>
+                    </div>
 
                     @foreach (var emp in employees)
                     {
@@ -53,43 +65,45 @@ else
                             r.WorkCenter == wc &&
                             r.EmployeeName == emp);
 
-                        <td>@(match?.PriorityCount ?? 0)</td>
+                        <div class="impact-cell">
+                            @(match?.PriorityCount ?? 0)
+                        </div>
                     }
-                </tr>
-            }
-        </tbody>
-    </table>
+                </div>
+    }
+</div>
+</div>
 
-    <h5>Parastie darbi</h5>
+    <div class="impact-section">
+        <div class="impact-section-header">
+            Parastie darbi
+    </div>
 
-    <table class="table table-sm">
-        <thead>
-            <tr>
-                <th>Workcentrs</th>
-                @foreach (var emp in employees)
-                {
-                    <th>@emp</th>
-                }
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var wc in workCenters)
+    <div class="impact-rows"
+     style="--emp-count:@employees.Count">
+
+    @foreach (var wc in workCenters)
+    {
+        <div class="impact-row">
+            <div class="impact-cell impact-wc">
+                <strong>@wc</strong>
+            </div>
+
+            @foreach (var emp in employees)
             {
-                <tr>
-                    <td><strong>@wc</strong></td>
+                var match = rows.FirstOrDefault(r =>
+                    r.WorkCenter == wc &&
+                    r.EmployeeName == emp);
 
-                    @foreach (var emp in employees)
-                    {
-                        var match = rows.FirstOrDefault(r =>
-                            r.WorkCenter == wc &&
-                            r.EmployeeName == emp);
-
-                        <td>@(match?.NormalCount ?? 0)</td>
-                    }
-                </tr>
+                <div class="impact-cell">
+                    @(match?.NormalCount ?? 0)
+                </div>
             }
-        </tbody>
-    </table>
+        </div>
+    }
+</div>
+    </div>
+</div>
 }
 
 @if (selectedEmployeeId != null)
@@ -109,6 +123,7 @@ else
         public int PriorityCount { get; set; }
         public int NormalCount { get; set; }
         public int EmployeeId { get; set; }
+        public int SortStepType { get; set; }
     }
 
     protected override async Task OnInitializedAsync()

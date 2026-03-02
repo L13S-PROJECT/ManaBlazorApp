@@ -79,7 +79,7 @@ box-shadow:
     height: 60vh;
     max-height: 60vh;
 
-    border: 1px solid #e2e8f0;
+    border: 1px solid #073c81;
     border-radius: 10px;
     background: #f8fafc;
 
@@ -107,10 +107,12 @@ box-shadow:
 /* ===== INNER SECTIONS ===== */
 
 .pp-section {
-    border: 1px solid #e5e7eb;      /* pelēks border */
+    border: 1px solid #5a94ea;
     border-radius: 8px;
-    background: #ffffff;           /* balts fons */
-    overflow: hidden;
+    background: #ffffff;
+
+    padding: 4px 6px;   /* mazāks */
+    margin: 0;          /* noņem lieko ārējo */
 }
 
 .pp-section-header {
@@ -136,7 +138,8 @@ box-shadow:
 }
 
 .pp-box-body {
-    padding: 3px 8px;   /* vēl mazāks */
+    padding: 4px 6px;
+    overflow-y: auto;
 }
 
 /* UPDATE button – kompaktāks un tumšāks */
@@ -186,4 +189,56 @@ box-shadow:
 
     display: flex;
     flex-direction: column;   /* svarīgais */
+}
+
+/* Mazāka atstarpe starp blokiem */
+
+.pp-section + .pp-section {
+    margin-top: 6px;   /* bija lielāks – tagad ļoti tuvu */
+}
+
+/* ===== Search ===== */
+
+.pp-search-wrapper {
+    position: relative;
+    max-width: 320px;
+    width: 100%;
+}
+
+.pp-search-wrapper input {
+    padding-right: 28px;
+}
+
+.pp-search-clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    font-weight: 600;
+    color: #6b7280;
+}
+
+.pp-search-clear:hover {
+    color: #111827;
+}
+
+.pp-columns-header {
+    pointer-events: none; /* lai header nepāķer klikšķus uz rindām */
+}
+
+.pp-columns-header button,
+.pp-columns-header input {
+    pointer-events: auto; /* bet pogai/filtram ļaujam strādāt */
+}
+
+/* UPDATE button – noņem paliekošo focus glow */
+.pp-update-btn:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* Lai klikšķa brīdis būtu redzams */
+.pp-update-btn:active {
+    transform: scale(0.97);
 }
