@@ -14,10 +14,8 @@ else
                 <th>Nosaukums</th>
                 <th>Detaļa</th>
                 <th>Solis</th>
-                <th>Prioritāte</th>
                 <th>Statuss</th>
-                <th>Planned</th>
-                <th>Finishing qty</th>
+                <th>Apjoms</th>
             </tr>
         </thead>
 
@@ -31,24 +29,18 @@ else
                     <td>@t.ProductName</td>
                     <td>@t.PartName</td>
                     <td>@t.StepName</td>
-                    <td>@t.Priority</td>
                     <td>
-                        @(t.Status == 1 && !CanStart(t)
-                            ? "Gaida..."
-                            : StatusText(t.Status, t))
-                    </td>
-
-                    <td>
-                        @if (t.StepType != 3)
-                        {
-                            @t.Planned
-                        }
+                        @StatusText(t.Status, t)
                     </td>
 
                     <td>
                         @if (t.StepType == 3)
                         {
                             @t.Done
+                        }
+                        else
+                        {
+                            @t.Planned
                         }
                     </td>
                 </tr>

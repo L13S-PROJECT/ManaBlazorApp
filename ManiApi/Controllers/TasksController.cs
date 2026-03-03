@@ -46,13 +46,8 @@ END AS PriorityLevel,
   t.Started_At,              -- 3 StartedAt
   t.Finished_At,             -- 4 FinishedAt
 
-  t.Is_Comment_For_Employee, -- 5 IsCommentForEmployee
-
-  CASE 
-    WHEN t.Is_Comment_For_Employee = 1 
-    THEN t.Tasks_Comment 
-    ELSE NULL 
-  END AS Comment,             -- 6 Comment
+    t.Is_Comment_For_Employee, -- 5 IsCommentForEmployee
+    t.Tasks_Comment AS Comment, -- 6 Comment    
 
   p.Product_Name,            -- 7 ProductName
   tp.TopPart_Name,           -- 8 PartName
@@ -60,7 +55,11 @@ END AS PriorityLevel,
   b.Batches_Code,            -- 10 BatchCode
 
   COALESCE(t.Qty_Done, 0) AS DoneForTask, -- 10 Done
-
+CASE 
+    WHEN ts.Step_Type IN (1,2) THEN bp.Planned_Qty * ptp.Qty_Per_product
+    WHEN ts.Step_Type = 3 THEN t.Qty_Done
+    ELSE bp.Planned_Qty
+END AS PlannedQty,
   COALESCE(ts.Step_Order, 0) AS StepOrder, -- 11 soļa secība    
   ts.Step_Type              AS StepType,       -- 12 (Detailed/Assembly/Finishing)
   b.ID                      AS BatchId,       -- 13 (batches.ID)
@@ -139,14 +138,14 @@ ORDER BY
     StepName    = r.IsDBNull(12) ? null : r.GetString(12),
     BatchCode   = r.IsDBNull(13) ? null : r.GetString(13),
 
-    Planned = 0,
-    Done        = r.IsDBNull(14) ? 0 : r.GetInt32(14),
-    StepOrder   = r.IsDBNull(15) ? 0 : r.GetInt32(15),
+    Done    = r.IsDBNull(14) ? 0 : r.GetInt32(14),
+    Planned = r.IsDBNull(15) ? 0 : r.GetInt32(15),
+    StepOrder   = r.IsDBNull(16) ? 0 : r.GetInt32(16),
 
-    StepType       = r.IsDBNull(16) ? 0 : r.GetInt32(16),
-    BatchId        = r.IsDBNull(17) ? 0 : r.GetInt32(17),
-    VersionId      = r.IsDBNull(18) ? 0 : r.GetInt32(18),
-    BatchProductId = r.IsDBNull(19) ? 0 : r.GetInt32(19)
+    StepType       = r.IsDBNull(17) ? 0 : r.GetInt32(17),
+    BatchId        = r.IsDBNull(18) ? 0 : r.GetInt32(18),
+    VersionId      = r.IsDBNull(19) ? 0 : r.GetInt32(19),
+    BatchProductId = r.IsDBNull(20) ? 0 : r.GetInt32(20)
     });
     }
    }

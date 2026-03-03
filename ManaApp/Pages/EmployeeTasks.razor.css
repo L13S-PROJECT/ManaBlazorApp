@@ -1,33 +1,69 @@
+.employee-page-root {
+    background: #AFC1DE;
+    min-height: 100vh;
+
+    padding: 12px;
+
+    display: flex;
+    flex-direction: column;
+}
+
+.employee-main-block {
+    background: #ffffff;
+    border-radius: 6px;
+    border: 2px solid #1e40af;
+
+    flex: 1;                    /* 🔥 šis ir galvenais */
+    display: flex;
+    flex-direction: column;
+
+    padding: 12px;
+}
+
 .main-layout {
-    display: flex;        /* liek bērnus rindā */
-    gap: 24px; 
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
 
-    width: 100%;
-    box-sizing: border-box;
-    margin-top: 16px;   /* lai nepielīp no augšas */
-    height: calc(100vh - 200px);
-
-    background: #ffffff;        /* balts fons */
-    border-radius: 10px;        /* noapaļoti stūri */
-    padding: 10px;              /* iekšējā atkāpe */
-    border: 1px solid #e0e0e0;  /* viegla maliņa *//* atstarpe starp blokiem */
+    flex: 1;                    /* 🔥 bez šī nestiepjas */
+    min-height: 0;
 }
 
-.left-panel {
-    flex: 1;
-    min-width: 0; /*lai tabula ir tik cik vajag, nevis pēc satura */
-    overflow-x: auto;
-
-    background: #f7f7f7;
-    border-radius: 8px;
-    padding: 10px;              
-}
-
+.left-panel,
 .right-panel {
-    flex: 1; 
-    height: 100%;
-    min-width: 0; /*lai tabula ir tik cik vajag, nevis pēc satura */
-    background: #f7f7f7;
+    background: #f8fbff;
+    border-radius: 10px;
+    border: 1px solid #c7d2fe;
+
+    padding: 16px;
+
+    display: flex;
+    flex-direction: column;
+
+    min-height: 0;
+    overflow: hidden;
+}
+
+.elp-section {
+    background: #ffffff;
+    border: 1px solid #dbe3f5;
     border-radius: 8px;
-    padding: 10px;             
+
+    padding: 12px;
+    margin-bottom: 16px;
+
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.elp-section h5 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e3a8a;   /* tumši zils */
+}
+
+.elp-section.waiting {
+    background: #f1f3f5;
+    border: 1px solid #d6d8db;
+    opacity: 0.85;
 }

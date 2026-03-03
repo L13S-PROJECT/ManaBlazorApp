@@ -1,11 +1,4 @@
-.table {
-    table-layout: auto;      /* kolonnām fiksēts platums */
-    width: 100%;
-
-    border-collapse: collapse;
-    
-}
-
+/* TasksTable.razor.css */
 
 .table th,
 .table td {
@@ -43,4 +36,39 @@
 .table tbody tr.task-available {
     background: #dbeafe;              /* gaiši zils */
     border-left: 6px solid #1e40af;   /* tumši zila mala */
+}
+
+.table thead th {
+    border-bottom: 2px solid #1e40af;
+    font-weight: 600;
+    background: #eef2ff;
+    color: #1e3a8a;
+}
+
+.table tbody tr.task-disabled {
+    background: #f5f5f5;
+    color: #9aa0a6;
+}
+
+.table {
+    table-layout: fixed;
+    width: 100%;
+    border-collapse: collapse;
+}
+
+/* Mazās kolonnas ar px */
+
+.table th:nth-child(1),
+.table td:nth-child(1) {
+    width: 60px;     /* Batch */
+}
+
+.table th:nth-child(5),
+.table td:nth-child(5) {
+    width: 120px;    /* Statuss */
+}
+
+.table th:nth-child(6),
+.table td:nth-child(6) {
+    width: 70px;     /* Apjoms */
 }

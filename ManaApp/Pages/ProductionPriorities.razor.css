@@ -81,7 +81,7 @@ box-shadow:
 
     border: 1px solid #073c81;
     border-radius: 10px;
-    background: #f8fafc;
+    background: #DDE9FB;
 
     display: flex;
     flex-direction: column;
@@ -241,4 +241,10 @@ box-shadow:
 /* Lai klikšķa brīdis būtu redzams */
 .pp-update-btn:active {
     transform: scale(0.97);
+}
+
+/* Tumšāks fons prioritārajam blokam */
+.pp-section-priority {
+    background: #fdfdfe;      /* tumšāks nekā balts */
+    border-color: #3B82F6;
 }

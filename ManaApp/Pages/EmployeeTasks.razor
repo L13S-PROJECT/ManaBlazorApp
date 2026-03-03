@@ -7,9 +7,9 @@
 @using ManaApp.Services
 @inject AppState AppState
 
+<div class="employee-page-root">
 
-<PageHeader Title="Darbinieku uzdevumi" /> 
-
+<div class="employee-main-block">   
     <div class="main-layout">
 
     <div class="left-panel">
@@ -22,26 +22,121 @@
         }
         else
         {
-            @if (priorityTasks.Any())
-            {
-                <h5>Prioritārie darbi</h5>
-                <TasksTable Tasks="priorityTasks"
-                            StatusText="StatusText"
-                            CanStart="CanStart"
-                            OnSelect="SelectTask"
-                            OnOpen="OpenTaskDialog"
-                            AvailableTask="FirstAvailableTask" />
-            }
+                @if (InProgress.Any())
+                {
+                    <div class="elp-section">
+                    <h5>Darbs procesā</h5>
+                    <TasksTable Tasks="InProgress"
+                                StatusText="StatusText"
+                                CanStart="CanStart"
+                                OnSelect="SelectTask"
+                                OnOpen="OpenTaskDialog"
+                                AvailableTask="FirstAvailableTask" />
+                    </div>
+                }
 
-            @if (normalTasks.Any())
-            {
-                <h5>Pārējie darbi</h5>
-                <TasksTable Tasks="normalTasks"
-                            StatusText="StatusText"
-                            CanStart="CanStart"
-                            OnSelect="SelectTask"
-                            OnOpen="OpenTaskDialog" 
-                            AvailableTask="FirstAvailableTask"/>
+                @if (SuperPriorityCanStart.Any())
+                {
+                    <div class="elp-section">
+                    <h5>Prioritārie – var sākt</h5>
+                    <TasksTable Tasks="SuperPriorityCanStart"
+                                StatusText="StatusText"
+                                CanStart="CanStart"
+                                OnSelect="SelectTask"
+                                OnOpen="OpenTaskDialog"
+                                AvailableTask="FirstAvailableTask" />
+                    </div>
+                }
+
+                @if (BatchPriorityCanStart.Any())
+                    {
+                        <div class="elp-section">
+                            <h5>Prioritārie</h5>
+                            <TasksTable Tasks="BatchPriorityCanStart"
+                                        StatusText="StatusText"
+                                        CanStart="CanStart"
+                                        OnSelect="SelectTask"
+                                        OnOpen="OpenTaskDialog"
+                                        AvailableTask="FirstAvailableTask" />
+                        </div>
+                    }
+
+                    @if (BatchPriorityWaiting.Any())
+                    {
+                        <div class="elp-section waiting">
+                            <h5>Prioritārie – gaida</h5>
+                            <TasksTable Tasks="BatchPriorityWaiting"
+                                        StatusText="StatusText"
+                                        CanStart="CanStart"
+                                        OnSelect="SelectTask"
+                                        OnOpen="OpenTaskDialog"
+                                        AvailableTask="FirstAvailableTask" />
+                        </div>
+                    }
+
+                @if (SuperPriorityWaiting.Any())
+                {
+                    <div class="elp-section waiting">
+                    <h5>Prioritārie – gaida</h5>
+                    <TasksTable Tasks="SuperPriorityWaiting"
+                                StatusText="StatusText"
+                                CanStart="CanStart"
+                                OnSelect="SelectTask"
+                                OnOpen="OpenTaskDialog"
+                                AvailableTask="FirstAvailableTask" />
+                    </div>
+                }
+
+                @if (NormalSuperCanStart.Any())
+                {
+                    <div class="elp-section">
+                    <h5>Pārējie – var sākt</h5>
+                    <TasksTable Tasks="NormalSuperCanStart"
+                                StatusText="StatusText"
+                                CanStart="CanStart"
+                                OnSelect="SelectTask"
+                                OnOpen="OpenTaskDialog"
+                                AvailableTask="FirstAvailableTask" />
+                    </div>
+                }
+
+                @if (NormalSuperWaiting.Any())
+                {
+                    <div class="elp-section waiting">
+                    <h5>Pārējie – gaida</h5>
+                    <TasksTable Tasks="NormalSuperWaiting"
+                                StatusText="StatusText"
+                                CanStart="CanStart"
+                                OnSelect="SelectTask"
+                                OnOpen="OpenTaskDialog"
+                                AvailableTask="FirstAvailableTask" />
+                    </div>
+                }
+
+@if (NormalCanStart.Any())
+{
+    <div class="elp-section">
+        <h5>Pārējie</h5>
+        <TasksTable Tasks="NormalCanStart"
+                    StatusText="StatusText"
+                    CanStart="CanStart"
+                    OnSelect="SelectTask"
+                    OnOpen="OpenTaskDialog"
+                    AvailableTask="FirstAvailableTask" />
+    </div>
+}
+
+@if (NormalWaiting.Any())
+{
+   <div class="elp-section waiting">
+        <h5>Pārējie – gaida</h5>
+        <TasksTable Tasks="NormalWaiting"
+                    StatusText="StatusText"
+                    CanStart="CanStart"
+                    OnSelect="SelectTask"
+                    OnOpen="OpenTaskDialog"
+                    AvailableTask="FirstAvailableTask" />
+    </div>
 }
 
         }
@@ -58,9 +153,9 @@
                 AvailableTask="FirstAvailableTask"
                 HasActiveTask="tasks.Any(t => t.Status == 2)" />
     </div>
-
+</div>
     </div>
-
+</div>
 <TaskDialog IsOpen="_isDialogOpen"
             IsFinish="@(_dialogMode == TaskDialogMode.Finish)"
             SelectedTask="_selectedTask"
@@ -83,16 +178,36 @@
 @code {
     private List<TaskRow> tasks = new();
     
-private List<TaskRow> priorityTasks =>
-    tasks?
-        .Where(t => t.BatchPriority)   // tikai BatchProduct priority
-        .ToList() ?? new();
+private IEnumerable<TaskRow> InProgress =>
+    tasks.Where(t => t.Status == 2);
 
+// 1) Super prioritārie (BatchPriority + Tasks_Priority)
+private IEnumerable<TaskRow> SuperPriorityCanStart =>
+    tasks.Where(t => t.BatchPriority && t.Priority == 1 && t.Status == 1 && CanStart(t));
 
-private List<TaskRow> normalTasks =>
-    tasks?
-        .Where(t => !t.BatchPriority)
-        .ToList() ?? new();
+private IEnumerable<TaskRow> SuperPriorityWaiting =>
+    tasks.Where(t => t.BatchPriority && t.Priority == 1 && t.Status == 1 && !CanStart(t));
+
+// 2) Prioritārie (BatchPriority tikai)
+private IEnumerable<TaskRow> BatchPriorityCanStart =>
+    tasks.Where(t => t.BatchPriority && t.Priority == 0 && t.Status == 1 && CanStart(t));
+
+private IEnumerable<TaskRow> BatchPriorityWaiting =>
+    tasks.Where(t => t.BatchPriority && t.Priority == 0 && t.Status == 1 && !CanStart(t));
+
+// 3) Secīgie ar part prioritāti
+private IEnumerable<TaskRow> NormalSuperCanStart =>
+    tasks.Where(t => !t.BatchPriority && t.Priority == 1 && t.Status == 1 && CanStart(t));
+
+private IEnumerable<TaskRow> NormalSuperWaiting =>
+    tasks.Where(t => !t.BatchPriority && t.Priority == 1 && t.Status == 1 && !CanStart(t));
+
+// 4) Parastie
+private IEnumerable<TaskRow> NormalCanStart =>
+    tasks.Where(t => !t.BatchPriority && t.Priority == 0 && t.Status == 1 && CanStart(t));
+
+private IEnumerable<TaskRow> NormalWaiting =>
+    tasks.Where(t => !t.BatchPriority && t.Priority == 0 && t.Status == 1 && !CanStart(t));
 
 
 protected override async Task OnInitializedAsync()
