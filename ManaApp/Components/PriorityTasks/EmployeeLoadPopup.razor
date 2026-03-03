@@ -14,40 +14,51 @@ else
     <div class="popup-overlay">
         <div class="popup-box">
 
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div>
-                    <h5 class="mb-0">@model.EmployeeName</h5>
-                    <small class="text-muted">@model.WorkCenterName</small>
+            <div class="elp-header">
+                <div class="elp-header-left">
+                    <div class="elp-title">@model.EmployeeName</div>
+                    <div class="elp-sub">@model.WorkCenterName</div>
                 </div>
-                <button class="btn btn-sm btn-secondary" @onclick="Close">X</button>
-            </div>
 
+                <button class="elp-close" @onclick="Close">X</button>
+            </div>
+<div class="elp-content">
 @if (EmployeeId > 0)
 {
-    <h6>Darbs procesā</h6>
+    
 
     @if (model.InProgress != null && model.InProgress.Any())
-            {
-                <table class="table table-sm">
+        {
+        <div class="elp-section">
+            <h6>Darbs procesā</h6>
+                <table class="table table-sm elp-table">
                     <thead>
                         <tr>
                             <th>Batch</th>
                             <th>Produkts</th>
                             <th>Detaļa</th>
+                            <th>Apraksts</th>
                             <th>Skaits</th>
-                            <th>Status</th>
+                            <th>Procesā</th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody>
                     @foreach (var t in model.InProgress)
                     {
-                        <tr>
+                        <tr @key="t.TaskId">
                             <td>@t.BatchCode</td>
-                            <td>@t.ProductName</td>
-                            <td>@t.TopPartName</td>
+                            <td>
+                                @if (!t.Assigned_To.HasValue || t.Assigned_To.Value == 0)
+                                {
+                                    <span class="unassigned-mark" title="Nav piešķirts darbiniekam">❗</span>
+                                }
+                                @t.ProductName
+                            </td>
+                            <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
+                            <td>@t.StepName</td>
                             <td>@t.Qty</td>
-                            <td>@t.Status</td>
+                            <td></td>
                             <td>
                                 <span style="cursor:pointer"
                                     @onclick="() => OpenTaskDetails(t)">
@@ -58,33 +69,47 @@ else
                     }
                     </tbody>
                 </table>
+            </div>
             }
 }
-<h6 class="mt-3">Prioritārie darbi</h6>
 
-                @if (model.Priority != null && model.Priority.Any())
-                {
-                    <table class="table table-sm">
+        @if (PrioritySuper.Any())
+        {
+            <div class="elp-section">
+                <h6 class="mt-3">Prioritārie darbi (super)</h6>
+
+                    <table class="table table-sm elp-table">
                         <thead>
                             <tr>
                                 <th>Batch</th>
                                 <th>Produkts</th>
                                 <th>Detaļa</th>
+                                <th>Apraksts</th>
                                 <th>Skaits</th>
                                 <th>Prioritārs</th>
                                 <th></th>
                             </tr>
                         </thead>
                         <tbody>
-                        @foreach (var t in model.Priority)
+                        @foreach (var t in PrioritySuper)
                         {
-                            <tr>
+                            <tr @key="t.TaskId">
                                 <td>@t.BatchCode</td>
-                                <td>@t.ProductName</td>
-                                <td>@t.TopPartName</td>
+                                <td>
+                                    @if (!t.Assigned_To.HasValue || t.Assigned_To.Value == 0)
+                                    {
+                                        <span class="unassigned-mark" title="Nav piešķirts darbiniekam">❗</span>
+                                    }
+                                    @t.ProductName
+                                </td>
+                                <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
+                                <td>@t.StepName</td>
                                 <td>@t.Qty</td>
                                 <td>
-                                    <input type="checkbox" @bind="t.Tasks_Priority" />
+                                    <input type="checkbox"
+                                        value="true"
+                                        checked="@t.Tasks_Priority"
+                                        @onchange="async e => await OnPartPriorityChanged(t, e)" />
                                 </td>
                                 <td>
                                     <span style="cursor:pointer"
@@ -96,33 +121,46 @@ else
                         }
                         </tbody>
                     </table>
-                }
+                </div>
+            }
 
- <h6 class="mt-3">Secīgie darbi</h6>
 
-                @if (model.Normal != null && model.Normal.Any())
-                {
-                    <table class="table table-sm">
+
+    @if (PriorityNormal.Any())
+        {
+            <div class="elp-section">
+                <h6 class="mt-3">Prioritārie darbi</h6>
+                    <table class="table table-sm elp-table">
                         <thead>
                             <tr>
                                 <th>Batch</th>
                                 <th>Produkts</th>
                                 <th>Detaļa</th>
+                                <th>Apraksts</th>
                                 <th>Skaits</th>
                                 <th>Prioritārs</th>
                                 <th></th>
                             </tr>
                         </thead>
                         <tbody>
-                        @foreach (var t in model.Normal)
+                        @foreach (var t in PriorityNormal)
                         {
-                            <tr>
+                            <tr @key="t.TaskId">
                                 <td>@t.BatchCode</td>
-                                <td>@t.ProductName</td>
-                                <td>@t.TopPartName</td>
+                                <td>
+                                    @if (!t.Assigned_To.HasValue || t.Assigned_To.Value == 0)
+                                    {
+                                        <span class="unassigned-mark" title="Nav piešķirts darbiniekam">❗</span>
+                                    }
+                                    @t.ProductName
+                                </td>
+                                <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
+                                <td>@t.StepName</td>
                                 <td>@t.Qty</td>
                                 <td>
-                                    <input type="checkbox" @bind="t.Tasks_Priority" />
+                                    <input type="checkbox"
+                                    checked="@t.Tasks_Priority"
+                                    @onchange="(e) => OnPartPriorityChanged(t, e)" />
                                 </td>
                                 <td>
                                     <span style="cursor:pointer"
@@ -134,15 +172,125 @@ else
                         }
                         </tbody>
                     </table>
-                }
-                   <div class="d-flex justify-content-end mt-3">
+                </div>
+            }
+
+ 
+
+    @if (NormalSuper.Any())
+        {
+            <div class="elp-section">
+                <h6 class="mt-3">Secīgie darbi (ar prioritāti)</h6>
+                    <table class="table table-sm elp-table">
+                        <thead>
+                            <tr>
+                                <th>Batch</th>
+                                <th>Produkts</th>
+                                <th>Detaļa</th>
+                                <th>Apraksts</th>
+                                <th>Skaits</th>
+                                <th>Prioritārs</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var t in NormalSuper)
+                        {
+                            <tr @key="t.TaskId">
+                                <td>@t.BatchCode</td>
+                                <td>
+                                    @if (!t.Assigned_To.HasValue || t.Assigned_To.Value == 0)
+                                    {
+                                        <span class="unassigned-mark" title="Nav piešķirts darbiniekam">❗</span>
+                                    }
+                                    @t.ProductName
+                                </td>
+                                <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
+                                <td>@t.StepName</td>
+                                <td>@t.Qty</td>
+                                <td>
+                                        <input type="checkbox"
+                                            value="true"
+                                            checked="@t.Tasks_Priority"
+                                            @onchange="async e => await OnPartPriorityChanged(t, e)" />
+                                </td>
+                                <td>
+                                    <span style="cursor:pointer"
+                                        @onclick="() => OpenTaskDetails(t)">
+                                        🔍
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+ }
+
+ 
+
+    @if (NormalNormal.Any())
+        {
+       
+        <div class="elp-section">
+            <table class="table table-sm elp-table">
+                        <thead>
+                            <tr>
+                                <th>Batch</th>
+                                <th>Produkts</th>
+                                <th>Detaļa</th>
+                                <th>Apraksts</th>
+                                <th>Skaits</th>
+                                <th>Prioritārs</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var t in NormalNormal)
+                        {
+                            <tr @key="t.TaskId">
+                                <td>@t.BatchCode</td>
+                                <td>
+                                    @if (!t.Assigned_To.HasValue || t.Assigned_To.Value == 0)
+                                    {
+                                        <span class="unassigned-mark" title="Nav piešķirts darbiniekam">❗</span>
+                                    }
+                                    @t.ProductName
+                                </td>
+                                <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
+                                <td>@t.StepName</td>
+                                <td>@t.Qty</td>
+                                <td>
+                                    <input type="checkbox"
+                                        value="true"
+                                        checked="@t.Tasks_Priority"
+                                        @onchange="async e => await OnPartPriorityChanged(t, e)" />
+                                </td>
+                                <td>
+                                    <span style="cursor:pointer"
+                                        @onclick="() => OpenTaskDetails(t)">
+                                        🔍
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+            </div>
+        }
+</div>
+                <div class="elp-footer">
                     <button class="btn btn-primary" @onclick="ReloadData">Atjaunot</button>
                     <button class="btn btn-secondary me-2" @onclick="Close">Aizvērt</button>
                 </div>
         </div>
 
-   </div>
+</div>
+
 }
+
+
+
 @if (detailsBatchProductId != null && detailsProductToPartId != null)
 {
     <StepDetailsPopup 
@@ -264,7 +412,7 @@ private class TaskRow
     public int ProductToPartId { get; set; }
     public string? ProductName { get; set; }
     public string? TopPartName { get; set; }
-
+    public string? StepName { get; set; }
     public int Qty { get; set; }
     public int Status { get; set; }
 
@@ -293,6 +441,56 @@ private class StepDetailRow
 private void CloseTaskDetails()
 {
     selectedTaskId = null;
+}
+
+private IEnumerable<TaskRow> PrioritySuper =>
+    model?.Priority?.Where(t => t.Tasks_Priority) ?? Enumerable.Empty<TaskRow>();
+
+private IEnumerable<TaskRow> PriorityNormal =>
+    model?.Priority?.Where(t => !t.Tasks_Priority) ?? Enumerable.Empty<TaskRow>();
+
+private IEnumerable<TaskRow> NormalSuper =>
+    model?.Normal?.Where(t => t.Tasks_Priority) ?? Enumerable.Empty<TaskRow>();
+
+private IEnumerable<TaskRow> NormalNormal =>
+    model?.Normal?.Where(t => !t.Tasks_Priority) ?? Enumerable.Empty<TaskRow>();
+
+private async Task OnPartPriorityChanged(TaskRow t, ChangeEventArgs e)
+{
+    var isChecked = e?.Value is bool b && b;
+
+    await Http.PostAsJsonAsync("api/tasks/set-part-priority", new
+    {
+        BatchProductId = t.BatchProductId,
+        ProductToPartId = t.ProductToPartId,
+        Tasks_Priority = isChecked
+    });
+
+    // lokāli uzreiz atjaunojam visus šīs detaļas status=1 taskus,
+    // lai UI uzreiz redz izmaiņu
+    if (model?.Priority != null)
+    {
+        foreach (var x in model.Priority
+            .Where(x => x.BatchProductId == t.BatchProductId
+                     && x.ProductToPartId == t.ProductToPartId
+                     && x.Status == 1))
+        {
+            x.Tasks_Priority = isChecked;
+        }
+    }
+
+    if (model?.Normal != null)
+    {
+        foreach (var x in model.Normal
+            .Where(x => x.BatchProductId == t.BatchProductId
+                     && x.ProductToPartId == t.ProductToPartId
+                     && x.Status == 1))
+        {
+            x.Tasks_Priority = isChecked;
+        }
+    }
+
+    StateHasChanged();
 }
 
 }

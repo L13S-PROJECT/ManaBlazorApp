@@ -15,7 +15,128 @@
     background: white;
     width: 800px;
     max-width: 95%;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+
     border-radius: 8px;
-    padding: 20px;
+    border: 2px solid #2563EB;   /* zilā kontūra */
+    padding: 0;                  /* noņem ārējo padding */
+
     box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+}
+
+/* EmployeeLoadPopup header */
+
+.elp-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    padding: 10px 14px;
+
+    background: #2563EB;
+    color: #ffffff;
+
+    border-bottom: 1px solid #1E40AF;
+}
+
+.elp-title {
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.elp-sub {
+    font-size: 12px;
+    opacity: 0.85;
+}
+
+.elp-close {
+    background: #1E40AF;
+    border: none;
+    color: #ffffff;
+    font-weight: 600;
+
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.elp-content {
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.elp-close:hover {
+    background: #1D4ED8;
+}
+
+.elp-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+
+    padding: 6px 10px;
+
+    background: #F1F5FB;
+    border-top: 1px solid #D0DFF5;
+}
+
+.elp-table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.elp-table th,
+.elp-table td {
+    font-size: 12px;
+    vertical-align: middle;
+}
+
+.elp-table th:nth-child(1),
+.elp-table td:nth-child(1) { width: 70px; }   /* Batch */
+
+.elp-table th:nth-child(2),
+.elp-table td:nth-child(2) { width: 90px; }   /* Produkts */
+
+.elp-table th:nth-child(3),
+.elp-table td:nth-child(3) { width: 160px; }  /* Detaļa */
+
+.elp-table th:nth-child(4),
+.elp-table td:nth-child(4) { width: 220px; }  /* Apraksts */
+
+.elp-table th:nth-child(5),
+.elp-table td:nth-child(5) { width: 60px; text-align:center; }  /* Skaits */
+
+.elp-table th:nth-child(6),
+.elp-table td:nth-child(6) { width: 70px; text-align:center; }  /* Status / Prioritārs */
+
+.elp-table th:nth-child(7),
+.elp-table td:nth-child(7) { width: 40px; text-align:center; }  /* lupa */
+
+
+.elp-section {
+    margin-bottom: 10px;
+    padding: 6px 10px;
+
+    background: #F4F8FF;
+
+    border: 1px solid #B7C8E6;
+    border-top: 2px solid #2563EB;   /* augšējā mala biezāka */
+
+    border-radius: 10px;
+
+    box-shadow:
+        inset 0 2px 4px rgba(0,0,0,0.08),
+        inset 0 -1px 2px rgba(0,0,0,0.05);
 }

@@ -1896,6 +1896,7 @@ END AS Qty,
     t.Tasks_Status AS Status,
     ts.Step_Order,
     ts.Step_Type,
+    ts.Step_Name,
     ts.ProductToPart_ID,
     tp.TopPart_Name,
     ts.IsFinal,
@@ -1938,12 +1939,13 @@ ORDER BY
             Status = r.GetInt32(5),
             StepOrder = r.IsDBNull(6) ? 0 : r.GetInt32(6),
             StepType = r.GetInt32(7),
-            ProductToPartId = r.GetInt32(8),
-            TopPartName = r.IsDBNull(9) ? null : r.GetString(9),
-            IsFinal = !r.IsDBNull(10) && r.GetBoolean(10),
-            Assigned_To = r.IsDBNull(11) ? (int?)null : r.GetInt32(11),
-            Tasks_Priority = !r.IsDBNull(12) && r.GetBoolean(12),
-            Claimed_By = r.IsDBNull(13) ? (int?)null : r.GetInt32(13)
+            StepName = r.IsDBNull(8) ? null : r.GetString(8),
+            ProductToPartId = r.GetInt32(9),
+            TopPartName = r.IsDBNull(10) ? null : r.GetString(10),
+            IsFinal = !r.IsDBNull(11) && r.GetBoolean(11),
+            Assigned_To = r.IsDBNull(12) ? (int?)null : r.GetInt32(12),
+            Tasks_Priority = !r.IsDBNull(13) && r.GetBoolean(13),
+            Claimed_By = r.IsDBNull(14) ? (int?)null : r.GetInt32(14)
         });
     }
 }
@@ -1965,6 +1967,7 @@ END AS Qty,
     t.Tasks_Status AS Status,
     ts.Step_Order,
     ts.Step_Type,
+    ts.Step_Name,
     ts.ProductToPart_ID,
     tp.TopPart_Name,
     ts.IsFinal,
@@ -2010,12 +2013,13 @@ await using (var r2 = await cmd2.ExecuteReaderAsync())
             Status = r2.GetInt32(5),
             StepOrder = r2.IsDBNull(6) ? 0 : r2.GetInt32(6),
             StepType = r2.GetInt32(7),
-            ProductToPartId = r2.GetInt32(8),
-            TopPartName = r2.IsDBNull(9) ? null : r2.GetString(9),
-            IsFinal = !r2.IsDBNull(10) && r2.GetBoolean(10),
-            Assigned_To = r2.IsDBNull(11) ? (int?)null : r2.GetInt32(11),
-            Tasks_Priority = !r2.IsDBNull(12) && r2.GetBoolean(12),
-            Claimed_By = r2.IsDBNull(13) ? (int?)null : r2.GetInt32(13)
+            StepName = r2.IsDBNull(8) ? null : r2.GetString(8),
+            ProductToPartId = r2.GetInt32(9),
+            TopPartName = r2.IsDBNull(10) ? null : r2.GetString(10),
+            IsFinal = !r2.IsDBNull(11) && r2.GetBoolean(11),
+            Assigned_To = r2.IsDBNull(12) ? (int?)null : r2.GetInt32(12),
+            Tasks_Priority = !r2.IsDBNull(13) && r2.GetBoolean(13),
+            Claimed_By = r2.IsDBNull(14) ? (int?)null : r2.GetInt32(14)
         });
     }
 }
@@ -2036,6 +2040,7 @@ END AS Qty,
     t.Tasks_Status AS Status,
     ts.Step_Order,
     ts.Step_Type,
+    ts.Step_Name,
     ts.ProductToPart_ID,
     tp.TopPart_Name,
     ts.IsFinal,
@@ -2081,12 +2086,13 @@ await using (var r3 = await cmd3.ExecuteReaderAsync())
             Status = r3.GetInt32(5),
             StepOrder = r3.IsDBNull(6) ? 0 : r3.GetInt32(6),
             StepType = r3.GetInt32(7),
-            ProductToPartId = r3.GetInt32(8),
-            TopPartName = r3.IsDBNull(9) ? null : r3.GetString(9),
-            IsFinal = !r3.IsDBNull(10) && r3.GetBoolean(10),
-            Assigned_To = r3.IsDBNull(11) ? (int?)null : r3.GetInt32(11),
-            Tasks_Priority = !r3.IsDBNull(12) && r3.GetBoolean(12),
-            Claimed_By = r3.IsDBNull(13) ? (int?)null : r3.GetInt32(13)          
+            StepName = r3.IsDBNull(8) ? null : r3.GetString(8),
+            ProductToPartId = r3.GetInt32(9),
+            TopPartName = r3.IsDBNull(10) ? null : r3.GetString(10),
+            IsFinal = !r3.IsDBNull(11) && r3.GetBoolean(11),
+            Assigned_To = r3.IsDBNull(12) ? (int?)null : r3.GetInt32(12),
+            Tasks_Priority = !r3.IsDBNull(13) && r3.GetBoolean(13),
+            Claimed_By = r3.IsDBNull(14) ? (int?)null : r3.GetInt32(14)          
         });
     }
 }
@@ -2141,5 +2147,67 @@ public async Task<IActionResult> GetStepsForPart(
 
     return Ok(list);
 }
+
+public sealed class SetPartPriorityDto
+{
+    public int BatchProductId { get; set; }
+    public int ProductToPartId { get; set; }
+    public bool Tasks_Priority { get; set; }
+}
+
+[HttpPost("set-part-priority")]
+public async Task<IActionResult> SetPartPriority([FromBody] SetPartPriorityDto dto)
+{
+    if (dto is null || dto.BatchProductId <= 0 || dto.ProductToPartId <= 0)
+        return BadRequest("BatchProductId un ProductToPartId ir obligāti.");
+
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    // DEBUG: paskatāmies, kādi ProductToPart_ID atbilst šim filtram
+    await using var cmdDbg = conn.CreateCommand();
+    cmdDbg.CommandText = @"
+SELECT DISTINCT ts.ProductToPart_ID
+FROM tasks t
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+WHERE t.IsActive = 1
+  AND t.Tasks_Status = 1
+  AND t.BatchProduct_ID = @bp
+  AND ts.ProductToPart_ID = @ptp;
+";
+    cmdDbg.Parameters.Add(new MySqlConnector.MySqlParameter("@bp", dto.BatchProductId));
+    cmdDbg.Parameters.Add(new MySqlConnector.MySqlParameter("@ptp", dto.ProductToPartId));
+
+    var touchedPtp = new List<int>();
+    await using (var r = await cmdDbg.ExecuteReaderAsync())
+    {
+        while (await r.ReadAsync())
+            touchedPtp.Add(r.GetInt32(0));
+    }
+
+    // UPDATE: uzliek/noņem prioritāti visiem status=1 soļiem šai detaļai šajā batchProduct
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+UPDATE tasks t
+SET t.Tasks_Priority = @prio
+WHERE t.IsActive = 1
+  AND t.Tasks_Status = 1
+  AND t.BatchProduct_ID = @bp
+  AND t.TopPartStep_ID IN (
+      SELECT ts.ID
+      FROM toppartsteps ts
+      WHERE ts.IsActive = 1
+        AND ts.ProductToPart_ID = @ptp
+  );
+";
+    cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@prio", dto.Tasks_Priority ? 1 : 0));
+    cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@bp", dto.BatchProductId));
+    cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@ptp", dto.ProductToPartId));
+
+    var affected = await cmd.ExecuteNonQueryAsync();
+
+    return Ok(new { updated = affected, requestedPtp = dto.ProductToPartId, touchedPtp });
+}
+
     }
 }
