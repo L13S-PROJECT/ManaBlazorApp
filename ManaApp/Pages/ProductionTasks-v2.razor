@@ -215,7 +215,7 @@ var batch = await response.Content.ReadFromJsonAsync<ProductBatchRow>();
     private List<ProductRow> Products = new();
     private List<ProductBatchRow> ProductBatches = new();
 
-    private async Task SelectCategory(CategoryRow c)
+private async Task SelectCategory(CategoryRow c)
 {
             // ⬇ RESET ķēdei 2 → 3 → 4
             SelectedBatch   = null;      // 4. box
@@ -232,9 +232,23 @@ var catRows = AllProducts
     .ToList();
 
 // 2) batches/list -> Planned + Detailed + Assembly (inprogress/finish)
-var plannedList = await Http.GetFromJsonAsync<List<BatchPlannedRow>>(
-    "http://localhost:5270/api/batches/list?batch_type=1"
-) ?? new();
+// 2) batches/list -> Planned + Detailed + Assembly
+var versionIds = catRows
+    .Where(x => x.VersionId.HasValue)
+    .Select(x => x.VersionId!.Value)
+    .Distinct()
+    .ToList();
+
+string url = "http://localhost:5270/api/batches/list?batch_type=1";
+
+if (versionIds.Any())
+{
+    var query = string.Join("&versionIds=", versionIds);
+    url += $"&versionIds={query}";
+}
+
+var plannedList = await Http.GetFromJsonAsync<List<BatchPlannedRow>>(url)
+                   ?? new();
 
 var plannedByVersion = plannedList.GroupBy(x => x.VersionId).ToDictionary(g => g.Key, g => g.Sum(x => x.Planned));
 var detIpByVersion   = plannedList.GroupBy(x => x.VersionId).ToDictionary(g => g.Key, g => g.Sum(x => x.DetailedInProgress));
@@ -242,7 +256,21 @@ var detFinByVersion  = plannedList.GroupBy(x => x.VersionId).ToDictionary(g => g
 var asmIpByVersion   = plannedList.GroupBy(x => x.VersionId).ToDictionary(g => g.Key, g => g.Sum(x => x.AssemblyInProgress));
 var asmFinByVersion  = plannedList.GroupBy(x => x.VersionId).ToDictionary(g => g.Key, g => g.Sum(x => x.AssemblyFinish));
 
-// 3) stockmovements/summary -> Assembly (reālais), Finishing, Stock
+
+// 3) summary-by-versions (VIENS pieprasījums)
+var summaryUrl = "http://localhost:5270/api/production/overview-by-versions";
+
+if (versionIds.Any())
+{
+    var query = string.Join("&versionIds=", versionIds);
+    summaryUrl += $"?versionIds={query}";
+}
+
+var summaries = await Http.GetFromJsonAsync<List<VersionSummaryDto>>(summaryUrl)
+                ?? new();
+
+var summaryDict = summaries.ToDictionary(x => x.VersionId);
+
 foreach (var r in catRows)
 {
     if (r.VersionId is not int vid || vid <= 0) continue;
@@ -252,22 +280,16 @@ foreach (var r in catRows)
     r.DetailedFinish     = detFinByVersion.TryGetValue(vid, out var d2) ? d2 : 0;
     r.AssemblyINProgress = asmIpByVersion.TryGetValue(vid, out var a1) ? a1 : 0;
 
-    // AssemblyFinish kā Planning lapā: no summary (reālais)
-    var sum = await Http.GetFromJsonAsync<StockSummary>(
-        $"http://localhost:5270/api/stockmovements/summary?versionId={vid}"
-    );
-
-    if (sum is not null)
-        {
-            r.AssemblyFinish      = sum.Assembly;
-            r.FinishingInProgress = sum.Finishing;
-            r.InStock             = sum.Stock;
-        }
-
+    if (summaryDict.TryGetValue(vid, out var sum))
+    {
+        r.AssemblyFinish      = sum.Assembly;
+        r.FinishingInProgress = sum.Finishing;
+        r.InStock             = sum.Stock;
+    }
 }
 
 // 4) Grupējam uz 1 rindu uz produktu (bez versijām)
-Products = AllProducts
+Products = catRows
     .Where(p => string.Equals(
         p.categoryName,
         c.CategoryName,

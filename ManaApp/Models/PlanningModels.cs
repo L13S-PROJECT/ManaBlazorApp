@@ -135,6 +135,13 @@ public sealed class ProductGroupRow : IPlanningRow
 
 }
 
+public sealed class VersionSummaryDto
+{
+    public int VersionId { get; set; }
+    public int Assembly { get; set; }
+    public int Finishing { get; set; }
+    public int Stock { get; set; }
+}
 
 public interface IPlanningRow
 {

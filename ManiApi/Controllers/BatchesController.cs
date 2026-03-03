@@ -424,7 +424,9 @@ LIMIT 1;
 
 // GET: /api/batches/list?batch_type=1
 [HttpGet("list")]
-public async Task<IActionResult> GetProductionBatches([FromQuery] int batch_type = 1)
+public async Task<IActionResult> GetProductionBatches(
+    [FromQuery] int batch_type = 1,
+    [FromQuery] List<int>? versionIds = null)
 {
     var conn = _db.Database.GetDbConnection();
     await conn.OpenAsync();
@@ -443,24 +445,8 @@ SELECT
    -- Planned: tikai 1/5, nav 2/3
 SUM(
     CASE
-        WHEN EXISTS (
-                SELECT 1
-                FROM tasks t
-                JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-                WHERE t.BatchProduct_ID = bp.ID
-                  AND t.IsActive = 1
-                  AND ts.Step_Type = 1
-                  AND t.Tasks_Status IN (1,5)
-            )
-            AND NOT EXISTS (
-                SELECT 1
-                FROM tasks t
-                JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-                WHERE t.BatchProduct_ID = bp.ID
-                  AND t.IsActive = 1
-                  AND ts.Step_Type = 1
-                  AND t.Tasks_Status IN (2,3)
-            )
+        WHEN tsum.DetPlannedCnt > 0
+         AND tsum.DetStartedCnt = 0
         THEN bp.Planned_Qty
         ELSE 0
     END
@@ -471,26 +457,8 @@ SUM(
 -- UN ir vēl kāds Detailed ar 1/2/5 (tātad nav 100% pabeigts)
 SUM(
     CASE
-        -- Detailed ir sācies
-        WHEN EXISTS (
-            SELECT 1
-            FROM tasks t
-            JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-            WHERE t.BatchProduct_ID = bp.ID
-              AND t.IsActive = 1
-              AND ts.Step_Type = 1
-              AND t.Tasks_Status IN (2,3)
-        )
-        -- Bet vēl NAV pilnībā pabeigts
-        AND EXISTS (
-            SELECT 1
-            FROM tasks t
-            JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-            WHERE t.BatchProduct_ID = bp.ID
-              AND t.IsActive = 1
-              AND ts.Step_Type = 1
-              AND t.Tasks_Status <> 3
-        )
+        WHEN tsum.DetStartedCnt > 0
+         AND tsum.DetNotFinishedCnt > 0
         THEN bp.Planned_Qty
         ELSE 0
     END
@@ -500,100 +468,75 @@ SUM(
     -- visi Detailed = 3, nav vairs 1/2/5
     -- UN Assembly vēl NAV sācies (nav statusu 2 vai 3)
     SUM(
-        CASE
-            WHEN EXISTS (
-                SELECT 1
-                FROM tasks t
-                JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-                WHERE t.BatchProduct_ID = bp.ID
-                  AND t.IsActive = 1
-                  AND ts.Step_Type = 1
-                  AND t.Tasks_Status = 3
-            )
-            AND NOT EXISTS (
-                SELECT 1
-                FROM tasks t
-                JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-                WHERE t.BatchProduct_ID = bp.ID
-                  AND t.IsActive = 1
-                  AND ts.Step_Type = 1
-                  AND t.Tasks_Status IN (1,2,5)
-            )
-            AND NOT EXISTS (
-                SELECT 1
-                FROM tasks t
-                JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-                WHERE t.BatchProduct_ID = bp.ID
-                  AND t.IsActive = 1
-                  AND ts.Step_Type = 2         -- Assembly
-                  AND t.Tasks_Status IN (2,3)  -- Assembly jau kustas
-            )
-            THEN bp.Planned_Qty
-            ELSE 0
-        END
-    ) AS DetailedFinish,
+    CASE
+        WHEN tsum.DetStartedCnt > 0
+         AND tsum.DetNotFinishedCnt = 0
+         AND tsum.AsmStartedCnt = 0
+        THEN bp.Planned_Qty
+        ELSE 0
+    END
+) AS DetailedFinish,
 
     -- Assembly IN PROGRESS:
     -- Ir vismaz viens Assembly ar 2 VAI 3
     -- UN ir vēl kāds Assembly ar 1/2/5 (nav 100% pabeigts)
     SUM(
-        CASE
-            WHEN EXISTS (
-                    SELECT 1
-                    FROM tasks t
-                    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-                    WHERE t.BatchProduct_ID = bp.ID
-                      AND t.IsActive = 1
-                      AND ts.Step_Type = 2          -- Assembly
-                      AND t.Tasks_Status IN (2,3)
-                )
-                AND EXISTS (
-                    SELECT 1
-                    FROM tasks t
-                    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-                    WHERE t.BatchProduct_ID = bp.ID
-                      AND t.IsActive = 1
-                      AND ts.Step_Type = 2
-                      AND t.Tasks_Status IN (1,2,5)
-                )
-            THEN bp.Planned_Qty
-            ELSE 0
-        END
-    ) AS Assembly,
+    CASE
+        WHEN tsum.AsmStartedCnt > 0
+         AND tsum.AsmNotFinishedCnt > 0
+        THEN bp.Planned_Qty
+        ELSE 0
+    END
+) AS Assembly,
 
     -- Assembly FINISH:
     -- ir vismaz viens Assembly ar 3
     -- UN vairs nav neviena Assembly ar 1/2/5
 -- Assembly FINISH:
-SUM((
-    SELECT COALESCE(SUM(sm.Stock_Qty), 0)
-    FROM stock_movements sm
-    WHERE sm.IsActive = 1
-      AND sm.Move_Type = 'ASSEMBLY'
-      AND sm.BatchProduct_ID = bp.ID
-)) AS Done
-
-
+SUM(COALESCE(sm.AssemblyDone, 0)) AS Done
 ,
-SUM((
-    SELECT COALESCE(SUM(t.Qty_Done),0)
-    FROM tasks t
-    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-    WHERE t.BatchProduct_ID = bp.ID
-      AND t.IsActive = 1
-      AND ts.Step_Type = 3        -- Finishing
-      AND t.Tasks_Status = 2      -- STARTED
-)) AS FinishingInProgress
+SUM(COALESCE(tsum.FinishingStartedQty, 0)) AS FinishingInProgress
 
 FROM batches_products bp
 JOIN batches  b ON b.ID = bp.Batch_Id
 JOIN versions v ON v.ID = bp.Version_Id
 JOIN products p   ON p.ID = v.Product_ID
 JOIN categories c ON c.ID = p.Category_ID AND c.IsActive = 1
+LEFT JOIN (
+    SELECT 
+        BatchProduct_ID,
+        SUM(CASE WHEN Move_Type = 'ASSEMBLY' THEN Stock_Qty ELSE 0 END) AS AssemblyDone
+    FROM stock_movements
+    WHERE IsActive = 1
+    GROUP BY BatchProduct_ID
+) sm ON sm.BatchProduct_ID = bp.ID
+LEFT JOIN (
+    SELECT
+        t.BatchProduct_ID,
+
+        -- Detailed
+        SUM(CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status IN (1,5) THEN 1 ELSE 0 END) AS DetPlannedCnt,
+        SUM(CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status IN (2,3) THEN 1 ELSE 0 END) AS DetStartedCnt,
+        SUM(CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status <> 3 THEN 1 ELSE 0 END) AS DetNotFinishedCnt,
+
+        -- Assembly
+        SUM(CASE WHEN ts.Step_Type = 2 AND t.Tasks_Status IN (2,3) THEN 1 ELSE 0 END) AS AsmStartedCnt,
+        SUM(CASE WHEN ts.Step_Type = 2 AND t.Tasks_Status IN (1,2,5) THEN 1 ELSE 0 END) AS AsmNotFinishedCnt,
+
+        -- Finishing
+        SUM(CASE WHEN ts.Step_Type = 3 AND t.Tasks_Status = 2 THEN t.Qty_Done ELSE 0 END) AS FinishingStartedQty
+
+    FROM tasks t
+    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+    WHERE t.IsActive = 1
+    GROUP BY t.BatchProduct_ID
+) tsum ON tsum.BatchProduct_ID = bp.ID
+
 WHERE
     bp.IsActive = 1
     AND b.IsActive = 1
     AND b.Batches_Statuss = 1
+    AND (@useFilter = 0 OR bp.Version_Id IN ({versionFilter}))
     -- ja tev IR kolonna, kas atbilst batch_type (piem. b.Batches_Type_Id),
     -- te vari pielikt filtru, piem.:
     -- AND b.Batches_Type_Id = @batchType
@@ -604,6 +547,35 @@ GROUP BY
 ORDER BY
     p.Product_Name;";
 
+var useFilter = versionIds != null && versionIds.Any();
+
+if (useFilter)
+{
+    var paramNames = new List<string>();
+
+    for (int i = 0; i < versionIds!.Count; i++)
+    {
+        var paramName = $"@v{i}";
+        paramNames.Add(paramName);
+
+        var p = cmd.CreateParameter();
+        p.ParameterName = paramName;
+        p.Value = versionIds[i];
+        cmd.Parameters.Add(p);
+    }
+
+    var inClause = string.Join(",", paramNames);
+    cmd.CommandText = cmd.CommandText.Replace("{versionFilter}", inClause);
+}
+else
+{
+    cmd.CommandText = cmd.CommandText.Replace("{versionFilter}", "NULL");
+}
+
+var pFilter = cmd.CreateParameter();
+pFilter.ParameterName = "@useFilter";
+pFilter.Value = useFilter ? 1 : 0;
+cmd.Parameters.Add(pFilter);
     // ja izmanto filtru pēc tipa, atkomentē šo:
     // cmd.Parameters.Add(new MySqlParameter("@batchType", batch_type));
 

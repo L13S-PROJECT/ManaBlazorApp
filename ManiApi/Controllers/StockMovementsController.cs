@@ -652,6 +652,29 @@ public async Task<IActionResult> SummaryMulti([FromQuery] string ids)
     return Ok(result);
 }
 
+
+// GET: api/stockmovements/summary-by-versions?versionIds=1&versionIds=3
+[HttpGet("summary-by-versions")]
+public async Task<IActionResult> GetSummaryByVersions([FromQuery] List<int> versionIds)
+{
+    if (versionIds == null || versionIds.Count == 0)
+        return Ok(new List<object>());
+
+    var result = await _db.StockMovements
+        .Where(x => x.IsActive && versionIds.Contains(x.Version_ID))
+        .GroupBy(x => x.Version_ID)
+        .Select(g => new
+        {
+            VersionId = g.Key,
+            Assembly  = g.Where(x => x.Move_Type == MoveType.ASSEMBLY).Sum(x => x.Stock_Qty),
+            Finishing = g.Where(x => x.Move_Type == MoveType.FINISHING).Sum(x => x.Stock_Qty),
+            Stock     = g.Where(x => x.Move_Type == MoveType.STOCK).Sum(x => x.Stock_Qty)
+        })
+        .ToListAsync();
+
+    return Ok(result);
+}
+
    }
 
     
