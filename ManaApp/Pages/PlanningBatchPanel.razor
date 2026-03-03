@@ -57,43 +57,90 @@
 
 <div class="batch-dropzone">
 
-<h4 class="panel-subtitle">Pievienotās preces</h4>
+<div class="batch-sections-wrapper">
 
-@if (Items.Count == 0)
-{
-    <div style="opacity:.6;font-size:13px;">Nav pievienotu preču</div>
-}
-else
-{
-    <div style="margin-top:12px;">
-        @foreach (var it in Items)
-{
-<div class="batch-row">
-    <div class="batch-name">@it.Name</div>
+<div class="batch-section">
 
-    <div class="batch-right">
-        <div class="batch-code">@it.Code</div>
-        <div class="batch-qty">@it.Qty</div>
+    <div class="batch-section-header">
+        KAUSS
+    </div>
 
-        <div class="batch-actions">
-            <button class="icon-btn"
-                    title="Labot"
-                    @onclick="() => OpenEdit(it)">✎</button>
+    <div class="batch-section-body">
 
-            <button class="icon-btn"
-                    title="Dzēst preci"
-                    @onclick="() => DeleteItem(it)">🗑️</button>
-        </div>
+        @if (!KaussItems.Any())
+        {
+            <div class="batch-empty">Nav pievienotu preču</div>
+        }
+        else
+        {
+        @foreach (var pair in KaussItems.Select((item, i) => new { item, index = i + 1 }))
+            {
+                <div class="batch-row"
+                    @ondblclick="() => OpenEdit(pair.item)">
+                    <div class="col-nr">@($"{pair.index}.")</div>
+                    <div class="col-name">@pair.item.Name</div>
+                    <div class="col-code">@pair.item.Code</div>
+                    <div class="col-qty">@pair.item.Qty</div>
+                    <div class="col-actions">
+                        <button class="icon-btn edit-btn"
+                                title="Labot apjomu"
+                                @onclick="() => OpenEdit(pair.item)">✎</button>
+
+                        <button class="icon-btn delete-btn"
+                                title="Dzēst"
+                                @onclick="() => DeleteItem(pair.item)">🗑️</button>
+                    </div>
+                </div>
+            }
+        }
+
     </div>
 </div>
-}
+
+<hr />
+
+<div class="batch-section">
+
+    <div class="batch-section-header">
+        ADAPTERI
+    </div>
+
+    <div class="batch-section-body">
+
+        @if (!AdapterItems.Any())
+        {
+            <div class="batch-empty">Nav pievienotu adapteru</div>
+        }
+        else
+        {
+            @foreach (var pair in AdapterItems.Select((item, i) => new { item, index = i + 1 }))
+                {
+                    <div class="batch-row"
+                         @ondblclick="() => OpenEdit(pair.item)">
+                        <div class="col-nr">@($"{pair.index}.")</div>
+                        <div class="col-name">@pair.item.Name</div>
+                        <div class="col-code">@pair.item.Code</div>
+                        <div class="col-qty">@pair.item.Qty</div>
+                        <div class="col-actions">
+                            <button class="icon-btn edit-btn"
+                                    title="Labot apjomu"
+                                    @onclick="() => OpenEdit(pair.item)">✎</button>
+
+                            <button class="icon-btn delete-btn"
+                                    title="Dzēst"
+                                    @onclick="() => DeleteItem(pair.item)">🗑️</button>
+                        </div>
+                    </div>
+                }
+        }
 
     </div>
-}
 </div>
-}
+</div>
     </div>
-
+}
+</div>  
+    
 <BatchLineEditDialog
     IsOpen="isEditOpen"
     IsOpenChanged="v => isEditOpen = v"
@@ -633,5 +680,10 @@ private async Task DeleteSalesItem(SalesCartItem item)
     StateHasChanged();
 }
 
+private IEnumerable<BatchCartItem> KaussItems =>
+    Items.Where(x => x.ParentCategoryId == 1);
+
+private IEnumerable<BatchCartItem> AdapterItems =>
+    Items.Where(x => x.ParentCategoryId == 2);
 
 }

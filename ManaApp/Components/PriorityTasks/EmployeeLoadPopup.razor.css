@@ -123,17 +123,32 @@
 .elp-table th:nth-child(5),
 .elp-table td:nth-child(5) { width: 50px; text-align:center; }
 
-/* Darbinieks */
+/* Statuss */
 .elp-table th:nth-child(6),
-.elp-table td:nth-child(6) { width: 160px; }
+.elp-table td:nth-child(6) { 
+    width: 75px; 
+    text-align: center;
+}
+
+/* Darbinieks */
+.elp-table th:nth-child(7),
+.elp-table td:nth-child(7) { 
+    width: 130px; 
+}
 
 /* Prioritārs */
-.elp-table th:nth-child(7),
-.elp-table td:nth-child(7) { width: 60px; text-align:center; }
-
-/* Lupa */
 .elp-table th:nth-child(8),
-.elp-table td:nth-child(8) { width: 30px; text-align:center; }
+.elp-table td:nth-child(8) { 
+    width: 50px; 
+    text-align:center; 
+}
+
+/* Prioritārs */
+.elp-table th:nth-child(8),
+.elp-table td:nth-child(8) { 
+    width: 50px; 
+    text-align:center; 
+}
 
 
 .elp-section {

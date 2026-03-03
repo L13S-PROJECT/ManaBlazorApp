@@ -92,25 +92,23 @@
 
 .batch-row {
     display: grid;
-    grid-template-columns: 1fr auto;  /* nosaukums | labais bloks */
+    grid-template-columns: 30px 1fr 70px 50px 60px;
     align-items: center;
-    column-gap: 14px;                /* vienīgā vizuālā atstarpe */
 
-    background: #ffffff;
-    border: 1px solid #bfdbfe;
-    border-bottom: 2px solid #1e40af;
-    border-radius: 4px;
+    font-size: 12px;
+    height: 24px;
 
-    padding: 4px 10px;
-    margin-bottom: 6px;
+    border-bottom: 1px solid #e5e7eb;
 }
 
-.batch-right {
-    display: flex;
-    align-items: center;
-    gap: 10px;          /* KOMPAKTI starp kodu/qty/pogām */
+.batch-row div {
+    padding: 0 6px;
+    overflow: hidden;
     white-space: nowrap;
+    text-overflow: ellipsis;
 }
+
+
 
 .batch-actions {
     display: flex;
@@ -124,42 +122,6 @@
     gap: 16px;
 }
 
-.batch-name {
-    font-weight: 500;
-    font-size: 14px;
-
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.batch-code {
-    font-size: 12px;
-    opacity: 0.7;
-    text-align: center;
-}
-
-.batch-qty {
-    text-align: right;
-    font-weight: 500;
-    font-size: 13px;
-    padding: 0 3px; 
-    text-align: center;  
-}
-
-.batch-comment {
-    font-size: 13px;
-    opacity: 0.9;
-}
-
-.batch-actions {
-    display: flex;
-    justify-content: flex-end;
-    display: flex;
-    justify-content: flex-end;
-    gap: 6px;
-    flex-wrap: nowrap;     /* pogas nekad nelūzt jaunā rindā */
-}
 
 .planning-section {
     background: #ffffff;
@@ -260,8 +222,8 @@
 .icon-btn {
     background: transparent;   /* bez fona */
     border: none;              /* bez rāmja */
-    font-size: 14px;           /* mazāks izmērs */
-    padding: 2px 4px;
+    font-size: 12px;           /* mazāks izmērs */
+    padding: 0px 2px;
     cursor: pointer;
     color: #050c21;            /* tumši zilais */
 }
@@ -275,7 +237,7 @@
     border: 1px solid #bfdbfe;
     border-radius: 6px;
 
-    padding: 10px;
+    padding: 0px;
     margin-top: 6px;
 
     box-shadow: 0 4px 10px rgba(37, 99, 235, 0.15);
@@ -284,6 +246,113 @@
     display: flex;
     flex-direction: column;
 
-    overflow-y: auto;        /* vertikālais scroll ja vajag */
+    overflow: hidden;        /* vertikālais scroll ja vajag */
     min-height: 0;           /* svarīgi flex konteinerim */
+}
+
+.batch-sections-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0;           /* noņem atstarpi */
+    height: 100%;
+}
+
+/* 60% augšējais (KAUSS) */
+.batch-sections-wrapper .batch-section:first-child {
+    flex: 0 0 60%;
+}
+
+/* 40% apakšējais (ADAPTERI) */
+.batch-sections-wrapper .batch-section:last-child {
+    flex: 0 0 40%;
+}
+
+/* Katram box border */
+.batch-section {
+    display: flex;
+    flex-direction: column;
+
+    border: 1px solid #cbd5e1;   /* plāns border */
+    border-radius: 6px;
+    background: #f8fbff;
+
+    overflow: hidden;
+}
+
+/* Header mazāk zils */
+.batch-section-header {
+    background: #93c5fd;   /* daudz gaišāks zils */
+    color: #1e3a8a;        /* tumši zils teksts */
+    font-weight: 600;
+    padding: 4px 8px;
+    font-size: 13px;
+}
+
+/* Body */
+.batch-section-body {
+    padding: 6px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.batch-empty {
+    opacity: .6;
+    font-size: 13px;
+}
+
+.col-nr {
+    text-align: center;   /* centrē kolonnā */
+    font-weight: 700;     /* bold */
+    font-size: 13px;      /* mazliet lielāks */
+    color: #374151;       /* tumšāks */
+}
+
+.col-code {
+    text-align: center;
+    color: #6b7280;
+}
+
+.col-qty {
+    text-align: center;   /* pa vidu kolonnā */
+    font-weight: 600;
+    font-size: 13px;      /* mazliet lielāks */
+}
+
+.col-actions {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+}
+
+/* default pogas */
+.icon-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 4px;
+}
+
+/* DELETE poga sarkana */
+.delete-btn {
+    color: #dc2626;
+}
+
+/* Hover uz edit */
+.batch-row:has(.edit-btn:hover) {
+    background: #e0f2fe;   /* gaiši zils */
+}
+
+/* Hover uz delete */
+.batch-row:has(.delete-btn:hover) {
+    background: #fee2e2;   /* gaiši sarkans */
+}
+
+/* Hover uz pašas pogas */
+.edit-btn:hover {
+    color: #2563eb;
+}
+
+.delete-btn:hover {
+    color: #b91c1c;
 }

@@ -92,6 +92,7 @@ else
                                 <th>Detaļa</th>
                                 <th>Apraksts</th>
                                 <th>Skaits</th>
+                                <th>Statuss</th>
                                 <th>Darbinieks</th>
                                 <th>Prioritārs</th>
                                 <th></th>
@@ -112,6 +113,12 @@ else
                                 <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
                                 <td>@t.StepName</td>
                                 <td>@t.Qty</td>
+                                <td>
+                                    @if (t.Status == 1)
+                                    {
+                                        @(t.CanStart == true ? "Var sākt" : "Gaida...")
+                                    }
+                                </td>
                                 <td>
                                 <select class="form-select form-select-sm @(t.Status == 2 || t.Status == 3 ? "assigned-disabled" : "")"
                                         @bind="t.Assigned_To"
@@ -156,6 +163,7 @@ else
                                 <th>Detaļa</th>
                                 <th>Apraksts</th>
                                 <th>Skaits</th>
+                                <th>Statuss</th>
                                 <th>Darbinieks</th>
                                 <th>Prioritārs</th>
                                 <th></th>
@@ -176,6 +184,12 @@ else
                                 <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
                                 <td>@t.StepName</td>
                                 <td>@t.Qty</td>
+                                <td>
+                                    @if (t.Status == 1)
+                                    {
+                                        @(t.CanStart == true ? "Var sākt" : "Gaida...")
+                                    }
+                                </td>
                                 <td>
                                     <select class="form-select form-select-sm @(t.Status == 2 || t.Status == 3 ? "assigned-disabled" : "")"
                                             @bind="t.Assigned_To"
@@ -219,6 +233,7 @@ else
                                 <th>Detaļa</th>
                                 <th>Apraksts</th>
                                 <th>Skaits</th>
+                                <th>Statuss</th>
                                 <th>Darbinieks</th>
                                 <th>Prioritārs</th>
                                 <th></th>
@@ -239,6 +254,12 @@ else
                                 <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
                                 <td>@t.StepName</td>
                                 <td>@t.Qty</td>
+                                <td>
+                                    @if (t.Status == 1)
+                                    {
+                                        @(t.CanStart == true ? "Var sākt" : "Gaida...")
+                                    }
+                                </td>
                                 <td>
                                     <select class="form-select form-select-sm @(t.Status == 2 || t.Status == 3 ? "assigned-disabled" : "")"
                                             @bind="t.Assigned_To"
@@ -283,6 +304,7 @@ else
                                 <th>Detaļa</th>
                                 <th>Apraksts</th>
                                 <th>Skaits</th>
+                                <th>Statuss</th>
                                 <th>Darbinieks</th>
                                 <th>Prioritārs</th>
                                 <th></th>
@@ -303,6 +325,12 @@ else
                                 <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
                                 <td>@t.StepName</td>
                                 <td>@t.Qty</td>
+                                <td>
+                                    @if (t.Status == 1)
+                                    {
+                                        @(t.CanStart == true ? "Var sākt" : "Gaida...")
+                                    }
+                                </td>
                                 <td>
                                     <select class="form-select form-select-sm @(t.Status == 2 || t.Status == 3 ? "assigned-disabled" : "")"
                                             @bind="t.Assigned_To"
@@ -479,7 +507,7 @@ private class TaskRow
     public string? StepName { get; set; }
     public int Qty { get; set; }
     public int Status { get; set; }
-
+    public bool? CanStart { get; set; }
     public int StepOrder { get; set; }
     public int StepType { get; set; }
 

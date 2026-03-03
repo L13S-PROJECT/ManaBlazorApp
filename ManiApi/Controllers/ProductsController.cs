@@ -1124,6 +1124,8 @@ SELECT DISTINCT
     p.ID            AS Id,
     p.Product_Code  AS ProductCode,
     p.Product_Name  AS ProductName,
+    p.Category_ID   AS CategoryId,
+    c.Parent_ID     AS ParentCategoryId,
     c.Category_Name AS CategoryName,
     CASE 
         WHEN c.Parent_ID IS NULL THEN c.Category_Name
@@ -1168,16 +1170,18 @@ var list = new List<object>();
     while (await r.ReadAsync())
     {
         list.Add(new
-        {
-            Id = r.GetInt32(0),
-            ProductCode = r.GetString(1),
-            ProductName = r.GetString(2),
-            CategoryName = r.IsDBNull(3) ? "" : r.GetString(3),
-            RootName = r.IsDBNull(4) ? "" : r.GetString(4),
-            VersionId = r.GetInt32(5),
-            VersionName = r.IsDBNull(6) ? null : r.GetString(6),
-            VersionDate = r.IsDBNull(7) ? null : r.GetValue(7)?.ToString()
-        });
+            {
+                Id = r.GetInt32(0),
+                ProductCode = r.GetString(1),
+                ProductName = r.GetString(2),
+                CategoryId = r.GetInt32(3),
+                ParentCategoryId = r.IsDBNull(4) ? (int?)null : r.GetInt32(4),
+                CategoryName = r.IsDBNull(5) ? "" : r.GetString(5),
+                RootName = r.IsDBNull(6) ? "" : r.GetString(6),
+                VersionId = r.GetInt32(7),
+                VersionName = r.IsDBNull(8) ? null : r.GetString(8),
+                VersionDate = r.IsDBNull(9) ? null : r.GetValue(9)?.ToString()
+            });
     }
 
     return Ok(list);

@@ -579,6 +579,7 @@ if (addProductId.HasValue)
     
     if (line.Planned <= 0)
         return;
+var rowData = rows.FirstOrDefault(r => r.VersionId == line.VersionId);
 
     // 1) JA NAV draftBatchId -> izveidojam batch (status 4) + ieliekam 1. produktu
 if (!draftBatchId.HasValue || forceNewDraft)
@@ -615,14 +616,17 @@ var createDto = new
 
 
     // ⬇️ KRITISKI SVARĪGI — UI fiksē pirmo preci
-    batchItems.Add(new BatchCartItem
-    {
-        VersionId = line.VersionId,
-        Name = product?.ProductName ?? "",
-        Code = product?.ProductCode ?? line.BatchCode,
-        Qty       = line.Planned,
-        Comment   = line.Comment
-    });
+
+        batchItems.Add(new BatchCartItem
+        {
+            VersionId = line.VersionId,
+            Name = product?.ProductName ?? "",
+            Code = product?.ProductCode ?? line.BatchCode,
+            Qty = line.Planned,
+            Comment = line.Comment,
+            CategoryId = rowData?.CategoryId,
+            ParentCategoryId = rowData?.ParentCategoryId
+        });
 
     isAddOpen = false;
     addLine = null;
@@ -663,13 +667,16 @@ if (!resp.IsSuccessStatusCode)
     return;
 
 // UI atjauninām TIKAI PĒC veiksmīga API
+
 batchItems.Add(new BatchCartItem
 {
     VersionId = line.VersionId,
-    Code      = line.BatchCode,
     Name = product?.ProductName ?? "",
-    Qty       = line.Planned,
-    Comment   = line.Comment
+    Code = product?.ProductCode ?? line.BatchCode,
+    Qty = line.Planned,
+    Comment = line.Comment,
+    CategoryId = rowData?.CategoryId,
+    ParentCategoryId = rowData?.ParentCategoryId
 });
 
 await LoadDraftAsync();
@@ -741,7 +748,7 @@ private async Task LoadDraftAsync()
 
 if (!resp.IsSuccessStatusCode || resp.Content.Headers.ContentLength == 0)
 {
-    Console.WriteLine("LOAD DRAFT: no draft found");
+
     return;
 }
 
@@ -756,8 +763,7 @@ if (draft == null)
             return;
         }
 
-        Console.WriteLine($"LOAD DRAFT: batchId={draft.BatchId}, items={draft.Items.Count}");
-
+        
         // ✅ 1) saglabājam melnraksta ID
         draftBatchId = draft.BatchId;
 draftComment = draft.Comment;
@@ -769,13 +775,15 @@ foreach (var it in draft.Items)
     var row = rows.FirstOrDefault(r => r.VersionId == it.VersionId);
 
                 batchItems.Add(new BatchCartItem
-                {
-                    VersionId = it.VersionId,
-                    Code      = row?.productCode ?? "",
-                    Name      = row?.productName ?? "",
-                    Qty       = it.Qty,
-                    Comment   = it.Comment
-                });
+                    {
+                        VersionId = it.VersionId,
+                        Code      = row?.productCode ?? "",
+                        Name      = row?.productName ?? "",
+                        Qty       = it.Qty,
+                        Comment   = it.Comment,
+                        CategoryId = row?.CategoryId,
+                        ParentCategoryId = row?.ParentCategoryId
+                    });
 
 }
 

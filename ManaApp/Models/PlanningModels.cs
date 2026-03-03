@@ -9,6 +9,8 @@ public sealed class ProductRow
     public string productCode { get; set; } = "";
     public string productName { get; set; } = "";
     public string categoryName { get; set; } = "";
+    public int CategoryId { get; set; }
+    public int? ParentCategoryId { get; set; }
     public string rootName { get; set; } = "";
     public string versionName { get; set; } = "";
     public string versionDate { get; set; } = "";

@@ -8,7 +8,8 @@ namespace ManaApp.Shared
         public string Code { get; set; } = string.Empty;
         public int Qty { get; set; }
         public string? Comment { get; set; }
-
+        public int? CategoryId { get; set; }
+        public int? ParentCategoryId { get; set; }
         public BatchCartItem Clone() => new()
         {
             ProductId = ProductId,
@@ -16,7 +17,9 @@ namespace ManaApp.Shared
             Name = Name,
             Code = Code,
             Qty = Qty,
-            Comment = Comment
+            Comment = Comment,
+            CategoryId = CategoryId,
+            ParentCategoryId = ParentCategoryId
         };
     }
 }

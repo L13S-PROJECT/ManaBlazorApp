@@ -1894,6 +1894,22 @@ SELECT
     ELSE bp.Planned_Qty
 END AS Qty,
     t.Tasks_Status AS Status,
+    CASE
+    WHEN t.Tasks_Status = 1 AND NOT EXISTS (
+        SELECT 1
+        FROM tasks t2
+        JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+        WHERE t2.BatchProduct_ID = t.BatchProduct_ID
+          AND ts2.ProductToPart_ID = ts.ProductToPart_ID
+          AND ts2.Step_Order < ts.Step_Order
+          AND t2.Tasks_Status <> 3
+          AND t2.IsActive = 1
+    )
+    THEN 1
+    WHEN t.Tasks_Status = 1
+    THEN 0
+    ELSE NULL
+END AS CanStart,
     ts.Step_Order,
     ts.Step_Type,
     ts.Step_Name,
@@ -1937,15 +1953,16 @@ ORDER BY
             ProductName = r.GetString(3),
             Qty = r.IsDBNull(4) ? 0 : r.GetInt32(4),
             Status = r.GetInt32(5),
-            StepOrder = r.IsDBNull(6) ? 0 : r.GetInt32(6),
-            StepType = r.GetInt32(7),
-            StepName = r.IsDBNull(8) ? null : r.GetString(8),
-            ProductToPartId = r.GetInt32(9),
-            TopPartName = r.IsDBNull(10) ? null : r.GetString(10),
-            IsFinal = !r.IsDBNull(11) && r.GetBoolean(11),
-            Assigned_To = r.IsDBNull(12) ? (int?)null : r.GetInt32(12),
-            Tasks_Priority = !r.IsDBNull(13) && r.GetBoolean(13),
-            Claimed_By = r.IsDBNull(14) ? (int?)null : r.GetInt32(14)
+            CanStart = r.IsDBNull(6) ? (bool?)null : r.GetInt32(6) == 1,
+            StepOrder = r.IsDBNull(7) ? 0 : r.GetInt32(7),
+            StepType = r.GetInt32(8),
+            StepName = r.IsDBNull(9) ? null : r.GetString(9),
+            ProductToPartId = r.GetInt32(10),
+            TopPartName = r.IsDBNull(11) ? null : r.GetString(11),
+            IsFinal = !r.IsDBNull(12) && r.GetBoolean(12),
+            Assigned_To = r.IsDBNull(13) ? (int?)null : r.GetInt32(13),
+            Tasks_Priority = !r.IsDBNull(14) && r.GetBoolean(14),
+            Claimed_By = r.IsDBNull(15) ? (int?)null : r.GetInt32(15)
         });
     }
 }
@@ -1965,6 +1982,22 @@ SELECT
     ELSE bp.Planned_Qty
 END AS Qty,
     t.Tasks_Status AS Status,
+    CASE
+    WHEN t.Tasks_Status = 1 AND NOT EXISTS (
+        SELECT 1
+        FROM tasks t2
+        JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+        WHERE t2.BatchProduct_ID = t.BatchProduct_ID
+          AND ts2.ProductToPart_ID = ts.ProductToPart_ID
+          AND ts2.Step_Order < ts.Step_Order
+          AND t2.Tasks_Status <> 3
+          AND t2.IsActive = 1
+    )
+    THEN 1
+    WHEN t.Tasks_Status = 1
+    THEN 0
+    ELSE NULL
+END AS CanStart,
     ts.Step_Order,
     ts.Step_Type,
     ts.Step_Name,
@@ -2011,15 +2044,16 @@ await using (var r2 = await cmd2.ExecuteReaderAsync())
             ProductName = r2.GetString(3),
             Qty = r2.IsDBNull(4) ? 0 : r2.GetInt32(4),
             Status = r2.GetInt32(5),
-            StepOrder = r2.IsDBNull(6) ? 0 : r2.GetInt32(6),
-            StepType = r2.GetInt32(7),
-            StepName = r2.IsDBNull(8) ? null : r2.GetString(8),
-            ProductToPartId = r2.GetInt32(9),
-            TopPartName = r2.IsDBNull(10) ? null : r2.GetString(10),
-            IsFinal = !r2.IsDBNull(11) && r2.GetBoolean(11),
-            Assigned_To = r2.IsDBNull(12) ? (int?)null : r2.GetInt32(12),
-            Tasks_Priority = !r2.IsDBNull(13) && r2.GetBoolean(13),
-            Claimed_By = r2.IsDBNull(14) ? (int?)null : r2.GetInt32(14)
+            CanStart = r2.IsDBNull(6) ? (bool?)null : r2.GetInt32(6) == 1,
+            StepOrder = r2.IsDBNull(7) ? 0 : r2.GetInt32(7),
+            StepType = r2.GetInt32(8),
+            StepName = r2.IsDBNull(9) ? null : r2.GetString(9),
+            ProductToPartId = r2.GetInt32(10),
+            TopPartName = r2.IsDBNull(11) ? null : r2.GetString(11),
+            IsFinal = !r2.IsDBNull(12) && r2.GetBoolean(12),
+            Assigned_To = r2.IsDBNull(13) ? (int?)null : r2.GetInt32(13),
+            Tasks_Priority = !r2.IsDBNull(14) && r2.GetBoolean(14),
+            Claimed_By = r2.IsDBNull(15) ? (int?)null : r2.GetInt32(15)
         });
     }
 }
@@ -2038,6 +2072,22 @@ SELECT
     ELSE bp.Planned_Qty
 END AS Qty,
     t.Tasks_Status AS Status,
+    CASE
+    WHEN t.Tasks_Status = 1 AND NOT EXISTS (
+        SELECT 1
+        FROM tasks t2
+        JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+        WHERE t2.BatchProduct_ID = t.BatchProduct_ID
+          AND ts2.ProductToPart_ID = ts.ProductToPart_ID
+          AND ts2.Step_Order < ts.Step_Order
+          AND t2.Tasks_Status <> 3
+          AND t2.IsActive = 1
+    )
+    THEN 1
+    WHEN t.Tasks_Status = 1
+    THEN 0
+    ELSE NULL
+END AS CanStart,
     ts.Step_Order,
     ts.Step_Type,
     ts.Step_Name,
@@ -2084,15 +2134,16 @@ await using (var r3 = await cmd3.ExecuteReaderAsync())
             ProductName = r3.GetString(3),
             Qty = r3.IsDBNull(4) ? 0 : r3.GetInt32(4),
             Status = r3.GetInt32(5),
-            StepOrder = r3.IsDBNull(6) ? 0 : r3.GetInt32(6),
-            StepType = r3.GetInt32(7),
-            StepName = r3.IsDBNull(8) ? null : r3.GetString(8),
-            ProductToPartId = r3.GetInt32(9),
-            TopPartName = r3.IsDBNull(10) ? null : r3.GetString(10),
-            IsFinal = !r3.IsDBNull(11) && r3.GetBoolean(11),
-            Assigned_To = r3.IsDBNull(12) ? (int?)null : r3.GetInt32(12),
-            Tasks_Priority = !r3.IsDBNull(13) && r3.GetBoolean(13),
-            Claimed_By = r3.IsDBNull(14) ? (int?)null : r3.GetInt32(14)          
+            CanStart = r3.IsDBNull(6) ? (bool?)null : r3.GetInt32(6) == 1,
+            StepOrder = r3.IsDBNull(7) ? 0 : r3.GetInt32(7),
+            StepType = r3.GetInt32(8),
+            StepName = r3.IsDBNull(9) ? null : r3.GetString(9),
+            ProductToPartId = r3.GetInt32(10),
+            TopPartName = r3.IsDBNull(11) ? null : r3.GetString(11),
+            IsFinal = !r3.IsDBNull(12) && r3.GetBoolean(12),
+            Assigned_To = r3.IsDBNull(13) ? (int?)null : r3.GetInt32(13),
+            Tasks_Priority = !r3.IsDBNull(14) && r3.GetBoolean(14),
+            Claimed_By = r3.IsDBNull(15) ? (int?)null : r3.GetInt32(15)          
         });
     }
 }

@@ -276,9 +276,9 @@
     border-left:3px solid #3b82f6;
 }
 /* Visa rinda pelēka, ja checkbox nav atzīmēts */
-.tech-table tr:has(input[type="checkbox"]:not(:checked)) td{
-    background:#e5e7eb;   /* viegli tumšāks pelēks */
-    color:#4b5563;        /* tumši pelēks teksts */
+.readonly-panel .tech-table tr td{
+    background:#e5e7eb;
+    color:#6b7280;
 }
 
 /* ===== ReadOnly režīms (arhivēta rinda) ===== */
