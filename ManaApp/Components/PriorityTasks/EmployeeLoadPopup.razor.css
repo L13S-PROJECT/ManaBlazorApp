@@ -103,26 +103,37 @@
     vertical-align: middle;
 }
 
+/* Batch */
 .elp-table th:nth-child(1),
-.elp-table td:nth-child(1) { width: 70px; }   /* Batch */
+.elp-table td:nth-child(1) { width: 60px; }
 
+/* Produkts */
 .elp-table th:nth-child(2),
-.elp-table td:nth-child(2) { width: 90px; }   /* Produkts */
+.elp-table td:nth-child(2) { width: 80px; }
 
+/* Detaļa */
 .elp-table th:nth-child(3),
-.elp-table td:nth-child(3) { width: 160px; }  /* Detaļa */
+.elp-table td:nth-child(3) { width: 130px; }
 
+/* Apraksts */
 .elp-table th:nth-child(4),
-.elp-table td:nth-child(4) { width: 220px; }  /* Apraksts */
+.elp-table td:nth-child(4) { width: 130px; }
 
+/* Skaits */
 .elp-table th:nth-child(5),
-.elp-table td:nth-child(5) { width: 60px; text-align:center; }  /* Skaits */
+.elp-table td:nth-child(5) { width: 50px; text-align:center; }
 
+/* Darbinieks */
 .elp-table th:nth-child(6),
-.elp-table td:nth-child(6) { width: 70px; text-align:center; }  /* Status / Prioritārs */
+.elp-table td:nth-child(6) { width: 160px; }
 
+/* Prioritārs */
 .elp-table th:nth-child(7),
-.elp-table td:nth-child(7) { width: 40px; text-align:center; }  /* lupa */
+.elp-table td:nth-child(7) { width: 60px; text-align:center; }
+
+/* Lupa */
+.elp-table th:nth-child(8),
+.elp-table td:nth-child(8) { width: 30px; text-align:center; }
 
 
 .elp-section {
@@ -139,4 +150,19 @@
     box-shadow:
         inset 0 2px 4px rgba(0,0,0,0.08),
         inset 0 -1px 2px rgba(0,0,0,0.05);
+}
+
+.elp-footer .btn:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.elp-footer .btn:active {
+    transform: scale(0.97);
+}
+
+.assigned-disabled {
+    background-color: #f3f3f3;
+    color: #888;
+    pointer-events: none;
 }

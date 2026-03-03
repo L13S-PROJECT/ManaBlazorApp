@@ -405,3 +405,8 @@
     accent-color: #2563EB;
 }
 
+.assigned-readonly {
+    color: #555;
+    padding: 4px 6px;
+}
+

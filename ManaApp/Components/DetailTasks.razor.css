@@ -368,3 +368,8 @@
 .ptv2-comment-wrap::after {
     pointer-events: none;
 }
+
+.assigned-readonly {
+    color: #555;
+    padding: 4px 6px;
+}

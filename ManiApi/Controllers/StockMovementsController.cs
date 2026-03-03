@@ -611,6 +611,47 @@ public async Task<IActionResult> GetSoldByBatchProduct(
     return Ok(Math.Abs(sold));
 }
 
+// GET: api/stockmovements/summary-multi?ids=1,2,3
+[HttpGet("summary-multi")]
+public async Task<IActionResult> SummaryMulti([FromQuery] string ids)
+{
+    if (string.IsNullOrWhiteSpace(ids))
+        return BadRequest("ids required");
+
+    var versionIds = ids
+        .Split(',')
+        .Select(x => int.TryParse(x, out var v) ? v : 0)
+        .Where(x => x > 0)
+        .ToList();
+
+    if (versionIds.Count == 0)
+        return Ok(new List<object>());
+
+    var grouped = await _db.StockMovements
+        .Where(x => x.IsActive && versionIds.Contains(x.Version_ID))
+        .GroupBy(x => new { x.Version_ID, x.Move_Type })
+        .Select(g => new
+        {
+            g.Key.Version_ID,
+            g.Key.Move_Type,
+            Qty = g.Sum(m => m.Stock_Qty)
+        })
+        .ToListAsync();
+
+    var result = versionIds.Select(id => new
+    {
+        VersionId = id,
+        Detailed  = grouped.Where(x => x.Version_ID == id && x.Move_Type == MoveType.DETAILED).Sum(x => x.Qty),
+        Assembly  = grouped.Where(x => x.Version_ID == id && x.Move_Type == MoveType.ASSEMBLY).Sum(x => x.Qty),
+        Finishing = grouped.Where(x => x.Version_ID == id && x.Move_Type == MoveType.FINISHING).Sum(x => x.Qty),
+        Stock     = grouped.Where(x => x.Version_ID == id && x.Move_Type == MoveType.STOCK).Sum(x => x.Qty),
+        Scrap     = grouped.Where(x => x.Version_ID == id && x.Move_Type == MoveType.SCRAP).Sum(x => x.Qty),
+        Out       = grouped.Where(x => x.Version_ID == id && x.Move_Type == MoveType.OUT).Sum(x => x.Qty)
+    });
+
+    return Ok(result);
+}
+
    }
 
     

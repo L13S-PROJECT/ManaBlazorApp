@@ -62,6 +62,8 @@ public sealed class ProductContentDto
 
 public sealed class StockSummary
 {
+    [JsonPropertyName("versionId")]
+    public int VersionId { get; set; }
     [JsonPropertyName("detailed")]        public int Detailed { get; set; }
     [JsonPropertyName("detailedFinish")]  public int DetailedFinish { get; set; }
     [JsonPropertyName("assembly")]        public int Assembly { get; set; }

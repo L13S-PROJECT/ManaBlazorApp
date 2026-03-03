@@ -80,15 +80,25 @@
 <div></div> <!-- Gatavs -->
 <div></div> <!-- Apjoms -->
 
+<!-- 4. Piešķirts -->
 <div>
-    <select value="@t.Assigned_To"
-            @onchange="e => OnAssignedChanged(t.TaskId, e)">
-        <option value="">—</option>
-        @foreach (var emp in Employees)
-        {
-            <option value="@emp.Id">@emp.Name</option>
-        }
-    </select>
+    @if (t.Status == 2 || t.Status == 3)
+    {
+        <div class="assigned-readonly">
+            @Employees.FirstOrDefault(e => e.Id == t.Assigned_To)?.Name
+        </div>
+    }
+    else
+    {
+        <select value="@t.Assigned_To"
+                @onchange="e => OnAssignedChanged(t.TaskId, e)">
+            <option value="">—</option>
+            @foreach (var emp in Employees)
+            {
+                <option value="@emp.Id">@emp.Name</option>
+            }
+        </select>
+    }
 </div>
 
 

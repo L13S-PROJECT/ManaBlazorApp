@@ -72,8 +72,16 @@
             <!-- 3. Apjoms -->
             <div>@t.Done</div>
 
-            <!-- 4. Piešķirts -->
-            <div>
+<!-- 4. Piešķirts -->
+        <div>
+            @if (t.Status == 2 || t.Status == 3)
+            {
+                <div class="assigned-readonly">
+                    @Employees.FirstOrDefault(e => e.Id == t.Assigned_To)?.Name
+                </div>
+            }
+            else
+            {
                 <select value="@t.Assigned_To"
                         @onchange="e => OnAssignedChanged(t.TaskId, e)">
                     <option value="">—</option>
@@ -82,7 +90,8 @@
                         <option value="@emp.Id">@emp.Name</option>
                     }
                 </select>
-            </div>
+            }
+        </div>
 
 
             <!-- 5. Pieņēma -->

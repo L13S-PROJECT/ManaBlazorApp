@@ -313,9 +313,15 @@ private IEnumerable<ProductRow> NormalProducts =>
 
  private List<ProductRow> _priorityList = new();
 
-protected override async Task OnInitializedAsync()
+protected override async Task OnParametersSetAsync()
 {
-    await LoadProducts();
+    if (products == null)
+    {
+        await LoadProducts();
+
+        if (impactSummary != null)
+            await impactSummary.Reload();
+    }
 }
 
 private async Task LoadProducts()

@@ -98,6 +98,7 @@
 <div class="ptv2-box-detail">
 
 <ProductionTasksBatchDetail
+    @key="SelectedProduct?.productCode"
     SelectedProduct="SelectedProduct"
     ProductBatches="ProductBatches"
     SelectedBatch="SelectedBatch"
@@ -117,6 +118,7 @@
 </div>
     <div class="ptv2-box ptv2-box-tasks">
         <ProductionTasksDetailPanel
+            @key="SelectedBatch?.BatchProductId"
             SelectedBatch="SelectedBatch" />
     </div>
 </div>

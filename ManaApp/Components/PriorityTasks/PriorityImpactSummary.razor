@@ -149,8 +149,9 @@ private void OpenPopup(string employeeName)
         selectedEmployeeId = match.EmployeeId;
 }
 
-private void ClosePopup()
+private async Task ClosePopup()
 {
     selectedEmployeeId = null;
+    await Reload();
 }
 }

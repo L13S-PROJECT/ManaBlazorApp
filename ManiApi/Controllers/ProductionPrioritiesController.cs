@@ -211,14 +211,16 @@ public async Task<IActionResult> Get()
                     ELSE 0
                 END AS Assembly,
 
-                -- Done (Assembly stock)
-                (
-                    SELECT COALESCE(SUM(sm.Stock_Qty), 0)
-                    FROM stock_movements sm
-                    WHERE sm.IsActive = 1
-                    AND sm.Move_Type = 'ASSEMBLY'
-                    AND sm.BatchProduct_ID = bp.ID
-                ) AS Done,
+-- Done (pabeigts gala solis – Step_Type = 3)
+(
+    SELECT COALESCE(SUM(t.Qty_Done), 0)
+    FROM tasks t
+    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+    WHERE t.BatchProduct_ID = bp.ID
+      AND t.IsActive = 1
+      AND t.Tasks_Status = 3
+      AND ts.Step_Type = 3
+) AS Done,
 
                 -- Finishin X = cik detaļu ir procesā (šim BatchProduct)
 -- Finishing STATUS 2 (procesā)

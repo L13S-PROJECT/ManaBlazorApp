@@ -16,9 +16,14 @@ else
 
             <div class="elp-header">
                 <div class="elp-header-left">
-                    <div class="elp-title">@model.EmployeeName</div>
-                    <div class="elp-sub">@model.WorkCenterName</div>
-                </div>
+                    <div class="elp-title">
+                        @(EmployeeId == 0 ? "Nav piešķirts" : model.EmployeeName)
+                    </div>
+                    @if (EmployeeId != 0)
+                        {
+                            <div class="elp-sub">@model.WorkCenterName</div>
+                        }
+                    </div>
 
                 <button class="elp-close" @onclick="Close">X</button>
             </div>
@@ -39,6 +44,7 @@ else
                             <th>Detaļa</th>
                             <th>Apraksts</th>
                             <th>Skaits</th>
+                            <th></th>
                             <th>Procesā</th>
                             <th></th>
                         </tr>
@@ -86,6 +92,7 @@ else
                                 <th>Detaļa</th>
                                 <th>Apraksts</th>
                                 <th>Skaits</th>
+                                <th>Darbinieks</th>
                                 <th>Prioritārs</th>
                                 <th></th>
                             </tr>
@@ -105,6 +112,17 @@ else
                                 <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
                                 <td>@t.StepName</td>
                                 <td>@t.Qty</td>
+                                <td>
+                                <select class="form-select form-select-sm @(t.Status == 2 || t.Status == 3 ? "assigned-disabled" : "")"
+                                        @bind="t.Assigned_To"
+                                        disabled="@(t.Status == 2 || t.Status == 3)">
+                                        <option value="">Nav piešķirts</option>
+                                        @foreach (var emp in employees)
+                                        {
+                                            <option value="@emp.Id">@emp.Name</option>
+                                        }
+                                    </select>
+                                </td>
                                 <td>
                                     <input type="checkbox"
                                         value="true"
@@ -138,6 +156,7 @@ else
                                 <th>Detaļa</th>
                                 <th>Apraksts</th>
                                 <th>Skaits</th>
+                                <th>Darbinieks</th>
                                 <th>Prioritārs</th>
                                 <th></th>
                             </tr>
@@ -157,6 +176,17 @@ else
                                 <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
                                 <td>@t.StepName</td>
                                 <td>@t.Qty</td>
+                                <td>
+                                    <select class="form-select form-select-sm @(t.Status == 2 || t.Status == 3 ? "assigned-disabled" : "")"
+                                            @bind="t.Assigned_To"
+                                            disabled="@(t.Status == 2 || t.Status == 3)">
+                                        <option value="">Nav piešķirts</option>
+                                        @foreach (var emp in employees)
+                                        {
+                                            <option value="@emp.Id">@emp.Name</option>
+                                        }
+                                    </select>
+                                </td>
                                 <td>
                                     <input type="checkbox"
                                     checked="@t.Tasks_Priority"
@@ -189,6 +219,7 @@ else
                                 <th>Detaļa</th>
                                 <th>Apraksts</th>
                                 <th>Skaits</th>
+                                <th>Darbinieks</th>
                                 <th>Prioritārs</th>
                                 <th></th>
                             </tr>
@@ -208,6 +239,17 @@ else
                                 <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
                                 <td>@t.StepName</td>
                                 <td>@t.Qty</td>
+                                <td>
+                                    <select class="form-select form-select-sm @(t.Status == 2 || t.Status == 3 ? "assigned-disabled" : "")"
+                                            @bind="t.Assigned_To"
+                                            disabled="@(t.Status == 2 || t.Status == 3)">
+                                        <option value="">Nav piešķirts</option>
+                                        @foreach (var emp in employees)
+                                        {
+                                            <option value="@emp.Id">@emp.Name</option>
+                                        }
+                                    </select>
+                                </td>
                                 <td>
                                         <input type="checkbox"
                                             value="true"
@@ -241,6 +283,7 @@ else
                                 <th>Detaļa</th>
                                 <th>Apraksts</th>
                                 <th>Skaits</th>
+                                <th>Darbinieks</th>
                                 <th>Prioritārs</th>
                                 <th></th>
                             </tr>
@@ -260,6 +303,17 @@ else
                                 <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
                                 <td>@t.StepName</td>
                                 <td>@t.Qty</td>
+                                <td>
+                                    <select class="form-select form-select-sm @(t.Status == 2 || t.Status == 3 ? "assigned-disabled" : "")"
+                                            @bind="t.Assigned_To"
+                                            disabled="@(t.Status == 2 || t.Status == 3)">
+                                        <option value="">Nav piešķirts</option>
+                                        @foreach (var emp in employees)
+                                        {
+                                            <option value="@emp.Id">@emp.Name</option>
+                                        }
+                                    </select>
+                                </td>
                                 <td>
                                     <input type="checkbox"
                                         value="true"
@@ -307,21 +361,29 @@ else
     private int? detailsBatchProductId;
     private int? detailsProductToPartId;
     private EmployeeLoadModel? model;
+    private List<EmployeeDto> employees = new();
     private int? selectedTaskId;
     private List<StepDetailRow>? detailSteps;
 
 protected override async Task OnParametersSetAsync()
-{
+{   
+
+    if (employees.Count == 0)
+        {
+            employees = await Http.GetFromJsonAsync<List<EmployeeDto>>("api/employees")
+                        ?? new List<EmployeeDto>();
+        }
+    
     if (EmployeeId > 0)
-    {
-        model = await Http.GetFromJsonAsync<EmployeeLoadModel>(
-            $"api/tasks/employee-load?empId={EmployeeId}");
-    }
+        {
+            model = await Http.GetFromJsonAsync<EmployeeLoadModel>(
+                $"api/tasks/employee-load?empId={EmployeeId}");
+        }
     else
-    {
-        model = await Http.GetFromJsonAsync<EmployeeLoadModel>(
-            $"api/tasks/employee-load?empId=0");
-    }
+        {
+            model = await Http.GetFromJsonAsync<EmployeeLoadModel>(
+                $"api/tasks/employee-load?empId=0");
+        }
 }
 
 private async Task ReloadData()
@@ -363,10 +425,11 @@ private async Task UpdateData()
         foreach (var t in model.Priority)
         {
             list.Add(new
-            {
-                TaskId = t.TaskId,
-                Tasks_Priority = t.Tasks_Priority
-            });
+                {
+                    TaskId = t.TaskId,
+                    Tasks_Priority = t.Tasks_Priority,
+                    Assigned_To = t.Assigned_To
+                });
         }
     }
 
@@ -375,10 +438,11 @@ private async Task UpdateData()
         foreach (var t in model.Normal)
         {
             list.Add(new
-            {
-                TaskId = t.TaskId,
-                Tasks_Priority = t.Tasks_Priority
-            });
+                {
+                    TaskId = t.TaskId,
+                    Tasks_Priority = t.Tasks_Priority,
+                    Assigned_To = t.Assigned_To
+                });
         }
     }
 
@@ -438,6 +502,11 @@ private class StepDetailRow
     public string? PartName { get; set; }
 }
 
+private class EmployeeDto
+{
+    public int Id { get; set; }
+    public string? Name { get; set; }
+}
 private void CloseTaskDetails()
 {
     selectedTaskId = null;

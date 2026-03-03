@@ -80,14 +80,23 @@
 
                         <!-- 4. Piešķirts -->
                         <div>
-                            <select value="@t.Assigned_To"
-                                    @onchange="e => OnAssignedChanged(t.TaskId, e)">
-                                <option value="">—</option>
-                                @foreach (var emp in Employees)
+                            @if (t.Status == 2 || t.Status == 3)
                                 {
-                                    <option value="@emp.Id">@emp.Name</option>
+                                    <div class="assigned-readonly">
+                                        @Employees.FirstOrDefault(e => e.Id == t.Assigned_To)?.Name
+                                    </div>
                                 }
-                            </select>
+                                else
+                                {
+                                    <select value="@t.Assigned_To"
+                                            @onchange="e => OnAssignedChanged(t.TaskId, e)">
+                                        <option value="">—</option>
+                                        @foreach (var emp in Employees)
+                                        {
+                                            <option value="@emp.Id">@emp.Name</option>
+                                        }
+                                    </select>
+                                }
                         </div>
 
                         <!-- 5. Pieņēma -->
@@ -295,6 +304,18 @@ async Task OnAssignedChanged(int taskId, ChangeEventArgs e)
             ? v
             : (int?)null;
 
+    // 1️⃣ atjaunojam UI modeli
+    foreach (var list in TasksByStep.Values)
+    {
+        var task = list.FirstOrDefault(x => x.TaskId == taskId);
+        if (task != null)
+        {
+            task.Assigned_To = empId;
+            break;
+        }
+    }
+
+    // 2️⃣ sūtam uz API
     await Http.PostAsJsonAsync(
         "http://localhost:5270/api/tasks/update-assignee",
         new
