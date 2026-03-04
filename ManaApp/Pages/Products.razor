@@ -13,7 +13,7 @@
 @layout MainLayout
 @using ManaApp.Components.Products
 @using ManaApp.Pages
-       
+@using System.Text.Json;     
 
 <div class="products-main">
 
@@ -129,6 +129,7 @@
     Steps="editingSteps"
     StepTypes="stepTypes"
     WorkCenters="workCenters"
+    StepsError="stepsError"
     OnMoveUp="MoveUp"
     OnMoveDown="MoveDown"
     OnDelete="DeleteStepAsync"
@@ -581,13 +582,10 @@ private async Task LoadActiveWorkCentersAsync()
 {
 if (row.VersionId == null || row.VersionId == 0)
 {
-    Console.WriteLine("VersionId is NULL!");
     return;
 }
 
     selected = row;
-
-    Console.WriteLine($"Clicked VersionId = {row.VersionId}");
 
     openParts.Clear();
 
@@ -604,11 +602,11 @@ if (row.VersionId == null || row.VersionId == 0)
         selectedDetails = await Http.GetFromJsonAsync<ProductContentDto>(
             $"http://localhost:5270/api/products/content?versionId={row.VersionId}");
 
-        selectedPartDetails = await Http.GetFromJsonAsync<List<ProductDetailDto>>(
-    $"http://localhost:5270/api/products/details?versionId={row.VersionId}&stepType=1");
+            selectedPartDetails = await Http.GetFromJsonAsync<List<ProductDetailDto>>(
+                $"http://localhost:5270/api/products/details-by-version?versionId={row.VersionId}");
 
-worksByParts = await Http.GetFromJsonAsync<List<WorksByPartDto>>(
-    $"http://localhost:5270/api/products/works-by-version?versionId={row.VersionId}");
+            worksByParts = await Http.GetFromJsonAsync<List<WorksByPartDto>>(
+                $"http://localhost:5270/api/products/works-by-version?versionId={row.VersionId}");
     }
     finally
     {
@@ -701,10 +699,10 @@ private async Task CloseStepsDialog()
     if (selected is not null)
     {
         selectedPartDetails = await Http.GetFromJsonAsync<List<ProductDetailDto>>(
-            $"http://localhost:5270/api/products/details-by-product?id={selected.id}") ?? new();
+    $"http://localhost:5270/api/products/details-by-version?versionId={selected!.VersionId}") ?? new();
 
-        worksByParts = await Http.GetFromJsonAsync<List<WorksByPartDto>>(
-            $"http://localhost:5270/api/products/works-by-product?id={selected.id}") ?? new();
+         worksByParts = await Http.GetFromJsonAsync<List<WorksByPartDto>>(
+    $"http://localhost:5270/api/products/works-by-version?versionId={selected!.VersionId}") ?? new();
     }
 
     StateHasChanged();
@@ -814,65 +812,72 @@ private void RecalcOrders()
         return final.StepOrder == maxOrder;
     }
 
-    private async Task SaveStepsAsync()
-    {
-        // === GUARD: pārbaude pirms saglabāšanas ===
-var invalid = editingSteps
-    .Select((s, i) => new { s, i })
-    .FirstOrDefault(x => string.IsNullOrWhiteSpace(x.s.StepName)
-                      || x.s.StepType <= 0
-                      || x.s.WorkCentrId <= 0);
-
-if (invalid != null)
+private async Task SaveStepsAsync()
 {
-    var field = string.IsNullOrWhiteSpace(invalid.s.StepName) ? "nosaukums"
-             : (invalid.s.StepType <= 0 ? "soļa tips"
-             : "darba centrs");
-
-    stepsError = $"Izlabo soli #{invalid.i + 1}: nav aizpildīts {field}.";
-StateHasChanged();
-return;
-
-}
-// === /GUARD ===
-
+    try
+    {
+        stepsError = null;
         RecalcOrders();
 
-        if (!ValidateFinalRule())
+        if (editingSteps == null || editingSteps.Count == 0)
+            {
+                stepsError = "Nav neviena tehnoloģijas soļa.";
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+        await InvokeAsync(StateHasChanged);
+
+        var invalid = editingSteps
+            .Select((s, i) => new { s, i })
+            .FirstOrDefault(x => string.IsNullOrWhiteSpace(x.s.StepName)
+                              || x.s.StepType <= 0
+                              || x.s.WorkCentrId <= 0);
+
+        if (invalid != null)
         {
-            await JS.InvokeVoidAsync("alert",
-                "Noteikums: jābūt TIEŠI vienam 'Final' un tam jābūt pēdējam solim. Lūdzu izlabo pirms saglabāšanas.");
-            return;
+            var field = string.IsNullOrWhiteSpace(invalid.s.StepName) ? "nosaukums"
+                     : (invalid.s.StepType <= 0 ? "soļa tips"
+                     : "darba centrs");
+
+                    stepsError = $"Izlabo soli #{invalid.i + 1}: nav aizpildīts {field}.";
+                    await InvokeAsync(StateHasChanged);
+                    return;
         }
 
-        int tmpOrder = 1000;
+        if (!ValidateFinalRule())
+                {
+                    stepsError = "Pēdējam solim jābūt IsFinal.";
+                    await InvokeAsync(StateHasChanged);
+                    return;
+                }
+
+        // 2️⃣ PUT all (pareizais order)
         foreach (var step in editingSteps.Where(s => s.Id > 0))
         {
-            var prePayload = new
+            var payload = new
             {
                 Id = step.Id,
-                StepOrder = tmpOrder,
+                StepOrder = step.StepOrder,
                 StepName = step.StepName,
-                StepType = step.StepType > 0 ? step.StepType : 1,
+                StepType = step.StepType,
                 WorkCentrId = step.WorkCentrId,
                 ParallelGroup = step.IsParallel ? 1 : 0,
                 IsMandatory = step.IsMandatory,
                 IsFinal = step.IsFinal,
                 Comments = step.Comments
             };
-            tmpOrder += 10;
 
-            var preResp = await Http.PutAsJsonAsync("http://localhost:5270/api/products/step", prePayload);
-            if (!preResp.IsSuccessStatusCode)
-            {
-                var b = await preResp.Content.ReadAsStringAsync();
-                await JS.InvokeVoidAsync("alert", $"Pre-PUT kļūda: {b}");
-                return;
-            }
+
+            var resp = await Http.PutAsJsonAsync("http://localhost:5270/api/products/step", payload);
+
+                if (!resp.IsSuccessStatusCode)
+                {
+                    stepsError = await resp.Content.ReadAsStringAsync();
+                    await InvokeAsync(StateHasChanged);
+                    return;
+                }
         }
-
-        RecalcOrders();
-
+    // 1️⃣ POST new
         foreach (var step in editingSteps.Where(s => s.Id == 0))
         {
             var payload = new
@@ -880,7 +885,7 @@ return;
                 ProductToPartId = step.ProductToPartId,
                 StepOrder = step.StepOrder,
                 StepName = step.StepName,
-                StepType = step.StepType > 0 ? step.StepType : 1,
+                StepType = step.StepType,
                 WorkCentrId = step.WorkCentrId,
                 ParallelGroup = step.IsParallel ? 1 : 0,
                 IsMandatory = step.IsMandatory,
@@ -888,42 +893,31 @@ return;
                 Comments = step.Comments
             };
 
-            var resp = await Http.PostAsJsonAsync("http://localhost:5270/api/products/step", payload);
-            if (!resp.IsSuccessStatusCode)
-            {
-                var b = await resp.Content.ReadAsStringAsync();
-                await JS.InvokeVoidAsync("alert", $"POST kļūda: {b}");
-                return;
-            }
+var resp = await Http.PostAsJsonAsync("http://localhost:5270/api/products/step", payload);
+
+if (!resp.IsSuccessStatusCode)
+{
+    stepsError = await resp.Content.ReadAsStringAsync();
+    await InvokeAsync(StateHasChanged);
+    return;
+}
+
+var result = await resp.Content.ReadFromJsonAsync<JsonElement>();
+if (result.TryGetProperty("Id", out var idProp))
+{
+    step.Id = idProp.GetInt32();
+}
         }
 
-        foreach (var step in editingSteps.Where(s => s.Id > 0))
-        {
-            var payload = new
-            {
-                Id = step.Id,
-                StepOrder = step.StepOrder,
-                StepName = step.StepName,
-                StepType = step.StepType > 0 ? step.StepType : 1,
-                WorkCentrId = step.WorkCentrId,
-                ParallelGroup = step.IsParallel ? 1 : 0,
-                IsMandatory = step.IsMandatory,
-                IsFinal = step.IsFinal,
-                Comments = step.Comments
-            };
-
-            var resp = await Http.PutAsJsonAsync("http://localhost:5270/api/products/step", payload);
-            if (!resp.IsSuccessStatusCode)
-            {
-                var b = await resp.Content.ReadAsStringAsync();
-                await JS.InvokeVoidAsync("alert", $"PUT kļūda: {b}");
-                return;
-            }
-        }
-
-await CloseStepsDialog();
+            await CloseStepsDialog();
     }
 
+catch (Exception ex)
+{
+    stepsError = ex.ToString();
+    await InvokeAsync(StateHasChanged);
+}
+}
     // ===== Jaunas detaļas dialogs =====
    private NewPartVm newPart = new();
     private List<PartStepDto> newPartSteps = new();
@@ -1292,8 +1286,8 @@ private async Task ToggleTopPartAsync(TopPartDto part)
 
     selectedPartDetails ??= new List<ProductDetailDto>();
 
-    var existing = selectedPartDetails
-        .FirstOrDefault(x => x.TopPartCode == part.TopPartCode);
+var existing = selectedPartDetails
+    .FirstOrDefault(x => x.TopPartId == part.Id);
 
     if (existing is null)
     {
@@ -1308,10 +1302,18 @@ private async Task ToggleTopPartAsync(TopPartDto part)
             });
 
         if (!resp.IsSuccessStatusCode)
-        {
-            await JS.InvokeVoidAsync("alert", await resp.Content.ReadAsStringAsync());
-            return;
-        }
+            {
+                var msg = await resp.Content.ReadAsStringAsync();
+
+                if (msg.Contains("jau ir pievienota"))
+                {
+                    await JS.InvokeVoidAsync("alert", "Detaļa jau ir šai versijai.");
+                    return;
+                }
+
+                await JS.InvokeVoidAsync("alert", msg);
+                return;
+            }
 
         var result = await resp.Content.ReadFromJsonAsync<AddPartResponse>();
 
@@ -1325,6 +1327,7 @@ private async Task ToggleTopPartAsync(TopPartDto part)
         selectedPartDetails.Add(new ProductDetailDto
         {
             ProductToPartId = result.Id,
+            TopPartId = part.Id,
             TopPartName = part.TopPartName,
             TopPartCode = part.TopPartCode,
             Quantity = 1

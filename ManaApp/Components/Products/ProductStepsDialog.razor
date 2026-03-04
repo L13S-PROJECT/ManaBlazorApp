@@ -18,6 +18,12 @@
 <DialogTemplates>
 <Content>
 <div class="steps-dialog">
+    @if (!string.IsNullOrWhiteSpace(StepsError))
+            {
+                <div class="steps-error">
+                    @StepsError
+                </div>
+            }
     @if (Steps is null || Steps.Count == 0)
     {
         <div style="opacity:.7">Šai detaļai soļu nav.</div>
@@ -34,22 +40,28 @@
         <div class="steps-th steps-th-actions"></div>
     </div>
 
-    <div class="steps-table-body">
-            @for (int i = 0; i < Steps!.Count; i++)
+<div class="steps-table-body"
+     @onmouseup="EndDrag"
+     @onmouseleave="EndDrag">
+    @if (Steps == null)
+    {
+        <div></div>
+    }
+            @for (int i = 0; i < (Steps?.Count ?? 0); i++)
             {
-                var s = Steps[i];
+                var s = Steps![i];
                 var index = i;
 
-<div @key="s"
+<div 
      class="steps-tr steps-grid @( _selectedIndex == index ? "dragging" : "" ) 
      @( _hoverIndex == index && _isDragging && _selectedIndex != index ? "drop-target" : "" )"
-     @onmouseenter="() => OnDragEnter(index)"
-     @onmouseup="EndDrag">
+     @onmouseenter="() => OnDragEnter(index)">
               
                 <div class="steps-order-cell">
-                    <span class="steps-drag-handle"
-                        @onmousedown="() => StartDrag(index)"
-                        title="Pārvietot">⋮⋮</span>
+                <span class="steps-drag-handle"
+                    @onmousedown:preventDefault="true"
+                    @onmousedown="() => StartDrag(index)"
+                    title="Pārvietot">⋮⋮</span>
                 </div>
 
                 <div>
@@ -65,7 +77,8 @@
                                     CssClass="steps-ddl"
                                     PopupCssClass="steps-ddl-popup-small"
                                     DataSource="WorkCenters"
-                                    @bind-Value="s.WorkCentrId"
+                                    Value="s.WorkCentrId"
+                                    ValueChanged="@(v => s.WorkCentrId = v)"
                                     Width="100%">
                         <DropDownListFieldSettings Text="WorkCentr_Name" Value="Id" />
                     </SfDropDownList>
@@ -79,18 +92,18 @@
 
                     <label class="steps-flag" title="Pēdējais (Final) solis">
                         <input type="checkbox"
-                               checked="@s.IsFinal"
-                               disabled="@( !IsLastStep(s) )"
-                               @onchange="() => OnSetFinal.InvokeAsync(s)" />
+                            checked="@s.IsFinal"
+                            disabled="@( !IsLastStep(s) )"
+                            @onclick="() => OnSetFinal.InvokeAsync(s)" />
                         <span class="flag-icon final"></span>
                     </label>
                 </div>
 
                 <div>
                     <input class="steps-input steps-input-pill"
-                           type="text"
-                           value="@s.Comments"
-                           @onchange="e => s.Comments = e.Value?.ToString()" />
+                        type="text"
+                        @bind="s.Comments"
+                        @bind:event="oninput" />
                 </div>
 
                 <div class="steps-td-right">
@@ -118,12 +131,12 @@
             + Pievienot soli
         </button>
 
-        <button type="button"
-                class="steps-btn-save"
-                title="Saglabāt"
-                @onclick="async () => await OnSave.InvokeAsync()">
-            Saglabāt
-        </button>
+<button type="button"
+        class="steps-btn-save"
+        title="Saglabāt"
+        @onclick="HandleSave">
+    Saglabāt
+</button>
 
         <button type="button"
                 class="steps-btn-close"
@@ -140,10 +153,16 @@
 
 
 @code {
+
+    protected override void OnParametersSet()
+{
+    StateHasChanged();
+}
     [Parameter] public bool Visible { get; set; }
     [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public List<PartStepDto>? Steps { get; set; }
+    [Parameter] public string? StepsError { get; set; }
     [Parameter] public IEnumerable<StepTypeDto>? StepTypes { get; set; }
     [Parameter] public IEnumerable<WorkCenter>? WorkCenters { get; set; }
     [Parameter] public EventCallback<PartStepDto> OnMoveUp { get; set; }
@@ -241,12 +260,24 @@ private void EndDrag()
     _isDragging = false;
     _selectedIndex = null;
     _hoverIndex = null;
+
+    if (Steps != null)
+    {
+        for (int i = 0; i < Steps.Count; i++)
+            Steps[i].StepOrder = (i + 1) * 10;
+    }
+
     StateHasChanged();
 }
 
 private void OnDialogOpened(Syncfusion.Blazor.Popups.OpenEventArgs args)
 {
     args.PreventFocus = true;
+}
+
+private async Task HandleSave()
+{
+    await OnSave.InvokeAsync();
 }
 
 }

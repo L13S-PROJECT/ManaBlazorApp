@@ -316,6 +316,7 @@ public async Task<IActionResult> GetTopPartSteps(
                       tp => tp.Id,
                       (pt, tp) => new
                       {
+                          TopPartId = pt.TopPartId,
                           tp.TopPartName,
                           tp.TopPartCode,
                           tp.Stage,
@@ -327,6 +328,28 @@ public async Task<IActionResult> GetTopPartSteps(
             return Ok(rows);
 
         }
+
+[HttpGet("details-by-version")]
+public async Task<IActionResult> GetDetailsByVersion([FromQuery] int versionId)
+{
+    var rows = await _db.ProductTopParts.AsNoTracking()
+        .Where(pt => pt.VersionId == versionId && pt.IsActive)
+        .Join(_db.TopParts.Where(tp => tp.IsActive),
+              pt => pt.TopPartId,
+              tp => tp.Id,
+              (pt, tp) => new
+              {
+                  TopPartId = pt.TopPartId,
+                  tp.TopPartName,
+                  tp.TopPartCode,
+                  tp.Stage,
+                  Quantity = pt.QtyPerProduct,
+                  ProductToPartId = pt.Id
+              })
+        .ToListAsync();
+
+    return Ok(rows);
+}
 
 [HttpGet("stage-step-type-map")]
 public async Task<IActionResult> GetStageStepTypeMap()
@@ -732,6 +755,7 @@ var map = oldParts
         [HttpPost("step")]
         public async Task<IActionResult> CreateStep([FromBody] CreateStepRequest dto)
         {
+            Console.WriteLine("CREATE STEP API CALLED");
             if (dto.ProductToPartId <= 0) return BadRequest("ProductToPartId is required.");
             if (string.IsNullOrWhiteSpace(dto.StepName)) return BadRequest("StepName is required.");
            if (dto.WorkCentrId <= 0) return BadRequest("WorkCentrId required.");
@@ -780,12 +804,15 @@ dto.StepType = (int)await _db.StageStepTypeMaps
 
 
             // 4) IsFinal – nodrošinām, ka nebūs 2 aktīvi finālie
-            if (dto.IsFinal)
-            {
-                var hasFinal = await _db.TopPartSteps
-                    .AnyAsync(s => s.ProductToPartId == dto.ProductToPartId && s.IsActive && s.IsFinal);
-                if (hasFinal) return BadRequest("This part already has a final step.");
-            }
+                if (dto.IsFinal)
+                {
+                    var others = await _db.TopPartSteps
+                        .Where(s => s.ProductToPartId == dto.ProductToPartId && s.IsActive && s.IsFinal)
+                        .ToListAsync();
+
+                    foreach (var o in others)
+                        o.IsFinal = false;
+                }
 
             var step = new TopPartStep
             {
@@ -847,9 +874,12 @@ dto.StepType = (int)await _db.StageStepTypeMaps
             // IsFinal: ja uzliekam true — jāpārliecinās, ka citiem nav final
             if (dto.IsFinal && !step.IsFinal)
             {
-                var alreadyFinal = await _db.TopPartSteps
-                    .AnyAsync(s => s.ProductToPartId == step.ProductToPartId && s.IsActive && s.IsFinal && s.Id != step.Id);
-                if (alreadyFinal) return BadRequest("This part already has a final step.");
+                var others = await _db.TopPartSteps
+                    .Where(s => s.ProductToPartId == step.ProductToPartId && s.IsActive && s.Id != step.Id && s.IsFinal)
+                    .ToListAsync();
+
+                foreach (var o in others)
+                    o.IsFinal = false;
             }
 
             step.StepOrder = dto.StepOrder;
@@ -878,7 +908,32 @@ dto.StepType = (int)await _db.StageStepTypeMaps
             if (!versionActive) return BadRequest("Steps can be edited only for active version.");
 
             step.IsActive = false;
+
+// pārrēķinām secību pēc dzēšanas
+        var steps = await _db.TopPartSteps
+            .Where(s => s.ProductToPartId == step.ProductToPartId && s.IsActive && s.Id != step.Id)
+            .OrderBy(s => s.StepOrder)
+            .ToListAsync();
+
+        for (int i = 0; i < steps.Count; i++)
+        {
+            steps[i].StepOrder = (i + 1) * 10;
+        }
+
             await _db.SaveChangesAsync();
+
+                // nodrošinām, ka pēdējais solis ir Final
+                var last = steps.LastOrDefault();
+                if (last != null)
+                {
+                    foreach (var s in steps)
+                        s.IsFinal = false;
+
+                    last.IsFinal = true;
+
+                    await _db.SaveChangesAsync();
+                }
+
             return Ok();
         }
 

@@ -4,6 +4,7 @@ namespace ManaApp.Models
     {
         public string? TopPartName { get; set; }
         public string? TopPartCode { get; set; }
+        public int TopPartId { get; set; }
         public List<WorkStepItem>? Steps { get; set; }
     }
 
