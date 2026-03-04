@@ -6,18 +6,18 @@
 @inject IJSRuntime JS
 
 
-<SfDialog Width="900px"
-          CssClass="stepsDialog"
-          ShowCloseIcon="true"
-          IsModal="true"
-          ZIndex="10050"
-          Header="Tehnoloģijas soļi"
-          @bind-Visible="Visible">
-          
-<DialogEvents Opened="@( (Syncfusion.Blazor.Popups.OpenEventArgs args) => OnDialogOpened(args) )" />
-<DialogTemplates>
-<Content>
+@if (Visible)
+{
+<div class="steps-dialog-modal">
+<div class="steps-dialog-window">
+
+ <div class="steps-dialog-header">
+    Darba soļu secība
+</div>         
+
 <div class="steps-dialog">
+
+
     @if (Steps is null || Steps.Count == 0)
     {
         <div style="opacity:.7">Šai detaļai soļu nav.</div>
@@ -113,9 +113,10 @@
 </div>
     }
 </div>
-</Content>
 
-<FooterTemplate>
+
+<div class="steps-footer-wrapper">
+
     <div class="steps-footer">
 
         <button type="button"
@@ -128,7 +129,7 @@
 <button type="button"
         class="steps-btn-save"
         title="Saglabāt"
-        @onclick="async () => await OnSave.InvokeAsync()">
+        @onclick="HandleSave">
     Saglabāt
 </button>
 
@@ -140,10 +141,11 @@
         </button>
 
     </div>
-</FooterTemplate>
-</DialogTemplates>
+</div>
 
-</SfDialog>
+</div>
+</div>
+}
 
 
 @code {
@@ -267,6 +269,7 @@ private void OnDialogOpened(Syncfusion.Blazor.Popups.OpenEventArgs args)
 private async Task HandleSave()
 {
     await OnSave.InvokeAsync();
+    StateHasChanged();
 }
 
 }

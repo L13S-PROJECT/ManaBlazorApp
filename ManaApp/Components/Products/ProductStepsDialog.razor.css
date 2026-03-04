@@ -170,11 +170,9 @@
 }
 
 /* ===== Steps footer layout ===== */
-
-.steps-footer{
-  display:flex;
-  gap:12px;
-  justify-content:flex-end;
+.steps-footer-wrapper{
+  padding:12px 18px;
+  border-top:1px solid #e5e7eb;
 }
 
 /* Kopīgais pogu stils */
@@ -220,4 +218,82 @@
 
 .steps-btn-close:hover{
   background:#eff6ff;
+}
+
+/* Modal background */
+.steps-dialog-modal{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.35);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:10050;
+}
+
+/* Dialog window */
+.steps-dialog-window{
+  width:860px;
+  height:420px;          /* ← FIKSĒTS AUGSTUMS */
+
+  background:#ffffff;
+
+  border-radius:12px;
+  border:1px solid #60a5fa;
+
+  box-shadow:0 10px 25px rgba(0,0,0,0.18);
+
+  display:flex;
+  flex-direction:column;
+
+  overflow:hidden;       /* ← lai header ņem radius */
+}
+
+.steps-dialog{
+  flex:1;
+  padding:16px 18px;
+
+  display:flex;
+  flex-direction:column;
+
+  overflow:hidden;
+}
+
+.steps-table-body{
+  flex:1;
+  overflow-y:auto;
+  max-height:320px;
+  padding-right:4px;
+}
+
+.steps-dialog-window:hover{
+  border-color:#60a5fa;
+}
+
+.steps-dialog-header{
+  font-size:16px;
+  font-weight:600;
+
+  padding:12px 18px;
+
+  border-bottom:2px solid #2563eb;
+  border-top-left-radius:12px;
+  border-top-right-radius:12px;
+
+  background:linear-gradient(
+      to right,
+      #eff6ff,
+      #ffffff
+  );
+
+  color:#1e3a8a;
+}
+
+.steps-footer-wrapper{
+  padding:12px 18px;
+  border-top:1px solid #e5e7eb;
+  background:#f8fafc;
+
+  display:flex;
+  justify-content:flex-end;
 }

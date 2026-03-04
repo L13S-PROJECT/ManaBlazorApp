@@ -129,7 +129,7 @@
     Steps="editingSteps"
     StepTypes="stepTypes"
     WorkCenters="workCenters"
-    StepsError="stepsError"
+    StepsError="@stepsError"
     OnMoveUp="MoveUp"
     OnMoveDown="MoveDown"
     OnDelete="DeleteStepAsync"
@@ -816,6 +816,9 @@ private void RecalcOrders()
 
 private async Task SaveStepsAsync()
 {
+    
+    stepsError = null;
+
     try
     {
             await InvokeAsync(StateHasChanged);
@@ -831,26 +834,23 @@ private async Task SaveStepsAsync()
         await InvokeAsync(StateHasChanged);
 
         var invalid = editingSteps
-            .Select((s, i) => new { s, i })
-            .FirstOrDefault(x => string.IsNullOrWhiteSpace(x.s.StepName)
-                              || x.s.StepType <= 0
-                              || x.s.WorkCentrId <= 0);
+    .Select((s, i) => new { s, i })
+    .FirstOrDefault(x => string.IsNullOrWhiteSpace(x.s.StepName)
+                      || x.s.WorkCentrId <= 0);
 
-        if (invalid != null)
-        {
-            var field = string.IsNullOrWhiteSpace(invalid.s.StepName) ? "nosaukums"
-                     : (invalid.s.StepType <= 0 ? "soļa tips"
-                     : "darba centrs");
+    if (invalid != null)
+    {
+        var field = string.IsNullOrWhiteSpace(invalid.s.StepName)
+            ? "nosaukums"
+            : "darba centrs";
 
-                    stepsError = $"Izlabo soli #{invalid.i + 1}: nav aizpildīts {field}.";
-                    await InvokeAsync(StateHasChanged);
-                    return;
-        }
+        await JS.InvokeVoidAsync("alert", $"Izlabo soli #{invalid.i + 1}: nav aizpildīts {field}.");
+        return;
+    }
 
 if (!ValidateFinalRule())
 {
-    stepsError = "Pēdējam solim jābūt atzīmētam kā Final.";
-    await InvokeAsync(StateHasChanged);
+    await JS.InvokeVoidAsync("alert", "Pēdējam solim jābūt atzīmētam kā Final.");
     return;
 }
 
@@ -915,11 +915,11 @@ if (result.TryGetProperty("Id", out var idProp))
             await OnRowClicked(selected!);
     }
 
-        catch (Exception ex)
-            {
-                stepsError = ex.ToString();
-                await InvokeAsync(StateHasChanged);
-            }
+catch (Exception ex)
+{
+    await JS.InvokeVoidAsync("alert", ex.Message);
+}
+
 }
     // ===== Jaunas detaļas dialogs =====
    private NewPartVm newPart = new();
