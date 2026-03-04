@@ -676,7 +676,8 @@ if (row.VersionId == null || row.VersionId == 0)
         if (detail is null) return;
 
         currentStepsPartId = detail.ProductToPartId;
-editingSteps = await LoadStepsAsync(detail.ProductToPartId);
+        var steps = await LoadStepsAsync(detail.ProductToPartId);
+        editingSteps = new List<PartStepDto>(steps);
 
 // ielādē dropdown avotus katru reizi atverot
 await LoadActiveWorkCentersAsync();
@@ -693,17 +694,18 @@ private async Task CloseStepsDialog()
     isWorkCentersOpen = false;
 
     stepsError = null;
-    SetMainDialog(null);
 
     // Pēc soļu rediģēšanas/dzēšanas atsvaidzini labo pusi (“Tehnoloģija” sarakstu)
     if (selected is not null)
     {
         selectedPartDetails = await Http.GetFromJsonAsync<List<ProductDetailDto>>(
-    $"http://localhost:5270/api/products/details-by-version?versionId={selected!.VersionId}") ?? new();
+            $"http://localhost:5270/api/products/details-by-version?versionId={selected!.VersionId}") ?? new();
 
-         worksByParts = await Http.GetFromJsonAsync<List<WorksByPartDto>>(
-    $"http://localhost:5270/api/products/works-by-version?versionId={selected!.VersionId}") ?? new();
+        worksByParts = await Http.GetFromJsonAsync<List<WorksByPartDto>>(
+            $"http://localhost:5270/api/products/works-by-version?versionId={selected!.VersionId}") ?? new();
     }
+
+    SetMainDialog(null);
 
     StateHasChanged();
 }
@@ -816,8 +818,9 @@ private async Task SaveStepsAsync()
 {
     try
     {
-        stepsError = null;
-        RecalcOrders();
+            await InvokeAsync(StateHasChanged);
+            stepsError = null;
+            RecalcOrders();
 
         if (editingSteps == null || editingSteps.Count == 0)
             {
@@ -844,12 +847,12 @@ private async Task SaveStepsAsync()
                     return;
         }
 
-        if (!ValidateFinalRule())
-                {
-                    stepsError = "Pēdējam solim jābūt IsFinal.";
-                    await InvokeAsync(StateHasChanged);
-                    return;
-                }
+if (!ValidateFinalRule())
+{
+    stepsError = "Pēdējam solim jābūt atzīmētam kā Final.";
+    await InvokeAsync(StateHasChanged);
+    return;
+}
 
         // 2️⃣ PUT all (pareizais order)
         foreach (var step in editingSteps.Where(s => s.Id > 0))
@@ -908,15 +911,15 @@ if (result.TryGetProperty("Id", out var idProp))
     step.Id = idProp.GetInt32();
 }
         }
-
-            await CloseStepsDialog();
+            SetMainDialog(null);
+            await OnRowClicked(selected!);
     }
 
-catch (Exception ex)
-{
-    stepsError = ex.ToString();
-    await InvokeAsync(StateHasChanged);
-}
+        catch (Exception ex)
+            {
+                stepsError = ex.ToString();
+                await InvokeAsync(StateHasChanged);
+            }
 }
     // ===== Jaunas detaļas dialogs =====
    private NewPartVm newPart = new();

@@ -7,23 +7,17 @@
 
 
 <SfDialog Width="900px"
-            CssClass="stepsDialog"
+          CssClass="stepsDialog"
           ShowCloseIcon="true"
           IsModal="true"
           ZIndex="10050"
           Header="Tehnoloģijas soļi"
-          Visible="Visible"
-        VisibleChanged="VisibleChanged">
+          @bind-Visible="Visible">
+          
 <DialogEvents Opened="@( (Syncfusion.Blazor.Popups.OpenEventArgs args) => OnDialogOpened(args) )" />
 <DialogTemplates>
 <Content>
 <div class="steps-dialog">
-    @if (!string.IsNullOrWhiteSpace(StepsError))
-            {
-                <div class="steps-error">
-                    @StepsError
-                </div>
-            }
     @if (Steps is null || Steps.Count == 0)
     {
         <div style="opacity:.7">Šai detaļai soļu nav.</div>
@@ -53,8 +47,8 @@
                 var index = i;
 
 <div 
-     class="steps-tr steps-grid @( _selectedIndex == index ? "dragging" : "" ) 
-     @( _hoverIndex == index && _isDragging && _selectedIndex != index ? "drop-target" : "" )"
+     @key="s"
+     class="steps-tr steps-grid @( _selectedIndex == index ? "dragging" : "" )"
      @onmouseenter="() => OnDragEnter(index)">
               
                 <div class="steps-order-cell">
@@ -134,7 +128,7 @@
 <button type="button"
         class="steps-btn-save"
         title="Saglabāt"
-        @onclick="HandleSave">
+        @onclick="async () => await OnSave.InvokeAsync()">
     Saglabāt
 </button>
 
@@ -153,11 +147,6 @@
 
 
 @code {
-
-    protected override void OnParametersSet()
-{
-    StateHasChanged();
-}
     [Parameter] public bool Visible { get; set; }
     [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
