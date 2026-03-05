@@ -1,0 +1,79 @@
+.ptv3-root {
+    display: grid;
+    grid-template-rows: 5vh 1fr 25vh;
+    height: 100vh;
+    width: 100%;
+    gap: 10px;
+    padding: 10px;
+    box-sizing: border-box;
+    background: #AFC1DE;
+}
+
+.ptv3-toolbar {
+    background: #ffffff;
+    border: 2px solid #000;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ptv3-main {
+    background: #ffffff;
+    border: 2px solid #000;
+    border-radius: 10px;
+    overflow-y: auto;
+    padding: 6px;
+}
+
+.ptv3-detail {
+    background: #ffffff;
+    border: 2px solid #000;
+    border-radius: 10px;
+    overflow-y: auto;
+    padding: 6px;
+}
+
+.ptv3-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.ptv3-table th {
+    background: #2563EB;
+    color: #ffffff;
+    padding: 6px;
+    text-align: left;
+    border: 1px solid #d1d5db;
+
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.ptv3-table td {
+    padding: 6px;
+    border: 1px solid #e5e7eb;
+}
+
+.ptv3-table tr:hover {
+    background: #E8F0FE;
+    cursor: pointer;
+}
+
+.ptv3-active {
+    background: #ffffff;
+    font-weight: 600;
+    border-left: 4px solid #2563EB;
+}
+
+.ptv3-detail-start {
+    background: #FEF3C7;   /* dzeltens */
+    font-weight: 600;
+}
+
+.ptv3-detail-finish {
+    background: #BBF7D0;   /* zaļš */
+    font-weight: 600;
+}

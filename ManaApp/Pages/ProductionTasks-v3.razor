@@ -1,0 +1,176 @@
+@page "/productiontasks-v3"
+
+@using ManaApp.Components
+@using ManaApp.Models
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<div class="ptv3-root">
+
+    <!-- TOOLBAR -->
+    <div class="ptv3-toolbar">
+        <input class="ptv3-search"
+            placeholder="Meklēt: batch, kods, nosaukums..."
+            @bind="SearchText"
+            @bind:event="oninput" />
+    </div>
+
+    <!-- MAIN CONTENT -->
+<div class="ptv3-main">
+
+    <table class="ptv3-table">
+
+        <thead>
+<tr>
+    <th>Batch</th>
+    <th>Kategorija</th>
+    <th>Nosaukums</th>
+    <th>Kods</th>
+    <th>Versija</th>
+    <th>Plānots</th>
+    <th>Procesā</th>
+    <th>Sold</th>
+    <th>Done</th>
+
+    <th>Detaļas</th>
+    <th>Detail</th>
+    <th>Assembly</th>
+    <th>Fin</th>
+    <th>Finishing</th>
+
+    <th>Komentārs</th>
+</tr>
+</thead>
+
+<tbody>
+
+@foreach (var b in ProductBatches
+    .Where(x =>
+        string.IsNullOrWhiteSpace(SearchText)
+        || (x.BatchCode ?? "").Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+        || (x.ProductCode ?? "").Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+        || (AllProducts.FirstOrDefault(p => p.productCode == x.ProductCode)?.productName ?? "")
+            .Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+    ))
+{
+<tr class="@(SelectedBatch?.BatchProductId == b.BatchProductId ? "ptv3-active" : "")"
+    @onclick="() => SelectRow(b.BatchProductId)">
+
+    <td>@b.BatchCode</td>
+    <td>@b.CategoryName</td>
+    <td>@AllProducts.FirstOrDefault(x => x.productCode == b.ProductCode)?.productName</td>
+    <td>@b.ProductCode</td>
+    <td>@b.VersionName</td>
+    <td>@b.Planned</td>
+    <td>@(b.DetailedInProgress + b.DetailedFinish + b.AssemblyInProgress + b.AssemblyFinish + b.FinishingInProgress)</td>
+    <td>@b.Sold</td>
+    <td>@b.Done</td>
+    <td>@($"{b.DetailedStarted}/{b.DetailsTotal}")</td>
+    <td class="@(b.DetailFinish != null ? "ptv3-detail-finish" 
+                : b.DetailStart != null ? "ptv3-detail-start" 
+                : "")">
+
+            @if (b.DetailFinish != null)
+            {
+                @b.DetailFinish?.ToString("dd.MM.yyyy")
+            }
+            else if (b.DetailStart != null)
+            {
+                @b.DetailStart?.ToString("dd.MM.yyyy")
+            }
+
+    </td>
+    <td class="@(b.AssemblyFinishDate != null ? "ptv3-detail-finish" 
+        : b.AssemblyStart != null ? "ptv3-detail-start" 
+        : "")">
+
+                @if (b.AssemblyFinishDate != null)
+                {
+                    @b.AssemblyFinishDate?.ToString("dd.MM.yyyy")
+                }
+                else if (b.AssemblyStart != null)
+                {
+                    @b.AssemblyStart?.ToString("dd.MM.yyyy")
+                }
+
+    </td>
+    <td>@($"{b.FinishingInProgress}/{Math.Max(b.AssemblyFinish - b.FinishingInProgress - b.Sold, 0)}")</td>
+    <td>-</td>
+    <td>-</td>
+
+</tr>
+}
+
+</tbody>
+
+    </table>
+
+</div>
+
+    <!-- DETAIL PANEL -->
+<div class="ptv3-detail">
+
+    <ProductionTasksDetailPanel
+        @key="SelectedBatch?.BatchProductId"
+        SelectedBatch="SelectedBatch" />
+
+</div>
+
+</div>
+
+@code {
+
+    private ProductBatchRow? SelectedBatch;
+    private string SearchText = "";
+private void SelectRow(int batchProductId)
+{
+    SelectedBatch = ProductBatches
+        .FirstOrDefault(x => x.BatchProductId == batchProductId);
+}
+
+private List<ProductBatchRow> ProductBatches = new();
+private List<ProductRow> AllProducts = new();
+private Dictionary<int, VersionSummaryDto> VersionSummary = new();
+private Dictionary<int, string> BatchCodes = new();
+protected override async Task OnInitializedAsync()
+{
+        ProductBatches = await Http.GetFromJsonAsync<List<ProductBatchRow>>(
+            "http://localhost:5270/api/batches/list-production"
+        ) ?? new();
+
+foreach (var b in ProductBatches)
+{
+    b.Sold = await Http.GetFromJsonAsync<int>(
+        $"http://localhost:5270/api/stockmovements/sold-by-batchproduct?batchProductId={b.BatchProductId}"
+    );
+}
+
+    AllProducts = await Http.GetFromJsonAsync<List<ProductRow>>(
+        "http://localhost:5270/api/products/planning-list"
+    ) ?? new();
+
+    var versionIds = AllProducts
+    .Where(x => x.VersionId.HasValue)
+    .Select(x => x.VersionId!.Value)
+    .Distinct()
+    .ToList();
+
+    var summaryUrl = "http://localhost:5270/api/production/overview-by-versions";
+
+    if (versionIds.Any())
+    {
+        var query = string.Join("&versionIds=", versionIds);
+        summaryUrl += $"?versionIds={query}";
+    }
+
+    var summaries = await Http.GetFromJsonAsync<List<VersionSummaryDto>>(summaryUrl)
+                    ?? new();
+
+    VersionSummary = summaries.ToDictionary(x => x.VersionId);
+
+VersionSummary = summaries.ToDictionary(x => x.VersionId);
+
+
+            }
+
+}

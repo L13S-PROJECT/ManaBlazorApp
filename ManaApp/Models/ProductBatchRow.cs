@@ -5,8 +5,13 @@ public sealed class ProductBatchRow
 {
     public int BatchId { get; set; }
     public int BatchProductId { get; set; }
-
     public string BatchCode { get; set; } = "";
+   public string? Comment { get; set; }
+    public DateTime? StartedAt { get; set; }
+    public string ProductCode { get; set; } = "";
+    public string CategoryName { get; set; } = "";
+    public int VersionId { get; set; }
+    public string? VersionName { get; set; }
 
     public int Planned { get; set; }
 
@@ -14,13 +19,17 @@ public sealed class ProductBatchRow
 
     public int Done { get; set; }
 
-    public string? Comment { get; set; }
-    public DateTime? StartedAt { get; set; }
+    public int DetailedInProgress { get; set; }
+    public int DetailedFinish { get; set; }
+    public int AssemblyInProgress { get; set; }
+    public int AssemblyFinish { get; set; }
+    public int FinishingInProgress { get; set; }
+    public int DetailedStarted { get; set; }
+    public int DetailsTotal { get; set; }
 
-    public int VersionId { get; set; }
-    public string? VersionName { get; set; }
-
-    public string ProductCode { get; set; } = "";
-    public string CategoryName { get; set; } = "";
+    public DateTime? DetailStart { get; set; }
+    public DateTime? DetailFinish { get; set; }
+    public DateTime? AssemblyStart { get; set; }
+    public DateTime? AssemblyFinishDate { get; set; }
 }
 

@@ -434,6 +434,8 @@ public async Task<IActionResult> GetProductionBatches(
     await using var cmd = conn.CreateCommand();
     cmd.CommandText = @"
 SELECT
+    b.ID                               AS BatchId,
+    b.Batches_Code                     AS BatchCode,
     bp.ID                              AS BatchProductId,
     bp.Version_Id                      AS VersionId,
     p.Product_Name                     AS ProductName,
@@ -493,8 +495,12 @@ SUM(
     -- ir vismaz viens Assembly ar 3
     -- UN vairs nav neviena Assembly ar 1/2/5
 -- Assembly FINISH:
-SUM(COALESCE(sm.AssemblyDone, 0)) AS Done
-,
+SUM(COALESCE(sm.AssemblyDone, 0)) AS Done,
+
+SUM(COALESCE(sm.AssemblyDone, 0)) 
+- SUM(COALESCE(tsum.FinishingStartedQty, 0)) 
+AS AssemblyFinish,
+
 SUM(COALESCE(tsum.FinishingStartedQty, 0)) AS FinishingInProgress
 
 FROM batches_products bp
@@ -503,13 +509,13 @@ JOIN versions v ON v.ID = bp.Version_Id
 JOIN products p   ON p.ID = v.Product_ID
 JOIN categories c ON c.ID = p.Category_ID AND c.IsActive = 1
 LEFT JOIN (
-    SELECT 
+    SELECT
         BatchProduct_ID,
-        SUM(CASE WHEN Move_Type = 'ASSEMBLY' THEN Stock_Qty ELSE 0 END) AS AssemblyDone
+        SUM(CASE WHEN Move_Type = 'SOLD' THEN ABS(Stock_Qty) ELSE 0 END) AS Sold
     FROM stock_movements
     WHERE IsActive = 1
     GROUP BY BatchProduct_ID
-) sm ON sm.BatchProduct_ID = bp.ID
+) ss ON ss.BatchProduct_ID = bp.ID
 LEFT JOIN (
     SELECT
         t.BatchProduct_ID,
@@ -585,19 +591,22 @@ cmd.Parameters.Add(pFilter);
     {
 list.Add(new
 {
-    BatchProductId      = r.GetInt32(0),
-    VersionId           = r.GetInt32(1),
-    ProductName         = r.GetString(2),
-    ProductCode         = r.GetString(3),
-    CategoryName        = r.GetString(4),
-    VersionName         = r.GetString(5),
-    IsPriority          = r.GetBoolean(6),
-    Planned             = r.GetInt32(7),
-    DetailedInProgress  = r.GetInt32(8),
-    DetailedFinish      = r.GetInt32(9),
-    Assembly            = r.GetInt32(10),
-    Done                = r.GetInt32(11),
-    FinishingInProgress = r.GetInt32(12)
+    BatchId             = r.GetInt32(0),
+    BatchCode           = r.GetString(1),
+    BatchProductId      = r.GetInt32(2),
+    VersionId           = r.GetInt32(3),
+    ProductName         = r.GetString(4),
+    ProductCode         = r.GetString(5),
+    CategoryName        = r.GetString(6),
+    VersionName         = r.GetString(7),
+    IsPriority          = r.GetBoolean(8),
+    Planned             = r.GetInt32(9),
+    DetailedInProgress  = r.GetInt32(10),
+    DetailedFinish      = r.GetInt32(11),
+    Assembly            = r.GetInt32(12),
+    Done                = r.GetInt32(13),
+    AssemblyFinish      = r.GetInt32(14),
+    FinishingInProgress = r.GetInt32(15)
 });
 
     }
@@ -1162,7 +1171,176 @@ WHERE ID = @id
     return Ok(new { batchId = dto.BatchId });
 }
 
+[HttpGet("list-production")]
+public async Task<IActionResult> GetProductionBatchesRows()
+{
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
 
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+SELECT
+    b.ID           AS BatchId,
+    b.Batches_Code AS BatchCode,
+    bp.ID          AS BatchProductId,
+    bp.Version_Id  AS VersionId,
+    p.Product_Name AS ProductName,
+    p.Product_Code AS ProductCode,
+    c.Category_Name AS CategoryName,
+    v.Version_Name  AS VersionName,
+    bp.is_priority  AS IsPriority,
+    bp.Planned_Qty  AS Planned
+, COALESCE(tsum.DetailedInProgress, 0)  AS DetailedInProgress
+, COALESCE(tsum.DetailedFinish, 0)      AS DetailedFinish
+, COALESCE(tsum.AssemblyInProgress, 0)  AS AssemblyInProgress
+, COALESCE(sm.AssemblyFinish, 0)      AS AssemblyFinish
+, COALESCE(tsum.FinishingInProgress, 0) AS FinishingInProgress
+, tsum.DetailStart
+, tsum.DetailFinish
+, tsum.AssemblyStart
+, tsum.AssemblyFinishDate
+, COALESCE(tsum.DetailedStarted, 0) AS DetailedStarted
+, COALESCE(pp.DetailsTotal, 0) AS DetailsTotal
+FROM batches_products bp
+JOIN batches  b ON b.ID = bp.Batch_Id
+JOIN versions v ON v.ID = bp.Version_Id
+JOIN products p ON p.ID = v.Product_ID
+JOIN categories c ON c.ID = p.Category_ID
+LEFT JOIN (
+    SELECT 
+        BatchProduct_ID,
+        GREATEST(SUM(CASE WHEN Move_Type = 'ASSEMBLY' THEN Stock_Qty ELSE 0 END),0) AS AssemblyFinish
+    FROM stock_movements
+    WHERE IsActive = 1
+    GROUP BY BatchProduct_ID
+) sm ON sm.BatchProduct_ID = bp.ID
+
+LEFT JOIN (
+    SELECT
+        t.BatchProduct_ID,
+        CASE
+            WHEN SUM(CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status IN (2,3) THEN 1 ELSE 0 END) > 0
+             AND SUM(CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status <> 3 THEN 1 ELSE 0 END) > 0
+            THEN MAX(bp2.Planned_Qty)
+            ELSE 0
+        END AS DetailedInProgress,
+
+        CASE
+            WHEN SUM(CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status IN (2,3) THEN 1 ELSE 0 END) > 0
+             AND SUM(CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status <> 3 THEN 1 ELSE 0 END) = 0
+             AND SUM(CASE WHEN ts.Step_Type = 2 AND t.Tasks_Status IN (2,3) THEN 1 ELSE 0 END) = 0
+            THEN MAX(bp2.Planned_Qty)
+            ELSE 0
+        END AS DetailedFinish,
+
+        CASE
+            WHEN SUM(CASE WHEN ts.Step_Type = 2 AND t.Tasks_Status IN (2,3) THEN 1 ELSE 0 END) > 0
+             AND SUM(CASE WHEN ts.Step_Type = 2 AND t.Tasks_Status IN (1,2,5) THEN 1 ELSE 0 END) > 0
+            THEN MAX(bp2.Planned_Qty)
+            ELSE 0
+        END AS AssemblyInProgress,
+
+SUM(CASE 
+        WHEN ts.Step_Type = 3 AND t.Tasks_Status IN (1,2,3)
+        THEN t.Qty_Done + t.Qty_Scrap
+        ELSE 0
+    END) AS FinishingInProgress,
+
+MIN(CASE 
+        WHEN ts.Step_Type = 1 AND t.Tasks_Status = 2 
+        THEN t.Started_At 
+      END) AS DetailStart,
+
+MAX(CASE 
+        WHEN ts.Step_Type = 1 AND t.Tasks_Status = 3 
+        THEN t.Finished_At 
+      END) AS DetailFinish,
+
+MIN(CASE 
+        WHEN ts.Step_Type = 2 AND t.Tasks_Status = 2
+        THEN t.Started_At
+      END) AS AssemblyStart,
+
+MAX(CASE 
+        WHEN ts.Step_Type = 2 AND t.Tasks_Status = 3
+        THEN t.Finished_At
+      END) AS AssemblyFinishDate,
+
+COUNT(DISTINCT CASE 
+      WHEN mdet.Stage = 1 AND t.Tasks_Status IN (1,2,3)
+      THEN ptp.ID
+  END) AS DetailedStarted
+    FROM tasks t
+    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+    JOIN producttopparts ptp 
+        ON ptp.ID = ts.ProductToPart_ID
+        AND ptp.IsActive = 1
+            LEFT JOIN stage_step_type_map mdet
+            ON mdet.Stage = 1
+            AND mdet.IsActive = 1
+            AND mdet.Step_Type_ID = ts.Step_Type
+JOIN batches_products bp2 ON bp2.ID = t.BatchProduct_ID
+WHERE t.IsActive = 1
+  AND ts.IsActive = 1
+GROUP BY t.BatchProduct_ID
+) tsum ON tsum.BatchProduct_ID = bp.ID
+LEFT JOIN (
+    SELECT
+        ptp.Version_ID,
+        COUNT(DISTINCT ptp.ID) AS DetailsTotal
+    FROM producttopparts ptp
+    JOIN toppartsteps ts
+         ON ts.ProductToPart_ID = ptp.ID
+        AND ts.IsActive = 1
+    JOIN stage_step_type_map mdet
+         ON mdet.Stage = 1
+        AND mdet.IsActive = 1
+        AND mdet.Step_Type_ID = ts.Step_Type
+    WHERE ptp.IsActive = 1
+    GROUP BY ptp.Version_ID
+) pp ON pp.Version_ID = bp.Version_Id
+WHERE bp.IsActive = 1
+  AND b.IsActive = 1
+  AND b.Batches_Statuss = 1
+ORDER BY b.ID DESC;
+";
+
+    var list = new List<object>();
+
+    await using var r = await cmd.ExecuteReaderAsync();
+    while (await r.ReadAsync())
+    {
+        list.Add(new
+        {
+            BatchId        = r.GetInt32(0),
+            BatchCode      = r.GetString(1),
+            BatchProductId = r.GetInt32(2),
+            VersionId      = r.GetInt32(3),
+            ProductName    = r.GetString(4),
+            ProductCode    = r.GetString(5),
+            CategoryName   = r.GetString(6),
+            VersionName    = r.GetString(7),
+            IsPriority     = r.GetBoolean(8),
+            Planned             = r.GetInt32(9),
+            DetailedInProgress  = r.GetInt32(10),
+            DetailedFinish      = r.GetInt32(11),
+            AssemblyInProgress  = r.GetInt32(12),
+            AssemblyFinish      = r.GetInt32(13),
+            FinishingInProgress = r.GetInt32(14),
+
+            DetailStart  = r.IsDBNull(15) ? (DateTime?)null : r.GetFieldValue<DateTime>(15),
+            DetailFinish = r.IsDBNull(16) ? (DateTime?)null : r.GetFieldValue<DateTime>(16),
+
+            AssemblyStart  = r.IsDBNull(17) ? (DateTime?)null : r.GetFieldValue<DateTime>(17),
+            AssemblyFinishDate = r.IsDBNull(18) ? (DateTime?)null : r.GetFieldValue<DateTime>(18),
+
+            DetailedStarted = r.GetInt32(19),
+            DetailsTotal = r.GetInt32(20)
+        });
+    }
+
+    return Ok(list);
+}
 
     } // <-- beidzas public class BatchesController
 
