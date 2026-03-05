@@ -94,7 +94,7 @@
                 }
 
     </td>
-    <td>@($"{b.FinishingInProgress}/{Math.Max(b.AssemblyFinish - b.FinishingInProgress - b.Sold, 0)}")</td>
+    <td>@($"{b.FinishingInProgress}/{b.AssemblyFinish}")</td>
     <td>-</td>
     <td>-</td>
 
@@ -142,6 +142,20 @@ foreach (var b in ProductBatches)
 {
     b.Sold = await Http.GetFromJsonAsync<int>(
         $"http://localhost:5270/api/stockmovements/sold-by-batchproduct?batchProductId={b.BatchProductId}"
+    );
+}
+
+foreach (var b in ProductBatches)
+{
+    b.AssemblyFinish = await Http.GetFromJsonAsync<int>(
+        $"http://localhost:5270/api/batches/assembly-out-total?batchProductId={b.BatchProductId}"
+    );
+}
+
+foreach (var b in ProductBatches)
+{
+    b.FinishingInProgress = await Http.GetFromJsonAsync<int>(
+        $"http://localhost:5270/api/batches/finishing-out?batchProductId={b.BatchProductId}"
     );
 }
 

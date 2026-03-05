@@ -55,6 +55,7 @@ END AS PriorityLevel,
   b.Batches_Code,            -- 10 BatchCode
 
   COALESCE(t.Qty_Done, 0) AS DoneForTask, -- 10 Done
+t.Assigned_To,
 CASE 
     WHEN ts.Step_Type IN (1,2) THEN bp.Planned_Qty * ptp.Qty_Per_product
     WHEN ts.Step_Type = 3 THEN t.Qty_Done
@@ -85,21 +86,22 @@ AND NOT EXISTS (
       AND t2.Tasks_Status <> 3
       AND t2.IsActive = 1
 )
-  AND (
-    (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To = 0))
+
+AND (
+    (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To = 0 OR t.Assigned_To IS NULL))
  OR (@empId = 0 AND (t.Assigned_To IS NULL OR t.Assigned_To = 0))
 )
 
 ORDER BY
   CASE
       WHEN bp.is_priority = 1 AND t.Tasks_Priority = 1 THEN 1
-      WHEN bp.is_priority = 1 THEN 2
+      WHEN bp.is_priority = 1 AND t.Tasks_Priority = 0 THEN 2
       WHEN bp.is_priority = 0 AND t.Tasks_Priority = 1 THEN 3
       ELSE 4
-  END ASC,
-  bp.Priority ASC,
-  bp.ID ASC,
-  ts.Step_Order ASC;
+  END,
+  bp.Priority,
+  ts.Step_Order,
+  t.ID;
 ";
 
 
@@ -139,13 +141,14 @@ ORDER BY
     BatchCode   = r.IsDBNull(13) ? null : r.GetString(13),
 
     Done    = r.IsDBNull(14) ? 0 : r.GetInt32(14),
-    Planned = r.IsDBNull(15) ? 0 : r.GetInt32(15),
-    StepOrder   = r.IsDBNull(16) ? 0 : r.GetInt32(16),
+    Assigned_To = r.IsDBNull(15) ? (int?)null : r.GetInt32(15),
+    Planned = r.IsDBNull(16) ? 0 : r.GetInt32(16),
+    StepOrder   = r.IsDBNull(17) ? 0 : r.GetInt32(17),
 
-    StepType       = r.IsDBNull(17) ? 0 : r.GetInt32(17),
-    BatchId        = r.IsDBNull(18) ? 0 : r.GetInt32(18),
-    VersionId      = r.IsDBNull(19) ? 0 : r.GetInt32(19),
-    BatchProductId = r.IsDBNull(20) ? 0 : r.GetInt32(20)
+    StepType       = r.IsDBNull(18) ? 0 : r.GetInt32(18),
+    BatchId        = r.IsDBNull(19) ? 0 : r.GetInt32(19),
+    VersionId      = r.IsDBNull(20) ? 0 : r.GetInt32(20),
+    BatchProductId = r.IsDBNull(21) ? 0 : r.GetInt32(21)
     });
     }
    }
@@ -231,16 +234,21 @@ JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
 JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
 WHERE t.IsActive = 1
   AND bp.IsActive = 1
-  AND t.Tasks_Status = 1
+  AND t.Tasks_Status = 2
   AND t.ID <> @taskId
-  AND t.Assigned_To = @emp
-  AND (
+  AND (t.Assigned_To = @emp OR t.Assigned_To = 0)
+AND (
         (bp.is_priority = 1 AND @curIsPriority = 0)
 
      OR (bp.is_priority = @curIsPriority 
          AND bp.Priority = @curBatchOrder 
+         AND bp.ID = (
+            SELECT BatchProduct_ID
+            FROM tasks
+            WHERE ID = @taskId
+         )
          AND ts.Step_Order < @curStepOrder)
-  )
+)
 LIMIT 1;";
 
     var pTask = checkOrder.CreateParameter();
@@ -2107,8 +2115,8 @@ JOIN toppart tp ON tp.ID = ptp.TopPart_ID
 WHERE t.IsActive = 1
   AND t.Tasks_Status = 1
   AND bp.is_priority = 0
-  AND (
-    (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To = 0))
+AND (
+    (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To = 0 OR t.Assigned_To IS NULL))
  OR (@empId = 0 AND (t.Assigned_To IS NULL OR t.Assigned_To = 0))
 )
 ORDER BY

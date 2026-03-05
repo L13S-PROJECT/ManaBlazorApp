@@ -508,6 +508,19 @@ JOIN batches  b ON b.ID = bp.Batch_Id
 JOIN versions v ON v.ID = bp.Version_Id
 JOIN products p   ON p.ID = v.Product_ID
 JOIN categories c ON c.ID = p.Category_ID AND c.IsActive = 1
+
+LEFT JOIN (
+    SELECT
+        BatchProduct_ID,
+        SUM(CASE WHEN Move_Type = 'ASSEMBLY' THEN Stock_Qty ELSE 0 END)
+        -
+        SUM(CASE WHEN Move_Type = 'SOLD' THEN ABS(Stock_Qty) ELSE 0 END)
+        AS AssemblyDone
+    FROM stock_movements
+    WHERE IsActive = 1
+    GROUP BY BatchProduct_ID
+) sm ON sm.BatchProduct_ID = bp.ID
+
 LEFT JOIN (
     SELECT
         BatchProduct_ID,
@@ -530,7 +543,7 @@ LEFT JOIN (
         SUM(CASE WHEN ts.Step_Type = 2 AND t.Tasks_Status IN (1,2,5) THEN 1 ELSE 0 END) AS AsmNotFinishedCnt,
 
         -- Finishing
-        SUM(CASE WHEN ts.Step_Type = 3 AND t.Tasks_Status = 2 THEN t.Qty_Done ELSE 0 END) AS FinishingStartedQty
+        0 AS FinishingStartedQty
 
     FROM tasks t
     JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
@@ -1193,7 +1206,8 @@ SELECT
 , COALESCE(tsum.DetailedInProgress, 0)  AS DetailedInProgress
 , COALESCE(tsum.DetailedFinish, 0)      AS DetailedFinish
 , COALESCE(tsum.AssemblyInProgress, 0)  AS AssemblyInProgress
-, COALESCE(sm.AssemblyFinish, 0)      AS AssemblyFinish
+, COALESCE(sm.AssemblyDone, 0)      AS AssemblyFinish
+, COALESCE(sm.Sold, 0)              AS Sold
 , COALESCE(tsum.FinishingInProgress, 0) AS FinishingInProgress
 , tsum.DetailStart
 , tsum.DetailFinish
@@ -1209,7 +1223,16 @@ JOIN categories c ON c.ID = p.Category_ID
 LEFT JOIN (
     SELECT 
         BatchProduct_ID,
-        GREATEST(SUM(CASE WHEN Move_Type = 'ASSEMBLY' THEN Stock_Qty ELSE 0 END),0) AS AssemblyFinish
+
+SUM(CASE WHEN Move_Type = 'ASSEMBLY' THEN Stock_Qty ELSE 0 END)
+-
+SUM(CASE WHEN Move_Type = 'SOLD' THEN ABS(Stock_Qty) ELSE 0 END)
+AS AssemblyDone,
+
+SUM(CASE WHEN Move_Type = 'FINISHING' THEN Stock_Qty ELSE 0 END) AS FinishingSent,
+
+SUM(CASE WHEN Move_Type = 'SOLD' THEN ABS(Stock_Qty) ELSE 0 END) AS Sold
+
     FROM stock_movements
     WHERE IsActive = 1
     GROUP BY BatchProduct_ID
@@ -1326,20 +1349,111 @@ ORDER BY b.ID DESC;
             DetailedFinish      = r.GetInt32(11),
             AssemblyInProgress  = r.GetInt32(12),
             AssemblyFinish      = r.GetInt32(13),
-            FinishingInProgress = r.GetInt32(14),
+            Sold                = r.GetInt32(14),
+            FinishingInProgress = r.GetInt32(15),
 
-            DetailStart  = r.IsDBNull(15) ? (DateTime?)null : r.GetFieldValue<DateTime>(15),
-            DetailFinish = r.IsDBNull(16) ? (DateTime?)null : r.GetFieldValue<DateTime>(16),
+            DetailStart  = r.IsDBNull(16) ? (DateTime?)null : r.GetFieldValue<DateTime>(16),
+            DetailFinish = r.IsDBNull(17) ? (DateTime?)null : r.GetFieldValue<DateTime>(17),
 
-            AssemblyStart  = r.IsDBNull(17) ? (DateTime?)null : r.GetFieldValue<DateTime>(17),
-            AssemblyFinishDate = r.IsDBNull(18) ? (DateTime?)null : r.GetFieldValue<DateTime>(18),
+            AssemblyStart  = r.IsDBNull(18) ? (DateTime?)null : r.GetFieldValue<DateTime>(18),
+            AssemblyFinishDate = r.IsDBNull(19) ? (DateTime?)null : r.GetFieldValue<DateTime>(19),
 
-            DetailedStarted = r.GetInt32(19),
-            DetailsTotal = r.GetInt32(20)
+            DetailedStarted = r.GetInt32(20),
+            DetailsTotal = r.GetInt32(21)
         });
     }
 
     return Ok(list);
+}
+
+// GET: /api/batches/assembly-out?batchProductId=123
+[HttpGet("assembly-out")]
+public async Task<IActionResult> GetAssemblyOut([FromQuery] int batchProductId)
+{
+    if (batchProductId <= 0)
+        return BadRequest();
+
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+SELECT COALESCE(SUM(Stock_Qty),0)
+FROM stock_movements
+WHERE BatchProduct_ID = @bpId
+  AND Move_Type = 'OUT'
+  AND IsActive = 1
+  AND Stock_Qty > 0;";
+
+    var p = cmd.CreateParameter();
+    p.ParameterName = "@bpId";
+    p.Value = batchProductId;
+    cmd.Parameters.Add(p);
+
+    var result = await cmd.ExecuteScalarAsync();
+    var qty = (result == null || result == DBNull.Value) ? 0 : Convert.ToInt32(result);
+
+    return Ok(qty);
+}
+
+// GET: /api/batches/finishing-out
+[HttpGet("finishing-out")]
+public async Task<IActionResult> GetFinishingOut([FromQuery] int batchProductId)
+{
+    if (batchProductId <= 0)
+        return BadRequest();
+
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+SELECT COALESCE(SUM(Stock_Qty),0)
+FROM stock_movements
+WHERE BatchProduct_ID = @bpId
+  AND Move_Type = 'FINISHING'
+  AND IsActive = 1
+  AND Stock_Qty < 0;";
+
+    var p = cmd.CreateParameter();
+    p.ParameterName = "@bpId";
+    p.Value = batchProductId;
+    cmd.Parameters.Add(p);
+
+    var result = await cmd.ExecuteScalarAsync();
+    var qty = result == null ? 0 : Math.Abs(Convert.ToInt32(result));
+
+    return Ok(qty);
+}
+
+// GET: api/batches/assembly-out-total?batchProductId=123
+[HttpGet("assembly-out-total")]
+public async Task<IActionResult> GetAssemblyOutTotal([FromQuery] int batchProductId)
+{
+    if (batchProductId <= 0)
+        return BadRequest();
+
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+SELECT 
+    COALESCE(SUM(CASE WHEN Move_Type='ASSEMBLY' THEN Stock_Qty END),0)
+  - COALESCE(SUM(CASE WHEN Move_Type='OUT' THEN Stock_Qty END),0)
+FROM stock_movements
+WHERE BatchProduct_ID = @bpId
+  AND IsActive = 1;";
+
+    var p = cmd.CreateParameter();
+    p.ParameterName = "@bpId";
+    p.Value = batchProductId;
+    cmd.Parameters.Add(p);
+
+    var result = await cmd.ExecuteScalarAsync();
+    var qty = result == null ? 0 : Math.Abs(Convert.ToInt32(result));
+
+    return Ok(qty);
 }
 
     } // <-- beidzas public class BatchesController

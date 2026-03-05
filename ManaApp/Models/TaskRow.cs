@@ -16,6 +16,7 @@ public sealed class TaskRow
     public int Done { get; set; }
     public int StepOrder { get; set; }
 
+
     public int StepType { get; set; }
     public int BatchId { get; set; }
     public int VersionId { get; set; }
@@ -25,4 +26,7 @@ public sealed class TaskRow
     public bool IsCommentForEmployee { get; set; }
 
     public bool BatchPriority { get; set; }
+    public int? Assigned_To { get; set; }
+
+    public int? Claimed_By { get; set; }
 }

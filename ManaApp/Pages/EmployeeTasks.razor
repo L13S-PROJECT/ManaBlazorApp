@@ -240,6 +240,7 @@ private async Task ClaimTask(int taskId)
     if (resp.IsSuccessStatusCode)
     {
         await LoadTasks();
+        StateHasChanged();
         CloseTaskDialog();
     }
 }
@@ -320,20 +321,18 @@ private TaskRow? _activeTask;
     // kas joprojām ir sarakstā (t.i., nav pabeigts).
     private bool CanStart(TaskRow t)
 {
-    // 1. solis vienmēr drīkst (secības ziņā)
-    if (t.StepOrder <= 1)
-        return true;
-
-    // vai ir kāds iepriekšējais solis šai pašai partijai + detaļai,
-    // kurš NAV pabeigts (Status != 3)?
     var hasPrevNotFinished = tasks.Any(other =>
         other.BatchCode == t.BatchCode &&
         other.PartName == t.PartName &&
         other.StepOrder < t.StepOrder &&
+        other.Status == 2);
+
+    var hasHigherBatchPriority = tasks.Any(other =>
+        other.BatchPriority &&
+        !t.BatchPriority &&
         other.Status != 3);
 
-    // ja priekšā ir nepabeigti soļi -> šo sākt nedrīkst
-    return !hasPrevNotFinished;
+    return !hasPrevNotFinished && !hasHigherBatchPriority;
 }
 
 private void SelectTask(TaskRow task)

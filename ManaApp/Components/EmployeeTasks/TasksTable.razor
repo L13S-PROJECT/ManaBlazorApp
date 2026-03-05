@@ -26,7 +26,13 @@ else
     style="cursor: @(CanStart(t) ? "pointer" : "default")"
     @onclick="() => { if (CanStart(t)) OnSelect.InvokeAsync(t); }">
                     <td>@t.BatchCode</td>
-                    <td>@t.ProductName</td>
+                    <td>
+                            @if (t.Assigned_To == null || t.Assigned_To == 0)
+                            {
+                                <span style="color:red;font-weight:bold;margin-right:4px;">!</span>
+                            }
+                        @t.ProductName
+                    </td>
                     <td>@t.PartName</td>
                     <td>@t.StepName</td>
                     <td>
