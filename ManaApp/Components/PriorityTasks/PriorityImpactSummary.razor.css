@@ -77,7 +77,7 @@
 
 .impact-columns-grid {
     display: grid;
-    grid-template-columns: 180px repeat(var(--emp-count), 1fr);
+    grid-template-columns: 180px 90px 90px repeat(var(--emp-count), 1fr);
 }
 
 /* ===== Impact Rows Grid ===== */
@@ -89,7 +89,7 @@
 
 .impact-row {
     display: grid;
-    grid-template-columns: 180px repeat(var(--emp-count), 1fr);
+    grid-template-columns: 180px 90px 90px repeat(var(--emp-count), 1fr);
     align-items: center;
 
     padding: 4px 0;

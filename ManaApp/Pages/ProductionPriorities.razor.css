@@ -248,3 +248,27 @@ box-shadow:
     background: #fdfdfe;      /* tumšāks nekā balts */
     border-color: #3B82F6;
 }
+
+.popup-overlay{
+    position: fixed;
+    top:0;
+    left:0;
+    right:0;
+    bottom:0;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+
+    background: rgba(0,0,0,0.35);
+
+    z-index:9999;
+}
+
+.popup-box{
+    background:white;
+    padding:20px;
+    border-radius:8px;
+    min-width:220px;
+    text-align:center;
+}

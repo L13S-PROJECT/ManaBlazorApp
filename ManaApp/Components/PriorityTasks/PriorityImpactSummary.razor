@@ -28,20 +28,44 @@ else
 <div class="priority-impact-box">
 
 <div class="impact-columns-header">
-   <div class="impact-columns-grid"
+<div class="impact-row"
      style="--emp-count:@employees.Count">
-        <div><strong>Workcentrs</strong></div>
 
-        @foreach (var emp in employees)
-        {
-            <div>
-                <span style="cursor:pointer"
-                      @onclick="() => OpenPopup(emp)">
-                    <strong>@emp</strong>
-                </span>
-            </div>
-        }
-    </div>
+    <div class="impact-cell"><strong>Workcentrs</strong></div>
+    <div class="impact-cell"><strong>Var sākt</strong></div>
+    <div class="impact-cell"><strong>Kopā</strong></div>
+
+    @foreach (var emp in employees)
+    {
+        <div class="impact-cell">
+            <span style="cursor:pointer"
+                  @onclick="() => OpenPopup(emp)">
+                <strong>@emp</strong>
+            </span>
+        </div>
+    }
+
+</div>
+</div>
+
+<div class="impact-row" style="--emp-count:@employees.Count">
+
+    <div class="impact-cell"><strong>Var sākt</strong></div>
+
+    <div class="impact-cell"></div>
+    <div class="impact-cell"></div>
+
+    @foreach (var emp in employees)
+    {
+        var sum = rows
+            .Where(r => r.EmployeeName == emp)
+            .Sum(r => r.CanStartCount);
+
+        <div class="impact-cell">
+            <strong>@sum</strong>
+        </div>
+    }
+
 </div>
 
     <div class="impact-section">
@@ -52,12 +76,26 @@ else
     <div class="impact-rows"
      style="--emp-count:@employees.Count">
 
-            @foreach (var wc in workCenters)
-            {
+@foreach (var wc in workCenters)
+{
+        var wcCanStart = rows
+            .Where(r => r.WorkCenter == wc)
+            .Sum(r => r.CanStartCount);
+
                 <div class="impact-row">
                     <div class="impact-cell impact-wc">
                         <strong>@wc</strong>
                     </div>
+
+                <div class="impact-cell">
+                    <strong>@wcCanStart</strong>
+                </div>
+
+                <div class="impact-cell">
+                    <strong>
+                        @rows.Where(r => r.WorkCenter == wc).Sum(r => r.PriorityCount)
+                    </strong>
+                </div>
 
                     @foreach (var emp in employees)
                     {
@@ -68,10 +106,11 @@ else
                         <div class="impact-cell">
                             @(match?.PriorityCount ?? 0)
                         </div>
+                        
                     }
                 </div>
-    }
-</div>
+            }
+    </div>
 </div>
 
     <div class="impact-section">
@@ -87,8 +126,18 @@ else
         <div class="impact-row">
             <div class="impact-cell impact-wc">
                 <strong>@wc</strong>
-            </div>
+        </div>
+        <div class="impact-cell">
+        <strong>
+        @rows.Where(r => r.WorkCenter == wc).Sum(r => r.NormalCanStartCount)
+        </strong>
+</div>
 
+        <div class="impact-cell">
+            <strong>
+                @rows.Where(r => r.WorkCenter == wc).Sum(r => r.NormalCount)
+            </strong>
+        </div>
             @foreach (var emp in employees)
             {
                 var match = rows.FirstOrDefault(r =>
@@ -124,6 +173,9 @@ else
         public int NormalCount { get; set; }
         public int EmployeeId { get; set; }
         public int SortStepType { get; set; }
+        public int CanStartCount { get; set; }
+        public int PriorityCanStartCount { get; set; }
+        public int NormalCanStartCount { get; set; }
     }
 
     protected override async Task OnInitializedAsync()

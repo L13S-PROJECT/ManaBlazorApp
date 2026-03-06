@@ -294,9 +294,25 @@ else
             
 
 <PriorityImpactSummary @ref="impactSummary" />
+@if (showSavedPopup)
+{
+    <div class="popup-overlay">
+        <div class="popup-box">
+            <div class="mb-3">
+                Dati ir atjaunoti.
+            </div>
 
+            <button class="btn btn-primary"
+                    @onclick="() => showSavedPopup = false">
+                OK
+            </button>
+        </div>
+    </div>
+}
 
 @code {
+
+    private bool showSavedPopup = false;
     private List<ProductRow>? products;
     
 private IEnumerable<ProductRow> PriorityProducts =>
@@ -428,8 +444,7 @@ private class ProductRow
 
 private async Task SavePriorities()
 {
-    Console.WriteLine("SAVE CLICKED");
-
+    
     if (products == null)
         return;
 
@@ -463,12 +478,14 @@ private async Task SavePriorities()
     );
 }
 
-    await LoadProducts();
+await LoadProducts();
 
-    if (impactSummary != null)
-        await impactSummary.Reload();
+if (impactSummary != null)
+    await impactSummary.Reload();
 
-    StateHasChanged();
+showSavedPopup = true;
+
+StateHasChanged();
 }
 private PriorityImpactSummary? impactSummary;
 

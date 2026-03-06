@@ -419,8 +419,63 @@ SELECT
     e.ID AS EmployeeId,
     e.Employee_Name AS EmployeeName,
 
-    SUM(CASE WHEN bp.is_priority = 1 AND t.ID IS NOT NULL THEN 1 ELSE 0 END) AS PriorityCount,
-    SUM(CASE WHEN bp.is_priority = 0 AND t.ID IS NOT NULL THEN 1 ELSE 0 END) AS NormalCount
+SUM(CASE WHEN bp.is_priority = 1 AND t.ID IS NOT NULL THEN 1 ELSE 0 END) AS PriorityCount,
+SUM(CASE WHEN bp.is_priority = 0 AND t.ID IS NOT NULL THEN 1 ELSE 0 END) AS NormalCount,
+SUM(
+    CASE
+        WHEN bp.is_priority = 1
+    AND t.ID IS NOT NULL
+ AND NOT EXISTS (
+    SELECT 1
+    FROM tasks t2
+    JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+    WHERE t2.BatchProduct_ID = t.BatchProduct_ID
+        AND ts2.ProductToPart_ID = s.ProductToPart_ID
+        AND ts2.Step_Order < s.Step_Order
+      AND t2.Tasks_Status <> 3
+      AND t2.IsActive = 1
+)
+
+        THEN 1 ELSE 0
+    END
+) AS PriorityCanStartCount,
+
+SUM(
+    CASE
+        WHEN bp.is_priority = 0
+        AND t.Tasks_Status = 1
+        AND t.ID IS NOT NULL
+        AND NOT EXISTS (
+            SELECT 1
+            FROM tasks t2
+            JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+            WHERE t2.BatchProduct_ID = t.BatchProduct_ID
+              AND ts2.ProductToPart_ID = s.ProductToPart_ID
+              AND ts2.Step_Order < s.Step_Order
+              AND t2.Tasks_Status <> 3
+              AND t2.IsActive = 1
+        )
+        THEN 1 ELSE 0
+    END
+) AS NormalCanStartCount,
+SUM(
+    CASE 
+WHEN t.ID IS NOT NULL
+AND NOT EXISTS (
+    SELECT 1
+    FROM tasks t2
+    JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+    WHERE t2.BatchProduct_ID = t.BatchProduct_ID
+      AND ts2.ProductToPart_ID = s.ProductToPart_ID
+      AND ts2.Step_Order < s.Step_Order
+      AND t2.Tasks_Status <> 3
+      AND t2.IsActive = 1
+)
+    
+        THEN 1
+        ELSE 0
+    END
+) AS CanStartCount
 
 FROM workcentr_type wc
 
@@ -440,8 +495,12 @@ LEFT JOIN toppartsteps s
 LEFT JOIN tasks t
     ON t.TopPartStep_ID = s.ID
     AND t.IsActive = 1
-    AND t.Tasks_Status IN (1,2)
-    AND IFNULL(t.Assigned_To, 0) = e.ID
+    AND t.Tasks_Status = 1
+    AND (
+        (e.ID = 0 AND (t.Assigned_To IS NULL OR t.Assigned_To = 0))
+        OR
+        (e.ID > 0 AND t.Assigned_To = e.ID)
+    )
 
 LEFT JOIN batches_products bp
     ON bp.ID = t.BatchProduct_ID
@@ -472,7 +531,10 @@ ORDER BY
                     EmployeeId   = reader.IsDBNull(2) ? 0 : reader.GetInt32(2),
                     EmployeeName = reader.GetString(3),
                     PriorityCount = reader.IsDBNull(4) ? 0 : reader.GetInt32(4),
-                    NormalCount   = reader.IsDBNull(5) ? 0 : reader.GetInt32(5)
+                    NormalCount   = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
+                    PriorityCanStartCount = reader.IsDBNull(6) ? 0 : reader.GetInt32(6),
+                    NormalCanStartCount   = reader.IsDBNull(7) ? 0 : reader.GetInt32(7),
+                    CanStartCount = reader.IsDBNull(8) ? 0 : reader.GetInt32(8)
                 });
         }
     }

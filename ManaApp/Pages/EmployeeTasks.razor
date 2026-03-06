@@ -264,7 +264,7 @@ StateHasChanged(); //
 
 }
 private TaskRow? FirstAvailableTask =>
-    tasks.FirstOrDefault(t => t.Status == 1);
+    tasks.FirstOrDefault(t => t.Status == 1 && CanStart(t));
 
 private async Task FinishTask(TaskRow task)
 {
@@ -319,18 +319,23 @@ private TaskRow? _activeTask;
 
     // Pārbaudām, vai ir kāds iepriekšējais solis šai pašai partijai + detaļai,
     // kas joprojām ir sarakstā (t.i., nav pabeigts).
-    private bool CanStart(TaskRow t)
+private bool CanStart(TaskRow t)
 {
     var hasPrevNotFinished = tasks.Any(other =>
         other.BatchCode == t.BatchCode &&
         other.PartName == t.PartName &&
         other.StepOrder < t.StepOrder &&
-        other.Status == 2);
+        other.Status != 3);
 
     var hasHigherBatchPriority = tasks.Any(other =>
-        other.BatchPriority &&
-        !t.BatchPriority &&
-        other.Status != 3);
+    other.BatchPriority &&
+    !t.BatchPriority &&
+    other.Status == 1 &&
+    !tasks.Any(prev =>
+        prev.BatchCode == other.BatchCode &&
+        prev.PartName == other.PartName &&
+        prev.StepOrder < other.StepOrder &&
+        prev.Status != 3));
 
     return !hasPrevNotFinished && !hasHigherBatchPriority;
 }

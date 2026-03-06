@@ -1,5 +1,6 @@
 @inject HttpClient Http
 @namespace ManaApp.Components.PriorityTasks
+@inject IJSRuntime JS
 
 @if (model == null)
 {
@@ -473,6 +474,8 @@ private async Task UpdateData()
                 });
         }
     }
+
+await JS.InvokeVoidAsync("console.log", list);
 
     var response = await Http.PostAsJsonAsync("api/tasks/update-steps", list);
 
