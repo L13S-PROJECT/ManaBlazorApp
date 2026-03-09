@@ -51,10 +51,35 @@ END AS PriorityLevel,
 
   p.Product_Name,            -- 7 ProductName
   tp.TopPart_Name,           -- 8 PartName
-  ts.Step_Name,              -- 9 StepName
-  b.Batches_Code,            -- 10 BatchCode
 
-  COALESCE(t.Qty_Done, 0) AS DoneForTask, -- 10 Done
+ts.Step_Name,
+
+ts.Estimated_Minutes,
+
+(
+    SELECT COALESCE(SUM(s.DurationMinutes),0)
+    FROM tasks_work_sessions s
+    WHERE s.Task_ID = t.ID
+) AS ActualMinutes,
+
+(
+    CASE 
+        WHEN ts.Step_Type IN (1,2) THEN (bp.Planned_Qty * ptp.Qty_Per_product) * ts.Estimated_Minutes
+        WHEN ts.Step_Type = 3 THEN t.Qty_Done * ts.Estimated_Minutes
+        ELSE bp.Planned_Qty * ts.Estimated_Minutes
+    END
+) AS EstimatedTotalMinutes,
+
+(
+    SELECT COALESCE(SUM(ts2.Estimated_Minutes),0)
+    FROM toppartsteps ts2
+    WHERE ts2.ProductToPart_ID = ts.ProductToPart_ID
+      AND ts2.Step_Order < ts.Step_Order
+) AS EstimatedStartMinutes,
+
+b.Batches_Code,
+
+  COALESCE(t.Qty_Done, 0) AS DoneForTask, -- 11 Done
 t.Assigned_To,
 CASE 
     WHEN ts.Step_Type IN (1,2) THEN bp.Planned_Qty * ptp.Qty_Per_product
@@ -138,17 +163,23 @@ ORDER BY
     ProductName = r.IsDBNull(10) ? null : r.GetString(10),
     PartName    = r.IsDBNull(11) ? null : r.GetString(11),
     StepName    = r.IsDBNull(12) ? null : r.GetString(12),
-    BatchCode   = r.IsDBNull(13) ? null : r.GetString(13),
 
-    Done    = r.IsDBNull(14) ? 0 : r.GetInt32(14),
-    Assigned_To = r.IsDBNull(15) ? (int?)null : r.GetInt32(15),
-    Planned = r.IsDBNull(16) ? 0 : r.GetInt32(16),
-    StepOrder   = r.IsDBNull(17) ? 0 : r.GetInt32(17),
+    EstimatedMinutes = r.IsDBNull(13) ? 0 : r.GetInt32(13),
+    ActualMinutes    = r.IsDBNull(14) ? 0 : r.GetInt32(14),
+    EstimatedTotalMinutes = r.IsDBNull(15) ? 0 : r.GetInt32(15),
+    EstimatedStartMinutes = r.IsDBNull(16) ? 0 : r.GetInt32(16),
 
-    StepType       = r.IsDBNull(18) ? 0 : r.GetInt32(18),
-    BatchId        = r.IsDBNull(19) ? 0 : r.GetInt32(19),
-    VersionId      = r.IsDBNull(20) ? 0 : r.GetInt32(20),
-    BatchProductId = r.IsDBNull(21) ? 0 : r.GetInt32(21)
+    BatchCode   = r.IsDBNull(17) ? null : r.GetString(17),
+
+    Done    = r.IsDBNull(18) ? 0 : r.GetInt32(18),
+    Assigned_To = r.IsDBNull(19) ? (int?)null : r.GetInt32(19),
+    Planned = r.IsDBNull(20) ? 0 : r.GetInt32(20),
+    StepOrder   = r.IsDBNull(21) ? 0 : r.GetInt32(21),
+
+    StepType       = r.IsDBNull(22) ? 0 : r.GetInt32(22),
+    BatchId        = r.IsDBNull(23) ? 0 : r.GetInt32(23),
+    VersionId      = r.IsDBNull(24) ? 0 : r.GetInt32(24),
+    BatchProductId = r.IsDBNull(25) ? 0 : r.GetInt32(25)
     });
     }
    }
@@ -427,6 +458,21 @@ VALUES
             }
         }
     }
+
+await using (var session = conn.CreateCommand())
+{
+    session.Transaction = tx;
+    session.CommandText = @"
+INSERT INTO tasks_work_sessions
+    (Task_ID, Employee_ID, StartTime)
+VALUES
+    (@taskId, @emp, CURRENT_TIMESTAMP);";
+
+    session.Parameters.Add(new MySqlParameter("@taskId", dto.TaskId));
+    session.Parameters.Add(new MySqlParameter("@emp", dto.EmpId));
+
+    await session.ExecuteNonQueryAsync();
+}
 
     await tx.CommitAsync();
     return Ok(new { claimed = true, taskId = dto.TaskId, empId = dto.EmpId });
@@ -838,6 +884,23 @@ VALUES
         newStatus  = 3;
         newDoneOut = currentDone;
     }
+
+// aizveram aktīvo darba sesiju
+await using (var closeSession = conn.CreateCommand())
+{
+    closeSession.Transaction = tx;
+    closeSession.CommandText = @"
+UPDATE tasks_work_sessions
+SET 
+    EndTime = CURRENT_TIMESTAMP,
+    DurationMinutes = TIMESTAMPDIFF(MINUTE, StartTime, CURRENT_TIMESTAMP)
+WHERE Task_ID = @taskId
+  AND EndTime IS NULL;";
+
+    closeSession.Parameters.Add(new MySqlParameter("@taskId", dto.TaskId));
+
+    await closeSession.ExecuteNonQueryAsync();
+}
 
     await tx.CommitAsync();
     return Ok(new { taskId = dto.TaskId, status = newStatus, done = newDoneOut });

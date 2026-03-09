@@ -39,7 +39,7 @@
 /* GRID layout soļu rindām */
 .steps-dialog .steps-grid{
   display:grid;
-  grid-template-columns: 44px 1.9fr 1.1fr 100px 2.3fr 50px;
+  grid-template-columns: 44px 2fr 1.2fr 120px 90px 2.2fr 50px;
   align-items:center;
   gap:10px;
 }

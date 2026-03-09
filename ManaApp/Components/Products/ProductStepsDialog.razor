@@ -30,6 +30,7 @@
         <div class="steps-th">Nosaukums</div>
         <div class="steps-th steps-th-workcenter">Darba centrs</div>
         <div class="steps-th steps-th-flags">Statuss</div>
+        <div class="steps-th steps-th-time">Min</div>
         <div class="steps-th">Komentārs</div>
         <div class="steps-th steps-th-actions"></div>
     </div>
@@ -91,6 +92,14 @@
                             @onclick="() => OnSetFinal.InvokeAsync(s)" />
                         <span class="flag-icon final"></span>
                     </label>
+                </div>
+
+                <div>
+                    <input class="steps-input"
+                        type="number"
+                        min="0"
+                        style="width:70px"
+                        @bind="s.EstimatedMinutes" />
                 </div>
 
                 <div>

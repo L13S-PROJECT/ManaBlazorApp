@@ -663,7 +663,8 @@ if (row.VersionId == null || row.VersionId == 0)
     private async Task<List<ManaApp.Models.PartStepDto>> LoadStepsAsync(int productToPartId)
     {
         var url = $"http://localhost:5270/api/products/steps-by-part?productToPartId={productToPartId}";
-        return await Http.GetFromJsonAsync<List<ManaApp.Models.PartStepDto>>(url) ?? new();
+        var steps = await Http.GetFromJsonAsync<List<ManaApp.Models.PartStepDto>>(url) ?? new();
+        return steps;
     }
 
     private async Task OpenStepsForPart(string? topPartCode)
@@ -864,6 +865,7 @@ if (!ValidateFinalRule())
                 StepName = step.StepName,
                 StepType = step.StepType,
                 WorkCentrId = step.WorkCentrId,
+                EstimatedMinutes = step.EstimatedMinutes,
                 ParallelGroup = step.IsParallel ? 1 : 0,
                 IsMandatory = step.IsMandatory,
                 IsFinal = step.IsFinal,
@@ -890,6 +892,7 @@ if (!ValidateFinalRule())
                 StepName = step.StepName,
                 StepType = step.StepType,
                 WorkCentrId = step.WorkCentrId,
+                EstimatedMinutes = step.EstimatedMinutes,
                 ParallelGroup = step.IsParallel ? 1 : 0,
                 IsMandatory = step.IsMandatory,
                 IsFinal = step.IsFinal,

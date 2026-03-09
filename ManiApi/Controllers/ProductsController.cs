@@ -45,6 +45,7 @@ public class CreateStepRequest
     public string StepName { get; set; } = "";
     public int StepType { get; set; }          // StepTypes.Id
     public int WorkCentrId { get; set; }       // WorkCentrs.Id
+    public int? EstimatedMinutes { get; set; }
     public int ParallelGroup { get; set; } = 0;
     public bool IsMandatory { get; set; }
     public bool IsFinal { get; set; }
@@ -58,6 +59,7 @@ public class UpdateStepRequest
     public string StepName { get; set; } = "";
     public int StepType { get; set; }
     public int WorkCentrId { get; set; }
+    public int? EstimatedMinutes { get; set; }
     public int ParallelGroup { get; set; } = 0;
     public bool IsMandatory { get; set; }
     public bool IsFinal { get; set; }
@@ -739,6 +741,7 @@ var map = oldParts
     StepTypeName = t.StepTypeName,   // ← PAREIZI
 
     t.s.WorkCentrId,
+    EstimatedMinutes = t.s.EstimatedMinutes,
     WorkCenterName = wc.WorkCentr_Name,
     t.s.ParallelGroup,
     t.s.IsMandatory,
@@ -821,6 +824,7 @@ dto.StepType = (int)await _db.StageStepTypeMaps
                 StepName = dto.StepName,
                 StepType = dto.StepType,
                 WorkCentrId = dto.WorkCentrId,
+                EstimatedMinutes = dto.EstimatedMinutes,
                 ParallelGroup = dto.ParallelGroup,
                 IsMandatory = dto.IsMandatory,
                 IsFinal = dto.IsFinal,
@@ -886,6 +890,7 @@ dto.StepType = (int)await _db.StageStepTypeMaps
             step.StepName = dto.StepName;
             step.StepType = dto.StepType;
             step.WorkCentrId = dto.WorkCentrId;
+            step.EstimatedMinutes = dto.EstimatedMinutes;
             step.ParallelGroup = dto.ParallelGroup;
             step.IsMandatory = dto.IsMandatory;
             step.IsFinal = dto.IsFinal;
