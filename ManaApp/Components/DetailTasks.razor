@@ -185,7 +185,7 @@
     private Dictionary<int, string> DetailedIndicators = new();
 
     [Parameter] public ProductBatchRow? SelectedBatch { get; set; }
-
+    [Parameter] public EventCallback OnDataChanged { get; set; }
 // Parts ir ProductTopParts konkrētajai VersionId (no SelectedBatch) 26.01.2026
     private List<DetailPartRow> Parts = new();
 
@@ -200,21 +200,22 @@ private sealed class DetailedIndicatorRow
     = new(); // key = TopPartStepId
 
 
-    protected override async Task OnParametersSetAsync()
+protected override async Task OnParametersSetAsync()
 {
-    Parts.Clear();
-    TasksByStep.Clear();
+        Parts.Clear();
+        TasksByStep.Clear();
+        ActivatedParts.Clear();
 
     if (SelectedBatch?.VersionId is not int vid || vid <= 0)
         return;
 
 // 🆕 ielādējam aktivizētās detaļas (status != 5)
-if (SelectedBatch?.BatchId is int batchId && batchId > 0)
+if (SelectedBatch?.BatchProductId is int batchProductId && batchProductId > 0)
 {
-    var activeParts =
-        await Http.GetFromJsonAsync<List<int>>(
-            $"http://localhost:5270/api/tasks/active-parts?batchId={batchId}"
-        ) ?? new();
+var activeParts =
+    await Http.GetFromJsonAsync<List<int>>(
+        $"http://localhost:5270/api/tasks/active-parts?batchProductId={batchProductId}"
+    ) ?? new();
 
     ActivatedParts = activeParts.ToHashSet();
 }
@@ -358,17 +359,15 @@ async Task OnActivatePart(int productToPartId)
     if (part is null)
         return;
 
-    var batchCode = SelectedBatch?.BatchCode ?? "—";
+var batchCode = SelectedBatch?.BatchCode ?? "—";
 
-        var ok = await JS.InvokeAsync<bool>(
-            "confirm",
-            $"Vai detaļa \"{part.TopPartName}\" ({batchCode}) ir gatava?"
-        );
+var ok = await JS.InvokeAsync<bool>(
+    "confirm",
+    $"Vai detaļa partijā {batchCode} ir gatava?"
+);
 
-    if (!ok)
-        return;
-
-    
+if (!ok)
+    return;
 
 Console.WriteLine(
     $"[UI] BatchProductId={SelectedBatch?.BatchProductId}, ProductToPartId={productToPartId}"
@@ -384,18 +383,30 @@ Console.WriteLine(
     }
     );
 
+var activeParts =
+    await Http.GetFromJsonAsync<List<int>>(
+    $"http://localhost:5270/api/tasks/active-parts?batchProductId={SelectedBatch!.BatchProductId}"
+) ?? new();
 
-    var activeParts =
-        await Http.GetFromJsonAsync<List<int>>(
-            $"http://localhost:5270/api/tasks/active-parts?batchId={batchId}"
+ActivatedParts.Add(productToPartId);
+await InvokeAsync(StateHasChanged);
+
+// pārlādējam arī indikatorus šai rindai
+if (SelectedBatch?.BatchProductId is int batchProductId2 && batchProductId2 > 0)
+{
+    var indicators =
+        await Http.GetFromJsonAsync<List<DetailedIndicatorRow>>(
+            $"http://localhost:5270/api/tasks/detailed-indicators?batchProductId={batchProductId2}"
         ) ?? new();
 
-    ActivatedParts = activeParts.ToHashSet();
+    DetailedIndicators = indicators.ToDictionary(
+        x => x.ProductToPartId,
+        x => x.State
+    );
+}
 
-    
-
-    // pārlādējam detaļas / taskus
-    await OnParametersSetAsync();
+await InvokeAsync(StateHasChanged);
+await OnDataChanged.InvokeAsync();
 }
 
     private bool IsCommentPopupOpen = false;
@@ -437,6 +448,8 @@ async Task ConfirmComment()
 
     IsCommentPopupOpen = false;
     EditingTask = null;
+
+    await OnDataChanged.InvokeAsync();
 }
 
 async Task OnCommentVisibilityChanged(DetailTaskRow task, ChangeEventArgs e)

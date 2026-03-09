@@ -23,6 +23,8 @@
     border: 2px solid #000;
     border-radius: 10px;
     overflow-y: auto;
+    overflow-x: visible;
+    overflow: visible;
     padding: 6px;
 }
 
@@ -57,13 +59,17 @@
     border: 1px solid #e5e7eb;
 }
 
-.ptv3-table tr:hover {
-    background: #E8F0FE;
+.ptv3-table tbody tr {
+    transition: background-color 0.15s ease;
+}
+
+.ptv3-table tbody tr:hover {
+    background: #E0ECFF;
     cursor: pointer;
 }
 
 .ptv3-active {
-    background: #ffffff;
+    background: #CFE0FF;
     font-weight: 600;
     border-left: 4px solid #2563EB;
 }
@@ -76,4 +82,114 @@
 .ptv3-detail-finish {
     background: #BBF7D0;   /* zaļš */
     font-weight: 600;
+}
+
+.fin-blue {
+    background-color: #EAF2FF;
+}
+
+.fin-green {
+    background-color: #BBF7D0;
+}
+
+.fin-yellow {
+    background-color: #FEF3C7;
+}
+
+.fin-bar {
+    display: flex;
+    width: 100%;
+    height: 12px;
+    border-radius: 2px;
+    overflow: hidden;
+    background: #f3f4f6;
+    pointer-events: none;
+}
+
+.fin-seg-active {
+    flex: 1;
+    background: #facc15;   /* dzeltens */
+    border-right: 1px solid #ffffff;
+}
+
+.fin-seg-empty {
+    flex: 1;
+    background: #e5e7eb;   /* pelēks */
+    border-right: 1px solid #ffffff;
+}
+
+.fin-seg-green {
+    flex: 1;
+    background: #22c55e;
+    border-right: 1px solid #ffffff;
+}
+
+.fin-seg-yellow {
+    flex: 1;
+    background: #facc15;
+    border-right: 1px solid #ffffff;
+}
+
+.fin-seg-gray {
+    flex: 1;
+    background: #9ca3af;
+    border-right: 1px solid #ffffff;
+}
+
+.fin-seg-white {
+    flex: 1;
+    background: #ffffff;
+    border-right: 1px solid #e5e7eb;
+}
+
+.fin-hover {
+    position: relative;
+}
+
+.fin-tooltip {
+    position: absolute;
+    top: 100%;
+    margin-top: 6px;
+    left: 0;
+    background: #1f2937;
+    color: #ffffff;
+    font-size: 12px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    white-space: pre-line;
+    width: 160px;
+    z-index: 100;
+
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease 0.35s;
+}
+
+.fin-hover:hover .fin-tooltip {
+    opacity: 1;
+}
+
+.ptv3-comment {
+    max-width: 180px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    position: relative;
+}
+
+.ptv3-comment-edit {
+    position: absolute;
+    left: 0;
+    top: -2px;
+    width: 320px;
+    min-height: 60px;
+    border: 1px solid #c8c8c8;
+    border-radius: 4px;
+    background: #ffffff;
+    font-size: 14px;
+    padding: 4px 6px;
+    outline: none;
+    box-sizing: border-box;
+    resize: vertical;
+    z-index: 20;
 }

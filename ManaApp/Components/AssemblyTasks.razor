@@ -180,7 +180,7 @@
 
 @code {
 [Parameter] public ProductBatchRow? SelectedBatch { get; set; }
-
+[Parameter] public EventCallback OnDataChanged { get; set; }
 private List<DetailPartRow> Parts = new();
 
 private Dictionary<int, List<DetailTaskRow>> TasksByStep = new();
@@ -318,6 +318,8 @@ async Task ConfirmComment()
 
     IsCommentPopupOpen = false;
     EditingTask = null;
+
+    await OnDataChanged.InvokeAsync();
 }
 private Dictionary<int, string> AssemblyIndicators = new();
 

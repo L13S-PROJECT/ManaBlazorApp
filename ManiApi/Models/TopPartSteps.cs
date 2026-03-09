@@ -35,6 +35,8 @@ public int? DependsOnStepId { get; set; }
 
         [Column("WorkCentr_ID")]
         public int WorkCentrId { get; set; }  // FK uz workcentr_type.ID
+        [Column("Estimated_Minutes")]
+        public int? EstimatedMinutes { get; set; }
 
         [Column("Comments")]
         public string? Comments { get; set; }

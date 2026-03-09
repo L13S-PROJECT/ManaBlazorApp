@@ -28,7 +28,6 @@
     <th>Kods</th>
     <th>Versija</th>
     <th>Plānots</th>
-    <th>Procesā</th>
     <th>Sold</th>
     <th>Done</th>
 
@@ -51,7 +50,8 @@
         || (x.ProductCode ?? "").Contains(SearchText, StringComparison.OrdinalIgnoreCase)
         || (AllProducts.FirstOrDefault(p => p.productCode == x.ProductCode)?.productName ?? "")
             .Contains(SearchText, StringComparison.OrdinalIgnoreCase)
-    ))
+    )
+    .ToList())
 {
 <tr class="@(SelectedBatch?.BatchProductId == b.BatchProductId ? "ptv3-active" : "")"
     @onclick="() => SelectRow(b.BatchProductId)">
@@ -62,7 +62,6 @@
     <td>@b.ProductCode</td>
     <td>@b.VersionName</td>
     <td>@b.Planned</td>
-    <td>@(b.DetailedInProgress + b.DetailedFinish + b.AssemblyInProgress + b.AssemblyFinish + b.FinishingInProgress)</td>
     <td>@b.Sold</td>
     <td>@b.Done</td>
     <td>@($"{b.DetailedStarted}/{b.DetailsTotal}")</td>
@@ -94,9 +93,42 @@
                 }
 
     </td>
-    <td>@($"{b.FinishingInProgress}/{b.AssemblyFinish}")</td>
-    <td>-</td>
-    <td>-</td>
+
+<td class="@GetFinCellClass(b)">
+    @($"{b.FinishingInProgress}/{b.AssemblyFinish}")
+</td>
+
+<td class="fin-hover">
+    <div class="fin-bar">
+        @foreach (var seg in GetFinSegments(b))
+        {
+            <div class="@seg"></div>
+        }
+    </div>
+
+    <div class="fin-tooltip">
+        @GetFinHover(b)
+    </div>
+</td>
+<td class="ptv3-comment"
+    title="@b.Comment">
+
+@if (EditingRow?.BatchProductId == b.BatchProductId)
+{
+    <textarea class="ptv3-comment-edit"
+              @bind="EditingComment"
+              @bind:event="onchange"
+              @onkeydown="@(e => HandleCommentKey(e))">
+    </textarea>
+}
+else
+{
+    <div @ondblclick="() => EditComment(b)">
+        @(string.IsNullOrWhiteSpace(b.Comment) ? "-" : b.Comment)
+    </div>
+}
+
+</td>
 
 </tr>
 }
@@ -110,9 +142,9 @@
     <!-- DETAIL PANEL -->
 <div class="ptv3-detail">
 
-    <ProductionTasksDetailPanel
-        @key="SelectedBatch?.BatchProductId"
-        SelectedBatch="SelectedBatch" />
+<ProductionTasksDetailPanel
+        SelectedBatch="SelectedBatch"
+        OnDataChanged="HandleDetailChanged" />
 
 </div>
 
@@ -130,6 +162,7 @@ private void SelectRow(int batchProductId)
 
 private List<ProductBatchRow> ProductBatches = new();
 private List<ProductRow> AllProducts = new();
+private Dictionary<string, ProductRow> ProductsByCode = new();
 private Dictionary<int, VersionSummaryDto> VersionSummary = new();
 private Dictionary<int, string> BatchCodes = new();
 protected override async Task OnInitializedAsync()
@@ -137,27 +170,6 @@ protected override async Task OnInitializedAsync()
         ProductBatches = await Http.GetFromJsonAsync<List<ProductBatchRow>>(
             "http://localhost:5270/api/batches/list-production"
         ) ?? new();
-
-foreach (var b in ProductBatches)
-{
-    b.Sold = await Http.GetFromJsonAsync<int>(
-        $"http://localhost:5270/api/stockmovements/sold-by-batchproduct?batchProductId={b.BatchProductId}"
-    );
-}
-
-foreach (var b in ProductBatches)
-{
-    b.AssemblyFinish = await Http.GetFromJsonAsync<int>(
-        $"http://localhost:5270/api/batches/assembly-out-total?batchProductId={b.BatchProductId}"
-    );
-}
-
-foreach (var b in ProductBatches)
-{
-    b.FinishingInProgress = await Http.GetFromJsonAsync<int>(
-        $"http://localhost:5270/api/batches/finishing-out?batchProductId={b.BatchProductId}"
-    );
-}
 
     AllProducts = await Http.GetFromJsonAsync<List<ProductRow>>(
         "http://localhost:5270/api/products/planning-list"
@@ -186,5 +198,137 @@ VersionSummary = summaries.ToDictionary(x => x.VersionId);
 
 
             }
+private string GetFinCellClass(ProductBatchRow b)
+{
+    var x = b.FinishingInProgress;
+    var y = b.AssemblyFinish;
+
+    if (x == 0 && y > 0)
+        return "fin-yellow";
+
+    if (x == y && y > 0)
+        return "fin-green";
+
+    if (x < y)
+        return "fin-blue";
+
+    return "";
+}
+
+private List<string> GetFinSegments(ProductBatchRow b)
+{
+    
+    var segments = new List<string>();
+
+    var total = b.AssemblyFinish;
+
+    for (int i = 0; i < b.FinStatus3; i++)
+        segments.Add("fin-seg-green");
+
+    for (int i = 0; i < b.FinStatus2; i++)
+        segments.Add("fin-seg-yellow");
+
+    for (int i = 0; i < b.FinStatus1; i++)
+        segments.Add("fin-seg-gray");
+
+    while (segments.Count < total)
+        segments.Add("fin-seg-white");
+
+    return segments;
+}
+
+private string GetFinHover(ProductBatchRow b)
+{
+    var total = b.AssemblyFinish;
+    var done = b.FinStatus3;
+    var inProgress = b.FinStatus2;
+    var waiting = b.FinStatus1;
+
+    var sent = done + inProgress + waiting;
+    var remaining = total - sent;
+
+    return $"Krāsošana:\n" +
+       $"🟩 {done} pabeigts\n" +
+       $"🟨 {inProgress} procesā\n" +
+       $"⬛ {waiting} gaida\n" +
+       $"⬜ {remaining} nav nosūtīts\n\n" +
+       $"Nosūtīts: {sent}/{total}";
+
+}
+
+private ProductBatchRow? EditingRow;
+private string EditingComment = "";
+
+private void EditComment(ProductBatchRow b)
+{
+    EditingRow = b;
+    EditingComment = b.Comment ?? "";
+}
+
+private async Task HandleCommentKey(KeyboardEventArgs e)
+{
+    // ESC = atcelt labošanu
+    if (e.Key == "Escape")
+    {
+        EditingRow = null;
+        return;
+    }
+
+    // Enter bez Shift = saglabāt
+    if (e.Key != "Enter" || e.ShiftKey || EditingRow == null)
+        return;
+
+    var dto = new
+    {
+        BatchProductId = EditingRow.BatchProductId,
+        PlannedQty = EditingRow.Planned,
+        Comment = EditingComment
+    };
+
+    await Http.PostAsJsonAsync(
+        "http://localhost:5270/api/batches/update-line",
+        dto);
+
+    // atjaunojam UI
+    EditingRow.Comment = EditingComment;
+    EditingRow = null;
+}
+
+private async Task ReloadBatches()
+{
+    ProductBatches = await Http.GetFromJsonAsync<List<ProductBatchRow>>(
+        "http://localhost:5270/api/batches/list-production"
+    ) ?? new();
+
+    if (SelectedBatch != null)
+    {
+        SelectedBatch = ProductBatches
+            .FirstOrDefault(x => x.BatchProductId == SelectedBatch.BatchProductId);
+    }
+
+    await InvokeAsync(StateHasChanged);
+}
+private async Task ReloadBatchRow(int batchProductId)
+{
+    var list = await Http.GetFromJsonAsync<List<ProductBatchRow>>(
+        "http://localhost:5270/api/batches/list-production"
+    ) ?? new();
+
+    var updated = list.FirstOrDefault(x => x.BatchProductId == batchProductId);
+    if (updated == null)
+        return;
+
+    var index = ProductBatches.FindIndex(x => x.BatchProductId == batchProductId);
+    if (index >= 0)
+        ProductBatches[index] = updated;
+
+    await InvokeAsync(StateHasChanged);
+}
+
+private async Task HandleDetailChanged()
+{
+    if (SelectedBatch != null)
+        await ReloadBatchRow(SelectedBatch.BatchProductId);
+}
 
 }

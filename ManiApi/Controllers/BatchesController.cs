@@ -1202,13 +1202,17 @@ SELECT
     c.Category_Name AS CategoryName,
     v.Version_Name  AS VersionName,
     bp.is_priority  AS IsPriority,
-    bp.Planned_Qty  AS Planned
+    bp.Planned_Qty  AS Planned, 
+    bp.BatchProduct_Comments AS Comment
 , COALESCE(tsum.DetailedInProgress, 0)  AS DetailedInProgress
 , COALESCE(tsum.DetailedFinish, 0)      AS DetailedFinish
 , COALESCE(tsum.AssemblyInProgress, 0)  AS AssemblyInProgress
 , COALESCE(sm.AssemblyDone, 0)      AS AssemblyFinish
 , COALESCE(sm.Sold, 0)              AS Sold
 , COALESCE(tsum.FinishingInProgress, 0) AS FinishingInProgress
+, COALESCE(tsum.FinStatus1, 0) AS FinStatus1
+, COALESCE(tsum.FinStatus2, 0) AS FinStatus2
+, COALESCE(tsum.FinStatus3, 0) AS FinStatus3
 , tsum.DetailStart
 , tsum.DetailFinish
 , tsum.AssemblyStart
@@ -1224,7 +1228,11 @@ LEFT JOIN (
     SELECT 
         BatchProduct_ID,
 
-SUM(CASE WHEN Move_Type = 'ASSEMBLY' THEN Stock_Qty ELSE 0 END)
+SUM(CASE 
+        WHEN Move_Type = 'ASSEMBLY' AND Stock_Qty > 0 
+        THEN Stock_Qty 
+        ELSE 0 
+    END)
 -
 SUM(CASE WHEN Move_Type = 'SOLD' THEN ABS(Stock_Qty) ELSE 0 END)
 AS AssemblyDone,
@@ -1242,19 +1250,17 @@ LEFT JOIN (
     SELECT
         t.BatchProduct_ID,
         CASE
-            WHEN SUM(CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status IN (2,3) THEN 1 ELSE 0 END) > 0
-             AND SUM(CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status <> 3 THEN 1 ELSE 0 END) > 0
-            THEN MAX(bp2.Planned_Qty)
-            ELSE 0
-        END AS DetailedInProgress,
+    WHEN SUM(CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status IN (1,2,3) THEN 1 ELSE 0 END) > 0
+     AND SUM(CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status <> 3 THEN 1 ELSE 0 END) > 0
+    THEN MAX(bp2.Planned_Qty)
+    ELSE 0
+END AS DetailedInProgress,
 
-        CASE
-            WHEN SUM(CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status IN (2,3) THEN 1 ELSE 0 END) > 0
-             AND SUM(CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status <> 3 THEN 1 ELSE 0 END) = 0
-             AND SUM(CASE WHEN ts.Step_Type = 2 AND t.Tasks_Status IN (2,3) THEN 1 ELSE 0 END) = 0
-            THEN MAX(bp2.Planned_Qty)
-            ELSE 0
-        END AS DetailedFinish,
+CASE
+    WHEN SUM(CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status <> 3 THEN 1 ELSE 0 END) = 0
+    THEN MAX(bp2.Planned_Qty)
+    ELSE 0
+END AS DetailedFinish,
 
         CASE
             WHEN SUM(CASE WHEN ts.Step_Type = 2 AND t.Tasks_Status IN (2,3) THEN 1 ELSE 0 END) > 0
@@ -1264,20 +1270,29 @@ LEFT JOIN (
         END AS AssemblyInProgress,
 
 SUM(CASE 
-        WHEN ts.Step_Type = 3 AND t.Tasks_Status IN (1,2,3)
-        THEN t.Qty_Done + t.Qty_Scrap
+        WHEN ts.Step_Type = 3 AND t.Tasks_Status <> 5
+        THEN t.Qty_Done 
         ELSE 0
     END) AS FinishingInProgress,
+SUM(CASE WHEN ts.Step_Type = 3 AND t.Tasks_Status = 1 THEN t.Qty_Done ELSE 0 END) AS FinStatus1,
+SUM(CASE WHEN ts.Step_Type = 3 AND t.Tasks_Status = 2 THEN t.Qty_Done ELSE 0 END) AS FinStatus2,
+SUM(CASE WHEN ts.Step_Type = 3 AND t.Tasks_Status = 3 THEN t.Qty_Done ELSE 0 END) AS FinStatus3,
 
 MIN(CASE 
-        WHEN ts.Step_Type = 1 AND t.Tasks_Status = 2 
+        WHEN ts.Step_Type = 1 
+         AND t.Tasks_Status IN (2,3)
+         AND t.Started_At IS NOT NULL
         THEN t.Started_At 
       END) AS DetailStart,
 
-MAX(CASE 
+CASE
+    WHEN SUM(CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status <> 3 THEN 1 ELSE 0 END) = 0
+    THEN MAX(CASE 
         WHEN ts.Step_Type = 1 AND t.Tasks_Status = 3 
         THEN t.Finished_At 
-      END) AS DetailFinish,
+    END)
+    ELSE NULL
+END AS DetailFinish,
 
 MIN(CASE 
         WHEN ts.Step_Type = 2 AND t.Tasks_Status = 2
@@ -1344,22 +1359,26 @@ ORDER BY b.ID DESC;
             CategoryName   = r.GetString(6),
             VersionName    = r.GetString(7),
             IsPriority     = r.GetBoolean(8),
-            Planned             = r.GetInt32(9),
-            DetailedInProgress  = r.GetInt32(10),
-            DetailedFinish      = r.GetInt32(11),
-            AssemblyInProgress  = r.GetInt32(12),
-            AssemblyFinish      = r.GetInt32(13),
-            Sold                = r.GetInt32(14),
-            FinishingInProgress = r.GetInt32(15),
+            Planned = r.GetInt32(9),
+            Comment = r.IsDBNull(10) ? null : r.GetString(10),
+            DetailedInProgress = r.GetInt32(11),
+            DetailedFinish      = r.GetInt32(12),
+            AssemblyInProgress  = r.GetInt32(13),
+            AssemblyFinish      = r.GetInt32(14),
+            Sold                = r.GetInt32(15),
+            FinishingInProgress = r.GetInt32(16),
+            FinStatus1 = r.IsDBNull(17) ? 0 : r.GetInt32(17),
+            FinStatus2 = r.IsDBNull(18) ? 0 : r.GetInt32(18),
+            FinStatus3 = r.IsDBNull(19) ? 0 : r.GetInt32(19),
 
-            DetailStart  = r.IsDBNull(16) ? (DateTime?)null : r.GetFieldValue<DateTime>(16),
-            DetailFinish = r.IsDBNull(17) ? (DateTime?)null : r.GetFieldValue<DateTime>(17),
+            DetailStart  = r.IsDBNull(20) ? (DateTime?)null : r.GetFieldValue<DateTime>(20),
+            DetailFinish = r.IsDBNull(21) ? (DateTime?)null : r.GetFieldValue<DateTime>(21),
 
-            AssemblyStart  = r.IsDBNull(18) ? (DateTime?)null : r.GetFieldValue<DateTime>(18),
-            AssemblyFinishDate = r.IsDBNull(19) ? (DateTime?)null : r.GetFieldValue<DateTime>(19),
+            AssemblyStart  = r.IsDBNull(22) ? (DateTime?)null : r.GetFieldValue<DateTime>(22),
+            AssemblyFinishDate = r.IsDBNull(23) ? (DateTime?)null : r.GetFieldValue<DateTime>(23),
 
-            DetailedStarted = r.GetInt32(20),
-            DetailsTotal = r.GetInt32(21)
+            DetailedStarted = r.GetInt32(24),
+            DetailsTotal = r.GetInt32(25)
         });
     }
 

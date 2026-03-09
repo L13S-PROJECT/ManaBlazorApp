@@ -1186,10 +1186,10 @@ public sealed class UpdateStepDto
 // GET: /api/tasks/active-parts?batchId=123
 // Atgriež ProductToPart_ID sarakstu šai partijai ar statusu 1
 [HttpGet("active-parts")]
-public async Task<IActionResult> GetActiveParts([FromQuery] int batchId)
+public async Task<IActionResult> GetActiveParts([FromQuery] int batchProductId)
 {
-    if (batchId <= 0)
-        return BadRequest("batchId is required.");
+    if (batchProductId <= 0)
+    return BadRequest("batchProductId is required.");
 
     var conn = _db.Database.GetDbConnection();
     await conn.OpenAsync();
@@ -1201,15 +1201,15 @@ FROM tasks t
 JOIN batches_products bp   ON bp.ID = t.BatchProduct_ID
 JOIN toppartsteps     ts   ON ts.ID = t.TopPartStep_ID
 JOIN producttopparts  ptp  ON ptp.ID = ts.ProductToPart_ID
-WHERE t.IsActive      = 1
-  AND t.Tasks_Status  IN (1,2,3,4)
-  AND bp.Batch_Id     = @batch
-  AND ptp.IsActive    = 1;
+WHERE t.IsActive = 1
+  AND t.Tasks_Status IN (1,2,3)
+  AND t.BatchProduct_ID = @bp
+  AND ptp.IsActive = 1;
 ";
 
     var pBatch = cmd.CreateParameter();
-    pBatch.ParameterName = "@batch";
-    pBatch.Value = batchId;
+    pBatch.ParameterName = "@bp";
+    pBatch.Value = batchProductId;
     cmd.Parameters.Add(pBatch);
 
     var list = new List<int>();

@@ -177,7 +177,7 @@
 
 @code {
     [Parameter] public ProductBatchRow? SelectedBatch { get; set; }
-
+    [Parameter] public EventCallback OnDataChanged { get; set; }
     private List<FinishingPartVm> Parts = new();
 
     private sealed class FinishingPartVm
@@ -313,6 +313,8 @@ async Task ConfirmComment()
 
     IsCommentPopupOpen = false;
     EditingTask = null;
+
+    await OnDataChanged.InvokeAsync();
 }
 
 /* popup Finishin daļai */

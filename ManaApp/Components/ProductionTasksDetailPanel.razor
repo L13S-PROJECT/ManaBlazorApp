@@ -20,23 +20,26 @@
 
 <div class="ptv2-section">
     <div class="ptv2-tasks-subheader">DETAIL</div>
-    <DetailTasks 
-    @key="SelectedBatch?.BatchProductId"
-    SelectedBatch="SelectedBatch" />
+<DetailTasks 
+    @key="SelectedBatch"
+    SelectedBatch="SelectedBatch"
+    OnDataChanged="HandleDataChanged" />
 </div>
 
 <div class="ptv2-section">
     <div class="ptv2-tasks-subheader">ASSEMBLY</div>
     <AssemblyTasks 
     @key="SelectedBatch?.BatchProductId"
-    SelectedBatch="SelectedBatch" />
+    SelectedBatch="SelectedBatch"
+    OnDataChanged="OnDataChanged" />
 </div>
 
 <div class="ptv2-section">
     <div class="ptv2-tasks-subheader">FINISHING</div>
     <FinishingTasks 
     @key="SelectedBatch?.BatchProductId"
-    SelectedBatch="SelectedBatch" />
+    SelectedBatch="SelectedBatch"
+    OnDataChanged="OnDataChanged" />
 </div>
 
 
@@ -47,4 +50,11 @@
 
 @code {
     [Parameter] public ProductBatchRow? SelectedBatch { get; set; }
+
+    [Parameter] public EventCallback OnDataChanged { get; set; }
+
+    private void HandleDataChanged()
+    {
+        OnDataChanged.InvokeAsync(null);
+    }
 }

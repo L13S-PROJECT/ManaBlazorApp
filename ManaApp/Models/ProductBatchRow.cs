@@ -31,5 +31,9 @@ public sealed class ProductBatchRow
     public DateTime? DetailFinish { get; set; }
     public DateTime? AssemblyStart { get; set; }
     public DateTime? AssemblyFinishDate { get; set; }
+
+    public int FinStatus1 { get; set; }
+    public int FinStatus2 { get; set; } 
+    public int FinStatus3 { get; set; } 
 }
 
