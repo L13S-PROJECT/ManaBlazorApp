@@ -1,0 +1,51 @@
+@using ManaApp.Models
+
+<div class="gantt-row">
+
+    <div class="gantt-label">
+        @EmployeeName
+    </div>
+
+    <div class="gantt-timeline">
+
+        @if (Tasks != null)
+        {
+            @foreach (var t in Tasks)
+            {
+                <div class="gantt-bar"
+                     style="
+                    background:@(
+                        t.Status == 3 ? "#22c55e" :
+                        t.Status == 2 && t.ActualMinutes > t.EstimatedTotalMinutes ? "#ef4444" :
+                        (t.Status == 1 || t.Status == 2) && t.AssignedTo != null && t.AssignedTo != 0 && t.WorkCenterId != WorkCenterId ? "#a855f7" :
+                        t.Status == 2 ? "#eab308" :
+                        t.Status == 1 && (t.AssignedTo == null || t.AssignedTo == 0) ? "#9ca3af" :
+                        t.Status == 1 ? "#f97316" :
+                        "#9ca3af"
+                    );
+                left:@((Tasks.IndexOf(t)) * 42)px;
+                width:@Math.Max(10, (t.EstimatedTotalMinutes / 480.0) * 40)px;">
+
+                    @t.EstimatedTotalMinutes
+                </div>
+            }
+        }
+
+    </div>
+
+</div>
+
+@code {
+
+[Parameter]
+public int? EmployeeId { get; set; }
+
+[Parameter]
+public string? EmployeeName { get; set; }
+
+[Parameter]
+public List<GanttRow>? Tasks { get; set; }
+[Parameter]
+public int? WorkCenterId { get; set; }
+
+}

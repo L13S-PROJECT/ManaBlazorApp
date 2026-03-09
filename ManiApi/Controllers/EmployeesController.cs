@@ -51,7 +51,7 @@ public async Task<IActionResult> GetAll()
 
     await using var cmd = conn.CreateCommand();
     cmd.CommandText = @"
-SELECT ID, Employee_Name
+SELECT ID, Employee_Name, WorkCentrTypeID
 FROM employees
 WHERE IsActive = 1
 ORDER BY Employee_Name;
@@ -65,7 +65,8 @@ ORDER BY Employee_Name;
         list.Add(new
         {
             Id = r.GetInt32(0),
-            Name = r.GetString(1)
+            Name = r.GetString(1),
+            WorkCentrTypeID = r.IsDBNull(2) ? (int?)null : r.GetInt32(2)
         });
     }
 

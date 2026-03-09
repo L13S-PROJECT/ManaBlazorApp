@@ -4,8 +4,9 @@ public class GanttRow
 {
     public int TaskId { get; set; }
     public int Status { get; set; }
+    public bool IsPriority { get; set; }
+    public int Priority { get; set; }
     public int BatchProductId { get; set; }
-
     public int StepOrder { get; set; }
     public string? StepName { get; set; }
     public int StepType { get; set; }

@@ -1,0 +1,15 @@
+<div class="gantt-month">
+
+@for (int d = 1; d <= Days; d++)
+{
+    <div class="gantt-day">
+        @d
+    </div>
+}
+
+</div>
+
+@code{
+    [Parameter]
+    public int Days { get; set; } = 31;
+}

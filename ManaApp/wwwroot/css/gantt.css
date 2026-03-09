@@ -1,0 +1,92 @@
+.gantt-header {
+    display: flex;
+    border-bottom: 1px solid #ccc;
+}
+
+.gantt-left {
+    width: 220px;
+    padding: 6px;
+    font-weight: bold;
+}
+
+.gantt-month {
+    display: flex;
+    flex: 1;
+}
+
+.gantt-day {
+    width: 40px;
+    border-left: 1px solid #eee;
+    text-align: center;
+    font-size: 12px;
+}
+
+.gantt-row {
+    display: flex;
+    align-items: center;
+    height: 32px;
+}
+
+.gantt-label {
+    width: 220px;
+    padding-left: 6px;
+}
+
+.gantt-timeline{
+    position: relative;
+    flex:1;
+    height:28px;
+    border-left:1px solid #eee;
+    background:#f8fafc;
+}
+
+.gantt-timeline::before {
+    position: relative;
+    flex:1;
+    height:28px;
+    border-left:1px solid #eee;
+    background:#f8fafc;
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background-size: 40px 100%;
+    background-image: repeating-linear-gradient(
+        to right,
+        transparent,
+        transparent 39px,
+        #eee 40px
+    );
+}
+
+.gantt-bar {
+    position: absolute;
+    height: 20px;
+    border-radius: 4px;
+    color: white;
+    font-size: 11px;
+    padding: 2px 4px;
+}
+
+.gantt-container{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+}
+
+.gantt-day{
+    width:40px;
+    border:1px solid #ccc;
+    text-align:center;
+    font-size:12px;
+}
+
+.gantt-scroll {
+    overflow-x: auto;
+}
+
+.gantt-body {
+    min-width: 1400px;
+}

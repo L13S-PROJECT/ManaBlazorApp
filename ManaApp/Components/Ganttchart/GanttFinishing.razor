@@ -1,0 +1,31 @@
+@using ManaApp.Models
+
+<h3>Finishing</h3>
+
+@if (Groups != null)
+{
+@foreach (var wc in Groups.Where(w => w.WorkCenterId == 4))
+    {
+        <h4>@wc.WorkCenterName</h4>
+
+        foreach (var emp in wc.Employees)
+        {
+            <div style="margin-left:20px">
+
+                <div>
+                    <GanttEmployeeRow 
+                        EmployeeId="emp.EmployeeId"
+                        EmployeeName="@emp.EmployeeName"
+                        WorkCenterId="@wc.WorkCenterId"
+                        Tasks="emp.Tasks.Where(x => x.StepType == 3).ToList()" />
+                </div>
+
+            </div>
+        }
+    }
+}
+
+@code{
+    [Parameter]
+    public List<WorkCenterGroup>? Groups { get; set; }
+}

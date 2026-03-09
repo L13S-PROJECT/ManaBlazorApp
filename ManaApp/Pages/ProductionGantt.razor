@@ -1,6 +1,8 @@
 @page "/production-gantt"
 @inject HttpClient Http
 @using ManaApp.Models
+@using ManaApp.Components.Ganttchart
+
 
 <h3>Production Gantt</h3>
 
@@ -10,207 +12,62 @@
         Detail
     </div>
 
-    <div class="gantt-month">
-
-        @for (int d = 1; d <= 31; d++)
-        {
-            <div class="gantt-day">
-                @d
-            </div>
-        }
-
-    </div>
+<GanttTimeline Days="@daysInMonth" />
 
 </div>
 
-@if (data == null)
+@if (data.Count == 0)
 {
     <p>Loading...</p>
 }
-else
-{
-   <pre>@System.Text.Json.JsonSerializer.Serialize(data)</pre>
-}
 
 @if (grouped != null)
 {
-    @foreach (var wc in grouped.Where(w => 
-    w.Employees.Any(e => e.Tasks.Any(t => t.StepType == 1))))
-    {
-        <h4>@wc.WorkCenterName</h4>
+<div class="gantt-scroll">
+    <div class="gantt-body">
 
-        foreach (var emp in wc.Employees)
-        {
-            <div style="margin-left:20px">
+        <GanttDetail Groups="grouped" />
+        <GanttAssembly Groups="grouped" />
+        <GanttFinishing Groups="grouped" />
 
-                <b>
-                @(emp.EmployeeId == null ? "Unassigned" : $"Employee {emp.EmployeeId}")
-                </b>
-
-                <ul>
-
-                    @foreach (var t in emp.Tasks.Where(x => x.StepType == 1))
-                    {
-                        <div class="gantt-row">
-
-                            <div class="gantt-label">
-                                @t.StepName
-                            </div>
-
-                            <div class="gantt-timeline">
-
-                    <div class="gantt-bar"
-                        style="
-                        background:@(t.Status == 3 ? "#22c55e" :
-                                    t.Status == 2 ? "#eab308" :
-                                    t.Status == 1 ? "#f97316" :
-                                    t.Status == 5 ? "#9ca3af" :
-                                    "#9ca3af");
-                        left:@(t.EstimatedStartMinutes/480*40)px;
-                        width:@Math.Max(10,(t.EstimatedTotalMinutes/480)*40)px;">
-
-                                    @t.EstimatedTotalMinutes
-                                </div>
-
-                            </div>
-
-                        </div>
-                    }
-                </ul>
-
-            </div>
-        }
-    }
-}
-
-@if (grouped != null)
-{
-            <h3>Assembly</h3>
-
-            @foreach (var wc in grouped.Where(w => 
-    w.Employees.Any(e => e.Tasks.Any(t => t.StepType == 2))))
-            {
-                <h4>@wc.WorkCenterName</h4>
-
-                foreach (var emp in wc.Employees)
-                {
-                    <div style="margin-left:20px">
-
-                        <b>
-                        @(emp.EmployeeId == null ? "Unassigned" : $"Employee {emp.EmployeeId}")
-                        </b>
-
-                        <ul>
-                            @foreach (var t in emp.Tasks.Where(x => x.StepType == 2))
-                            {
-                                <div class="gantt-row">
-
-                                    <div class="gantt-label">
-                                        @t.StepName
-                                    </div>
-
-                                    <div class="gantt-timeline">
-
-                                        <div class="gantt-bar"
-                                            style="
-                                            background:@(t.Status == 3 ? "#22c55e" :
-                                                        t.Status == 2 ? "#eab308" :
-                                                        t.Status == 1 ? "#f97316" :
-                                                        "#9ca3af");
-                                            left:@(t.EstimatedStartMinutes/480*40)px;
-                                            width:@Math.Max(10,(t.EstimatedTotalMinutes/480)*40)px;">
-
-                                            @t.EstimatedTotalMinutes
-                                        </div>
-
-                                    </div>
-
-                                </div>
-                            }
-                        </ul>
-
-                    </div>
-                    }
-                }
-            }
-        
-
-
-<h3>Finishing</h3>
-
-@if (grouped != null)
-{
-    foreach (var wc in grouped.Where(w => 
-    w.Employees.Any(e => e.Tasks.Any(t => t.StepType == 3))))
-    {
-        <h4>@wc.WorkCenterName</h4>
-
-        foreach (var emp in wc.Employees)
-        {
-            <div style="margin-left:20px">
-
-                <b>
-                @(emp.EmployeeId == null ? "Unassigned" : $"Employee {emp.EmployeeId}")
-                </b>
-
-                <ul>
-                    @foreach (var t in emp.Tasks.Where(x => x.StepType == 3))
-                    {
-                        <div class="gantt-row">
-
-                            <div class="gantt-label">
-                                @t.StepName
-                            </div>
-
-                            <div class="gantt-timeline">
-
-                                <div class="gantt-bar"
-                                    style="
-                                    background:@(t.Status == 3 ? "#22c55e" :
-                                                t.Status == 2 ? "#eab308" :
-                                                t.Status == 1 ? "#f97316" :
-                                                "#9ca3af");
-                                    left:@(t.EstimatedStartMinutes/480*40)px;
-                                    width:@Math.Max(10,(t.EstimatedTotalMinutes/480)*40)px;">
-
-                                    @t.EstimatedTotalMinutes
-                                </div>
-
-                            </div>
-
-                        </div>
-                    }
-                </ul>
-
-            </div>
-        }
-    }
+    </div>
+</div>
 }
 
 @code {
+List<GanttRow> data = new();
+List<WorkCenterGroup> grouped = new();
+List<EmployeeDto> employees = new();
+int daysInMonth = DateTime.DaysInMonth(DateTime.Today.Year, DateTime.Today.Month);
 
-    List<GanttRow>? data;
-    List<WorkCenterGroup>? grouped;
   protected override async Task OnInitializedAsync()
 {
-    data = await Http.GetFromJsonAsync<List<GanttRow>>("api/production/gantt?batchProductId=569");
+    data = await Http.GetFromJsonAsync<List<GanttRow>>("api/production/gantt") ?? new();
+    employees = await Http.GetFromJsonAsync<List<EmployeeDto>>("api/employees") ?? new();
+    grouped = data
+    .GroupBy(x => x.WorkCenterId)
+    .Select(wc => new WorkCenterGroup
+    {
+        WorkCenterId = wc.Key,
+        WorkCenterName = wc.First().WorkCenterName,
 
-    grouped = data!
-        .GroupBy(x => x.WorkCenterId)
-        .Select(wc => new WorkCenterGroup
-        {
-            WorkCenterId = wc.Key,
-            WorkCenterName = wc.First().WorkCenterName,
-            Employees = wc
-                .GroupBy(x => x.AssignedTo)
-                .Select(emp => new EmployeeGroup
-                {
-                    EmployeeId = emp.Key,
-                    Tasks = emp.OrderBy(x => x.StepOrder).ToList()
-                })
-                .ToList()
-        })
-        .ToList();
+        Employees = employees
+            .Where(e => e.WorkCentrTypeID == wc.Key)
+            .Select(e => new EmployeeGroup
+            {
+                EmployeeId = e.Id,
+                EmployeeName = e.Name,
+                Tasks = wc
+                    .Where(t => t.AssignedTo == e.Id || t.AssignedTo == 0 || t.AssignedTo == null)
+                    .OrderByDescending(t => t.IsPriority)
+                    .ThenBy(t => t.Priority)
+                    .ThenBy(t => t.BatchProductId)
+                    .ThenBy(t => t.StepOrder)
+                    .ToList()
+            })
+            .ToList()
+    })
+    .ToList();
 }
 
 }
