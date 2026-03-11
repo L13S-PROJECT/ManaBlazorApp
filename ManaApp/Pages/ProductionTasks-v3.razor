@@ -5,6 +5,8 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 
+
+
 <div class="ptv3-root">
 
     <!-- TOOLBAR -->
@@ -152,6 +154,10 @@ else
 
 @code {
 
+[Parameter]
+[SupplyParameterFromQuery]
+public int? BatchProductId { get; set; }
+
     private ProductBatchRow? SelectedBatch;
     private string SearchText = "";
 private void SelectRow(int batchProductId)
@@ -194,8 +200,15 @@ protected override async Task OnInitializedAsync()
 
     VersionSummary = summaries.ToDictionary(x => x.VersionId);
 
-VersionSummary = summaries.ToDictionary(x => x.VersionId);
+    VersionSummary = summaries.ToDictionary(x => x.VersionId);
 
+if (BatchProductId.HasValue)
+{
+    SelectedBatch = ProductBatches
+        .FirstOrDefault(x => x.BatchProductId == BatchProductId.Value);
+
+    StateHasChanged();
+}
 
             }
 private string GetFinCellClass(ProductBatchRow b)

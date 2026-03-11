@@ -272,3 +272,35 @@ box-shadow:
     min-width:220px;
     text-align:center;
 }
+
+.fin-hover {
+    position: relative;
+}
+
+.fin-tooltip {
+    display: block;
+    position: absolute;
+    top: 100%;
+    margin-top: 6px;
+    left: 0;
+
+    background: #1f2937;
+    color: #ffffff;
+    font-size: 12px;
+
+    padding: 6px 8px;
+    border-radius: 4px;
+
+    white-space: pre-line;
+    width: 160px;
+
+    z-index: 100;
+
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease 0.35s;
+}
+
+.fin-hover:hover .fin-tooltip {
+    opacity: 1;
+}

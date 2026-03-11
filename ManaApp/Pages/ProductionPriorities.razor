@@ -232,7 +232,9 @@ else
                     </div>
 
                 <div>
-                    <div class="d-flex justify-content-center gap-3">
+                    
+<div class="fin-hover">
+    <div class="d-flex justify-content-center gap-3">
                         @{
                             var blue = p.FinishingStock;   // kopā gatavs krāsošanai = Assembly stock atlikums
                             if (blue < 0) blue = 0;
@@ -267,9 +269,13 @@ else
          style="height:6px; width:24px;">
     </div>
 </div>
-                    </div>
-                </div>
 
+                </div>
+                <div class="fin-tooltip">
+@($"Krāsošana:\n🟩 {p.FinishingStatus3} pabeigts\n🟨 {p.FinishingStatus2} procesā\n⬛ {p.FinishingStatus1} gaida")
+</div>
+        </div>
+</div>
                 <div>
                     <span style="cursor:pointer;"
                         @onclick="() => GoToBatch(p.BatchProductId)">
@@ -378,24 +384,24 @@ return "";
 
 private string GetAssemblyStatus(ProductRow p)
 {
-    if (p.Done > 0)
-        return "Done";
+        if (p.Assembly > 0)
+            return "In progress";
 
-    if (p.Assembly > 0)
-        return "In progress";
+        if (p.DetailedIsDone)
+            return "Done";
 
-    return "Not started";
+        return "Not started";
 }
 
 private string GetAssemblyBarClass(ProductRow p)
 {
-    if (p.Assembly > 0)
-        return "bg-warning";   // In progress
+        if (p.Assembly > 0)
+            return "bg-warning";
 
-    if (p.Done > 0)
-        return "bg-success";   // Done
+        if (p.DetailedIsDone)
+            return "bg-success";
 
-    return "bg-light";         // Not started
+        return "bg-light";
 }
 
 private string GetFinishingStatus(ProductRow p)
@@ -495,7 +501,7 @@ private int? _selectedId = null;
 
 private void GoToBatch(int batchProductId)
 {
-    Nav.NavigateTo($"/productiontasks-v2?batchProductId={batchProductId}");
+    Nav.NavigateTo($"/productiontasks-v3?batchProductId={batchProductId}");
 }
 
 private void StartDrag(ProductRow item)

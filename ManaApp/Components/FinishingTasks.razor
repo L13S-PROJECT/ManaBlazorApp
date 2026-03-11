@@ -386,6 +386,7 @@ private async Task OnFinishingOk((int Qty, string? Comment, int? RalColorId) dat
 
     // pārlādējam datus, lai UI atjaunojas
     await OnParametersSetAsync();
+    await OnDataChanged.InvokeAsync();
 }
 
 private List<FinishingIndicatorVm> FinishingIndicators = new();
