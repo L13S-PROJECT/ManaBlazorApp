@@ -28,18 +28,19 @@
         @foreach (var grp in cat)
 {
     <tr class="excel-row @(grp.IsExpanded ? "is-open" : "")"
-        @key="grp">
+    style="font-weight:600"
+    @key="grp">
 
 
-                <td class="name-cell expandable">
+                <td class="name-cell expandable" style="font-weight:600">
                     <span class="chevron"
                         @onclick="() => grp.IsExpanded = !grp.IsExpanded">
                         @(grp.IsExpanded ? "▾" : "▸")
                     </span>
 
-                    <span class="product-name">
-                        @grp.ProductName
-                    </span>
+                <span class="product-name product-main">
+                    @grp.ProductName
+                </span>
                 </td>
 
                 <td class="@(grp.InStock > 0 ? "cell-stock" : "cell-zero")">
@@ -83,35 +84,52 @@
         var ver = grp.Versions[i];
         var isLast = i == grp.Versions.Count - 1;
 
-        <tr class="excel-detail @(isLast ? "last-detail" : "")">
+        <tr class="excel-detail @(ver.IsRalRow ? "excel-ral" : "") @(isLast ? "last-detail" : "")"
+            @key="ver">
 
             <td class="name-cell detail-name">
                 <div class="detail-wrap">
-                    @grp.ProductName
-                    @if (!string.IsNullOrWhiteSpace(ver.versionName))
+                    @if(!ver.IsRalRow)
                     {
+                        @grp.ProductName
                         <span class="detail-version">(@ver.versionName)</span>
+                    }
+                    else
+                    {
+                        <span class="ral-dot">●</span>
+                        <span class="ral-code">RAL @ver.RalCode</span>
                     }
                 </div>
             </td>
 
-            <td>
-                <span class="instock-value">@ver.InStock</span>
-            </td>
+<td>
+    @if(ver.IsRalRow)
+    {
+        <span class="instock-value">@ver.InStock</span>
+    }
+</td>
 
             <td>
+            @if(!ver.IsRalRow)
+            {
                 <div class="planned-cell">
                     <span class="planned-value">@ver.Planned</span>
                 </div>
+            }
             </td>
 
             <td class="plus-cell"></td>
 
-            <td>@ver.DetailedInProgress</td>
-            <td>@ver.DetailedFinish</td>
-            <td>@ver.AssemblyINProgress</td>
-            <td>@ver.AssemblyFinish</td>
-            <td>@ver.FinishingInProgress</td>
+            <td>@if(!ver.IsRalRow){ @ver.DetailedInProgress }</td>
+            <td>@if(!ver.IsRalRow){ @ver.DetailedFinish }</td>
+            <td>@if(!ver.IsRalRow){ @ver.AssemblyINProgress }</td>
+            <td>@if(!ver.IsRalRow){ @ver.AssemblyFinish }</td>
+            <td>
+                @if(ver.IsRalRow)
+                {
+                    @ver.FinishingInProgress
+                }
+            </td>
 
         </tr>
         }

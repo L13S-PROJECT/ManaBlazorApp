@@ -74,11 +74,14 @@
 }
 
 .detail-name {
-    padding-left: 0px;     /* iespiesta iekšā zem vecāka */
-    
+    padding-left: 0px;
+    padding-left: 18px;   /* nobīde tekstam */
+
     align-items: center;
     gap: 6px;
-    box-sizing: border-box; /* SVARĪGI */
+    box-sizing: border-box;
+
+    border-left: 5px solid #33D6FF;   /* turpina zilo līniju */
 }
 
 .detail-version {
@@ -246,7 +249,7 @@ border-left: 5px solid #33D6FF;   /* neon gaiši zils */
     display: flex;
     align-items: center;
     gap: 6px;
-    padding-left: 10px;   /* tikai vizuāla indentācija */
+    padding-left: 2px;   /* tikai vizuāla indentācija */
     position: relative;
 }
 
@@ -260,11 +263,6 @@ border-left: 5px solid #33D6FF;   /* neon gaiši zils */
 
     color: #0b4b23;
     font-size: 13px;
-}
-
-/* teksts paliek turpat */
-.detail-wrap {
-    padding-left: 10px;     /* nemainām */
 }
 
 
@@ -464,3 +462,27 @@ border-left: 5px solid #33D6FF;   /* neon gaiši zils */
     color: #0f172a !important;
     font-weight: 600;
 }
+
+.product-main {
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.excel-ral td {
+    background: #F1F5F9 !important;
+}
+
+.excel-detail td:first-child::before {
+    content: "";
+    position: absolute;
+    left: -5px;
+    top: -1px;
+    bottom: -1px;
+    width: 5px;
+    background: #33D6FF;
+}
+
+.excel-ral td:first-child {
+    border-left: 5px solid #33D6FF !important;
+}
+

@@ -16,6 +16,8 @@ public sealed class ProductRow
     public string versionDate { get; set; } = "";
    public int? VersionId { get; set; }
     public bool IsActive { get; set; }
+    public bool IsRalRow { get; set; }
+    public int FinishingStatus { get; set; }
 
     [JsonPropertyName("versionIsActive")]
     public bool VersionIsActive { get; set; }
@@ -27,7 +29,8 @@ public sealed class ProductRow
     public int AssemblyFinish { get; set; }
     public int FinishingInProgress { get; set; }
     public int FinishingAllocated { get; set; }
-
+    public List<FinishingRalRow> FinishingRal { get; set; } = new();
+    public string? RalCode { get; set; }
 }
 
 public sealed class CategoryRow
@@ -163,4 +166,12 @@ public sealed class BatchProductRow
     public int Qty { get; set; }
     public string VersionName { get; set; } = "";
     public string VersionDate { get; set; } = "";
+}
+
+public sealed class FinishingRalRow
+{
+    public int? RalColorId { get; set; }
+    public string? RalCode { get; set; }
+    public int Qty { get; set; }
+    public int Status { get; set; }
 }

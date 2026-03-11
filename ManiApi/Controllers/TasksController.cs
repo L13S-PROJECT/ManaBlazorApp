@@ -1559,7 +1559,7 @@ JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID AND ptp.IsActive = 1
 WHERE ptp.Version_ID = @vid
   AND t.IsActive = 1
   AND ts.Step_Type = 3
-  AND t.Tasks_Status IN (2,3);";   // 2=in progress, 3=finished
+  AND t.Tasks_Status IN (1,2);";   // 1=allocated, 2=in progress
 
     var p = cmd.CreateParameter();
     p.ParameterName = "@vid";
@@ -2414,6 +2414,42 @@ public async Task<IActionResult> GetRalColors()
         .ToListAsync();
 
     return Ok(list);
+}
+
+// GET: api/tasks/finishing-by-version-ral?versionId=3
+[HttpGet("finishing-by-version-ral")]
+public async Task<IActionResult> GetFinishingByVersionRal([FromQuery] int versionId)
+{
+    if (versionId <= 0)
+        return BadRequest("versionId is required.");
+
+        var result = await _db.Tasks
+            .Join(_db.TopPartSteps,
+                t => t.TopPartStep_ID,
+                ts => ts.Id,
+                (t, ts) => new { t, ts })
+            .Join(_db.RalColors,
+                x => x.t.RAL_Color_ID,
+                rc => rc.ID,
+                (x, rc) => new { x.t, x.ts, rc })
+            .Where(x =>
+                x.t.IsActive &&
+                x.t.RAL_Color_ID != null &&
+                x.ts.StepType == 3 &&
+                _db.StockMovements.Any(sm =>
+                    sm.BatchProduct_ID == x.t.BatchProduct_ID &&
+                    sm.Version_ID == versionId))
+            .GroupBy(x => new { x.t.RAL_Color_ID, x.rc.Name })
+                .Select(g => new
+                {
+                    RalColorId = g.Key.RAL_Color_ID,
+                    RalCode = g.Key.Name,
+                    Qty = g.Sum(x => x.t.Qty_Done),
+                    Status = g.Min(x => x.t.Tasks_Status)
+                })
+    .ToListAsync();
+
+    return Ok(result);
 }
 
     }

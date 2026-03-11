@@ -179,18 +179,36 @@ GROUP BY sm.Move_Type;";
         }
     }
 
-    return Ok(new
-    {
-        Planned = planned,
-        Detailed = detailed,
-        DetailedFinish = 0,      // ja tev vajag vēlāk - var pielikt, bet Planningam nav kritiski
-        Assembly = assembly,
-        AssemblyFinish = 0,      // idem
-        Finishing = finishing,
-        Stock = stock,
-        Scrap = scrap,
-        Out = outQty
-    });
+    var finishingAllocated = await _db.Tasks
+        .Join(_db.TopPartSteps,
+            t => t.TopPartStep_ID,
+            ts => ts.Id,
+            (t, ts) => new { t, ts })
+        .Join(_db.ProductTopParts,
+            x => x.ts.ProductToPartId,
+            ptp => ptp.Id,
+            (x, ptp) => new { x.t, x.ts, ptp })
+        .Where(x =>
+            x.t.IsActive &&
+            x.ts.StepType == 3 &&
+            x.ptp.VersionId == versionId &&
+            (x.t.Tasks_Status == 1 || x.t.Tasks_Status == 2))
+        .SumAsync(x => (int?)x.t.Qty_Done) ?? 0;
+
+    finishing = finishingAllocated;
+
+        return Ok(new
+        {
+            Planned = planned,
+            Detailed = detailed,
+            DetailedFinish = 0,
+            Assembly = assembly,
+            AssemblyFinish = 0,
+            Finishing = finishingAllocated,
+            Stock = stock,
+            Scrap = scrap,
+            Out = outQty
+        });
 }
 
         // GET: api/stockmovements/finishing-totals?batchProductId=123
@@ -672,6 +690,30 @@ public async Task<IActionResult> GetSummaryByVersions([FromQuery] List<int> vers
             Assembly  = g.Where(x => x.Move_Type == MoveType.ASSEMBLY).Sum(x => x.Stock_Qty),
             Finishing = g.Where(x => x.Move_Type == MoveType.FINISHING).Sum(x => x.Stock_Qty),
             Stock     = g.Where(x => x.Move_Type == MoveType.STOCK).Sum(x => x.Stock_Qty)
+        })
+        .ToListAsync();
+
+    return Ok(result);
+}
+
+// GET: api/stockmovements/stock-by-version-ral?versionId=3
+[HttpGet("stock-by-version-ral")]
+public async Task<IActionResult> GetStockByVersionRal([FromQuery] int versionId)
+{
+    if (versionId <= 0)
+        return BadRequest("versionId is required.");
+
+    var result = await _db.StockMovements
+        .Where(x =>
+            x.IsActive &&
+            x.Version_ID == versionId &&
+            x.Move_Type == MoveType.STOCK &&
+            x.RAL_Color_ID != null)
+        .GroupBy(x => x.RAL_Color_ID)
+        .Select(g => new
+        {
+            RalColorId = g.Key,
+            Qty = g.Sum(x => x.Stock_Qty)
         })
         .ToListAsync();
 

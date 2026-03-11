@@ -20,3 +20,13 @@
     margin-left: -8px;
     margin-right: -1000px; /* izstiep visu rindu */
 }
+
+
+::deep .planning-grid .bg-finishing-wait{
+  background:#f9b115 !important;
+  color:#000;
+}
+
+::deep .planning-grid .bg-finishing{
+  background:#6ea8fe !important;
+}

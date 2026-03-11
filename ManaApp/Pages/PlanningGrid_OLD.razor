@@ -1,6 +1,7 @@
 @using ManaApp.Models
 @using Syncfusion.Blazor.Grids
 
+<h1 style="color:red">PLANNING GRID ACTIVE</h1>
 <SfGrid TValue="ProductGroupRow"
         DataSource="@Rows"
         Width="100%"
@@ -154,13 +155,23 @@
                                     var r = verObj as ProductRow;
                                     if (r is null) { return; }
                                 }
-                                <span>
-                                    @grp.ProductName
-                                    @if (!string.IsNullOrWhiteSpace(r.versionName))
-                                    {
-                                        <span style="margin-left:6px; opacity:.7;">@r.versionName</span>
-                                    }
-                                </span>
+                                    <span>
+                                        @grp.ProductName
+
+                                        @if (!string.IsNullOrWhiteSpace(r.versionName))
+                                        {
+                                            <span style="margin-left:6px; opacity:.7;">
+                                                (@r.versionName)
+                                            </span>
+                                        }
+
+                                        @if (r.IsRalRow && !string.IsNullOrWhiteSpace(r.RalCode))
+                                        {
+                                            <span style="margin-left:6px; color:#666;">
+                                                @r.RalCode
+                                            </span>
+                                        }
+                                    </span>
                             </Template>
                         </GridColumn>
 
@@ -234,9 +245,27 @@
                         <GridColumn HeaderText="FinishingInProgress" Width="100">
                             <Template Context="verObj">
                                 @{
-                                    var v = (verObj as ProductRow)?.FinishingInProgress ?? 0;
+                                    var r = verObj as ProductRow;
+                                    var v = r?.FinishingInProgress ?? 0;
+
+                                    var css =
+                                        r?.IsRalRow == true
+                                            ? (r.FinishingStatus == 1 ? "bg-finishing-wait"
+                                            : r.FinishingStatus == 2 ? "bg-finishing"
+                                            : "")
+                                            : (v > 0 ? "bg-finishing" : "");
                                 }
-                                <div class="cell-fill @(v > 0 ? "bg-finishing" : "")">@v</div>
+
+                                <div class="cell-fill"
+                                    style="background:@(
+                                        r?.IsRalRow == true
+                                            ? (r.FinishingStatus == 1 ? "#f9b115"
+                                            : r.FinishingStatus == 2 ? "#6ea8fe"
+                                            : "")
+                                            : (v > 0 ? "#6ea8fe" : "")
+                                    )">
+                                    @v
+                                </div>
                             </Template>
                         </GridColumn>
 
