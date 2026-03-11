@@ -13,9 +13,10 @@ public sealed class FinishingTaskRow
     public DateTime? StartedAt { get; set; }
     public DateTime? FinishedAt { get; set; }
     public string? Comment { get; set; }
-
+    
     public bool IsCommentForEmployee { get; set; }
     public int? RalColorId { get; set; }
     public string? RalName { get; set; }
+    public int Qty { get; set; }
 
 }

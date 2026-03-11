@@ -14,59 +14,47 @@
 
 @foreach (var p in Parts)
 {
-    <div class="ptv2-tasks-row ptv2-finishing-main">
-        <!-- 1. Nosaukums -->
-        <div class="ptv2-part-name" title="@p.PartName">
-            <span class="ptv2-part-indicator state-@(
-                FinishingIndicators.FirstOrDefault()?.State ?? "gray")">
-            </span>
-            @p.PartName
+        <div class="ptv2-tasks-row ptv2-finishing-main">
+
+                    <!-- NOSAUKUMS -->
+                    <div class="ptv2-part-name">
+                        <span class="ptv2-part-indicator state-@FinishingState"></span>
+                        FINISHING
+                    </div>
+
+                    <!-- SWITCH -->
+                    <div>
+                        <input type="checkbox"
+                            class="ptv2-switch"
+                            checked="@IsFinishingSwitchOn"
+                            disabled="@IsFinishingSwitchDisabled"
+                            @onclick:preventDefault="true"
+                            @onclick="OnFinishingSwitchClicked" />
+                    </div>
+
+                    <!-- APJOMS -->
+                    <div class="@(FinishingState == "gray" ? "ptv2-qty-inactive" : "ptv2-qty-active")">
+                        @FinAvailable
+                    </div>
+
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+
         </div>
 
-        <!-- 2. Gatavs -->
-        <div>
-            <input type="checkbox"
-                class="ptv2-switch"
-                checked="@IsFinishingSwitchOn"
-                disabled="@IsFinishingSwitchDisabled"
-                @onclick:preventDefault="true"
-                @onclick="OnFinishingSwitchClicked" />
-
-        </div>
-
-        <!-- 3. Apjoms -->
-        <div class="@(FinishingState == "gray" ? "qty-gray" : "qty-normal")">
-            @(FinishingState == "gray" ? "—" : FinAvailable)
-        </div>
-
-        <!-- 4. Piešķirts -->
-        <div></div>
-
-        <!-- 5. Pieņēma -->
-        <div></div>
-
-        <!-- 6. Sākums -->
-        <div></div>
-
-        <!-- 7. Pabeigts -->
-        <div></div>
-
-        <!-- 8. Komentārs -->
-        <div></div>
-
-        <!-- 9. Done -->
-        <div></div>
-    </div>
-
-    @foreach (var t in p.Tasks)
+    @foreach (var w in Waves)
     {
         <div class="ptv2-tasks-row sub task">
             <!-- 1. Nosaukums -->
         <div title="Finishing">
-            @t.PartName
-            @if (!string.IsNullOrWhiteSpace(t.RalName))
+            @w.PartName
+            @if (!string.IsNullOrWhiteSpace(w.RalName))
             {
-                <span class="finishing-ral"> • @t.RalName</span>
+                <span class="finishing-ral"> • @w.RalName</span>
             }
         </div>
 
@@ -74,20 +62,20 @@
             <div></div>
 
             <!-- 3. Apjoms -->
-            <div>@t.Done</div>
+            <div>@w.Qty</div>
 
 <!-- 4. Piešķirts -->
         <div>
-            @if (t.Status == 2 || t.Status == 3)
+            @if (w.Status == 2 || w.Status == 3)
             {
                 <div class="assigned-readonly">
-                    @Employees.FirstOrDefault(e => e.Id == t.Assigned_To)?.Name
+                    @Employees.FirstOrDefault(e => e.Id == w.Assigned_To)?.Name
                 </div>
             }
             else
             {
-                <select value="@t.Assigned_To"
-                        @onchange="e => OnAssignedChanged(t.TaskId, e)">
+                <select value="@w.Assigned_To"
+                        @onchange="e => OnAssignedChanged(w.TaskId, e)">
                     <option value="">—</option>
                     @foreach (var emp in Employees)
                     {
@@ -100,21 +88,21 @@
 
             <!-- 5. Pieņēma -->
             <div>
-                @Employees.FirstOrDefault(e => e.Id == t.Claimed_By)?.Name
+                @Employees.FirstOrDefault(e => e.Id == w.Claimed_By)?.Name
             </div>
 
             <!-- 6. Sākums -->
             <div>
-                @(t.StartedAt.HasValue
-                    ? t.StartedAt.Value.ToString("dd.MM.yyyy")
+                @(w.StartedAt.HasValue
+                    ? w.StartedAt.Value.ToString("dd.MM.yyyy")
                     : "—")
             </div>
 
 
             <!-- 7. Pabeigts -->
             <div>
-                @(t.FinishedAt.HasValue
-                    ? t.FinishedAt.Value.ToString("dd.MM.yyyy")
+                @(w.FinishedAt.HasValue
+                    ? w.FinishedAt.Value.ToString("dd.MM.yyyy")
                     : "—")
             </div>
 
@@ -122,14 +110,14 @@
             <div class="ptv2-comment-wrap">
     <input
         type="text"
-        class="ptv2-comment-input @(string.IsNullOrWhiteSpace(t.Comment) ? "empty" : "")"
-        value="@(string.IsNullOrWhiteSpace(t.Comment) ? "(Pievienot komentāru)" : t.Comment)"
+        class="ptv2-comment-input @(string.IsNullOrWhiteSpace(w.Comment) ? "empty" : "")"
+        value="@(string.IsNullOrWhiteSpace(w.Comment) ? "(Pievienot komentāru)" : w.Comment)"
         readonly />
     <button
         type="button"
         class="ptv2-comment-edit"
         title="Labot komentāru"
-        @onclick="() => OpenCommentEditor(t)">
+        @onclick="() => OpenCommentEditor(w)">
         ✎
     </button>
 </div>
@@ -140,8 +128,8 @@
                         class="ptv2-done-checkbox"
                         style="position:relative; z-index:6;"
                         title="Redzams darbiniekam"
-                        checked="@t.IsCommentForEmployee"
-                        @onchange="e => OnCommentVisibilityChanged(t, e)" />
+                        checked="@w.IsCommentForEmployee"
+                        @onchange="e => OnCommentVisibilityChanged(w, e)" />
                 </div>
 
 
@@ -184,7 +172,7 @@
     [Parameter] public ProductBatchRow? SelectedBatch { get; set; }
     [Parameter] public EventCallback OnDataChanged { get; set; }
     private List<FinishingPartVm> Parts = new();
-
+    private List<FinishingTaskRow> Waves = new();
     private sealed class FinishingPartVm
     {
         public string PartName { get; set; } = "";
@@ -206,31 +194,27 @@ protected override async Task OnParametersSetAsync()
     if (SelectedBatch?.BatchProductId is not int bpId || bpId <= 0)
         return;
 
-    var tasks =
-        await Http.GetFromJsonAsync<List<FinishingTaskRow>>(
-            $"http://localhost:5270/api/tasks/by-batch?batchProductId={bpId}&stepType=3"
-        ) ?? new();
+var indicators =
+    await Http.GetFromJsonAsync<List<FinishingIndicatorVm>>(
+        $"http://localhost:5270/api/tasks/finishing-indicators?batchProductId={bpId}"
+    ) ?? new();
 
-        tasks = tasks
-            .Where(t => t.Status != 5)
-            .ToList();
+FinishingIndicators = indicators;
+FinishingState = indicators.FirstOrDefault()?.State ?? "gray";
 
-    
-        var indicators =
-            await Http.GetFromJsonAsync<List<FinishingIndicatorVm>>(
-                $"http://localhost:5270/api/tasks/finishing-indicators?batchProductId={bpId}"
-            ) ?? new();
+var productToPartId = FinishingIndicators.FirstOrDefault()?.ProductToPartId ?? 0;
 
-        FinishingIndicators = indicators;
-
-        FinishingState = indicators.FirstOrDefault()?.State ?? "gray";
-
+var waves =
+    await Http.GetFromJsonAsync<List<FinishingTaskRow>>(
+        $"api/tasks/finishing-waves?batchProductId={bpId}&productToPartId={productToPartId}"
+    ) ?? new();
+Waves = waves;
 
     Parts.Add(new FinishingPartVm
-    {
-        PartName = "FINISHING",
-        Tasks = tasks
-    });
+        {
+            PartName = "FINISHING",
+            Tasks = waves
+        });
 
     var summary =
     await Http.GetFromJsonAsync<List<FinishingSummaryVm>>(
@@ -242,7 +226,7 @@ var s = summary?.FirstOrDefault(x => x.BatchProductId == bpId);
 FinPlanned = s?.Planned ?? 0;
 FinAvailable =
     await Http.GetFromJsonAsync<int>(
-        $"http://localhost:5270/api/stockmovements/assembly-total?batchProductId={bpId}"
+        $"http://localhost:5270/api/tasks/assembly-available-ui?batchProductId={bpId}"
     );
 
 FinSold =

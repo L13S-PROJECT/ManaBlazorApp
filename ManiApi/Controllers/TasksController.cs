@@ -1356,7 +1356,7 @@ public async Task<IActionResult> GetFinishingWaves([FromQuery] int batchProductI
             {
                 TaskId = x.t.ID,
                 Status = x.t.Tasks_Status,
-                Planned = x.t.Qty_Done,
+                Qty = x.t.Qty_Done,
                 StartedAt = x.t.Started_At,
                 FinishedAt = x.t.Finished_At,
                 Comment = x.t.Tasks_Comment,
@@ -2376,6 +2376,23 @@ public async Task<IActionResult> GetFinishingByVersionRal([FromQuery] int versio
     .ToListAsync();
 
     return Ok(result);
+}
+
+// GET: api/stockmovements/assembly-available-ui?batchProductId=123
+[HttpGet("assembly-available-ui")]
+public async Task<IActionResult> GetAssemblyAvailableUi([FromQuery] int batchProductId)
+{
+    if (batchProductId <= 0)
+        return BadRequest("batchProductId is required.");
+
+    var assemblyStock = await _db.StockMovements
+        .Where(x =>
+            x.IsActive &&
+            x.BatchProduct_ID == batchProductId &&
+            x.Move_Type == MoveType.ASSEMBLY)
+        .SumAsync(x => (int?)x.Stock_Qty) ?? 0;
+
+    return Ok(Math.Max(assemblyStock, 0));
 }
 
     }

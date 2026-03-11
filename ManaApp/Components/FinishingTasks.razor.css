@@ -35,11 +35,6 @@
     text-align: center;
 }
 
-/* Detaļas (PART) rinda – vidējs fonts */
-.ptv2-tasks-row:not(.sub) {
-    font-size: 12.5px;
-    font-weight: 500;
-}
 
 /* Step / Task rindas – mazākas */
 .ptv2-tasks-row.sub {
@@ -53,10 +48,10 @@
 }
 
 /* Detaļas (PART) rinda – izceļas virs step */
-.ptv2-tasks-row:not(.sub) {
+.ptv2-tasks-row:not(.sub):not(.ptv2-finishing-main) {
     font-size: 13px;
     font-weight: 600;
-    color: #1e2024;   /* gaiši pelēks */
+    color: #1e2024;
     background: #dcdedc;
 }
 
@@ -368,9 +363,9 @@
 /* FINISHINGTASKS.RAZOR.CSS */
 
 /* FINISHING galvenā rinda */
-.ptv2-finishing-main {
-    background: #E8F0FE;              /* ļoti gaišs zils */
-    border-left: 4px solid #2563EB;   /* zilā akcenta līnija */
+
+.ptv2-finishing-active {
+    border-left: 4px solid #2563EB;
 }
 
 .assigned-readonly {
