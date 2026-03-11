@@ -25,7 +25,7 @@
         </tr>
     </thead>
     <tbody>
-@foreach (var b in Batches)
+@foreach (var b in (Batches ?? Enumerable.Empty<BatchRow>()))
 {
     <tr>
         <td>@b.BatchCode</td>
@@ -33,22 +33,24 @@
         <td>@b.StockQty</td>
         <td>
             <input type="number"
-       min="0"
-       max="@b.StockQty"
-       @bind="b.SellFromStock"
-       @bind:event="oninput"
-       class="qty-input" />
+                min="0"
+                max="@b.StockQty"
+                disabled="@(b.StockQty == 0)"
+                @bind="b.SellFromStock"
+                @bind:event="oninput"
+                class="qty-input" />
 
         </td>
 
         <td>@b.AssemblyQty</td>
         <td>
             <input type="number"
-       min="0"
-       max="@b.AssemblyQty"
-       @bind="b.SellFromAssembly"
-       @bind:event="oninput"
-       class="qty-input" />
+                min="0"
+                max="@b.AssemblyQty"
+                disabled="@(b.AssemblyQty == 0)"
+                @bind="b.SellFromAssembly"
+                @bind:event="oninput"
+                class="qty-input" />
 
         </td>
     </tr>
@@ -84,8 +86,7 @@
     [Parameter] public string? VersionName { get; set; }
     [Parameter] public int ProductId { get; set; }
 
-[Parameter]
-public List<BatchRow> Batches { get; set; } = new();
+[Parameter] public List<BatchRow>? Batches { get; set; }
 
 public sealed class BatchRow
 {
@@ -98,11 +99,12 @@ public sealed class BatchRow
 }
 
 private bool HasAnyQty =>
-    Batches.Any(b => b.SellFromStock > 0 || b.SellFromAssembly > 0);
+    (Batches ?? Enumerable.Empty<BatchRow>())
+        .Any(b => b.SellFromStock > 0 || b.SellFromAssembly > 0);
 
 private async Task Cancel()
 {
-    foreach (var b in Batches)
+    foreach (var b in (Batches ?? Enumerable.Empty<BatchRow>()))
     {
         b.SellFromStock = 0;
         b.SellFromAssembly = 0;
@@ -140,9 +142,9 @@ private async Task OnOk()
     {
         ProductId = ProductId,
         ProductName = ProductName,
-        StockTotal = Batches.Sum(b => b.SellFromStock),
-        AssemblyTotal = Batches.Sum(b => b.SellFromAssembly),
-        BatchSelections = Batches
+        StockTotal = (Batches ?? Enumerable.Empty<BatchRow>()).Sum(b => b.SellFromStock),
+        AssemblyTotal = (Batches ?? Enumerable.Empty<BatchRow>()).Sum(b => b.SellFromAssembly),
+        BatchSelections = (Batches ?? Enumerable.Empty<BatchRow>())
     .SelectMany(b =>
     {
         var list = new List<BatchSelection>();

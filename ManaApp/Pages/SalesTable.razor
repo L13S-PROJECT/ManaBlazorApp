@@ -79,25 +79,30 @@
         var ver = grp.Versions[i];
         var isLast = i == grp.Versions.Count - 1;
 
-        <tr class="excel-detail @(isLast ? "last-detail" : "")">
+        <tr class="excel-detail @(ver.IsRalRow ? "excel-ral" : "") @(isLast ? "last-detail" : "")">
 
-            <td class="name-cell detail-name">
-                <div class="detail-wrap">
+        <td class="name-cell detail-name">
+            <div class="detail-wrap">
+                @if(!ver.IsRalRow)
+                {
                     @grp.ProductName
-                    @if (!string.IsNullOrWhiteSpace(ver.versionName))
-                    {
-                        <span class="detail-version">(@ver.versionName)</span>
-                    }
-                </div>
-            </td>
+                    <span class="detail-version">(@ver.versionName)</span>
+                }
+                else
+                {
+                    <span class="ral-dot">●</span>
+                    <span class="ral-code">RAL @ver.RalCode</span>
+                }
+            </div>
+        </td>
 
             <td class="minus-cell">
-                
-<button type="button"
-        class="instock-btn minus"
-        @onclick="() => OnSell.InvokeAsync(ver)">
-    –
-</button>
+                <button type="button"
+                        class="instock-btn minus"
+                        @onclick:stopPropagation="true"
+                        @onclick="() => OnSell.InvokeAsync(ver)">
+                    –
+                </button>
             </td>
 
             <td>

@@ -495,7 +495,9 @@ WHERE sm.IsActive = 1
 
 // GET: api/stockmovements/available-by-batch?versionId=3
 [HttpGet("available-by-batch")]
-public async Task<IActionResult> GetAvailableByBatch([FromQuery] int versionId)
+public async Task<IActionResult> GetAvailableByBatch(
+    [FromQuery] int versionId,
+    [FromQuery] string? ral)
 {
     if (versionId <= 0)
         return BadRequest("versionId is required.");
@@ -516,18 +518,31 @@ JOIN batches_products bp
     ON bp.ID = sm.BatchProduct_ID
 JOIN batches b
     ON b.ID = bp.Batch_Id
+LEFT JOIN ral_colors rc
+    ON rc.ID = sm.RAL_Color_ID
 WHERE sm.IsActive = 1
   AND sm.Version_ID = @vid
   AND sm.Move_Type IN ('STOCK', 'ASSEMBLY')
+  AND (
+    (@ral IS NOT NULL AND rc.Name = @ral)
+    OR
+    (@ral IS NULL AND sm.RAL_Color_ID IS NULL)
+)
 GROUP BY
     bp.ID,
     b.Batches_Code,
-    sm.Move_Type;";
+    sm.Move_Type,
+    sm.RAL_Color_ID;";
 
     var p = cmd.CreateParameter();
     p.ParameterName = "@vid";
     p.Value = versionId;
     cmd.Parameters.Add(p);
+
+    var pRal = cmd.CreateParameter();
+    pRal.ParameterName = "@ral";
+    pRal.Value = (object?)ral ?? DBNull.Value;
+    cmd.Parameters.Add(pRal);
 
     var rows = new List<object>();
 

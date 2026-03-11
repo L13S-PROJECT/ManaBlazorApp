@@ -389,84 +389,8 @@ WHERE t.ID = @id
     }
 
     // Tikai, ja tas ir Finishing solis un ir jēgpilns apjoms
-    if (stepType == 3 && versionId > 0 && batchProductId > 0 && finishingQty > 0)
-    {
-        // ✅ Idempotence: ja šim taskam jau ir ielikts FINISHING +qty (no Claim),
-        // tad neliekam vēlreiz (citādi Assembly kļūs vēl negatīvāks).
-        int alreadyMoved = 0;
-        await using (var chkMove = conn.CreateCommand())
-        {
-            chkMove.Transaction = tx;
-            chkMove.CommandText = @"
-SELECT COUNT(*)
-FROM stock_movements
-WHERE IsActive = 1
-  AND Task_ID = @taskId
-  AND BatchProduct_ID = @bpId
-  AND Version_ID = @ver
-  AND Move_Type = 'FINISHING'
-  AND Stock_Qty > 0;";
-
-            var pTask = chkMove.CreateParameter();
-            pTask.ParameterName = "@taskId";
-            pTask.Value = dto.TaskId;
-            chkMove.Parameters.Add(pTask);
-
-            var pBp = chkMove.CreateParameter();
-            pBp.ParameterName = "@bpId";
-            pBp.Value = batchProductId;
-            chkMove.Parameters.Add(pBp);
-
-            var pVer = chkMove.CreateParameter();
-            pVer.ParameterName = "@ver";
-            pVer.Value = versionId;
-            chkMove.Parameters.Add(pVer);
-
-            alreadyMoved = Convert.ToInt32(await chkMove.ExecuteScalarAsync());
-        }
-
-        if (alreadyMoved == 0)
-        {
-            await using (var cmdMove = conn.CreateCommand())
-            {
-                cmdMove.Transaction = tx;
-                cmdMove.CommandText = @"
-INSERT INTO stock_movements 
-    (Version_ID, BatchProduct_ID, Move_Type, RAL_Color_ID, Stock_Qty, Created_At, Task_ID, IsActive)
-VALUES
-    (@ver, @bpId, 'ASSEMBLY',  NULL,        -@qty, CURRENT_TIMESTAMP, @taskId, 1),
-    (@ver, @bpId, 'FINISHING', @ral,         @qty, CURRENT_TIMESTAMP, @taskId, 1);";
-
-                var pVer2 = cmdMove.CreateParameter();
-                pVer2.ParameterName = "@ver";
-                pVer2.Value = versionId;
-                cmdMove.Parameters.Add(pVer2);
-
-                var pBp2 = cmdMove.CreateParameter();
-                pBp2.ParameterName = "@bpId";
-                pBp2.Value = batchProductId;
-                cmdMove.Parameters.Add(pBp2);
-
-                var pQty = cmdMove.CreateParameter();
-                pQty.ParameterName = "@qty";
-                pQty.Value = finishingQty;
-                cmdMove.Parameters.Add(pQty);
-
-                var pTask2 = cmdMove.CreateParameter();
-                pTask2.ParameterName = "@taskId";
-                pTask2.Value = dto.TaskId;
-                cmdMove.Parameters.Add(pTask2);
-
-                var pRal = cmdMove.CreateParameter();
-                pRal.ParameterName = "@ral";
-                pRal.Value = (object?)ralColorId ?? DBNull.Value;
-                cmdMove.Parameters.Add(pRal);
-
-                await cmdMove.ExecuteNonQueryAsync();
-            }
-        }
-    }
-
+   // Finishing kustība tiek veikta OpenFinishing()
+// Claim šeit tikai maina statusu
 await using (var session = conn.CreateCommand())
 {
     session.Transaction = tx;
@@ -1279,6 +1203,8 @@ _db.StockMovements.Add(new StockMovement
     Task_ID = activeTask.ID,
     IsActive = true
 });
+
+await _db.SaveChangesAsync();
 
     return Ok(new OpenFinishingResultDto
     {

@@ -144,32 +144,47 @@ private ProductRow? minusRow;
 
 private async Task LoadSummariesForRows(IEnumerable<ProductRow> targetRows)
     {
+        var ids = targetRows
+            .Where(x => x.VersionId.HasValue && x.VersionId > 0)
+            .Select(x => x.VersionId!.Value)
+            .Distinct()
+            .ToList();
+
+        var summaries = await Http.GetFromJsonAsync<List<StockSummary>>(
+            $"http://localhost:5270/api/stockmovements/summary-multi?ids={string.Join(",", ids)}");
+
+var map = summaries?.ToDictionary(x => x.VersionId) ?? new();
         foreach (var r in targetRows)
         {
-            var eligible = targetRows.Count(r => r.VersionId.HasValue && r.VersionId > 0);
+    
+        if (r.VersionId is null || r.VersionId <= 0)
+            continue;
 
-if (r.VersionId is null || r.VersionId <= 0)
+if (r.VersionId is not int vid || !map.TryGetValue(vid, out var sum))
     continue;
 
-            var sum = await Http.GetFromJsonAsync<StockSummary>(
-    $"http://localhost:5270/api/stockmovements/summary?versionId={r.VersionId}");
+        r.InStock = sum.Stock;
 
-            if (sum is null) continue;
-            
-           r.InStock = sum.Stock;
+        // ⬅️ ŠĪ IR TRŪKSTOŠĀ RINDA
+        r.AssemblyFinish = sum.Assembly;
 
-// AssemblyINProgress / AssemblyFinish vairs NEMAINĀM šeit,
-// tie tagad nāk no /api/batches/list
-// r.AssemblyINProgress  = ...
-// r.AssemblyFinish      = ...
+        r.FinishingInProgress = sum.Finishing;
+        r.InStock            = sum.Stock;
 
-r.FinishingInProgress = sum.Finishing;
-r.InStock            = sum.Stock;
 
-var finAlloc = await Http.GetFromJsonAsync<FinAllocatedDto>(
-    $"http://localhost:5270/api/tasks/finishing-allocated-by-version?versionId={r.VersionId}");
+// var finAlloc = await Http.GetFromJsonAsync<FinAllocatedDto>(
+//     $"http://localhost:5270/api/tasks/finishing-allocated-by-version?versionId={r.VersionId}");
+//
+// r.FinishingAllocated = finAlloc?.FinishingAllocated ?? 0;
 
-r.FinishingAllocated = finAlloc?.FinishingAllocated ?? 0;
+var finishingRal =
+    await Http.GetFromJsonAsync<List<FinishingRalRow>>(
+        $"http://localhost:5270/api/tasks/finishing-by-version-ral?versionId={r.VersionId}");
+
+if (finishingRal != null)
+{
+    r.FinishingRal = finishingRal;
+}
 
         }
 
@@ -310,8 +325,6 @@ private async Task ReloadPlanningDataAsync()
         .GroupBy(x => x.VersionId)
         .ToDictionary(g => g.Key, g => g.Sum(x => x.AssemblyFinish));
 
-
-
     // 4) Aizpildām rindas
     foreach (var r in rows)
     {
@@ -327,16 +340,11 @@ private async Task ReloadPlanningDataAsync()
 
         var vid = r.VersionId.Value;
 
-        Console.WriteLine($"[DEBUG] row vid={vid}, planned={(plannedByVersion.TryGetValue(vid, out var p2) ? p2 : -1)}");
-
-
         r.Planned = plannedByVersion.TryGetValue(vid, out var p) ? p : 0;
         r.DetailedInProgress = detailedInProgressByVersion.TryGetValue(vid, out var d) ? d : 0;
         r.DetailedFinish = detailedFinishByVersion.TryGetValue(vid, out var df) ? df : 0;
         r.AssemblyINProgress = assemblyInProgressByVersion.TryGetValue(vid, out var ap) ? ap : 0;
-        r.AssemblyFinish =
-    assemblyFinishByVersion.TryGetValue(vid, out var af) ? af : 0;
-    
+        // AssemblyFinish nāk no stock_movements (LoadSummariesForRows)
 
             if (r.AssemblyFinish < 0)
                 r.AssemblyFinish = 0;
@@ -348,6 +356,7 @@ private async Task ReloadPlanningDataAsync()
         .OrderBy(r => r.categoryName)
         .ThenBy(r => r.productName)
         .ToList();
+
 
 // Uztaisām "viena rinda uz produktu" + bērni = versijas
 // Uztaisām "viena rinda uz produktu" + bērni = versijas
@@ -363,22 +372,63 @@ groupedRows = rows
 
         var first = g.First();
 
-
-        return new ProductGroupRow
+  return new ProductGroupRow
         {
             CategoryName = cat,
             ProductCode  = code,
             ProductName  = first.productName ?? "",
 
-            InStock = g.Sum(x => x.InStock),
+            InStock = g
+                .Where(x => !x.IsRalRow)
+                .Sum(x => x.InStock),
             Planned = g.Sum(x => x.Planned),
             DetailedInProgress = g.Sum(x => x.DetailedInProgress),
             DetailedFinish     = g.Sum(x => x.DetailedFinish),
-            AssemblyINProgress = g.Sum(x => x.AssemblyINProgress),
-            AssemblyFinish = g.Sum(x => x.AssemblyFinish),
+            AssemblyINProgress = g
+                .Where(x => !x.IsRalRow)
+                .Sum(x => x.AssemblyINProgress),
+            AssemblyFinish = g
+                .Where(x => !x.IsRalRow)
+                .Sum(x => x.AssemblyFinish),
+            FinishingInProgress = g
+                .Where(x => !x.IsRalRow)
+                .Sum(x => x.FinishingInProgress),
             Versions = g
-                .OrderByDescending(x => x.VersionId ?? 0) // jaunākā augšā
-                .ToList()
+                .OrderByDescending(x => x.VersionId ?? 0)
+                .SelectMany(v =>
+                {
+                    var list = new List<ProductRow>();
+
+                    if (!v.IsRalRow)
+                    {
+                        v.InStock = 0;
+                        v.FinishingInProgress = 0;
+                        list.Add(v);
+                    }
+
+                    if (v.FinishingRal != null && v.FinishingRal.Count > 0)
+                    {
+                        foreach (var ral in v.FinishingRal)
+                        {
+                            list.Add(new ProductRow
+                                {
+                                    productName = v.productName,
+                                    productCode = v.productCode,
+                                    versionName = v.versionName,
+                                    VersionId = v.VersionId,
+                                    id = v.id,
+                                    RalCode = ral.RalCode,
+                                    FinishingInProgress = ral.Status == 3 ? 0 : ral.Qty,
+                                    InStock = ral.Status == 3 ? ral.Qty : 0,
+                                    FinishingStatus = ral.Status,
+                                    IsRalRow = true
+                                });
+                        }
+                    }
+
+                    return list;
+                })
+            .ToList()
         };
     })
     
@@ -407,6 +457,7 @@ foreach (var grp in groupedRows
     BuildLatestVersionByCode();
     await InvokeAsync(StateHasChanged);
 }
+
 
 public sealed class FinProgressDto
 {
@@ -619,18 +670,28 @@ private int? sellVersionId;
 private SalesSummary? pendingSale;
 
 //testa labojums 10.01.2026
-
+private string? sellRalCode;
 private async Task OpenSellPopup(ProductRow row)
 {
     sellProductId = row.id;
     sellProductName = row.productName ?? "";
-    sellVersionName = row.versionName;
+    sellVersionName = row.IsRalRow
+    ? $"{row.versionName} • {row.RalCode}"
+    : row.versionName;
     sellVersionId = row.VersionId;
+    sellRalCode = row.RalCode;
 
     sellBatches.Clear();
+    
+    isSellPopupOpen = true;
+    StateHasChanged();
 
-    var apiRows = await Http.GetFromJsonAsync<List<ApiBatchRow>>(
-        $"http://localhost:5270/api/stockmovements/available-by-batch?versionId={row.VersionId}");
+    var url = row.IsRalRow
+    ? $"http://localhost:5270/api/stockmovements/available-by-batch?versionId={row.VersionId}&ral={row.RalCode}"
+    : $"http://localhost:5270/api/stockmovements/available-by-batch?versionId={row.VersionId}";
+
+    var apiRows = await Http.GetFromJsonAsync<List<ApiBatchRow>>(url);
+
 
     if (apiRows != null)
     {
@@ -640,9 +701,10 @@ private async Task OpenSellPopup(ProductRow row)
             {
                 BatchProductId = g.Key.BatchProductId,
                 BatchCode = g.Key.BatchCode,
-                StockQty = g.Where(x => x.MoveType == "STOCK").Sum(x => x.AvailableQty),
-                AssemblyQty = g.Where(x => x.MoveType == "ASSEMBLY").Sum(x => x.AvailableQty)
+                StockQty = Math.Max(g.Where(x => x.MoveType == "STOCK").Sum(x => x.AvailableQty), 0),
+                AssemblyQty = row.AssemblyFinish
             })
+            .Where(b => b.StockQty > 0 || b.AssemblyQty > 0)
             .ToList();
     }
     
@@ -665,9 +727,8 @@ foreach (var it in salesItems.Where(x => x.VersionId == row.VersionId))
     }
 }
 
+StateHasChanged();
 
-    isSellPopupOpen = true;
-    StateHasChanged();
 }
 
 private sealed class ApiBatchRow
