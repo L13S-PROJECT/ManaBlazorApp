@@ -13,6 +13,9 @@ namespace ManiApi.Models
         public int Qty_Scrap { get; set; }
         public int Tasks_Status { get; set; }
 
+        [Column("RAL_Color_ID")]
+        public int? RAL_Color_ID { get; set; }
+        
         [Column("Tasks_Comment")]
         public string? Tasks_Comment { get; set; }
         public bool Is_Comment_For_Employee { get; set; }

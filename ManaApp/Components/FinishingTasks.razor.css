@@ -377,3 +377,13 @@
     color: #555;
     padding: 4px 6px;
 }
+
+.finishing-ral {
+    color: #111;
+    font-weight: 500;
+}
+
+.finishing-ral span {
+    color: #444;
+    font-weight: 400;
+}

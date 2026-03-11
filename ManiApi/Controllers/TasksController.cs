@@ -350,10 +350,11 @@ UPDATE tasks
 
     // 3) Ja šis ir FINISHING solis (Step_Type = 3) un ir norādīts apjoms,
     //    veicam kustību ASSEMBLY -> FINISHING stock_movements (idempotenti).
-    int stepType = 0;
-    int batchProductId = 0;
-    int versionId = 0;
-    int finishingQty = 0;
+        int stepType = 0;
+        int batchProductId = 0;
+        int versionId = 0;
+        int finishingQty = 0;
+        int? ralColorId = null;
 
     await using (var info = conn.CreateCommand())
     {
@@ -363,7 +364,8 @@ SELECT
     ts.Step_Type,
     t.BatchProduct_ID,
     bp.Version_Id,
-    COALESCE(t.Qty_Done, 0) AS FinishingQty
+    COALESCE(t.Qty_Done, 0) AS FinishingQty,
+    t.RAL_Color_ID
 FROM tasks t
 JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
 JOIN batches_products bp ON bp.ID = t.BatchProduct_ID AND bp.IsActive = 1
@@ -382,6 +384,7 @@ WHERE t.ID = @id
             batchProductId = r.GetInt32(1);
             versionId = r.IsDBNull(2) ? 0 : r.GetInt32(2);
             finishingQty = r.IsDBNull(3) ? 0 : r.GetInt32(3);
+            ralColorId = r.IsDBNull(4) ? null : r.GetInt32(4);
         }
     }
 
@@ -429,10 +432,10 @@ WHERE IsActive = 1
                 cmdMove.Transaction = tx;
                 cmdMove.CommandText = @"
 INSERT INTO stock_movements 
-    (Version_ID, BatchProduct_ID, Move_Type, Stock_Qty, Created_At, Task_ID, IsActive)
+    (Version_ID, BatchProduct_ID, Move_Type, RAL_Color_ID, Stock_Qty, Created_At, Task_ID, IsActive)
 VALUES
-    (@ver, @bpId, 'ASSEMBLY',  -@qty, CURRENT_TIMESTAMP, @taskId, 1),
-    (@ver, @bpId, 'FINISHING',  @qty, CURRENT_TIMESTAMP, @taskId, 1);";
+    (@ver, @bpId, 'ASSEMBLY',  NULL,        -@qty, CURRENT_TIMESTAMP, @taskId, 1),
+    (@ver, @bpId, 'FINISHING', @ral,         @qty, CURRENT_TIMESTAMP, @taskId, 1);";
 
                 var pVer2 = cmdMove.CreateParameter();
                 pVer2.ParameterName = "@ver";
@@ -453,6 +456,11 @@ VALUES
                 pTask2.ParameterName = "@taskId";
                 pTask2.Value = dto.TaskId;
                 cmdMove.Parameters.Add(pTask2);
+
+                var pRal = cmdMove.CreateParameter();
+                pRal.ParameterName = "@ral";
+                pRal.Value = (object?)ralColorId ?? DBNull.Value;
+                cmdMove.Parameters.Add(pRal);
 
                 await cmdMove.ExecuteNonQueryAsync();
             }
@@ -530,6 +538,7 @@ FOR UPDATE;";
     int currentDone;
     int batchProductId;
     int versionId;
+    int? ralColorId;
 
     await using (var info = conn.CreateCommand())
     {
@@ -542,7 +551,8 @@ SELECT
     COALESCE(t.Qty_Done, 0)          AS CurrentDone,
     t.BatchProduct_ID,
     bp.Version_Id,
-    COALESCE(t.Qty_Scrap, 0)         AS FinishingPlannedQty
+    COALESCE(t.Qty_Scrap, 0)         AS FinishingPlannedQty,
+    t.RAL_Color_ID
 FROM tasks t
 JOIN toppartsteps ts     ON ts.ID = t.TopPartStep_ID
 JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
@@ -576,6 +586,7 @@ GROUP BY
         batchProductId = rr.GetInt32(4);
         versionId      = rr.IsDBNull(5) ? 0 : rr.GetInt32(5);
         var finishingPlannedQty = rr.IsDBNull(6) ? 0 : rr.GetInt32(6);
+        ralColorId = rr.IsDBNull(7) ? null : rr.GetInt32(7);
 
         // Ja Finishing solis – pārrakstām plannedQty ar to, ko iedeva Finishing popup
         if (stepType == 3 && finishingPlannedQty > 0)
@@ -866,16 +877,16 @@ WHERE IsActive = 1
             mv.Transaction = tx;
             mv.CommandText = @"
 INSERT INTO stock_movements
-    (Version_ID, BatchProduct_ID, Move_Type, Stock_Qty, Created_At, Task_ID, IsActive)
+    (Version_ID, BatchProduct_ID, Move_Type, RAL_Color_ID, Stock_Qty, Created_At, Task_ID, IsActive)
 VALUES
-    (@ver, @bpId, 'FINISHING', -@qty, CURRENT_TIMESTAMP, @taskId, 1),
-    (@ver, @bpId, 'STOCK',      @qty, CURRENT_TIMESTAMP, @taskId, 1);";
+    (@ver, @bpId, 'FINISHING', @ral, -@qty, CURRENT_TIMESTAMP, @taskId, 1),
+    (@ver, @bpId, 'STOCK',     @ral,  @qty, CURRENT_TIMESTAMP, @taskId, 1);";
 
             mv.Parameters.Add(new MySqlParameter("@ver", versionId));
             mv.Parameters.Add(new MySqlParameter("@bpId", batchProductId));
             mv.Parameters.Add(new MySqlParameter("@qty", qtyMove));
             mv.Parameters.Add(new MySqlParameter("@taskId", dto.TaskId));
-
+            mv.Parameters.Add(new MySqlParameter("@ral", (object?)ralColorId ?? DBNull.Value));
             await mv.ExecuteNonQueryAsync();
         }
     }
@@ -1052,6 +1063,7 @@ public sealed class OpenFinishingDto
     public int BatchProductId { get; set; }
     public int ProductToPartId { get; set; }
     public int Qty { get; set; }
+    public int? RalColorId { get; set; }
     public string? Comment { get; set; }
 }
 
@@ -1066,8 +1078,7 @@ public sealed class OpenFinishingResultDto
 public async Task<IActionResult> OpenFinishing([FromBody] OpenFinishingDto dto)
 {
 Console.WriteLine(
-  $"[open-finishing] bpId={dto.BatchProductId}, ptpId={dto.ProductToPartId}, qty={dto.Qty}, comment='{dto.Comment}'");
-
+ $"[open-finishing] bpId={dto.BatchProductId}, ptpId={dto.ProductToPartId}, qty={dto.Qty}, ral={dto.RalColorId}, comment='{dto.Comment}'");
 
     if (dto.BatchProductId <= 0 || dto.ProductToPartId <= 0 || dto.Qty <= 0)
         return BadRequest("BatchProductId, ProductToPartId un Qty ir obligāti, Qty > 0.");
@@ -1132,16 +1143,17 @@ var assemblyAvailable = Math.Max(assemblyStock - reservedForFinishing, 0);
     if (waitingTasks.Count == 0)
     {
         // 3a) NAV gaidoša taska → vienkārši veidojam jaunu vilnīti
-        activeTask = new ManiApi.Models.Tasks
-{
-    BatchProduct_ID = batchProductId,
-    TopPartStep_ID  = finishingStep.Id,
-    Tasks_Status    = 1,
-    IsActive        = true,
-    Qty_Done        = dto.Qty,
-    Qty_Scrap       = 0,
-    Tasks_Comment   = dto.Comment // ✅
-};
+activeTask = new ManiApi.Models.Tasks
+        {
+            BatchProduct_ID = batchProductId,
+            TopPartStep_ID  = finishingStep.Id,
+            Tasks_Status    = 1,
+            IsActive        = true,
+            Qty_Done        = dto.Qty,
+            Qty_Scrap       = 0,
+            RAL_Color_ID    = dto.RalColorId,
+            Tasks_Comment   = dto.Comment
+        };
 
         _db.Tasks.Add(activeTask);
         await _db.SaveChangesAsync();
@@ -1158,9 +1170,9 @@ var assemblyAvailable = Math.Max(assemblyStock - reservedForFinishing, 0);
             // Pilns vilnis vai parentam nav jēdzīga qty:
             // 5 -> 1 un izmantojam šo pašu rindu
             parent.Tasks_Status  = 1;
-parent.Qty_Done      = delta > 0 ? delta : planned;
-parent.Tasks_Comment = dto.Comment; // ✅ PIEVIENO
-
+            parent.Qty_Done      = delta > 0 ? delta : planned;
+            parent.Tasks_Comment = dto.Comment; // ✅ PIEVIENO
+            parent.RAL_Color_ID = dto.RalColorId;
 
             // ja ar kādām kļūdām bija vairāk "gaidošo" – deaktivējam tos
             foreach (var extra in waitingTasks.Skip(1))
@@ -1183,16 +1195,17 @@ parent.Tasks_Comment = dto.Comment; // ✅ PIEVIENO
 
 
             // Jaunais aktīvais vilnītis
-           activeTask = new ManiApi.Models.Tasks
-{
-    BatchProduct_ID = parent.BatchProduct_ID,
-    TopPartStep_ID  = parent.TopPartStep_ID,
-    Tasks_Status    = 1,
-    IsActive        = true,
-    Qty_Done        = delta,
-    Qty_Scrap       = 0,
-    Tasks_Comment   = dto.Comment
-};
+activeTask = new ManiApi.Models.Tasks
+            {
+                BatchProduct_ID = batchProductId,
+                TopPartStep_ID  = finishingStep.Id,
+                Tasks_Status    = 1,
+                IsActive        = true,
+                Qty_Done        = dto.Qty,
+                Qty_Scrap       = 0,
+                RAL_Color_ID    = dto.RalColorId,
+                Tasks_Comment   = dto.Comment
+            };
 
 
             _db.Tasks.Add(activeTask);
@@ -1219,6 +1232,53 @@ parent.Tasks_Comment = dto.Comment; // ✅ PIEVIENO
     }
 
     await tx.CommitAsync();
+
+var conn = _db.Database.GetDbConnection();
+await conn.OpenAsync();
+
+int versionId;
+
+await using (var cmd = conn.CreateCommand())
+{
+    cmd.CommandText = @"
+        SELECT Version_Id
+        FROM batches_products
+        WHERE ID = @id
+        LIMIT 1;";
+
+    var p = cmd.CreateParameter();
+    p.ParameterName = "@id";
+    p.Value = batchProductId;
+    cmd.Parameters.Add(p);
+
+    versionId = Convert.ToInt32(await cmd.ExecuteScalarAsync());
+}
+
+_db.StockMovements.Add(new StockMovement
+{
+    Version_ID = versionId,
+    BatchProduct_ID = batchProductId,
+    RAL_Color_ID = dto.RalColorId,
+    Move_Type = MoveType.ASSEMBLY,
+    Stock_Qty = -dto.Qty,
+    Created_At = DateTime.UtcNow,
+    Task_ID = activeTask.ID,
+    IsActive = true
+});
+
+await _db.SaveChangesAsync();
+
+_db.StockMovements.Add(new StockMovement
+{
+    Version_ID = versionId,
+    BatchProduct_ID = batchProductId,
+    RAL_Color_ID = dto.RalColorId,
+    Move_Type = MoveType.FINISHING,
+    Stock_Qty = dto.Qty,
+    Created_At = DateTime.UtcNow,
+    Task_ID = activeTask.ID,
+    IsActive = true
+});
 
     return Ok(new OpenFinishingResultDto
     {
@@ -1347,10 +1407,17 @@ public async Task<IActionResult> GetFinishingWaves([FromQuery] int batchProductI
 
     var list = await _db.Tasks
         .Join(_db.TopPartSteps,
-              t => t.TopPartStep_ID,
-              ts => ts.Id,
-              (t, ts) => new { t, ts })
-        .Where(x =>
+            t => t.TopPartStep_ID,
+            ts => ts.Id,
+            (t, ts) => new { t, ts })
+        .GroupJoin(_db.Set<RalColor>(),
+            x => x.t.RAL_Color_ID,
+            rc => rc.ID,
+            (x, rc) => new { x.t, x.ts, rc })
+        .SelectMany(
+            x => x.rc.DefaultIfEmpty(),
+            (x, rc) => new { x.t, x.ts, rc })
+            .Where(x =>
     x.t.IsActive &&
     x.t.BatchProduct_ID == batchProductId &&
     x.ts.ProductToPartId == productToPartId &&
@@ -1360,19 +1427,19 @@ public async Task<IActionResult> GetFinishingWaves([FromQuery] int batchProductI
 
         .OrderByDescending(x => x.t.ID)
         .Select(x => new
-{
-    TaskId = x.t.ID,
-    Status = x.t.Tasks_Status,
-    Planned = x.t.Qty_Done,
-    StartedAt = x.t.Started_At,
-    FinishedAt = x.t.Finished_At,
-    Comment = x.t.Tasks_Comment // ✅
-})
+            {
+                TaskId = x.t.ID,
+                Status = x.t.Tasks_Status,
+                Planned = x.t.Qty_Done,
+                StartedAt = x.t.Started_At,
+                FinishedAt = x.t.Finished_At,
+                Comment = x.t.Tasks_Comment,
+                RalName = x.rc != null ? x.rc.Name : null
+            })
 
         .ToListAsync();
 
-        Console.WriteLine("[finishing-waves] " + string.Join(" | ", list.Select(x => $"{x.TaskId}:{(x.Comment ?? "NULL")}")));
-
+Console.WriteLine("[finishing-waves] " + string.Join(" | ", list.Select(x => $"{x.TaskId}:{x.RalName}:{(x.Comment ?? "NULL")}")));
 
     return Ok(list);
 }
@@ -1859,14 +1926,16 @@ SELECT
     ptp.ID             AS ProductToPartId,
     t.Started_At,
     t.Finished_At,
-    t.Tasks_Comment    AS Comment,   -- ✅ ŠIS
+    t.Tasks_Comment AS Comment,
     t.Is_Comment_For_Employee AS IsCommentForEmployee,
-    tp.TopPart_Name  AS PartName
+    tp.TopPart_Name AS PartName,
+    rc.Name AS RalName
 
 FROM tasks t
 JOIN toppartsteps    ts  ON ts.ID = t.TopPartStep_ID
 JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
 JOIN toppart         tp  ON tp.ID  = ptp.TopPart_ID
+LEFT JOIN ral_colors rc ON rc.ID = t.RAL_Color_ID
 WHERE t.IsActive = 1
   AND t.BatchProduct_ID = @bpId
   AND ts.Step_Type = @stepType
@@ -1892,7 +1961,8 @@ ORDER BY ts.Step_Order, t.ID;
                 FinishedAt    = r.IsDBNull(8) ? (DateTime?)null : r.GetDateTime(8),
                 Comment = r.IsDBNull(9) ? null : r.GetString(9),
                 IsCommentForEmployee = !r.IsDBNull(10) && r.GetBoolean(10),
-                PartName = r.IsDBNull(11) ? null : r.GetString(11)
+                PartName = r.IsDBNull(11) ? null : r.GetString(11),
+                RalName = r.IsDBNull(12) ? null : r.GetString(12)   
             });
 
     }
@@ -2328,6 +2398,22 @@ WHERE t.IsActive = 1
     var affected = await cmd.ExecuteNonQueryAsync();
 
     return Ok(new { updated = affected, requestedPtp = dto.ProductToPartId, touchedPtp });
+}
+
+[HttpGet("ral-colors")]
+public async Task<IActionResult> GetRalColors()
+{
+    var list = await _db.RalColors
+        .Where(x => x.IsActive)
+        .OrderBy(x => x.Name)
+        .Select(x => new
+        {
+            Id = x.ID,
+            Name = x.Name
+        })
+        .ToListAsync();
+
+    return Ok(list);
 }
 
     }

@@ -18,6 +18,9 @@ namespace ManiApi.Models
         [Column("Move_Type")]
         public MoveType Move_Type { get; set; }
 
+        [Column("RAL_Color_ID")]
+        public int? RAL_Color_ID { get; set; }
+
         [Column("Stock_Qty")]
         public int Stock_Qty { get; set; }
 

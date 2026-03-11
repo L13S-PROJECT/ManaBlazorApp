@@ -16,6 +16,7 @@ namespace ManiApi.Data
         public DbSet<TopPart> TopParts { get; set; }
         public DbSet<ProductTopPart> ProductTopParts { get; set; }
         public DbSet<TopPartStep> TopPartSteps { get; set; }
+        public DbSet<RalColor> RalColors { get; set; }
         public DbSet<ManiApi.Models.StepType> StepTypes { get; set; }
         public DbSet<ManiApi.Models.Employee> Employees { get; set; }
         public DbSet<ManiApi.Models.Tasks> Tasks { get; set; }

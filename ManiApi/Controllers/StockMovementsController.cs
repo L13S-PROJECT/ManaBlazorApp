@@ -21,6 +21,7 @@ public sealed class MoveRequest
 
     // Var sūtīt vai nu gatavu BatchProduct_ID
     public int? BatchProduct_ID { get; set; }
+    public int? RalColorId { get; set; }
 
     // Vai tikai Batch_Id (batches.ID) – tad API pats atrod BatchProduct_ID
     public int? Batch_Id { get; set; }
@@ -90,22 +91,24 @@ public async Task<IActionResult> Move([FromBody] MoveRequest dto)
     var fromType = Enum.Parse<MoveType>(dto.From, ignoreCase: true);
     var toType   = Enum.Parse<MoveType>(dto.To,   ignoreCase: true);
 
-    var fromRow = new StockMovement
-{
-    Version_ID      = dto.Version_ID,
-    BatchProduct_ID = bpId,
-    Move_Type       = fromType,
-    Stock_Qty       = -dto.Qty,
-    Created_At      = now,
-    Task_ID         = dto.Task_ID,
-    IsActive        = true
-};
+var fromRow = new StockMovement
+    {
+        Version_ID      = dto.Version_ID,
+        BatchProduct_ID = bpId,
+        RAL_Color_ID    = dto.RalColorId,
+        Move_Type       = fromType,
+        Stock_Qty       = -dto.Qty,
+        Created_At      = now,
+        Task_ID         = dto.Task_ID,
+        IsActive        = true
+    };
 
 
     var toRow = new StockMovement
     {
         Version_ID      = dto.Version_ID,
         BatchProduct_ID = bpId,
+        RAL_Color_ID = dto.RalColorId,
         Move_Type       = toType,
         Stock_Qty       = dto.Qty,
         Created_At      = now,

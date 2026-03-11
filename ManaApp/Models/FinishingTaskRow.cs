@@ -15,5 +15,7 @@ public sealed class FinishingTaskRow
     public string? Comment { get; set; }
 
     public bool IsCommentForEmployee { get; set; }
+    public int? RalColorId { get; set; }
+    public string? RalName { get; set; }
 
 }

@@ -1,3 +1,5 @@
+@inject IJSRuntime JS
+
 @if (IsOpen)
 {
     <div class="ptv2-popup-backdrop">
@@ -29,6 +31,19 @@
                         @oninput="OnQtyInput" />
             </div>
 
+            <div class="finishing-ral">
+                <div class="finishing-send-label">RAL TONIS</div>
+
+                <select class="finishing-ral-select" @bind="SelectedRalId">
+                    <option value="">— izvēlies —</option>
+
+                    @foreach (var r in RalColors)
+                    {
+                        <option value="@r.Id">@r.Name</option>
+                    }
+                </select>
+            </div>
+
             <div class="finishing-comment">
                 <label class="finishing-comment-toggle">
                     <input type="checkbox" @bind="HasComment" />
@@ -55,7 +70,7 @@
 @code {
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
-    [Parameter] public EventCallback<(int Qty, string? Comment)> OnOk { get; set; }
+    [Parameter] public EventCallback<(int Qty, string? Comment, int? RalColorId)> OnOk { get; set; }
     [Parameter] public int PlannedQty { get; set; }
     [Parameter] public int SoldQty { get; set; }
     [Parameter] public int ScrapQty { get; set; }
@@ -91,12 +106,22 @@
 
 private async Task ConfirmOk()
 {
+    if (SelectedRalId == null)
+    {
+        await JS.InvokeVoidAsync("alert", "Izvēlies RAL toni.");
+        return;
+    }
+
     var comment = string.IsNullOrWhiteSpace(CommentText)
         ? null
         : CommentText;
 
-    await OnOk.InvokeAsync((SendQty, comment));
+    await OnOk.InvokeAsync((SendQty, comment, SelectedRalId));
 }
+
+[Parameter] public List<RalColor> RalColors { get; set; } = new();
+
+private int? SelectedRalId;
 
 
 }
