@@ -14,7 +14,7 @@ else
         var employees = rows
             .Select(r => r.EmployeeName)
             .Distinct()
-            .OrderBy(e => e)
+            .OrderBy(e => e == "Nav piešķirts" ? "" : e)
             .ToList();
 
         var workCenters = rows
@@ -80,7 +80,7 @@ else
 {
         var wcCanStart = rows
             .Where(r => r.WorkCenter == wc)
-            .Sum(r => r.CanStartCount);
+            .Sum(r => r.PriorityCanStartCount);
 
                 <div class="impact-row">
                     <div class="impact-cell impact-wc">

@@ -119,6 +119,7 @@ AND (
 
 ORDER BY
   CASE
+      WHEN t.Tasks_Push = 1 THEN 0
       WHEN bp.is_priority = 1 AND t.Tasks_Priority = 1 THEN 1
       WHEN bp.is_priority = 1 AND t.Tasks_Priority = 0 THEN 2
       WHEN bp.is_priority = 0 AND t.Tasks_Priority = 1 THEN 3
@@ -917,6 +918,11 @@ UPDATE tasks
             cmd.Parameters.Add(pPrio);
         }
 
+        if (dto.Tasks_Push.HasValue)
+            {
+                setParts.Add("Tasks_Push = @push");
+            }
+
         // ja jāmaina Assigned_To (var būt arī null -> noņem assignment)
         if (dto.Assigned_To.HasValue)
         {
@@ -925,6 +931,14 @@ UPDATE tasks
             pAss.Value = dto.Assigned_To.Value;
             cmd.Parameters.Add(pAss);
         }
+
+            if (dto.Tasks_Push.HasValue)
+            {
+                var pPush = cmd.CreateParameter();
+                pPush.ParameterName = "@push";
+                pPush.Value = dto.Tasks_Push.Value ? 1 : 0;
+                cmd.Parameters.Add(pPush);
+            }
 
         var affected = await cmd.ExecuteNonQueryAsync();
         totalUpdated += affected;
@@ -1155,8 +1169,6 @@ activeTask = new ManiApi.Models.Tasks
         }
     }
 
-    await tx.CommitAsync();
-
 var conn = _db.Database.GetDbConnection();
 await conn.OpenAsync();
 
@@ -1205,7 +1217,7 @@ _db.StockMovements.Add(new StockMovement
 });
 
 await _db.SaveChangesAsync();
-
+await tx.CommitAsync();
     return Ok(new OpenFinishingResultDto
     {
         TaskId = activeTask.ID
@@ -1227,6 +1239,8 @@ public sealed class UpdateStepDto
 
     // Vai solis ir prioritārs (var nebūt padots -> atstājam kā ir)
     public bool? Tasks_Priority { get; set; }
+
+    public bool? Tasks_Push { get; set; }
 
     // Kam tiek piešķirts (var būt null -> noņemam Assignment)
     public int? Assigned_To { get; set; }
@@ -1984,6 +1998,7 @@ END AS CanStart,
     ts.IsFinal,
     t.Assigned_To,
     t.Tasks_Priority,
+    t.Tasks_Push,
     t.Claimed_By
 FROM tasks t
 JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
@@ -2028,7 +2043,8 @@ ORDER BY
             IsFinal = !r.IsDBNull(12) && r.GetBoolean(12),
             Assigned_To = r.IsDBNull(13) ? (int?)null : r.GetInt32(13),
             Tasks_Priority = !r.IsDBNull(14) && r.GetBoolean(14),
-            Claimed_By = r.IsDBNull(15) ? (int?)null : r.GetInt32(15)
+            Tasks_Push = !r.IsDBNull(15) && r.GetBoolean(15),
+            Claimed_By = r.IsDBNull(16) ? (int?)null : r.GetInt32(16)
         });
     }
 }
@@ -2072,6 +2088,7 @@ END AS CanStart,
     ts.IsFinal,
     t.Assigned_To,
     t.Tasks_Priority,
+    t.Tasks_Push,
     t.Claimed_By
 FROM tasks t
 JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
@@ -2119,7 +2136,8 @@ await using (var r2 = await cmd2.ExecuteReaderAsync())
             IsFinal = !r2.IsDBNull(12) && r2.GetBoolean(12),
             Assigned_To = r2.IsDBNull(13) ? (int?)null : r2.GetInt32(13),
             Tasks_Priority = !r2.IsDBNull(14) && r2.GetBoolean(14),
-            Claimed_By = r2.IsDBNull(15) ? (int?)null : r2.GetInt32(15)
+            Tasks_Push = !r2.IsDBNull(15) && r2.GetBoolean(15),
+            Claimed_By = r2.IsDBNull(16) ? (int?)null : r2.GetInt32(16)
         });
     }
 }
@@ -2162,6 +2180,7 @@ END AS CanStart,
     ts.IsFinal,
     t.Assigned_To,
     t.Tasks_Priority,
+    t.Tasks_Push,
     t.Claimed_By
 FROM tasks t
 JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
@@ -2209,7 +2228,8 @@ await using (var r3 = await cmd3.ExecuteReaderAsync())
             IsFinal = !r3.IsDBNull(12) && r3.GetBoolean(12),
             Assigned_To = r3.IsDBNull(13) ? (int?)null : r3.GetInt32(13),
             Tasks_Priority = !r3.IsDBNull(14) && r3.GetBoolean(14),
-            Claimed_By = r3.IsDBNull(15) ? (int?)null : r3.GetInt32(15)          
+            Tasks_Push = !r3.IsDBNull(15) && r3.GetBoolean(15),
+            Claimed_By = r3.IsDBNull(16) ? (int?)null : r3.GetInt32(16)          
         });
     }
 }
@@ -2326,6 +2346,8 @@ WHERE t.IsActive = 1
     return Ok(new { updated = affected, requestedPtp = dto.ProductToPartId, touchedPtp });
 }
 
+
+
 [HttpGet("ral-colors")]
 public async Task<IActionResult> GetRalColors()
 {
@@ -2393,6 +2415,29 @@ public async Task<IActionResult> GetAssemblyAvailableUi([FromQuery] int batchPro
         .SumAsync(x => (int?)x.Stock_Qty) ?? 0;
 
     return Ok(Math.Max(assemblyStock, 0));
+}
+
+public sealed class SetTaskPushDto
+{
+    public int TaskId { get; set; }
+    public bool Tasks_Push { get; set; }
+}
+
+[HttpPost("set-task-push")]
+public async Task<IActionResult> SetTaskPush([FromBody] SetTaskPushDto dto)
+{
+    if (dto == null || dto.TaskId <= 0)
+        return BadRequest("TaskId required.");
+
+    var t = await _db.Tasks.FirstOrDefaultAsync(x => x.ID == dto.TaskId && x.IsActive);
+    if (t == null)
+        return NotFound();
+
+    t.Tasks_Push = dto.Tasks_Push;
+
+    await _db.SaveChangesAsync();
+
+    return Ok(new { updated = true });
 }
 
     }

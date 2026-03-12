@@ -72,3 +72,8 @@
 .table td:nth-child(6) {
     width: 70px;     /* Apjoms */
 }
+
+.task-push {
+    background: #FEE2E2;
+    border-left: 4px solid #DC2626;
+}

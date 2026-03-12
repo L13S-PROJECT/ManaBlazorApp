@@ -49,7 +49,6 @@
 }
 
 /* ===== Sticky Column Header ===== */
-
 .impact-columns-header {
     background: #eff6ff;
 
@@ -62,6 +61,8 @@
     position: sticky;
     top: 0;
     z-index: 30;
+
+    height: 140px;
 }
 
 .impact-section {
@@ -89,17 +90,37 @@
 
 .impact-row {
     display: grid;
-    grid-template-columns: 180px 90px 90px repeat(var(--emp-count), 1fr);
-    align-items: center;
-
+    grid-template-columns: 130px 50px 50px repeat(var(--emp-count), 1fr);
+    align-items: end;
+    
     padding: 4px 0;
     border-bottom: 1px solid #e5e7eb;
 }
 
 .impact-cell {
     padding: 2px 8px;
+    border-right: 1px solid #e5e7eb;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.impact-row .impact-cell:not(.impact-wc) {
+    text-align: center;
 }
 
 .impact-wc {
     font-weight: 500;
+    text-align: left;
+    justify-content: flex-start;
+}
+
+.impact-columns-header .impact-row:first-child .impact-cell:not(:first-child){
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    white-space: nowrap;
+    font-size: 12px;
+
+    align-items: flex-end;
 }

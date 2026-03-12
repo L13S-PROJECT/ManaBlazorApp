@@ -12,7 +12,7 @@
     return;
 }
 
-@foreach (var p in Parts)
+@if (SelectedBatch != null)
 {
         <div class="ptv2-tasks-row ptv2-finishing-main">
 
@@ -24,8 +24,8 @@
 
                     <!-- SWITCH -->
                     <div>
-                        <input type="checkbox"
-                            class="ptv2-switch"
+                    <input type="checkbox"
+                        class="ptv2-switch @(AssemblyNotFinished ? "ptv2-switch-disabled" : "")"
                             checked="@IsFinishingSwitchOn"
                             disabled="@IsFinishingSwitchDisabled"
                             @onclick:preventDefault="true"
@@ -33,7 +33,7 @@
                     </div>
 
                     <!-- APJOMS -->
-                    <div class="@(FinishingState == "gray" ? "ptv2-qty-inactive" : "ptv2-qty-active")">
+                    <div class="@(FinAvailable <= 0 ? "qty-gray" : "qty-normal")">
                         @FinAvailable
                     </div>
 
@@ -46,7 +46,7 @@
 
         </div>
 
-    @foreach (var w in Waves)
+    @foreach (var w in Waves.Where(x => x.Qty > 0))
     {
         <div class="ptv2-tasks-row sub task">
             <!-- 1. Nosaukums -->
@@ -136,6 +136,7 @@
         </div>
     }
 }
+
 
 @if (IsCommentPopupOpen && EditingTask is not null)
 {

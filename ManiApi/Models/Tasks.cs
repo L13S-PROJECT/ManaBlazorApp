@@ -9,6 +9,7 @@ namespace ManiApi.Models
         public int BatchProduct_ID { get; set; }
         public int TopPartStep_ID { get; set; }
         public int Tasks_Priority { get; set; }
+        public bool Tasks_Push { get; set; }
         public int Qty_Done { get; set; }
         public int Qty_Scrap { get; set; }
         public int Tasks_Status { get; set; }

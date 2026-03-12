@@ -20,7 +20,11 @@ else
         </thead>
 
         <tbody>
-            @foreach (var t in Tasks)
+            @foreach (var t in Tasks
+                .OrderByDescending(t => t.Tasks_Push)
+                .ThenBy(t => t.Status == 2 ? 0 : 1)
+                .ThenBy(t => t.StepOrder)
+                .ThenBy(t => t.TaskId))
             {
 <tr class="@GetRowClass(t)"
     style="cursor: @(CanStart(t) ? "pointer" : "default")"
@@ -63,18 +67,21 @@ else
     [Parameter] public EventCallback<TaskRow> OnSelect { get; set; }
     [Parameter] public TaskRow? AvailableTask { get; set; }
     private string GetRowClass(TaskRow t)
-        {
-            if (t.Status == 2)
-                return "table-warning";
+    {
+        if (t.Tasks_Push && t.Status == 1)
+            return "task-push";
 
-            if (t.Status == 3)
-                return "table-success";
+        if (t.Status == 2)
+            return "table-warning";
 
-            if (AvailableTask != null && t.TaskId == AvailableTask.TaskId)
-                return "task-available";
+        if (t.Status == 3)
+            return "table-success";
 
-            return "task-disabled";
-        }
+        if (AvailableTask != null && t.TaskId == AvailableTask.TaskId)
+            return "task-available";
+
+        return "task-disabled";
+    }
 
 private TaskRow? FirstStartable =>
     Tasks.FirstOrDefault(t => t.Status == 1);
