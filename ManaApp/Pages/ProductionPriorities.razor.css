@@ -99,10 +99,6 @@ box-shadow:
     padding: 4px 10px;
 }
 
-.pp-box-body {
-    padding: 8px;        /* mazāks padding */
-    overflow-y: auto;    /* scroll iekšpusē */
-}
 
 /* ===== INNER SECTIONS ===== */
 
@@ -139,7 +135,7 @@ box-shadow:
 
 .pp-box-body {
     padding: 4px 6px;
-    overflow-y: auto;
+    overflow: visible;
 }
 
 /* UPDATE button – kompaktāks un tumšāks */
@@ -190,6 +186,7 @@ box-shadow:
     display: flex;
     flex-direction: column;   /* svarīgais */
 }
+
 
 /* Mazāka atstarpe starp blokiem */
 
@@ -288,8 +285,9 @@ box-shadow:
     color: #ffffff;
     font-size: 12px;
 
-    padding: 6px 8px;
-    border-radius: 4px;
+    padding: 6px 8px 5px 8px;
+    line-height: 1.25;
+    border-radius: 6px;
 
     white-space: pre-line;
     width: 160px;
@@ -303,4 +301,11 @@ box-shadow:
 
 .fin-hover:hover .fin-tooltip {
     opacity: 1;
+}
+
+.pp-sticky-header{
+    background:#EEF4FF;
+    padding:6px 8px;
+
+    border-bottom:2px solid #3B82F6;
 }

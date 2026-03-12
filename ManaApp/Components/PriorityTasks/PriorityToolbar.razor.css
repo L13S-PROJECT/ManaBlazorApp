@@ -1,0 +1,51 @@
+.pp-toolbar-grid{
+    display:grid;
+
+    grid-template-columns:
+    24px
+    50px
+    50px
+    1.2fr
+    1fr
+    50px
+    60px
+    70px
+    75px
+    1.1fr
+    1.1fr
+    32px
+    40px;
+
+    align-items:center;
+    gap:10px;
+    grid-auto-flow: column;
+}
+
+.pp-filter-reset{
+    width:28px;
+    height:28px;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    padding:0;
+    font-size:14px;
+    font-weight:600;
+
+    border-radius:6px;
+
+    background:#ffffff;
+    border:1px solid #cbd5e1;
+
+    color:#1E40AF;
+
+    box-shadow:0 1px 3px rgba(0,0,0,0.08);
+}
+
+.pp-filter-reset:hover{
+    background:#EFF6FF;
+    border-color:#2563EB;
+
+    box-shadow:0 0 0 2px rgba(37,99,235,0.15);
+}

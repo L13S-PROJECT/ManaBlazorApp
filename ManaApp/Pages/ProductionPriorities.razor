@@ -6,9 +6,8 @@
 
 
 @if (products == null)
-
 {
-    <p>Ielādē...</p>
+    <div style="height:200px;"></div>
 }
 else
 {
@@ -22,25 +21,15 @@ else
 
 <div class="d-flex justify-content-between align-items-center" style="margin-bottom:2px; gap:8px;">
 
-<div class="pp-search-wrapper">
+<PriorityToolbar
+    @bind-SearchText="_searchText"
+    @bind-BatchFilter="_batchFilter"
+    @bind-DetailFilter="_detailFilter"
+    @bind-AssemblyFilter="_assemblyFilter"
+    @bind-FinishingFilter="_finishingFilter"
+    BatchList="_batchList" />
 
-    <input type="text"
-           class="form-control form-control-sm"
-           placeholder="Meklēt..."
-           @bind="_searchText"
-           @bind:event="oninput" />
-
-    @if (!string.IsNullOrWhiteSpace(_searchText))
-    {
-       <span class="pp-search-clear"
-            @onclick="ClearSearch">
-            ✕
-        </span>
-    }
-
-</div>
-
-    <button class="btn btn-primary pp-update-btn"
+<button class="btn btn-primary pp-update-btn"
         @onclick="SavePriorities">
     ATJAUNOT
 </button>
@@ -121,8 +110,8 @@ else
                                 </div>
                             </div>
                         </div>
-
-                        <div>
+ <!-- hover Priority -->
+                        <div class="fin-hover">
                             <div class="d-flex justify-content-center gap-3">
 
                                 <!-- ASSEMBLY (zilais) -->
@@ -162,6 +151,22 @@ else
                                 </div>
 
                             </div>
+<div class="fin-tooltip">
+    <div class="mb-1">Krāsošana:</div>
+    <div class="mt-1">Kopā: @p.Planned</div>
+    <div class="d-flex align-items-center gap-2">
+        <div class="rounded" style="width:10px;height:10px;background:#3B82F6;"></div>
+        <div>@p.FinishingStock var sākt</div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <div class="rounded" style="width:10px;height:10px;background:#F59E0B;"></div>
+        <div>@p.FinishingStatus2 procesā</div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <div class="rounded" style="width:10px;height:10px;background:#22C55E;"></div>
+        <div>@p.FinishingStatus3 pabeigts</div>
+    </div>
+</div>
                         </div>
 
                         <div>
@@ -231,50 +236,63 @@ else
                         </div>
                     </div>
 
-                <div>
                     
-<div class="fin-hover">
-    <div class="d-flex justify-content-center gap-3">
+            <div class="fin-hover">
+                <div class="d-flex justify-content-center gap-3">
                         @{
                             var blue = p.FinishingStock;   // kopā gatavs krāsošanai = Assembly stock atlikums
                             if (blue < 0) blue = 0;
                         }
 
 <!-- ZILS = status 1 (stock atlikums) -->
-<div class="text-center">
-    <div class="text-muted" style="font-size:12px;">
-        @blue
-    </div>
-    <div class="rounded-pill bg-primary mt-1"
-         style="height:6px; width:24px;">
-    </div>
-</div>
+            <div class="text-center">
+                <div class="text-muted" style="font-size:12px;">
+                    @blue
+                </div>
+                <div class="rounded-pill bg-primary mt-1"
+                    style="height:6px; width:24px;">
+                </div>
+            </div>
 
 <!-- DZELTENS = status 2 -->
-<div class="text-center">
-    <div class="text-muted" style="font-size:12px;">
-        @p.FinishingStatus2
-    </div>
-    <div class="rounded-pill bg-warning mt-1"
-         style="height:6px; width:24px;">
-    </div>
-</div>
+            <div class="text-center">
+                <div class="text-muted" style="font-size:12px;">
+                    @p.FinishingStatus2
+                </div>
+                <div class="rounded-pill bg-warning mt-1"
+                    style="height:6px; width:24px;">
+                </div>
+            </div>
 
 <!-- ZAĻŠ = status 3 -->
-<div class="text-center">
-    <div class="text-muted" style="font-size:12px;">
-        @p.FinishingStatus3
-    </div>
-    <div class="rounded-pill bg-success mt-1"
-         style="height:6px; width:24px;">
-    </div>
-</div>
+                    <div class="text-center">
+                        <div class="text-muted" style="font-size:12px;">
+                            @p.FinishingStatus3
+                        </div>
+                        <div class="rounded-pill bg-success mt-1"
+                            style="height:6px; width:24px;">
+                        </div>
+                    </div>
 
+    </div>
+            <div class="fin-tooltip">
+                <div class="mb-1">Krāsošana:</div>
+                <div class="mt-1">Kopā: @p.Planned</div>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="rounded" style="width:10px;height:10px;background:#3B82F6;"></div>
+                    <div>@p.FinishingStock var sākt</div>
                 </div>
-                <div class="fin-tooltip">
-@($"Krāsošana:\n🟩 {p.FinishingStatus3} pabeigts\n🟨 {p.FinishingStatus2} procesā\n⬛ {p.FinishingStatus1} gaida")
-</div>
-        </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <div class="rounded" style="width:10px;height:10px;background:#F59E0B;"></div>
+                    <div>@p.FinishingStatus2 procesā</div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <div class="rounded" style="width:10px;height:10px;background:#22C55E;"></div>
+                    <div>@p.FinishingStatus3 pabeigts</div>
+                </div> 
+            </div>
 </div>
                 <div>
                     <span style="cursor:pointer;"
@@ -335,15 +353,12 @@ private IEnumerable<ProductRow> NormalProducts =>
 
  private List<ProductRow> _priorityList = new();
 
-protected override async Task OnParametersSetAsync()
+protected override async Task OnInitializedAsync()
 {
-    if (products == null)
-    {
-        await LoadProducts();
+    await LoadProducts();
 
-        if (impactSummary != null)
-            await impactSummary.Reload();
-    }
+    if (impactSummary != null)
+        await impactSummary.Reload();
 }
 
 private async Task LoadProducts()
@@ -356,6 +371,13 @@ private async Task LoadProducts()
     .OrderBy(p => p.Priority)
     .ToList()
     ?? new List<ProductRow>();
+
+    _batchList = products?
+        .Select(p => p.BatchCode)
+        .Distinct()
+        .OrderBy(x => x)
+        .ToList()
+        ?? new List<string>();
 
 }
 
@@ -562,6 +584,11 @@ private void OnPriorityToggled(ProductRow p, ChangeEventArgs e)
 }
 
 private string _searchText = "";
+private string _batchFilter = "";
+private string _detailFilter = "";
+private string _assemblyFilter = "";
+private string _finishingFilter = "";
+private List<string> _batchList = new();
 private void ClearSearch()
 {
     _searchText = "";
@@ -569,15 +596,73 @@ private void ClearSearch()
 
 private bool FilterProduct(ProductRow p)
 {
-    if (string.IsNullOrWhiteSpace(_searchText))
-        return true;
+    if (!string.IsNullOrWhiteSpace(_batchFilter) &&
+    p.BatchCode != _batchFilter)
+    return false;
 
     var s = _searchText.Trim().ToLower();
 
-    return
-        (p.BatchCode?.ToLower().Contains(s) ?? false) ||
-        (p.ProductCode?.ToLower().Contains(s) ?? false) ||
-        (p.ProductName?.ToLower().Contains(s) ?? false);
+if (!string.IsNullOrWhiteSpace(s))
+{
+    if (!(p.BatchCode?.ToLower().Contains(s) ?? false) &&
+        !(p.ProductCode?.ToLower().Contains(s) ?? false) &&
+        !(p.ProductName?.ToLower().Contains(s) ?? false))
+        return false;
+}
+    
+    if (!string.IsNullOrWhiteSpace(_detailFilter))
+{
+    if (_detailFilter == "NotStarted" && (p.DetailedStartedX > 0 || p.DetailedIsDone))
+        return false;
+
+    if (_detailFilter == "InProgress" && (p.DetailedStartedX == 0 || p.DetailedIsDone))
+        return false;
+
+    if (_detailFilter == "Done" && !p.DetailedIsDone)
+        return false;
+}
+
+if (!string.IsNullOrWhiteSpace(_assemblyFilter))
+{
+    var assemblyDone =
+        p.FinishingStock > 0 ||
+        p.FinishingStatus2 > 0 ||
+        p.FinishingStatus3 > 0;
+
+    if (_assemblyFilter == "NotStarted" &&
+        (p.Assembly > 0 || assemblyDone || p.DetailedIsDone))
+        return false;
+
+    if (_assemblyFilter == "CanStart" &&
+        !(p.DetailedIsDone && p.Assembly == 0 && !assemblyDone))
+        return false;
+
+    if (_assemblyFilter == "InProgress" &&
+        !(p.Assembly > 0 && !assemblyDone))
+        return false;
+
+    if (_assemblyFilter == "Done" && !assemblyDone)
+        return false;
+}
+
+if (!string.IsNullOrWhiteSpace(_finishingFilter))
+{
+    if (_finishingFilter == "NotStarted" &&
+        (p.FinishingStatus2 > 0 || p.FinishingStatus3 > 0 || p.FinishingStock > 0))
+        return false;
+
+    if (_finishingFilter == "CanStart" &&
+        !(p.FinishingStock > 0 && p.FinishingStatus2 == 0 && p.FinishingStatus3 == 0))
+        return false;
+
+    if (_finishingFilter == "InProgress" && p.FinishingStatus2 == 0)
+        return false;
+
+    if (_finishingFilter == "Done" && p.FinishingStatus3 == 0)
+        return false;
+}
+
+return true;
 }
 
 }

@@ -1,0 +1,163 @@
+<div class="pp-toolbar-grid priority-grid">
+
+<div></div>
+
+<div style="grid-column:2 / 4;">
+<select class="form-select form-select-sm pp-filter-batch"
+        value="@BatchFilter"
+        @onchange="OnBatchChanged">
+
+    <option value="">Batch</option>
+
+    @foreach (var b in BatchList)
+    {
+        <option value="@b">@b</option>
+    }
+
+</select>
+</div>
+
+<button class="pp-filter-reset"
+        title="Notīrīt filtrus"
+        @onclick="ResetFilters">
+    ✕
+</button>
+
+<div></div>
+
+<div class="pp-filter-search" style="grid-column:4 / 10;">
+    <input class="form-control form-control-sm"
+           placeholder="Meklēt..."
+           value="@SearchText"
+           @oninput="OnSearchChanged" />
+</div>
+
+
+<div style="grid-column:11; width:110px;">
+<select class="form-select form-select-sm pp-filter-detail"
+        value="@DetailFilter"
+        @onchange="OnDetailChanged">
+
+    <option value="">Detail</option>
+    <option value="NotStarted">Nav iesākts</option>
+    <option value="InProgress">Procesā</option>
+    <option value="Done">Pabeigts</option>
+
+</select>
+</div>
+
+<div style="grid-column:12; width:110px;">
+<select class="form-select form-select-sm pp-filter-assembly"
+        value="@AssemblyFilter"
+        @onchange="OnAssemblyChanged">
+
+    <option value="">Assembly</option>
+    <option value="NotStarted">Nav iesākts</option>
+    <option value="CanStart">Var sākt</option>
+    <option value="InProgress">Procesā</option>
+    <option value="Done">Pabeigts</option>
+
+</select>
+</div>
+
+<div style="grid-column:18; width:110px;">
+<select class="form-select form-select-sm pp-filter-finishing"
+        value="@FinishingFilter"
+        @onchange="OnFinishingChanged">
+
+    <option value="">Finishing</option>
+    <option value="NotStarted">Nav iesākts</option>
+    <option value="CanStart">Var sākt</option>
+    <option value="InProgress">Procesā</option>
+    <option value="Done">Pabeigts</option>
+
+</select>
+</div>
+
+</div>
+@code {
+
+    [Parameter]
+    public string SearchText { get; set; } = "";
+    [Parameter]
+    public EventCallback<string> SearchTextChanged { get; set; }
+
+    private async Task OnSearchChanged(ChangeEventArgs e)
+    {
+        SearchText = e.Value?.ToString() ?? "";
+        await SearchTextChanged.InvokeAsync(SearchText);
+    }
+    [Parameter]
+    public List<string> BatchList { get; set; } = new();
+
+    [Parameter]
+    public string BatchFilter { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> BatchFilterChanged { get; set; }
+    [Parameter]
+    public string StageFilter { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> StageFilterChanged { get; set; }
+    
+    [Parameter]
+    public string DetailFilter { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> DetailFilterChanged { get; set; }
+    
+    [Parameter]
+    public string AssemblyFilter { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> AssemblyFilterChanged { get; set; }
+    
+    [Parameter]
+    public string FinishingFilter { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> FinishingFilterChanged { get; set; }
+
+    private async Task ResetFilters()
+{
+    SearchText = "";
+    BatchFilter = "";
+    DetailFilter = "";
+    AssemblyFilter = "";
+    FinishingFilter = "";
+
+    await SearchTextChanged.InvokeAsync(SearchText);
+    await BatchFilterChanged.InvokeAsync(BatchFilter);
+    await DetailFilterChanged.InvokeAsync(DetailFilter);
+    await AssemblyFilterChanged.InvokeAsync(AssemblyFilter);
+    await FinishingFilterChanged.InvokeAsync(FinishingFilter);
+}
+
+private async Task OnBatchChanged(ChangeEventArgs e)
+{
+    BatchFilter = e.Value?.ToString() ?? "";
+    await BatchFilterChanged.InvokeAsync(BatchFilter);
+}
+
+private async Task OnDetailChanged(ChangeEventArgs e)
+{
+    DetailFilter = e.Value?.ToString() ?? "";
+    await DetailFilterChanged.InvokeAsync(DetailFilter);
+}
+
+private async Task OnAssemblyChanged(ChangeEventArgs e)
+{
+    AssemblyFilter = e.Value?.ToString() ?? "";
+    await AssemblyFilterChanged.InvokeAsync(AssemblyFilter);
+
+}
+
+private async Task OnFinishingChanged(ChangeEventArgs e)
+{
+    FinishingFilter = e.Value?.ToString() ?? "";
+    await FinishingFilterChanged.InvokeAsync(FinishingFilter);
+
+}
+
+}
