@@ -7,7 +7,7 @@
 
         <div class="elp-header">
             <div class="elp-title">
-                Darbu sadale
+                Nav piešķirts
             </div>
 
             <button class="elp-close" @onclick="Close">
@@ -30,14 +30,14 @@
     if (!tasks.Any())
         continue;
 
-    <div class="elp-section">
+<div class="elp-section">
 
-        <h6>
-            @wc 
-            <span style="font-weight:400;color:#666;">
-            (@FormatTime(tasks.Sum(t => t.Qty * t.EstimatedMinutes)))
-            </span>
-        </h6>
+<div class="wc-header">
+    @wc
+    <span class="wc-time">
+        (@FormatTime(tasks.Sum(t => t.Qty * t.EstimatedMinutes)))
+    </span>
+</div>
 
         <table class="table table-sm elp-table">
 
@@ -58,15 +58,17 @@
             </thead>
 
             <tbody>
-        @if (pushTasks.Any())
-            {
-            <tr class="table-secondary">
-                <td colspan="9"><b>Push</b></td>
-            </tr>
-            }
+@if (pushTasks.Any())
+{
+<tr class="section-header">
+    <td colspan="11">
+        <b>Push</b>
+    </td>
+</tr>
+}
 @foreach (var t in pushTasks)
 {
-<tr>
+<tr class="section-push">
     <td>@t.BatchCode</td>
     <td>@t.ProductName</td>
     <td>@t.TopPartName</td>
@@ -118,13 +120,13 @@
           
 @if (priorityTasks.Any())
 {
-<tr class="table-secondary">
-    <td colspan="9"><b>Priority</b></td>
+<tr class="section-header">
+    <td colspan="11"><b>Priority</b></td>
 </tr>
 
 @foreach (var t in priorityTasks)
 {
-    <tr>
+    <tr class="section-priority">
         <td>@t.BatchCode</td>
         <td>@t.ProductName</td>
         <td>@t.TopPartName</td>
@@ -176,13 +178,13 @@
 }
 @if (ordinaryTasks.Any())
 {
-<tr class="table-secondary">
-    <td colspan="9"><b>Ordinary</b></td>
+<tr class="section-header">
+    <td colspan="11"><b>Ordinary</b></td>
 </tr>
 
 @foreach (var t in ordinaryTasks)
 {
-    <tr>
+    <tr class="section-ordinary">
         <td>@t.BatchCode</td>
         <td>@t.ProductName</td>
         <td>@t.TopPartName</td>
@@ -242,11 +244,11 @@
 
 </div>
 
-        <div class="elp-footer">
-            <button class="btn btn-secondary" @onclick="Close">
-                Aizvērt
-            </button>
-        </div>
+<div class="elp-footer manager-footer">
+    <button class="manager-btn-close" @onclick="Close">
+        Aizvērt
+    </button>
+</div>
 
     </div>
 </div>
