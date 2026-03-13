@@ -558,8 +558,9 @@ private void CloseDialog()
 
 private async Task LoadActiveWorkCentersAsync()
 {
-    workCenters = await Http.GetFromJsonAsync<List<WorkCenter>>(
-        "http://localhost:5270/api/workcenters") ?? new();
+    workCenters = (await Http.GetFromJsonAsync<List<WorkCenter>>(
+    "http://localhost:5270/api/workcenters") ?? new())
+    .ToList();
 }
 
     private async Task DeletePartAsync(int productToPartId)

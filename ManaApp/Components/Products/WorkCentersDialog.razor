@@ -24,9 +24,9 @@
                 <input class="wc-input wc-code"
                     type="text"
                     maxlength="3"
-                    placeholder="Kods"
+                    placeholder="KODS"
                     value="@NewCode"
-                    @oninput="e => NewCodeChanged.InvokeAsync(e.Value?.ToString())" />
+                    @oninput="OnCodeChanged" />
 
                 <button type="button"
                         class="wc-add-btn"
@@ -179,4 +179,20 @@
 
     [Parameter] public EventCallback<WorkCenterManageDto> MoveUp { get; set; }
     [Parameter] public EventCallback<WorkCenterManageDto> MoveDown { get; set; }
+
+private async Task OnCodeChanged(ChangeEventArgs e)
+{
+    var value = new string(
+            (e.Value?.ToString() ?? "")
+            .ToUpper()
+            .Where(char.IsLetterOrDigit)
+            .ToArray()
+        );
+
+    if (value.Length > 3)
+        value = value.Substring(0, 3);
+
+    await NewCodeChanged.InvokeAsync(value);
+}
+
 }

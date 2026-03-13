@@ -948,10 +948,12 @@ dto.StepType = (int)await _db.StageStepTypeMaps
             var rows = await _db.WorkCentrs
                 .AsNoTracking()
                 .Where(wc => wc.IsActive)
+                .OrderBy(wc => wc.WorkCenter_Order)
                 .Select(wc => new
                 {
                     wc.Id,
-                    wc.WorkCentr_Name
+                    wc.WorkCentr_Name,
+                    wc.WorkCenter_Order
                 })
                 .ToListAsync();
 
