@@ -160,14 +160,20 @@
     Visible="isWorkCentersOpen"
     VisibleChanged="@(v => isWorkCentersOpen = v)"
     Items="manageWorkCenters"
+    StepTypes="stepTypes"
     NewName="@newWorkCenterName"
+    NewNameChanged="@(v => newWorkCenterName = v)"
+    NewCode="@newWorkCenterCode"
+    NewCodeChanged="@(v => newWorkCenterCode = v)"
     EditId="editWorkCenterId"
     @bind-EditName="editWorkCenterName"
     OnAdd="AddWorkCenterAsync"
     OnSaveEdit="SaveEditWorkCenterAsync"
     OnCancelEdit="CancelEditWorkCenter"
     OnBeginEdit="BeginEditWorkCenter"
-    OnDelete="DeleteWorkCenterAsync" >
+    OnDelete="DeleteWorkCenterAsync"
+    MoveUp="MoveUp"
+    MoveDown="MoveDown">
 </WorkCentersDialog>
 
 <!-- === JAUNA DETAĻA dialogs === -->
@@ -207,7 +213,7 @@
     private int filterResetKey = 0;
 
     private ProductRow? selected;
-
+    private string newWorkCenterCode = "";
     private ProductContentDto? selectedDetails;
     private bool loadingDetails = false;
     private HashSet<string> openParts = new();
@@ -1094,6 +1100,7 @@ private List<WorkCenterManageDto> manageWorkCenters = new();
 private async Task OpenWorkCenterDialogAsync()
 {
     newWorkCenterName = "";   
+    newWorkCenterCode = "";
 
     manageWorkCenters = (await Http.GetFromJsonAsync<List<WorkCenterManageDto>>(
         "http://localhost:5270/api/workcenters/manage") ?? new())
@@ -1112,7 +1119,8 @@ private async Task RefreshWorkCentersAsync()
 {
     manageWorkCenters = (await Http.GetFromJsonAsync<List<WorkCenterManageDto>>(
     "http://localhost:5270/api/workcenters/manage") ?? new())
-    .Where(x => x.IsActive)                   // ← slēpjam neaktīvos
+    .Where(x => x.IsActive)
+    .OrderBy(x => x.WorkCenter_Order)
     .ToList();
 
 }
@@ -1120,26 +1128,42 @@ private async Task RefreshWorkCentersAsync()
 private async Task AddWorkCenterAsync()
 {
     var name = (newWorkCenterName ?? "").Trim();
-    if (string.IsNullOrWhiteSpace(name)) { await JS.InvokeVoidAsync("alert","Ievadi nosaukumu."); return; }
+    var codeInput = (newWorkCenterCode ?? "").Trim().ToUpper();
 
-// ģenerējam kodu (bez atstarpēm, lielie burti; ja gribi citu formātu — pasaki)
-var code = (name ?? "").Trim().ToUpper().Replace(" ", "_");
+    if (string.IsNullOrWhiteSpace(name))
+    {
+        await JS.InvokeVoidAsync("alert", "Ievadi nosaukumu.");
+        return;
+    }
 
-var resp = await Http.PostAsJsonAsync("http://localhost:5270/api/workcenters/add",
-    new { WorkCentr_Name = name, WorkCentr_Code = code });
-    
+    if (string.IsNullOrWhiteSpace(codeInput))
+        {
+            await JS.InvokeVoidAsync("alert", "Ievadi kodu.");
+            return;
+        }
+
+        if (codeInput.Length != 3)
+        {
+            await JS.InvokeVoidAsync("alert", "Kodam jābūt tieši 3 simboliem.");
+            return;
+        }
+
+    var resp = await Http.PostAsJsonAsync(
+        "http://localhost:5270/api/workcenters/add",
+        new { WorkCentr_Name = name, WorkCentr_Code = codeInput });
 
     if (!resp.IsSuccessStatusCode)
     {
         await JS.InvokeVoidAsync("alert", await resp.Content.ReadAsStringAsync());
         return;
     }
+
     newWorkCenterName = "";
+    newWorkCenterCode = "";
+
     await RefreshWorkCentersAsync();
     await LoadActiveWorkCentersAsync();
-
 }
-
 
 private void CancelEditWorkCenter()
 {
@@ -1156,8 +1180,17 @@ private async Task SaveEditWorkCenterAsync()
     // ģenerējam kodu no nosaukuma (bez atstarpēm, lielie burti)
 var code = (name ?? "").Trim().ToUpper().Replace(" ", "_");
 
+var row = manageWorkCenters.First(x => x.Id == editWorkCenterId!.Value);
+
 var resp = await Http.PutAsJsonAsync("http://localhost:5270/api/workcenters/update",
-    new { Id = editWorkCenterId!.Value, WorkCentr_Name = name, WorkCentr_Code = code });
+    new 
+    { 
+        Id = row.Id,
+        WorkCentr_Name = name,
+        WorkCentr_Code = code,
+        WorkCenter_Order = row.WorkCenter_Order,
+        Step_Type_ID = row.Step_Type_ID
+    });
 
 
     if (!resp.IsSuccessStatusCode)
@@ -1168,6 +1201,7 @@ var resp = await Http.PutAsJsonAsync("http://localhost:5270/api/workcenters/upda
     editWorkCenterId = null; editWorkCenterName = "";
     await RefreshWorkCentersAsync();
     await LoadActiveWorkCentersAsync();
+    StateHasChanged();
 
 }
 
@@ -1380,6 +1414,52 @@ private bool ShowArchived
 private void OnArchivedChanged(ChangeEventArgs e)
 {
     ApplyFilters();
+}
+
+async Task MoveUp(WorkCenterManageDto wc)
+{
+
+    var list = manageWorkCenters.OrderBy(x => x.WorkCenter_Order).ToList();
+    var index = list.FindIndex(x => x.Id == wc.Id);
+    
+    if (index <= 0)
+        return;
+
+    var above = list[index - 1];
+
+    var current = list[index];
+        current.WorkCenter_Order -= 10;
+        above.WorkCenter_Order += 10;
+
+    await Http.PutAsJsonAsync("http://localhost:5270/api/workcenters/update", current);
+    await Http.PutAsJsonAsync("http://localhost:5270/api/workcenters/update", above);
+
+    await RefreshWorkCentersAsync();
+    StateHasChanged();
+}
+
+async Task MoveDown(WorkCenterManageDto wc)
+{
+    
+    var list = manageWorkCenters.OrderBy(x => x.WorkCenter_Order).ToList();
+    
+
+    var index = list.FindIndex(x => x.Id == wc.Id);
+    
+    if (index == -1 || index >= list.Count - 1)
+        return;
+
+    var below = list[index + 1];
+
+    var current = list[index];
+        current.WorkCenter_Order += 10;
+        below.WorkCenter_Order -= 10;;
+
+    await Http.PutAsJsonAsync("http://localhost:5270/api/workcenters/update", current);
+    await Http.PutAsJsonAsync("http://localhost:5270/api/workcenters/update", below);
+
+    await RefreshWorkCentersAsync();
+    StateHasChanged();
 }
 
 }

@@ -15,10 +15,18 @@
         <Content>
 
             <div class="manage-toolbar">
-                <input class="manage-input-small wc-input"
+                <input class="wc-input wc-name"
                     type="text"
                     placeholder="Pievienot jaunu darba centru"
-                    @bind="NewName" />
+                    value="@NewName"
+                    @oninput="e => NewNameChanged.InvokeAsync(e.Value?.ToString())" />
+
+                <input class="wc-input wc-code"
+                    type="text"
+                    maxlength="3"
+                    placeholder="Kods"
+                    value="@NewCode"
+                    @oninput="e => NewCodeChanged.InvokeAsync(e.Value?.ToString())" />
 
                 <button type="button"
                         class="wc-add-btn"
@@ -31,19 +39,57 @@
             <table class="manage-table">
                 <thead>
                     <tr>
-                        <th>Nosaukums</th>
-                        <th style="width:120px;"></th>
+                     <th style="width:70px;">Sec.</th>
+                    <th style="width:120px;">Tips</th>
+                    <th>Nosaukums</th>
+                    <th style="width:120px;"></th>
                     </tr>
                 </thead>
 
                 <tbody>
-                    @foreach (var it in Items ?? Enumerable.Empty<WorkCenterManageDto>())
+                    @foreach (var it in (Items ?? Enumerable.Empty<WorkCenterManageDto>())
+                    .OrderBy(x => x.WorkCenter_Order)
+                    .Select((x,i) => new { Item = x, Index = i })
+                    .ToList())
                     {
-            <tr class="@(EditId == it.Id ? "wc-row-edit" : "")">
-                <td colspan="2">
+                        <tr @key="it.Item.Id" class="@(EditId == it.Item.Id ? "wc-row-edit" : "")">
+
+                        <td style="width:70px;">
+                            @if (EditId == it.Item.Id)
+                                {
+                                    <input class="manage-input-small"
+                                        type="number"
+                                        style="width:60px"
+                                        value="@(it.Index + 1)"
+                                        disabled />
+                                }
+                            else
+                            {
+                                @(it.Index + 1)
+                            }
+                        </td>
+                                                <td style="width:120px;">
+                                    @if (EditId == it.Item.Id)
+                                    {
+                                        <select class="manage-input-small"
+                                                @onchange="e => it.Item.Step_Type_ID = Convert.ToInt32(e.Value)">
+                                            @foreach (var st in StepTypes ?? Enumerable.Empty<StepTypeDto>())
+                                            {
+                                                <option value="@st.Id" selected="@(it.Item.Step_Type_ID == st.Id)">
+                                                    @st.StepTypeName
+                                                </option>
+                                            }
+                                        </select>
+                                    }
+                                    else
+                                    {
+                                        @(StepTypes?.FirstOrDefault(x => x.Id == it.Item.Step_Type_ID)?.StepTypeName)
+                                    }
+                            </td>
+                        <td>
                     <div class="wc-row">
                             <span class="wc-name">
-                                @if (EditId == it.Id)
+                                @if (EditId == it.Item.Id)
                                 {
                                 <input class="manage-input-small"
                                     type="text"
@@ -52,15 +98,15 @@
                                 }
                                 else
                                 {
-                                    @it.WorkCentr_Name
+                                    @it.Item.WorkCentr_Name
                                 }
                             </span>
 
             <span class="wc-actions">
-                @if (EditId == it.Id)
+                @if (EditId == it.Item.Id)
                 {
                     <button class="wc-save-btn"
-                            @onclick="OnSaveEdit">
+                            @onclick="() => OnSaveEdit.InvokeAsync()">
                         Saglabāt
                     </button>
 
@@ -71,17 +117,30 @@
                 }
                 else
                 {
+                    <button type="button"
+                            class="wc-icon-edit"
+                            title="Uz augšu"
+                            @onclick="() => MoveUp.InvokeAsync(it.Item)">
+                                            ↑
+                    </button>
+
+                    <button type="button"
+                            class="wc-icon-edit"
+                            title="Uz leju"
+                            @onclick="() => MoveDown.InvokeAsync(it.Item)">
+                        ↓
+                    </button>
                     <button class="wc-icon-edit"
                                 title="Labot"
-                                @onclick="() => OnBeginEdit.InvokeAsync(it)">
+                                @onclick="() => OnBeginEdit.InvokeAsync(it.Item)">
                             ✎
                         </button>
 
-                        @if (it.IsActive)
+                        @if (it.Item.IsActive)
                         {
                             <button class="wc-icon-delete"
                                     title="Dzēst"
-                                    @onclick="() => OnDelete.InvokeAsync(it.Id)">
+                                    @onclick="() => OnDelete.InvokeAsync(it.Item.Id)">
                                 🗑
                             </button>
                         }
@@ -102,10 +161,12 @@
 @code {
     [Parameter] public bool Visible { get; set; }
     [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
-
+    [Parameter] public List<StepTypeDto>? StepTypes { get; set; }
     [Parameter] public List<WorkCenterManageDto>? Items { get; set; }
     [Parameter] public string NewName { get; set; } = "";
-    
+    [Parameter] public EventCallback<string> NewNameChanged { get; set; }
+    [Parameter] public string NewCode { get; set; } = "";
+    [Parameter] public EventCallback<string> NewCodeChanged { get; set; }
     [Parameter] public int? EditId { get; set; }
     [Parameter] public string EditName { get; set; } = "";
     [Parameter] public EventCallback<string> EditNameChanged { get; set; }
@@ -115,4 +176,7 @@
 
     [Parameter] public EventCallback<WorkCenterManageDto> OnBeginEdit { get; set; }
     [Parameter] public EventCallback<int> OnDelete { get; set; }
+
+    [Parameter] public EventCallback<WorkCenterManageDto> MoveUp { get; set; }
+    [Parameter] public EventCallback<WorkCenterManageDto> MoveDown { get; set; }
 }

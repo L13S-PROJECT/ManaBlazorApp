@@ -44,16 +44,15 @@ else
                             <th>Detaļa</th>
                             <th>Apraksts</th>
                             <th>Skaits</th>
-                            <th></th>
-                            <th>Prioritārs</th>
-                            <th>Push</th>
+                            <th>Laiks</th>
+                            <th>Statuss</th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody>
                     @foreach (var t in model.InProgress)
                     {
-                        <tr @key="t.TaskId">
+                        <tr @key="t">
                             <td>@t.BatchCode</td>
                             <td>
                                 @if (!t.Assigned_To.HasValue || t.Assigned_To.Value == 0)
@@ -65,7 +64,14 @@ else
                             <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
                             <td>@t.StepName</td>
                             <td>@t.Qty</td>
-                            <td></td>
+                            <td>@FormatTime(t.Qty * t.EstimatedMinutes)</td>
+                            <td>
+                                @if (t.Status == 2)
+                                {
+                                    <span>Procesā</span>
+                                }
+                            </td>
+
                             <td>
                                 <span style="cursor:pointer"
                                     @onclick="() => OpenTaskDetails(t)">
@@ -91,6 +97,7 @@ else
                     <th>Detaļa</th>
                     <th>Apraksts</th>
                     <th>Skaits</th>
+                    <th>Laiks</th>
                     <th>Statuss</th>
                     <th>Darbinieks</th>
                     <th>Prioritārs</th>
@@ -101,12 +108,13 @@ else
             <tbody>
                 @foreach (var t in PushTasks)
                 {
-                    <tr @key="t.TaskId">
+                    <tr @key="t">
                         <td>@t.BatchCode</td>
                         <td>@t.ProductName</td>
                         <td>@t.TopPartName</td>
                         <td>@t.StepName</td>
                         <td>@t.Qty</td>
+                        <td>@FormatTime(t.Qty * t.EstimatedMinutes)</td>
 
                         <td>
                             @if (t.Status == 1)
@@ -167,6 +175,7 @@ else
                                 <th>Detaļa</th>
                                 <th>Apraksts</th>
                                 <th>Skaits</th>
+                                <th>Laiks</th>
                                 <th>Statuss</th>
                                 <th>Darbinieks</th>
                                 <th>Prioritārs</th>
@@ -177,7 +186,7 @@ else
                         <tbody>
                         @foreach (var t in PrioritySuper)
                         {
-                            <tr @key="t.TaskId">
+                            <tr @key="t">
                                 <td>@t.BatchCode</td>
                                 <td>
                                     @if (!t.Assigned_To.HasValue || t.Assigned_To.Value == 0)
@@ -189,6 +198,7 @@ else
                                 <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
                                 <td>@t.StepName</td>
                                 <td>@t.Qty</td>
+                                <td>@FormatTime(t.Qty * t.EstimatedMinutes)</td>
                                 <td>
                                     @if (t.Status == 1)
                                     {
@@ -206,12 +216,20 @@ else
                                         }
                                     </select>
                                 </td>
-                                <td>
+                               <td>
                                     <input type="checkbox"
                                         value="true"
                                         checked="@t.Tasks_Priority"
                                         @onchange="async e => await OnPartPriorityChanged(t, e)" />
                                 </td>
+
+                                <td>
+                                    <button class="push-btn"
+                                            @onclick="() => TogglePush(t)">
+                                        ↑
+                                    </button>
+                                </td>
+
                                 <td>
                                     <span style="cursor:pointer"
                                         @onclick="() => OpenTaskDetails(t)">
@@ -238,7 +256,8 @@ else
                                 <th>Produkts</th>
                                 <th>Detaļa</th>
                                 <th>Apraksts</th>
-                                <th>Skaits</th>
+                                 <th>Skaits</th>
+                                <th>Laiks</th>
                                 <th>Statuss</th>
                                 <th>Darbinieks</th>
                                 <th>Prioritārs</th>
@@ -249,7 +268,7 @@ else
                         <tbody>
                         @foreach (var t in PriorityNormal)
                         {
-                            <tr @key="t.TaskId">
+                            <tr @key="t">
                                 <td>@t.BatchCode</td>
                                 <td>
                                     @if (!t.Assigned_To.HasValue || t.Assigned_To.Value == 0)
@@ -261,6 +280,7 @@ else
                                 <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
                                 <td>@t.StepName</td>
                                 <td>@t.Qty</td>
+                                <td>@FormatTime(t.Qty * t.EstimatedMinutes)</td>
                                 <td>
                                     @if (t.Status == 1)
                                     {
@@ -316,6 +336,7 @@ else
                                 <th>Detaļa</th>
                                 <th>Apraksts</th>
                                 <th>Skaits</th>
+                                <th>Laiks</th>
                                 <th>Statuss</th>
                                 <th>Darbinieks</th>
                                 <th>Prioritārs</th>
@@ -326,7 +347,7 @@ else
                         <tbody>
                         @foreach (var t in NormalSuper)
                         {
-                            <tr @key="t.TaskId">
+                            <tr @key="t">
                                 <td>@t.BatchCode</td>
                                 <td>
                                     @if (!t.Assigned_To.HasValue || t.Assigned_To.Value == 0)
@@ -338,6 +359,7 @@ else
                                 <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
                                 <td>@t.StepName</td>
                                 <td>@t.Qty</td>
+                                <td>@FormatTime(t.Qty * t.EstimatedMinutes)</td>
                                 <td>
                                     @if (t.Status == 1)
                                     {
@@ -356,16 +378,20 @@ else
                                     </select>
                                 </td>
                                 <td>
-                                        <input type="checkbox"
-                                            value="true"
-                                            checked="@t.Tasks_Priority"
-                                            @onchange="async e => await OnPartPriorityChanged(t, e)" />
+                                    <input type="checkbox"
+                                        value="true"
+                                        checked="@t.Tasks_Priority"
+                                        @onchange="async e => await OnPartPriorityChanged(t, e)" />
                                 </td>
+
                                 <td>
-                                        <button class="push-btn"
-                                                @onclick="() => TogglePush(t)">
-                                            ↑
-                                        </button>
+                                    <button class="push-btn"
+                                            @onclick="() => TogglePush(t)">
+                                        ↑
+                                    </button>
+                                </td>
+
+                                <td>
                                     <span style="cursor:pointer"
                                         @onclick="() => OpenTaskDetails(t)">
                                         🔍
@@ -392,6 +418,7 @@ else
                                 <th>Detaļa</th>
                                 <th>Apraksts</th>
                                 <th>Skaits</th>
+                                <th>Laiks</th>
                                 <th>Statuss</th>
                                 <th>Darbinieks</th>
                                 <th>Prioritārs</th>
@@ -402,7 +429,7 @@ else
                         <tbody>
                         @foreach (var t in NormalNormal)
                         {
-                            <tr @key="t.TaskId">
+                            <tr @key="t">
                                 <td>@t.BatchCode</td>
                                 <td>
                                     @if (!t.Assigned_To.HasValue || t.Assigned_To.Value == 0)
@@ -414,6 +441,7 @@ else
                                 <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
                                 <td>@t.StepName</td>
                                 <td>@t.Qty</td>
+                                <td>@FormatTime(t.Qty * t.EstimatedMinutes)</td>
                                 <td>
                                     @if (t.Status == 1)
                                     {
@@ -636,6 +664,7 @@ private class TaskRow
     public string? TopPartName { get; set; }
     public string? StepName { get; set; }
     public int Qty { get; set; }
+    public int EstimatedMinutes { get; set; }
     public int Status { get; set; }
     public bool? CanStart { get; set; }
     public int StepOrder { get; set; }
@@ -745,6 +774,31 @@ private async Task TogglePush(TaskRow t)
         t.Assigned_To = null;
 
     StateHasChanged();
+}
+
+private string FormatTime(int minutes)
+{
+    if (minutes <= 0)
+        return "0";
+
+    var days = minutes / 480;
+    minutes %= 480;
+
+    var hours = minutes / 60;
+    minutes %= 60;
+
+    var parts = new List<string>();
+
+    if (days > 0)
+        parts.Add($"{days} d");
+
+    if (hours > 0)
+        parts.Add($"{hours} h");
+
+    if (minutes > 0)
+        parts.Add($"{minutes} m");
+
+    return string.Join(" ", parts);
 }
 
 }

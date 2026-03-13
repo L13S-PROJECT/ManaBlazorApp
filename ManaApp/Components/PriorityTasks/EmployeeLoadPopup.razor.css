@@ -13,7 +13,7 @@
 
 .popup-box {
     background: white;
-    width: 850px;
+    width: 1000px;
     max-width: 95%;
     max-height: 90vh;
     overflow: hidden;
@@ -123,29 +123,36 @@
 .elp-table th:nth-child(5),
 .elp-table td:nth-child(5) { width: 50px; text-align:center; }
 
-/* Statuss */
+/* Laiks */
 .elp-table th:nth-child(6),
 .elp-table td:nth-child(6) { 
-    width: 75px; 
+    width: 90px; 
+    text-align: center;
+}
+
+/* Statuss */
+.elp-table th:nth-child(7),
+.elp-table td:nth-child(7) { 
+    width: 100px; 
     text-align: center;
 }
 
 /* Darbinieks */
-.elp-table th:nth-child(7),
-.elp-table td:nth-child(7) { 
+.elp-table th:nth-child(8),
+.elp-table td:nth-child(8) { 
     width: 130px; 
 }
 
 /* Prioritārs */
-.elp-table th:nth-child(8),
-.elp-table td:nth-child(8) { 
-    width: 50px; 
+.elp-table th:nth-child(9),
+.elp-table td:nth-child(9) { 
+    width: 60px; 
     text-align:center; 
 }
 
-/* Prioritārs */
-.elp-table th:nth-child(8),
-.elp-table td:nth-child(8) { 
+/* Push */
+.elp-table th:nth-child(10),
+.elp-table td:nth-child(10) { 
     width: 50px; 
     text-align:center; 
 }

@@ -1,8 +1,8 @@
+@using ManaApp.Components.PriorityTasks
 @using System.Linq
 @using System.Text.Json.Serialization
 @inject HttpClient Http
 @namespace ManaApp.Components.PriorityTasks
-
 
 @if (rows == null)
 {
@@ -35,15 +35,17 @@ else
     <div class="impact-cell"><strong>Var sākt</strong></div>
     <div class="impact-cell"><strong>Kopā</strong></div>
 
-    @foreach (var emp in employees)
-    {
-        <div class="impact-cell">
-            <span style="cursor:pointer"
-                  @onclick="() => OpenPopup(emp)">
-                <strong>@emp</strong>
-            </span>
-        </div>
-    }
+@foreach (var emp in employees)
+{
+    var empRow = rows.FirstOrDefault(r => r.EmployeeName == emp);
+
+    <div class="impact-cell">
+        <span style="cursor:pointer"
+              @onclick="() => OpenPopup(empRow?.EmployeeId ?? 0, emp)">
+            <strong>@emp</strong>
+        </span>
+    </div>
+}
 
 </div>
 </div>
@@ -157,8 +159,16 @@ else
 
 @if (selectedEmployeeId != null)
 {
-    <EmployeeLoadPopup EmployeeId="selectedEmployeeId.Value"
-                       OnClose="ClosePopup" />
+    if (selectedEmployeeId == 0)
+    {
+        <ManagerAssignPopup EmployeeId="0"
+                            OnClose="ClosePopup" />
+    }
+    else
+    {
+        <EmployeeLoadPopup EmployeeId="selectedEmployeeId.Value"
+                           OnClose="ClosePopup" />
+    }
 }
 
 @code {
@@ -193,12 +203,17 @@ else
     }
 
     private int? selectedEmployeeId;
-
-private void OpenPopup(string employeeName)
+    private bool selectedManagerPopup = false;
+private void OpenPopup(int employeeId, string employeeName)
 {
-    var match = rows?.FirstOrDefault(r => r.EmployeeName == employeeName);
-    if (match != null)
-        selectedEmployeeId = match.EmployeeId;
+    if (employeeName == "Nav piešķirts")
+    {
+        selectedEmployeeId = employeeId;   // jaunais popup
+        return;
+    }
+
+    selectedEmployeeId = employeeId;       // vecais popup
+    selectedManagerPopup = false;
 }
 
 private async Task ClosePopup()

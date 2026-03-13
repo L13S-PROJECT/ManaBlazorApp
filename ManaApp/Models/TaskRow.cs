@@ -2,6 +2,9 @@ namespace ManaApp.Models;
 
 public sealed class TaskRow
 {
+    public string? WorkCenter { get; set; }
+    
+    public int? WorkCenterSort { get; set; }
     public int TaskId { get; set; }
     public byte Priority { get; set; }
     public int Status { get; set; }
@@ -16,8 +19,6 @@ public sealed class TaskRow
     public int Planned { get; set; }
     public int Done { get; set; }
     public int StepOrder { get; set; }
-
-
     public int StepType { get; set; }
     public int BatchId { get; set; }
     public int VersionId { get; set; }

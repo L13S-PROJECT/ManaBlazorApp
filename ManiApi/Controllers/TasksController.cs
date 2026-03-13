@@ -1964,6 +1964,8 @@ WHERE ID = @empId;
 
     cmd.CommandText = @"
 SELECT
+    wc.Workcentr_Name AS WorkCenter,
+    wc.ID AS WorkCenterSort,
     t.ID AS TaskId,
     t.BatchProduct_ID,
     b.Batches_Code AS BatchCode,
@@ -1993,6 +1995,7 @@ END AS CanStart,
     ts.Step_Order,
     ts.Step_Type,
     ts.Step_Name,
+    ts.Estimated_Minutes,
     ts.ProductToPart_ID,
     tp.TopPart_Name,
     ts.IsFinal,
@@ -2006,6 +2009,7 @@ JOIN batches b ON b.ID = bp.Batch_Id
 JOIN versions v ON v.ID = bp.Version_Id
 JOIN products p ON p.ID = v.Product_ID
 JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+LEFT JOIN workcentr_type wc ON wc.ID = ts.WorkCentr_ID AND wc.IsActive = 1
 JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
 JOIN toppart tp ON tp.ID = ptp.TopPart_ID
 WHERE t.IsActive = 1
@@ -2028,23 +2032,26 @@ ORDER BY
     {
         list.Add(new
         {
-            TaskId = r.GetInt32(0),
-            BatchProductId = r.GetInt32(1),
-            BatchCode = r.GetString(2),
-            ProductName = r.GetString(3),
-            Qty = r.IsDBNull(4) ? 0 : r.GetInt32(4),
-            Status = r.GetInt32(5),
-            CanStart = r.IsDBNull(6) ? (bool?)null : r.GetInt32(6) == 1,
-            StepOrder = r.IsDBNull(7) ? 0 : r.GetInt32(7),
-            StepType = r.GetInt32(8),
-            StepName = r.IsDBNull(9) ? null : r.GetString(9),
-            ProductToPartId = r.GetInt32(10),
-            TopPartName = r.IsDBNull(11) ? null : r.GetString(11),
-            IsFinal = !r.IsDBNull(12) && r.GetBoolean(12),
-            Assigned_To = r.IsDBNull(13) ? (int?)null : r.GetInt32(13),
-            Tasks_Priority = !r.IsDBNull(14) && r.GetBoolean(14),
-            Tasks_Push = !r.IsDBNull(15) && r.GetBoolean(15),
-            Claimed_By = r.IsDBNull(16) ? (int?)null : r.GetInt32(16)
+            WorkCenter = r.IsDBNull(0) ? null : r.GetString(0),
+            WorkCenterSort = r.IsDBNull(1) ? (int?)null : r.GetInt32(1),
+            TaskId = r.GetInt32(2),
+            BatchProductId = r.GetInt32(3),
+            BatchCode = r.GetString(4),
+            ProductName = r.GetString(5),
+            Qty = r.IsDBNull(6) ? 0 : r.GetInt32(6),
+            Status = r.GetInt32(7),
+            CanStart = r.IsDBNull(8) ? (bool?)null : r.GetInt32(8) == 1,
+            StepOrder = r.IsDBNull(9) ? 0 : r.GetInt32(9),
+            StepType = r.GetInt32(10),
+            StepName = r.IsDBNull(11) ? null : r.GetString(11),
+            EstimatedMinutes = r.IsDBNull(12) ? 0 : r.GetInt32(12),
+            ProductToPartId = r.GetInt32(13),
+            TopPartName = r.IsDBNull(14) ? null : r.GetString(14),
+            IsFinal = !r.IsDBNull(15) && r.GetBoolean(15),
+            Assigned_To = r.IsDBNull(16) ? (int?)null : r.GetInt32(16),
+            Tasks_Priority = !r.IsDBNull(17) && r.GetBoolean(17),
+            Tasks_Push = !r.IsDBNull(18) && r.GetBoolean(18),
+            Claimed_By = r.IsDBNull(19) ? (int?)null : r.GetInt32(19)
         });
     }
 }
@@ -2054,6 +2061,8 @@ ORDER BY
 await using var cmd2 = conn.CreateCommand();
 cmd2.CommandText = @"
 SELECT
+    wc.Workcentr_Name AS WorkCenter,
+    wc.ID AS WorkCenterSort,
     t.ID AS TaskId,
     t.BatchProduct_ID,
     b.Batches_Code AS BatchCode,
@@ -2083,6 +2092,7 @@ END AS CanStart,
     ts.Step_Order,
     ts.Step_Type,
     ts.Step_Name,
+    ts.Estimated_Minutes,
     ts.ProductToPart_ID,
     tp.TopPart_Name,
     ts.IsFinal,
@@ -2096,6 +2106,7 @@ JOIN batches b ON b.ID = bp.Batch_Id
 JOIN versions v ON v.ID = bp.Version_Id
 JOIN products p ON p.ID = v.Product_ID
 JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+LEFT JOIN workcentr_type wc ON wc.ID = ts.WorkCentr_ID AND wc.IsActive = 1
 JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
 JOIN toppart tp ON tp.ID = ptp.TopPart_ID
 WHERE t.IsActive = 1
@@ -2121,23 +2132,26 @@ await using (var r2 = await cmd2.ExecuteReaderAsync())
     {
         priorityList.Add(new
         {
-            TaskId = r2.GetInt32(0),
-            BatchProductId = r2.GetInt32(1),
-            BatchCode = r2.GetString(2),
-            ProductName = r2.GetString(3),
-            Qty = r2.IsDBNull(4) ? 0 : r2.GetInt32(4),
-            Status = r2.GetInt32(5),
-            CanStart = r2.IsDBNull(6) ? (bool?)null : r2.GetInt32(6) == 1,
-            StepOrder = r2.IsDBNull(7) ? 0 : r2.GetInt32(7),
-            StepType = r2.GetInt32(8),
-            StepName = r2.IsDBNull(9) ? null : r2.GetString(9),
-            ProductToPartId = r2.GetInt32(10),
-            TopPartName = r2.IsDBNull(11) ? null : r2.GetString(11),
-            IsFinal = !r2.IsDBNull(12) && r2.GetBoolean(12),
-            Assigned_To = r2.IsDBNull(13) ? (int?)null : r2.GetInt32(13),
-            Tasks_Priority = !r2.IsDBNull(14) && r2.GetBoolean(14),
-            Tasks_Push = !r2.IsDBNull(15) && r2.GetBoolean(15),
-            Claimed_By = r2.IsDBNull(16) ? (int?)null : r2.GetInt32(16)
+            WorkCenter = r2.IsDBNull(0) ? null : r2.GetString(0),
+            WorkCenterSort = r2.IsDBNull(1) ? (int?)null : r2.GetInt32(1),
+            TaskId = r2.GetInt32(2),
+            BatchProductId = r2.GetInt32(3),
+            BatchCode = r2.GetString(4),
+            ProductName = r2.GetString(5),
+            Qty = r2.IsDBNull(6) ? 0 : r2.GetInt32(6),
+            Status = r2.GetInt32(7),
+            CanStart = r2.IsDBNull(8) ? (bool?)null : r2.GetInt32(8) == 1,
+            StepOrder = r2.IsDBNull(9) ? 0 : r2.GetInt32(9),
+            StepType = r2.GetInt32(10),
+            StepName = r2.IsDBNull(11) ? null : r2.GetString(11),
+            EstimatedMinutes = r2.IsDBNull(12) ? 0 : r2.GetInt32(12),
+            ProductToPartId = r2.GetInt32(13),
+            TopPartName = r2.IsDBNull(14) ? null : r2.GetString(14),
+            IsFinal = !r2.IsDBNull(15) && r2.GetBoolean(15),
+            Assigned_To = r2.IsDBNull(16) ? (int?)null : r2.GetInt32(16),
+            Tasks_Priority = !r2.IsDBNull(17) && r2.GetBoolean(17),
+            Tasks_Push = !r2.IsDBNull(18) && r2.GetBoolean(18),
+            Claimed_By = r2.IsDBNull(19) ? (int?)null : r2.GetInt32(19)
         });
     }
 }
@@ -2146,6 +2160,8 @@ await using (var r2 = await cmd2.ExecuteReaderAsync())
 await using var cmd3 = conn.CreateCommand();
 cmd3.CommandText = @"
 SELECT
+    wc.Workcentr_Name AS WorkCenter,
+    wc.ID AS WorkCenterSort,
     t.ID AS TaskId,
     t.BatchProduct_ID,
     b.Batches_Code AS BatchCode,
@@ -2175,6 +2191,7 @@ END AS CanStart,
     ts.Step_Order,
     ts.Step_Type,
     ts.Step_Name,
+    ts.Estimated_Minutes,
     ts.ProductToPart_ID,
     tp.TopPart_Name,
     ts.IsFinal,
@@ -2188,6 +2205,7 @@ JOIN batches b ON b.ID = bp.Batch_Id
 JOIN versions v ON v.ID = bp.Version_Id
 JOIN products p ON p.ID = v.Product_ID
 JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+LEFT JOIN workcentr_type wc ON wc.ID = ts.WorkCentr_ID AND wc.IsActive = 1
 JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
 JOIN toppart tp ON tp.ID = ptp.TopPart_ID
 WHERE t.IsActive = 1
@@ -2213,23 +2231,26 @@ await using (var r3 = await cmd3.ExecuteReaderAsync())
     {
         normalList.Add(new
         {
-            TaskId = r3.GetInt32(0),
-            BatchProductId = r3.GetInt32(1),
-            BatchCode = r3.GetString(2),
-            ProductName = r3.GetString(3),
-            Qty = r3.IsDBNull(4) ? 0 : r3.GetInt32(4),
-            Status = r3.GetInt32(5),
-            CanStart = r3.IsDBNull(6) ? (bool?)null : r3.GetInt32(6) == 1,
-            StepOrder = r3.IsDBNull(7) ? 0 : r3.GetInt32(7),
-            StepType = r3.GetInt32(8),
-            StepName = r3.IsDBNull(9) ? null : r3.GetString(9),
-            ProductToPartId = r3.GetInt32(10),
-            TopPartName = r3.IsDBNull(11) ? null : r3.GetString(11),
-            IsFinal = !r3.IsDBNull(12) && r3.GetBoolean(12),
-            Assigned_To = r3.IsDBNull(13) ? (int?)null : r3.GetInt32(13),
-            Tasks_Priority = !r3.IsDBNull(14) && r3.GetBoolean(14),
-            Tasks_Push = !r3.IsDBNull(15) && r3.GetBoolean(15),
-            Claimed_By = r3.IsDBNull(16) ? (int?)null : r3.GetInt32(16)          
+            WorkCenter = r3.IsDBNull(0) ? null : r3.GetString(0),
+            WorkCenterSort = r3.IsDBNull(1) ? (int?)null : r3.GetInt32(1),
+            TaskId = r3.GetInt32(2),
+            BatchProductId = r3.GetInt32(3),
+            BatchCode = r3.GetString(4),
+            ProductName = r3.GetString(5),
+            Qty = r3.IsDBNull(6) ? 0 : r3.GetInt32(6),
+            Status = r3.GetInt32(7),
+            CanStart = r3.IsDBNull(8) ? (bool?)null : r3.GetInt32(8) == 1,
+            StepOrder = r3.IsDBNull(9) ? 0 : r3.GetInt32(9),
+            StepType = r3.GetInt32(10),
+            StepName = r3.IsDBNull(11) ? null : r3.GetString(11),
+            EstimatedMinutes = r3.IsDBNull(12) ? 0 : r3.GetInt32(12),
+            ProductToPartId = r3.GetInt32(13),
+            TopPartName = r3.IsDBNull(14) ? null : r3.GetString(14),
+            IsFinal = !r3.IsDBNull(15) && r3.GetBoolean(15),
+            Assigned_To = r3.IsDBNull(16) ? (int?)null : r3.GetInt32(16),
+            Tasks_Priority = !r3.IsDBNull(17) && r3.GetBoolean(17),
+            Tasks_Push = !r3.IsDBNull(18) && r3.GetBoolean(18),
+            Claimed_By = r3.IsDBNull(19) ? (int?)null : r3.GetInt32(19)          
         });
     }
 }

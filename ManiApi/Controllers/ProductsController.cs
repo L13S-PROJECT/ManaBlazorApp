@@ -1113,8 +1113,15 @@ return Ok(new { id = row.Id });
         {
             var rows = await db.WorkCentrs
                 .OrderByDescending(x => x.IsActive)
-                .ThenBy(x => x.WorkCentr_Name)
-                .Select(x => new { x.Id, x.WorkCentr_Name, x.IsActive })
+                .ThenBy(x => x.WorkCenter_Order)
+                .Select(x => new 
+                        { 
+                            x.Id, 
+                            x.WorkCentr_Name, 
+                            x.WorkCenter_Order,
+                            x.Step_Type_ID,
+                            x.IsActive 
+                        })
                 .ToListAsync();
 
             return Ok(rows);
@@ -1134,6 +1141,12 @@ if (string.IsNullOrWhiteSpace(dto.WorkCentr_Code))
         .ToUpper()
         .Replace(" ", "_");
 }
+
+var maxOrder = await db.WorkCentrs.MaxAsync(x => (int?)x.WorkCenter_Order) ?? 0;
+dto.WorkCenter_Order = maxOrder + 10;
+
+if (dto.Step_Type_ID == null)
+    dto.Step_Type_ID = 1;
 
 dto.IsActive = true;
 db.WorkCentrs.Add(dto);
@@ -1155,7 +1168,17 @@ return Ok(dto);
             var row = await db.WorkCentrs.FirstOrDefaultAsync(x => x.Id == dto.Id);
             if (row is null) return NotFound();
 
-            row.WorkCentr_Name = dto.WorkCentr_Name; // IsActive nemainām te
+            row.WorkCentr_Name = dto.WorkCentr_Name;
+            if (dto.WorkCenter_Order <= 0)
+                {
+                    var maxOrder = await db.WorkCentrs.MaxAsync(x => (int?)x.WorkCenter_Order) ?? 0;
+                    row.WorkCenter_Order = maxOrder + 10;
+                }
+                else
+                {
+                    row.WorkCenter_Order = dto.WorkCenter_Order;
+                }
+            row.Step_Type_ID = dto.Step_Type_ID;
             await db.SaveChangesAsync();
             return Ok();
         }
