@@ -9,13 +9,12 @@
     OnCalendarChanged="OnCalendarChanged" />
 
 <EmployeeAvailabilityTable 
-    Items="availabilityList" 
+    WorkLogs="workLogs"  
     Employees="employees"
     SelectedDate="selectedDate" />
 
 
 @code {
-private List<EmployeeAvailabilityModel> availabilityList = new();
 
 private List<EmployeeDto> employees = new();
     
@@ -27,18 +26,6 @@ private async Task LoadData()
         "api/employeeworklog/date/" + selectedDate.ToString("yyyy-MM-dd")
     ) ?? new();
 
-    availabilityList = workLogs
-        .Where(w => w.TimeFrom.HasValue && w.TimeTo.HasValue)
-        .Select(w => new EmployeeAvailabilityModel
-        {
-            EmployeeID = w.EmployeeID,
-            DateFrom = selectedDate.Add(w.TimeFrom ?? TimeSpan.Zero),
-            DateTo = selectedDate.Add(w.TimeTo ?? TimeSpan.Zero),
-            Hours = w.Hours ?? 0,
-            Notes = w.Notes,
-            Status = "WORK"
-        })
-        .ToList();
 }
 protected override async Task OnInitializedAsync()
 {

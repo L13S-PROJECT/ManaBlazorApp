@@ -33,6 +33,7 @@ namespace ManiApi.Data
 {
     base.OnModelCreating(modelBuilder);
     modelBuilder.Entity<EmployeeWorkLog>().ToTable("employee_work_log");
+    modelBuilder.Entity<EmployeeAvailability>().ToTable("employee_availability");
     // <- PIESPIED tabulas nosaukumu ar underscore
     modelBuilder.Entity<StockMovement>().ToTable("stock_movements");
 

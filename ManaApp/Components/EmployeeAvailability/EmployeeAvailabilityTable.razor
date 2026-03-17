@@ -20,7 +20,7 @@
 <tbody>
 @foreach (var emp in Employees)
 {
-    var item = Items.FirstOrDefault(x => x.EmployeeID == emp.Id);
+    var item = WorkLogs.FirstOrDefault(x => x.EmployeeID == emp.Id);
 
     var day = calendar.FirstOrDefault(x => x.WorkDate.Date == SelectedDate.Date);
     var isCustomDay = day != null;
@@ -28,19 +28,19 @@
 
     var start = emp.WorkStart;
     var end = isDayOff
-    ? start
+    ? emp.WorkEnd
     : isCustomDay
         ? day?.WorkEnd
         : emp.WorkEnd;
 
     var breakMin = item?.BreakMinutes ?? (day?.BreakMinutes ?? 60);
 
-    var startTime = item?.DateFrom.TimeOfDay ?? start ?? TimeSpan.Zero;
-    var endTime = item != null
-        ? item.DateTo.TimeOfDay
-        : end ?? TimeSpan.Zero;
+    var startTime = item?.TimeFrom ?? start ?? TimeSpan.Zero;
+    var endTime = item?.TimeTo ?? end ?? TimeSpan.Zero;
 
-    var hours = (endTime - startTime).TotalHours - (breakMin / 60.0);
+    var hours = isDayOff
+    ? 0
+    : (endTime - startTime).TotalHours - (breakMin / 60.0);
 
 <tr class="ea-row 
     @(isDayOff && item == null ? "ea-row-off" : "")
@@ -52,15 +52,15 @@
 <td class="ea-def-start @(item != null ? "ea-old" : "")">@start?.ToString(@"hh\:mm")</td>
 <td class="ea-def-end @(item != null ? "ea-old" : "")">@end?.ToString(@"hh\:mm")</td>
 <td class="ea-act-start">
-    @(item != null && item.DateFrom.TimeOfDay.TotalMinutes > 0 
-        ? item.DateFrom.ToString("HH:mm") 
-        : "")
+@(item?.TimeFrom != null 
+    ? item.TimeFrom.Value.ToString(@"hh\:mm") 
+    : "")
 </td>
 
 <td class="ea-act-end">
-    @(item != null && item.DateTo.TimeOfDay.TotalMinutes > 0 
-        ? item.DateTo.ToString("HH:mm") 
-        : "")
+@(item?.TimeTo != null 
+    ? item.TimeTo.Value.ToString(@"hh\:mm") 
+    : "")
 </td>
 
 <td class="ea-hours">
@@ -99,19 +99,21 @@
         <div class="time-row">
             <input type="number" min="0" max="23"
                    class="steps-input time-part"
-                   value="@selectedItem.DateFrom.Hour"
-                   @onchange="e => selectedItem.DateFrom = SetTime(
-                       int.Parse(e.Value!.ToString()!),
-                       selectedItem.DateFrom.Minute)" />
+                   value="@SelectedDate.Add(selectedItem.TimeFrom ?? TimeSpan.Zero).Hour"
+                   @onchange="e => selectedItem.TimeFrom = new TimeSpan(
+                        int.Parse(e.Value!.ToString()!),
+                        selectedItem.TimeFrom?.Minutes ?? 0,
+                        0)" />
 
             <span>:</span>
 
             <input type="number" min="0" max="59"
                    class="steps-input time-part"
-                   value="@selectedItem.DateFrom.Minute.ToString("D2")"
-                   @onchange="e => selectedItem.DateFrom = SetTime(
-                       selectedItem.DateFrom.Hour,
-                       int.Parse(e.Value!.ToString()!))" />
+                   value="@SelectedDate.Add(selectedItem.TimeFrom ?? TimeSpan.Zero).Minute.ToString("D2")"
+                  @onchange="e => selectedItem.TimeFrom = new TimeSpan(
+                            selectedItem.TimeFrom?.Hours ?? 0,
+                            int.Parse(e.Value!.ToString()!),
+                            0)" />
         </div>
     </div>
 
@@ -120,19 +122,21 @@
         <div class="time-row">
             <input type="number" min="0" max="23"
                    class="steps-input time-part"
-                   value="@selectedItem.DateTo.Hour"
-                   @onchange="e => selectedItem.DateTo = SetTime(
-                       int.Parse(e.Value!.ToString()!),
-                       selectedItem.DateTo.Minute)" />
+                   value="@SelectedDate.Add(selectedItem.TimeTo ?? TimeSpan.Zero).Hour"
+                @onchange="e => selectedItem.TimeTo = new TimeSpan(
+                    int.Parse(e.Value!.ToString()!),
+                    selectedItem.TimeTo?.Minutes ?? 0,
+                    0)" />
 
             <span>:</span>
 
             <input type="number" min="0" max="59"
                    class="steps-input time-part"
-                   value="@selectedItem.DateTo.Minute.ToString("D2")"
-                   @onchange="e => selectedItem.DateTo = SetTime(
-                       selectedItem.DateTo.Hour,
-                       int.Parse(e.Value!.ToString()!))" />
+                   value="@SelectedDate.Add(selectedItem.TimeTo ?? TimeSpan.Zero).Minute.ToString("D2")"
+                   @onchange="e => selectedItem.TimeTo = new TimeSpan(
+                        selectedItem.TimeTo?.Hours ?? 0,
+                        int.Parse(e.Value!.ToString()!),
+                        0)" />
         </div>
     </div>
 
@@ -176,8 +180,7 @@
 
 @code {
     [Parameter]
-public List<EmployeeAvailabilityModel> Items { get; set; } = new();
-
+public List<EmployeeWorkLogModel> WorkLogs { get; set; } = new();
     [Parameter]
 public List<EmployeeDto> Employees { get; set; } = new();
 [Parameter]
@@ -206,25 +209,25 @@ bool useDefaultBreak
 
 void AddAvailability()
 {
-    Items.Add(new EmployeeAvailabilityModel
-    {
-        EmployeeID = Employees.First().Id,
-        DateFrom = SelectedDate,
-        DateTo = SelectedDate,
-        Status = "WORK",
-        Hours = Employees.First().DefaultDailyHours,
-    });
+WorkLogs.Add(new EmployeeWorkLogModel
+{
+    EmployeeID = Employees.First().Id,
+    WorkDate = SelectedDate,
+    TimeFrom = new TimeSpan(8, 0, 0),
+    TimeTo = new TimeSpan(17, 0, 0),
+    BreakMinutes = 60
+});
 }
 private DateTime SetTime(int h, int m)
 {
     return SelectedDate.Add(new TimeSpan(h, m, 0));
 }
 EmployeeDto? selectedEmployee;
-EmployeeAvailabilityModel? selectedItem;
+EmployeeWorkLogModel? selectedItem;
 bool showPopup = false;
 bool isCompanyDayOff = false;
 
-void OpenEdit(EmployeeDto emp, EmployeeAvailabilityModel? item)
+void OpenEdit(EmployeeDto emp, EmployeeWorkLogModel? item)
 {
     selectedEmployee = emp;
 
@@ -244,22 +247,21 @@ var isCustomDay = day != null &&
     );
 var isDayOff = day != null && (day.WorkStart == null || day.WorkEnd == null);
 
-selectedItem = new EmployeeAvailabilityModel
+selectedItem = new EmployeeWorkLogModel
 {
     EmployeeID = emp.Id,
-DateFrom = isDayOff
-    ? SelectedDate
-    : SelectedDate.Add(
-        emp.WorkStart ?? new TimeSpan(8, 0, 0)
-    ),
+    WorkDate = SelectedDate,
 
-    DateTo = isDayOff
-        ? SelectedDate
-        : SelectedDate.Add(
-            isCustomDay
-                ? (day?.WorkEnd ?? new TimeSpan(17, 0, 0))
-                : (emp.WorkEnd ?? new TimeSpan(17, 0, 0))
-        ),
+    TimeFrom = isDayOff
+        ? TimeSpan.Zero
+        : emp.WorkStart ?? new TimeSpan(8, 0, 0),
+
+    TimeTo = isDayOff
+        ? TimeSpan.Zero
+        : isCustomDay
+            ? (day?.WorkEnd ?? new TimeSpan(17, 0, 0))
+            : (emp.WorkEnd ?? new TimeSpan(17, 0, 0)),
+
     BreakMinutes = isDayOff
         ? 0
         : isCustomDay
@@ -281,7 +283,7 @@ if (!confirm)
 
     if (selectedItem == null) return;
 
-if (selectedItem.DateTo <= selectedItem.DateFrom)
+if (SelectedDate.Add(selectedItem.TimeTo ?? TimeSpan.Zero) <= SelectedDate.Add(selectedItem.TimeFrom ?? TimeSpan.Zero))
 {
     await JS.InvokeVoidAsync("alert", "Nepareizs laika intervāls");
     return;
@@ -291,8 +293,8 @@ var model = new EmployeeWorkLogModel
 {
     EmployeeID = selectedItem.EmployeeID,
     WorkDate = SelectedDate,
-    TimeFrom = selectedItem.DateFrom.TimeOfDay,
-    TimeTo = selectedItem.DateTo.TimeOfDay,
+    TimeFrom = SelectedDate.Add(selectedItem.TimeFrom ?? TimeSpan.Zero).TimeOfDay,
+    TimeTo = SelectedDate.Add(selectedItem.TimeTo ?? TimeSpan.Zero).TimeOfDay,
     BreakMinutes = selectedItem.BreakMinutes,
     Notes = selectedItem.Notes,
     Hours = (decimal)CalculatedHours()
@@ -300,22 +302,12 @@ var model = new EmployeeWorkLogModel
 
 await Http.PostAsJsonAsync("api/employeeworklog", model);
 
-// refresh Items (vienkāršais variants)
+// refresh WorkLogs (vienkāršais variants)
 var updated = await Http.GetFromJsonAsync<List<EmployeeWorkLogModel>>(
     "api/employeeworklog/date/" + SelectedDate.ToString("yyyy-MM-dd")
 );
 
-Items = updated?
-    .Select(w => new EmployeeAvailabilityModel
-    {
-        EmployeeID = w.EmployeeID,
-        DateFrom = SelectedDate.Add(w.TimeFrom ?? TimeSpan.Zero),
-        DateTo = SelectedDate.Add(w.TimeTo ?? TimeSpan.Zero),
-        Hours = w.Hours ?? 0,
-        Notes = w.Notes,
-        BreakMinutes = w.BreakMinutes
-    })
-    .ToList() ?? new();
+WorkLogs = updated ?? new();
 
 
 showPopup = false;
@@ -333,7 +325,7 @@ double CalculatedHours()
     if (selectedItem == null)
         return 0;
 
-    var total = (selectedItem.DateTo - selectedItem.DateFrom).TotalHours;
+    var total = (SelectedDate.Add(selectedItem.TimeTo ?? TimeSpan.Zero) - SelectedDate.Add(selectedItem.TimeFrom ?? TimeSpan.Zero)).TotalHours;
 
     var breakHours = (selectedItem.BreakMinutes ?? 0) / 60.0;
 

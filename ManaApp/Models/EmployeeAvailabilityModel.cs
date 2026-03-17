@@ -13,7 +13,6 @@ namespace ManaApp.Models
         public string Status { get; set; } = "";
 
         public decimal? Hours { get; set; }
-        public int? BreakMinutes { get; set; }
 
         public string? Notes { get; set; }
     }
