@@ -1,0 +1,247 @@
+/* Galvenā rinda */
+.cc-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    padding: 6px 8px;
+
+    font-size: 12px;
+    background: white;
+    border: 1px solid #2563eb;
+    border-top: 3px solid #2563eb;
+    border-radius: 8px;
+
+    flex-wrap: nowrap;
+    width: 100%;
+}
+
+
+.cc-hours.hidden {
+    visibility: hidden;
+}
+
+/* Input vienots stils */
+.cc-row input {
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 3px 6px;
+    font-size: 12px;
+    text-align: center;
+}
+
+/* Fokus */
+.cc-row input:focus {
+    outline: none;
+    border-color: #9ca3af;
+    box-shadow: 0 0 0 1px rgba(156,163,175,0.4);
+}
+
+/* Badge */
+.cc-badge {
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 11px;
+    text-align: center;
+}
+
+.cc-badge.default {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.cc-badge.custom {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+/* Pogas */
+.cc-btn {
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid #d1d5db;
+}
+
+/* varianti */
+.cc-btn.save {
+    background: #2563eb;
+    color: white;
+    border-color: #1d4ed8;
+}
+
+.cc-btn.range {
+    background: white;
+    color: #2563eb;
+    border: 1px solid #2563eb;
+}
+.cc-btn.range:hover {
+    background: #dbeafe; /* gaiši zils */
+}
+
+.cc-btn.reset {
+    background: white;
+    color: #2563eb;
+    border: 1px solid #2563eb;
+}
+
+/* hover */
+.cc-btn.save:hover {
+    background: #1d4ed8;
+}
+
+.cc-date-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.cc-date-hidden {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.cc-date-btn {
+    border: 1px solid #d1d5db;
+    background: #f9fafb;
+    border-radius: 6px;
+    padding: 4px 6px;
+    cursor: pointer;
+}
+
+.cc-date-text {
+    font-size: 12px;
+    color: #111827;
+}
+
+.cc-time {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.cc-time-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+.cc-day {
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    text-align: center;
+}
+
+/* Darba diena */
+.cc-day.normal {
+    color: #2563eb; /* zils teksts */
+}
+
+/* Saīsināta */
+.cc-day.short {
+    background: #dbeafe; /* gaiši zils fons */
+    color: #1e3a8a;      /* tumši zils teksts */
+}
+
+/* Brīvdiena */
+.cc-day.off {
+    background: #1e3a8a; /* tumši zils */
+    color: white;
+}
+
+.cc-popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    background: rgba(0,0,0,0.4);
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    z-index: 1000;
+}
+
+.cc-popup {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+
+    min-width: 300px;
+}
+
+.cc-popup-title {
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+.cc-popup-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.cc-popup-row label {
+    min-width: 60px;
+    font-size: 12px;
+}
+
+.cc-popup-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.cc-popup-date-block {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+}
+
+.cc-popup-row {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+
+.cc-row > div {
+    flex: 0 0 auto;
+}
+
+.cc-row input[type="text"] {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: none;
+}
+
+.cc-hours-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.cc-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+}
+
+.cc-row > div {
+    flex: 0 0 auto;
+}
+
+.cc-notes {
+    flex: 1 1 auto !important;
+}

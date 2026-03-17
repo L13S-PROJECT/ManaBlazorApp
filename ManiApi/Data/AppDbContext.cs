@@ -19,6 +19,9 @@ namespace ManiApi.Data
         public DbSet<RalColor> RalColors { get; set; }
         public DbSet<ManiApi.Models.StepType> StepTypes { get; set; }
         public DbSet<ManiApi.Models.Employee> Employees { get; set; }
+        public DbSet<ManiApi.Models.EmployeeAvailability> EmployeeAvailabilities { get; set; }
+        public DbSet<ManiApi.Models.EmployeeWorkLog> EmployeeWorkLogs { get; set; }
+        public DbSet<CompanyCalendar> CompanyCalendars { get; set; }
         public DbSet<ManiApi.Models.Tasks> Tasks { get; set; }
         public DbSet<TaskWorkSession> TaskWorkSessions { get; set; }
         public DbSet<ManiApi.Models.WorkCenter> WorkCentrs { get; set; }
@@ -29,7 +32,7 @@ namespace ManiApi.Data
         
 {
     base.OnModelCreating(modelBuilder);
-
+    modelBuilder.Entity<EmployeeWorkLog>().ToTable("employee_work_log");
     // <- PIESPIED tabulas nosaukumu ar underscore
     modelBuilder.Entity<StockMovement>().ToTable("stock_movements");
 

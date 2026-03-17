@@ -25,5 +25,14 @@ namespace ManiApi.Models
 
         [Column("IsActive")]
         public bool IsActive { get; set; }
+
+        [Column("DefaultDailyHours")]
+        public decimal DefaultDailyHours { get; set; }
+
+        [Column("WorkStart")]
+        public TimeSpan? WorkStart { get; set; }
+
+        [Column("WorkEnd")]
+        public TimeSpan? WorkEnd { get; set; }
     }
 }

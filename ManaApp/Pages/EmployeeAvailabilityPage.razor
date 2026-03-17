@@ -1,0 +1,56 @@
+@page "/employee-availability"
+@using ManaApp.Shared
+@using ManaApp.Models
+@using ManaApp.Components.EmployeeAvailability
+@inject HttpClient Http
+
+<CompanyCalendarEditor />
+
+<h3>Employee Availability</h3>
+
+@foreach (var emp in employees)
+{
+    <div>@emp.Name</div>
+}
+
+<EmployeeAvailabilityTable Items="availabilityList" Employees="employees" />
+
+
+<h4>Work Logs</h4>
+
+@foreach (var w in workLogs)
+{
+    <div>
+        Emp: @w.EmployeeID |
+        From: @w.TimeFrom |
+        To: @w.TimeTo
+    </div>
+}
+
+@code {
+    private List<EmployeeAvailabilityModel> availabilityList = new()
+    {
+        new EmployeeAvailabilityModel
+        {
+            EmployeeID = 1,
+            DateFrom = DateTime.Today,
+            DateTo = DateTime.Today.AddDays(5),
+            Status = "WORK",
+            Hours = 8,
+            Notes = "test"
+        }
+    };
+
+private List<EmployeeDto> employees = new();
+    
+private List<EmployeeWorkLogModel> workLogs = new();
+protected override async Task OnInitializedAsync()
+    {
+        employees = await Http.GetFromJsonAsync<List<EmployeeDto>>("api/employees") ?? new();
+
+        workLogs = await Http.GetFromJsonAsync<List<EmployeeWorkLogModel>>(
+            "api/employeeworklog/date/" + DateTime.Today.ToString("yyyy-MM-dd")
+        ) ?? new();
+    }
+
+}

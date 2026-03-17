@@ -1,0 +1,53 @@
+@using ManaApp.Models
+
+<h4>Pieejamības saraksts</h4>
+
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Employee</th>
+            <th>Date From</th>
+            <th>Date To</th>
+            <th>Status</th>
+            <th>Hours</th>
+            <th>Notes</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Items)
+        {
+            <tr>
+                <td>@Employees.FirstOrDefault(e => e.Id == item.EmployeeID)?.Name</td>
+                <td>@item.DateFrom.ToShortDateString()</td>
+                <td>@item.DateTo.ToShortDateString()</td>
+                <td>@item.Status</td>
+                <td>@item.Hours</td>
+                <td>@item.Notes</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<button class="btn btn-primary" @onclick="AddAvailability">Add Availability</button>
+
+@code {
+    [Parameter]
+public List<EmployeeAvailabilityModel> Items { get; set; } = new();
+
+    [Parameter]
+public List<EmployeeDto> Employees { get; set; } = new();
+
+void AddAvailability()
+{
+    Items.Add(new EmployeeAvailabilityModel
+    {
+        EmployeeID = Employees.First().Id,
+        DateFrom = DateTime.Today,
+        DateTo = DateTime.Today,
+        Status = "WORK",
+        Hours = 8
+    });
+}
+
+}

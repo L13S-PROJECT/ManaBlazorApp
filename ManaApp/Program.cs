@@ -5,6 +5,7 @@ using Syncfusion.Licensing;
 using ManaApp;
 
 
+
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
@@ -23,5 +24,9 @@ SyncfusionLicenseProvider.RegisterLicense("Ngo9BigBOggjGyl/Vkd+XU9FcVRDX3xKf0x/T
 builder.Services.AddSyncfusionBlazor();
 
 builder.Services.AddScoped<ManaApp.Services.AppState>();
+
+var culture = new System.Globalization.CultureInfo("lv-LV");
+System.Globalization.CultureInfo.DefaultThreadCurrentCulture = culture;
+System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = culture;
 
 await builder.Build().RunAsync();

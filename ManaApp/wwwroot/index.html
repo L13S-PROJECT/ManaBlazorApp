@@ -52,6 +52,16 @@
     };
 </script>
 
+<script>
+    window.openDatePicker = (el) => {
+        if (el && el.showPicker) {
+            el.showPicker();
+        } else if (el) {
+            el.focus();
+        }
+    };
+</script>
+
 </body>
 </html>
 

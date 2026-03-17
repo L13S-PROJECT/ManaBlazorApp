@@ -1,0 +1,456 @@
+@using ManaApp.Models
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<h4>Kalendārs</h4>
+<div class="cc-row">
+<div class="cc-date-wrap">
+
+    <input type="date"
+           class="cc-date-hidden"
+           value="@selectedDate.ToString("yyyy-MM-dd")"
+           @onchange="OnDateChanged"
+           @ref="dateInputRef" />
+
+    <button class="cc-date-btn" @onclick="OpenDatePicker" title="Izvēlies datumu">
+        📅
+    </button>
+
+    <span class="cc-date-text">
+        @selectedDate.ToString("dd.MM.yyyy")
+    </span>
+
+</div>
+
+@if (calendar.Any(x => x.WorkDate.Date == selectedDate.Date))
+{
+    <span class="cc-badge custom">Pielāgots</span>
+}
+else
+{
+    <span class="cc-badge default">Standarta</span>
+}
+
+@if (selectedDay != null)
+{
+    <div>
+        @GetWorkingHours(selectedDay) h
+    </div>
+}
+
+@if (selectedDay != null)
+{
+                <label title="Atzīmē, ja šī ir brīvdiena (darba laiks nav)">
+                    <input type="checkbox" @bind="isDayOff" disabled="@IsDbDayOff()" />
+                    Brīvdiena
+                </label>
+
+<div class="cc-hours @(isDayOff || IsDbDayOff() ? "hidden" : "")">
+    <div class="cc-hours-row">
+<div class="cc-time-group">
+    <label>Darba dienas sākums:</label>
+<div class="cc-time">
+    <input type="number" min="0" max="23"
+           value="@GetHours(selectedDay.WorkStart)"
+           @onchange="e => selectedDay.WorkStart = SetTime(int.Parse(e.Value!.ToString()!), GetMinutes(selectedDay.WorkStart))"
+           style="width:50px;" />
+    :
+    <input type="number" min="0" max="59"
+           value="@GetMinutes(selectedDay.WorkStart).ToString("D2")"
+           @onchange="e => selectedDay.WorkStart = SetTime(GetHours(selectedDay.WorkStart), int.Parse(e.Value!.ToString()!))"
+           style="width:50px;" />
+</div>
+</div>
+<div class="cc-time-group">       
+    <label>Darba dienas beigas:</label>
+<div class="cc-time">
+    <input type="number" min="0" max="23"
+           value="@GetHours(selectedDay.WorkEnd)"
+           @onchange="e => selectedDay.WorkEnd = SetTime(int.Parse(e.Value!.ToString()!), GetMinutes(selectedDay.WorkEnd))"
+           style="width:50px;" />
+
+    :
+
+    <input type="number" min="0" max="59"
+           value="@GetMinutes(selectedDay.WorkEnd).ToString("D2")"
+           @onchange="e => selectedDay.WorkEnd = SetTime(GetHours(selectedDay.WorkEnd), int.Parse(e.Value!.ToString()!))"
+           style="width:50px;" />
+</div>
+</div>
+
+        <div>
+            <label>Pārtraukums (min):</label>   
+            <input type="number" @bind="selectedDay.BreakMinutes" style="width:60px;" />
+        </div>
+</div>
+</div>
+
+@if (!isDayOff)
+{
+    var isShortDay = selectedDay.WorkStart != new TimeSpan(8, 0, 0)
+                  || selectedDay.WorkEnd != new TimeSpan(17, 0, 0);
+
+    if (isShortDay)
+    {
+        <div class="cc-day short">Saīsināta darba diena</div>
+    }
+    else
+    {
+        <div class="cc-day normal">Darba diena</div>
+    }
+}
+else
+{
+    <div class="cc-day off">Brīvdiena</div>
+}
+       
+<div class="cc-notes">
+    <input type="text" @bind="selectedDay.Notes" placeholder="Piezīmes..." />
+</div>
+
+<div class="cc-actions">
+    <div>
+        <button class="cc-btn save" @onclick="Save" title="Saglabāt izmaiņas">Saglabāt</button>
+    </div>
+
+    <div>
+        <button class="cc-btn range" @onclick="ToggleRangeMode" title="Iestatīt vairākām dienām">Periods</button>
+    </div>
+@if (showRangePopup)
+{
+    <div class="cc-popup-overlay">
+        <div class="cc-popup">
+
+            <h3 class="cc-popup-title">Periods</h3>
+ <div class="cc-popup-row">
+
+    <div class="cc-popup-date-block">
+        <label>No:</label>
+        <div class="cc-date-wrap">
+            <input type="date"
+                   class="cc-date-hidden"
+                   value="@rangeFrom.ToString("yyyy-MM-dd")"
+                   @onchange="OnRangeFromChanged"
+                   @ref="rangeFromRef" />
+
+            <button class="cc-date-btn" @onclick="OpenRangeFrom">📅</button>
+
+            <span class="cc-date-text">
+                @rangeFrom.ToString("dd.MM.yyyy")
+            </span>
+        </div>
+    </div>
+
+    <div class="cc-popup-date-block">
+        <label>Līdz:</label>
+        <div class="cc-date-wrap">
+            <input type="date"
+                   class="cc-date-hidden"
+                   value="@rangeTo.ToString("yyyy-MM-dd")"
+                   @onchange="OnRangeToChanged"
+                   @ref="rangeToRef" />
+
+            <button class="cc-date-btn" @onclick="OpenRangeTo">📅</button>
+
+            <span class="cc-date-text">
+                @rangeTo.ToString("dd.MM.yyyy")
+            </span>
+        </div>
+    </div>
+
+</div>
+
+            <div class="cc-popup-row">
+                <label>
+                    <input type="checkbox" @bind="isDayOff" />
+                    Brīvdiena
+                </label>
+                <label>Komentārs:</label>
+                <input type="text" @bind="selectedDay.Notes" style="width:100%;" />
+            </div>
+
+            <div class="cc-popup-actions">
+                <button class="cc-btn save" @onclick="ApplyRange">Pielietot</button>
+                <button class="cc-btn reset" @onclick="() => showRangePopup = false">Aizvērt</button>
+            </div>
+
+        </div>
+    </div>
+}
+    <div>
+        <button class="cc-btn reset" @onclick="Reset"
+                title="Dzēš izmaiņas tikai šai dienai un atjauno standarta darba laiku">
+            Atjaunot
+        </button>
+    </div>
+</div>
+}
+
+</div>
+
+@code {
+    private List<CompanyCalendarModel> calendar = new();
+    private DateTime selectedDate = DateTime.Today;
+    private CompanyCalendarModel? selectedDay;
+
+    protected override async Task OnInitializedAsync()
+    {
+        calendar = await Http.GetFromJsonAsync<List<CompanyCalendarModel>>("api/companycalendar") ?? new();
+        UpdateSelectedDay();
+    }
+    private void OnDateChanged(ChangeEventArgs e)
+    {
+        selectedDate = DateTime.Parse(e.Value!.ToString()!);
+        UpdateSelectedDay();
+    }
+
+private string ToTimeString(TimeSpan? time)
+{
+    return time.HasValue 
+        ? time.Value.ToString(@"hh\:mm") 
+        : "";
+}
+
+private TimeSpan? ParseTime(string? value)
+{
+    if (TimeSpan.TryParse(value, out var result))
+        return result;
+
+    return null;
+}
+private async Task Save()
+{
+    var confirm = await JS.InvokeAsync<bool>("confirm", "Vai saglabāt izmaiņas?");
+if (!confirm)
+    return;
+
+    if (selectedDay == null)
+        return;
+
+    if (isDayOff)
+    {
+        selectedDay.WorkStart = null;
+        selectedDay.WorkEnd = null;
+    }
+
+    await Http.PostAsJsonAsync("api/companycalendar", selectedDay);
+var existing = calendar.FirstOrDefault(x => x.WorkDate.Date == selectedDay.WorkDate.Date);
+
+if (existing == null)
+{
+    calendar.Add(selectedDay);
+}
+else
+{
+    existing.WorkStart = selectedDay.WorkStart;
+    existing.WorkEnd = selectedDay.WorkEnd;
+    existing.BreakMinutes = selectedDay.BreakMinutes;
+    existing.Notes = selectedDay.Notes;
+}
+
+    UpdateSelectedDay();
+    await JS.InvokeVoidAsync("alert", "Izmaiņas saglabātas");
+}
+
+private bool isDayOff
+{
+    get => _isDayOff;
+    set
+    {
+        _isDayOff = value;
+
+        if (selectedDay == null)
+            return;
+
+        if (_isDayOff)
+        {
+            selectedDay.WorkStart = null;
+            selectedDay.WorkEnd = null;
+        }
+        else
+        {
+            selectedDay.WorkStart ??= new TimeSpan(8, 0, 0);
+            selectedDay.WorkEnd ??= new TimeSpan(17, 0, 0);
+            selectedDay.BreakMinutes ??= 60;
+        }
+    }
+}
+
+private bool _isDayOff;
+
+private void UpdateSelectedDay()
+{
+    var existing = calendar.FirstOrDefault(x => x.WorkDate.Date == selectedDate.Date);
+
+    if (existing != null)
+    {
+        selectedDay = existing;
+        isDayOff = selectedDay.WorkStart == null || selectedDay.WorkEnd == null;
+    }
+
+        else
+    {
+        selectedDay = new CompanyCalendarModel { WorkDate = selectedDate };
+
+        var isWeekend = selectedDate.DayOfWeek == DayOfWeek.Saturday 
+                    || selectedDate.DayOfWeek == DayOfWeek.Sunday;
+
+        isDayOff = isWeekend;
+
+            if (!isDayOff)
+            {
+                selectedDay.WorkStart = new TimeSpan(8, 0, 0);
+                selectedDay.WorkEnd = new TimeSpan(17, 0, 0);
+                selectedDay.BreakMinutes = 60;
+            }
+    }
+}
+private async Task Reset()
+{
+    if (selectedDay == null)
+        return;
+
+    var confirm = await JS.InvokeAsync<bool>("confirm", "Atjaunot uz standarta darba dienu?");
+    if (!confirm)
+        return;
+
+    calendar.RemoveAll(x => x.WorkDate.Date == selectedDay.WorkDate.Date);
+
+    UpdateSelectedDay();
+
+    if (selectedDay != null)
+    {
+        selectedDay.WorkStart = new TimeSpan(8, 0, 0);
+        selectedDay.WorkEnd = new TimeSpan(17, 0, 0);
+        selectedDay.BreakMinutes = 60;
+        isDayOff = false;
+
+        await Http.PostAsJsonAsync("api/companycalendar", selectedDay);
+    }
+
+    await JS.InvokeVoidAsync("alert", "Diena atjaunota kā darba diena");
+}
+
+private double GetWorkingHours(CompanyCalendarModel day)
+{
+    if (day.WorkStart == null || day.WorkEnd == null)
+        return 0;
+
+    var total = (day.WorkEnd.Value - day.WorkStart.Value).TotalHours;
+
+    var breakHours = (day.BreakMinutes ?? 0) / 60.0;
+
+    return total - breakHours;
+}
+
+private bool isRangeMode = false;
+
+private DateTime rangeFrom = DateTime.Today;
+private DateTime rangeTo = DateTime.Today;
+
+private TimeSpan? rangeWorkStart = new TimeSpan(8, 0, 0);
+private TimeSpan? rangeWorkEnd = new TimeSpan(17, 0, 0);
+private int? rangeBreak = 60;
+
+private bool showRangePopup = false;
+private void ToggleRangeMode()
+{
+    showRangePopup = true;
+}
+
+private void OnRangeFromChanged(ChangeEventArgs e)
+{
+    rangeFrom = DateTime.Parse(e.Value!.ToString()!);
+}
+
+private void OnRangeToChanged(ChangeEventArgs e)
+{
+    rangeTo = DateTime.Parse(e.Value!.ToString()!);
+}
+
+private async Task ApplyRange()
+{
+    var confirm = await JS.InvokeAsync<bool>("confirm", "Vai pielietot izmaiņas visam izvēlētajam periodam?");
+    if (!confirm)
+        return;
+
+    for (var date = rangeFrom.Date; date <= rangeTo.Date; date = date.AddDays(1))
+    {
+        var existing = calendar.FirstOrDefault(x => x.WorkDate.Date == date);
+
+        var isDayOffRange = isDayOff;
+
+        if (isDayOff)
+        {
+            selectedDay!.WorkStart = null;
+            selectedDay.WorkEnd = null;
+            selectedDay.BreakMinutes = null;
+        }
+
+        var day = new CompanyCalendarModel
+        {
+            WorkDate = date,
+            WorkStart = isDayOffRange ? null : selectedDay?.WorkStart,
+            WorkEnd = isDayOffRange ? null : selectedDay?.WorkEnd,
+            BreakMinutes = isDayOffRange ? null : selectedDay?.BreakMinutes,
+            Notes = existing?.Notes ?? selectedDay?.Notes
+        };
+
+        await Http.PostAsJsonAsync("api/companycalendar", day);
+
+        if (existing == null)
+        {
+            calendar.Add(day);
+        }
+        else
+        {
+            existing.WorkStart = day.WorkStart;
+            existing.WorkEnd = day.WorkEnd;
+            existing.BreakMinutes = day.BreakMinutes;
+            existing.Notes = day.Notes;
+        }
+    }
+
+    UpdateSelectedDay();
+
+    showRangePopup = false;
+
+    await JS.InvokeVoidAsync("alert", "Izmaiņas periodam saglabātas");
+}
+
+
+private ElementReference dateInputRef;
+
+private async Task OpenDatePicker()
+{
+    await JS.InvokeVoidAsync("openDatePicker", dateInputRef);
+}
+
+private int GetHours(TimeSpan? time) => time?.Hours ?? 0;
+private int GetMinutes(TimeSpan? time) => time?.Minutes ?? 0;
+
+private TimeSpan? SetTime(int hours, int minutes)
+{
+    return new TimeSpan(hours, minutes, 0);
+}
+
+private ElementReference rangeFromRef;
+
+private async Task OpenRangeFrom()
+{
+    await JS.InvokeVoidAsync("openDatePicker", rangeFromRef);
+}
+
+private ElementReference rangeToRef;
+
+private async Task OpenRangeTo()
+{
+    await JS.InvokeVoidAsync("openDatePicker", rangeToRef);
+}
+
+private bool IsDbDayOff()
+{
+    return calendar.Any(x => x.WorkDate.Date == selectedDate.Date && x.WorkStart == null);
+}
+
+}
