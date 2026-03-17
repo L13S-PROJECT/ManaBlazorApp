@@ -4,53 +4,61 @@
 @using ManaApp.Components.EmployeeAvailability
 @inject HttpClient Http
 
-<CompanyCalendarEditor />
+<CompanyCalendarEditor 
+    OnDateChangedCallback="OnCalendarDateChanged"
+    OnCalendarChanged="OnCalendarChanged" />
 
-<h3>Employee Availability</h3>
+<EmployeeAvailabilityTable 
+    Items="availabilityList" 
+    Employees="employees"
+    SelectedDate="selectedDate" />
 
-@foreach (var emp in employees)
-{
-    <div>@emp.Name</div>
-}
-
-<EmployeeAvailabilityTable Items="availabilityList" Employees="employees" />
-
-
-<h4>Work Logs</h4>
-
-@foreach (var w in workLogs)
-{
-    <div>
-        Emp: @w.EmployeeID |
-        From: @w.TimeFrom |
-        To: @w.TimeTo
-    </div>
-}
 
 @code {
-    private List<EmployeeAvailabilityModel> availabilityList = new()
-    {
-        new EmployeeAvailabilityModel
-        {
-            EmployeeID = 1,
-            DateFrom = DateTime.Today,
-            DateTo = DateTime.Today.AddDays(5),
-            Status = "WORK",
-            Hours = 8,
-            Notes = "test"
-        }
-    };
+private List<EmployeeAvailabilityModel> availabilityList = new();
 
 private List<EmployeeDto> employees = new();
     
 private List<EmployeeWorkLogModel> workLogs = new();
-protected override async Task OnInitializedAsync()
-    {
-        employees = await Http.GetFromJsonAsync<List<EmployeeDto>>("api/employees") ?? new();
 
-        workLogs = await Http.GetFromJsonAsync<List<EmployeeWorkLogModel>>(
-            "api/employeeworklog/date/" + DateTime.Today.ToString("yyyy-MM-dd")
-        ) ?? new();
-    }
+private async Task LoadData()
+{
+    workLogs = await Http.GetFromJsonAsync<List<EmployeeWorkLogModel>>(
+        "api/employeeworklog/date/" + selectedDate.ToString("yyyy-MM-dd")
+    ) ?? new();
+
+    availabilityList = workLogs
+        .Where(w => w.TimeFrom.HasValue && w.TimeTo.HasValue)
+        .Select(w => new EmployeeAvailabilityModel
+        {
+            EmployeeID = w.EmployeeID,
+            DateFrom = selectedDate.Add(w.TimeFrom ?? TimeSpan.Zero),
+            DateTo = selectedDate.Add(w.TimeTo ?? TimeSpan.Zero),
+            Hours = w.Hours ?? 0,
+            Notes = w.Notes,
+            Status = "WORK"
+        })
+        .ToList();
+}
+protected override async Task OnInitializedAsync()
+{
+    employees = (await Http.GetFromJsonAsync<List<EmployeeDto>>("api/employees") ?? new())
+        .Where(e => e.Role == "WORKSHOP")
+        .ToList();
+
+    await LoadData();
+}
+
+private async Task OnCalendarDateChanged(DateTime date)
+{
+    selectedDate = date;
+    await LoadData();
+}
+private DateTime selectedDate = DateTime.Today;
+
+private async Task OnCalendarChanged()
+{
+    await LoadData();
+}
 
 }

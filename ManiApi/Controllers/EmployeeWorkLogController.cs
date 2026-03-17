@@ -35,14 +35,33 @@ namespace ManiApi.Controllers
 
             if (existing == null)
             {
+                if (model.TimeFrom.HasValue && model.TimeTo.HasValue)
+                {
+                    var hours = (decimal)(model.TimeTo.Value - model.TimeFrom.Value).TotalHours;
+                    var breakMinutes = model.BreakMinutes ?? 0;
+
+                    model.Hours = hours - (breakMinutes / 60m);
+                }
+
                 _db.EmployeeWorkLogs.Add(model);
             }
             else
             {
                 existing.TimeFrom = model.TimeFrom;
                 existing.TimeTo = model.TimeTo;
-                existing.Hours = model.Hours;
+                if (model.TimeFrom.HasValue && model.TimeTo.HasValue)
+                    {
+                        var hours = (decimal)(model.TimeTo.Value - model.TimeFrom.Value).TotalHours;
+                        var breakMinutes = model.BreakMinutes ?? 0;
+
+                        existing.Hours = hours - (breakMinutes / 60m);
+                    }
+                    else
+                    {
+                        existing.Hours = model.Hours;
+                    }
                 existing.Notes = model.Notes;
+                existing.BreakMinutes = model.BreakMinutes;
             }
 
             await _db.SaveChangesAsync();

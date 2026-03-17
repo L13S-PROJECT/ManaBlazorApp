@@ -14,6 +14,8 @@ namespace ManaApp.Models
 
         public decimal? Hours { get; set; }
 
+        public int? BreakMinutes { get; set; }
+
         public string? Notes { get; set; }
     }
 }

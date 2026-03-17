@@ -1,33 +1,176 @@
 @using ManaApp.Models
+@inject HttpClient Http
+@inject IJSRuntime JS
 
 <h4>Pieejamības saraksts</h4>
 
 
-<table class="table">
-    <thead>
-        <tr>
-            <th>Employee</th>
-            <th>Date From</th>
-            <th>Date To</th>
-            <th>Status</th>
-            <th>Hours</th>
-            <th>Notes</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var item in Items)
-        {
-            <tr>
-                <td>@Employees.FirstOrDefault(e => e.Id == item.EmployeeID)?.Name</td>
-                <td>@item.DateFrom.ToShortDateString()</td>
-                <td>@item.DateTo.ToShortDateString()</td>
-                <td>@item.Status</td>
-                <td>@item.Hours</td>
-                <td>@item.Notes</td>
-            </tr>
-        }
-    </tbody>
+<table class="table ea-table">
+<thead>
+    <tr>
+        <th>Employee</th>
+        <th>Default Start</th>
+        <th>Default End</th>
+        <th>Actual Start</th>
+        <th>Actual End</th>
+        <th>Hours</th>
+        <th>Notes</th>
+    </tr>
+</thead>
+<tbody>
+@foreach (var emp in Employees)
+{
+    var item = Items.FirstOrDefault(x => x.EmployeeID == emp.Id);
+
+    var day = calendar.FirstOrDefault(x => x.WorkDate.Date == SelectedDate.Date);
+    var isCustomDay = day != null;
+    var isDayOff = day == null || day.WorkStart == null || day.WorkEnd == null;
+
+    var start = emp.WorkStart;
+    var end = isDayOff
+    ? start
+    : isCustomDay
+        ? day?.WorkEnd
+        : emp.WorkEnd;
+
+    var breakMin = item?.BreakMinutes ?? (day?.BreakMinutes ?? 60);
+
+    var startTime = item?.DateFrom.TimeOfDay ?? start ?? TimeSpan.Zero;
+    var endTime = item != null
+        ? item.DateTo.TimeOfDay
+        : end ?? TimeSpan.Zero;
+
+    var hours = (endTime - startTime).TotalHours - (breakMin / 60.0);
+
+<tr class="ea-row 
+    @(isDayOff && item == null ? "ea-row-off" : "")
+    @(item != null ? "ea-row-modified" : "")
+    @(selectedEmployeeId == emp.Id ? "ea-row-selected" : "")"
+    @onclick="() => { selectedEmployeeId = emp.Id; OpenEdit(emp, item); }">
+    <td class="ea-emp">@emp.Name</td>
+
+<td class="ea-def-start @(item != null ? "ea-old" : "")">@start?.ToString(@"hh\:mm")</td>
+<td class="ea-def-end @(item != null ? "ea-old" : "")">@end?.ToString(@"hh\:mm")</td>
+<td class="ea-act-start">
+    @(item != null && item.DateFrom.TimeOfDay.TotalMinutes > 0 
+        ? item.DateFrom.ToString("HH:mm") 
+        : "")
+</td>
+
+<td class="ea-act-end">
+    @(item != null && item.DateTo.TimeOfDay.TotalMinutes > 0 
+        ? item.DateTo.ToString("HH:mm") 
+        : "")
+</td>
+
+<td class="ea-hours">
+    @Math.Max(0, Math.Round(hours, 2))
+</td>
+    <td class="ea-notes">@item?.Notes</td>
+</tr>
+
+}
+</tbody>
 </table>
+
+@if (showPopup && selectedEmployee != null && selectedItem != null)
+{
+<div class="steps-dialog-modal">
+    <div class="steps-dialog-window">
+        <div class="steps-dialog">
+
+<div class="steps-dialog-header">
+    @selectedEmployee.Name - @SelectedDate.ToString("dd.MM.yyyy")
+</div>
+
+@if (isCompanyDayOff)
+{
+    <div style="color:red; font-weight:bold; margin-bottom:10px;">
+        ⚠ Uzņēmumā šī diena ir brīvdiena
+    </div>
+}
+
+<div class="steps-table-body">
+
+<div class="steps-grid">
+
+    <div>
+        <label>From:</label>
+        <div class="time-row">
+            <input type="number" min="0" max="23"
+                   class="steps-input time-part"
+                   value="@selectedItem.DateFrom.Hour"
+                   @onchange="e => selectedItem.DateFrom = SetTime(
+                       int.Parse(e.Value!.ToString()!),
+                       selectedItem.DateFrom.Minute)" />
+
+            <span>:</span>
+
+            <input type="number" min="0" max="59"
+                   class="steps-input time-part"
+                   value="@selectedItem.DateFrom.Minute.ToString("D2")"
+                   @onchange="e => selectedItem.DateFrom = SetTime(
+                       selectedItem.DateFrom.Hour,
+                       int.Parse(e.Value!.ToString()!))" />
+        </div>
+    </div>
+
+    <div>
+        <label>To:</label>
+        <div class="time-row">
+            <input type="number" min="0" max="23"
+                   class="steps-input time-part"
+                   value="@selectedItem.DateTo.Hour"
+                   @onchange="e => selectedItem.DateTo = SetTime(
+                       int.Parse(e.Value!.ToString()!),
+                       selectedItem.DateTo.Minute)" />
+
+            <span>:</span>
+
+            <input type="number" min="0" max="59"
+                   class="steps-input time-part"
+                   value="@selectedItem.DateTo.Minute.ToString("D2")"
+                   @onchange="e => selectedItem.DateTo = SetTime(
+                       selectedItem.DateTo.Hour,
+                       int.Parse(e.Value!.ToString()!))" />
+        </div>
+    </div>
+
+    <div>
+        <label>
+            <input type="checkbox" @bind="useDefaultBreak" />
+            Standarta pārtraukums
+        </label>
+
+        <input type="number" class="steps-input" 
+               @bind="selectedItem.BreakMinutes"
+               disabled="@(useDefaultBreak)" />
+    </div>
+
+    <div>
+        <label>Stundas:</label>
+        <div style="font-weight:bold; font-size:18px; color:#1d4ed8;">
+            @CalculatedHours()
+        </div>
+    </div>
+
+    <div style="grid-column: span 2;">
+        <label>Notes:</label>
+        <input type="text" class="steps-input" @bind="selectedItem.Notes" />
+    </div>
+
+</div>
+
+</div>
+
+<div class="steps-footer-wrapper steps-footer">
+    <button class="steps-btn-save" @onclick="Save">Saglabāt</button>
+    <button class="steps-btn-close" @onclick="() => showPopup = false">Aizvērt</button>
+</div>
+            </div>
+        </div>
+    </div>
+}
 
 <button class="btn btn-primary" @onclick="AddAvailability">Add Availability</button>
 
@@ -37,17 +180,165 @@ public List<EmployeeAvailabilityModel> Items { get; set; } = new();
 
     [Parameter]
 public List<EmployeeDto> Employees { get; set; } = new();
+[Parameter]
+public DateTime SelectedDate { get; set; }
+private List<CompanyCalendarModel> calendar = new();
+private bool _useDefaultBreak = true;
+
+int? selectedEmployeeId;
+bool useDefaultBreak
+{
+    get => _useDefaultBreak;
+    set
+    {
+        _useDefaultBreak = value;
+
+        if (selectedItem == null)
+            return;
+
+        if (_useDefaultBreak)
+        {
+            var day = calendar.FirstOrDefault(x => x.WorkDate.Date == SelectedDate.Date);
+            selectedItem.BreakMinutes = day?.BreakMinutes ?? 60;
+        }
+    }
+}
 
 void AddAvailability()
 {
     Items.Add(new EmployeeAvailabilityModel
     {
         EmployeeID = Employees.First().Id,
-        DateFrom = DateTime.Today,
-        DateTo = DateTime.Today,
+        DateFrom = SelectedDate,
+        DateTo = SelectedDate,
         Status = "WORK",
-        Hours = 8
+        Hours = Employees.First().DefaultDailyHours,
     });
 }
+private DateTime SetTime(int h, int m)
+{
+    return SelectedDate.Add(new TimeSpan(h, m, 0));
+}
+EmployeeDto? selectedEmployee;
+EmployeeAvailabilityModel? selectedItem;
+bool showPopup = false;
+bool isCompanyDayOff = false;
+
+void OpenEdit(EmployeeDto emp, EmployeeAvailabilityModel? item)
+{
+    selectedEmployee = emp;
+
+    var day = calendar.FirstOrDefault(x => x.WorkDate.Date == SelectedDate.Date);
+
+    if (item != null)
+    {
+        selectedItem = item;
+    }
+    else
+{
+var isCustomDay = day != null &&
+    (
+        day.WorkStart != emp.WorkStart ||
+        day.WorkEnd != emp.WorkEnd ||
+        day.BreakMinutes != 60
+    );
+var isDayOff = day != null && (day.WorkStart == null || day.WorkEnd == null);
+
+selectedItem = new EmployeeAvailabilityModel
+{
+    EmployeeID = emp.Id,
+DateFrom = isDayOff
+    ? SelectedDate
+    : SelectedDate.Add(
+        emp.WorkStart ?? new TimeSpan(8, 0, 0)
+    ),
+
+    DateTo = isDayOff
+        ? SelectedDate
+        : SelectedDate.Add(
+            isCustomDay
+                ? (day?.WorkEnd ?? new TimeSpan(17, 0, 0))
+                : (emp.WorkEnd ?? new TimeSpan(17, 0, 0))
+        ),
+    BreakMinutes = isDayOff
+        ? 0
+        : isCustomDay
+            ? day?.BreakMinutes ?? 60
+            : 60
+};
+}
+
+    showPopup = true;
+    useDefaultBreak = true;
+    isCompanyDayOff = day == null || day.WorkStart == null || day.WorkEnd == null;
+}
+
+async Task Save()
+{
+    var confirm = await JS.InvokeAsync<bool>("confirm", $"Vai saglabāt izmaiņas {SelectedDate:dd.MM.yyyy}?");
+if (!confirm)
+    return;
+
+    if (selectedItem == null) return;
+
+if (selectedItem.DateTo <= selectedItem.DateFrom)
+{
+    await JS.InvokeVoidAsync("alert", "Nepareizs laika intervāls");
+    return;
+}
+
+var model = new EmployeeWorkLogModel
+{
+    EmployeeID = selectedItem.EmployeeID,
+    WorkDate = SelectedDate,
+    TimeFrom = selectedItem.DateFrom.TimeOfDay,
+    TimeTo = selectedItem.DateTo.TimeOfDay,
+    BreakMinutes = selectedItem.BreakMinutes,
+    Notes = selectedItem.Notes,
+    Hours = (decimal)CalculatedHours()
+};
+
+await Http.PostAsJsonAsync("api/employeeworklog", model);
+
+// refresh Items (vienkāršais variants)
+var updated = await Http.GetFromJsonAsync<List<EmployeeWorkLogModel>>(
+    "api/employeeworklog/date/" + SelectedDate.ToString("yyyy-MM-dd")
+);
+
+Items = updated?
+    .Select(w => new EmployeeAvailabilityModel
+    {
+        EmployeeID = w.EmployeeID,
+        DateFrom = SelectedDate.Add(w.TimeFrom ?? TimeSpan.Zero),
+        DateTo = SelectedDate.Add(w.TimeTo ?? TimeSpan.Zero),
+        Hours = w.Hours ?? 0,
+        Notes = w.Notes,
+        BreakMinutes = w.BreakMinutes
+    })
+    .ToList() ?? new();
+
+
+showPopup = false;
+
+await JS.InvokeVoidAsync("alert", "Izmaiņas saglabātas");
+}
+
+protected override async Task OnInitializedAsync()
+{
+    calendar = await Http.GetFromJsonAsync<List<CompanyCalendarModel>>("api/companycalendar") ?? new();
+}
+
+double CalculatedHours()
+{
+    if (selectedItem == null)
+        return 0;
+
+    var total = (selectedItem.DateTo - selectedItem.DateFrom).TotalHours;
+
+    var breakHours = (selectedItem.BreakMinutes ?? 0) / 60.0;
+
+    return Math.Round(total - breakHours, 2);
+}
+
 
 }

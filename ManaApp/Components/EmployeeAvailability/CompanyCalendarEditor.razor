@@ -198,12 +198,16 @@ else
         calendar = await Http.GetFromJsonAsync<List<CompanyCalendarModel>>("api/companycalendar") ?? new();
         UpdateSelectedDay();
     }
-    private void OnDateChanged(ChangeEventArgs e)
-    {
-        selectedDate = DateTime.Parse(e.Value!.ToString()!);
-        UpdateSelectedDay();
-    }
+private async Task OnDateChanged(ChangeEventArgs e)
+{
+    selectedDate = DateTime.Parse(e.Value!.ToString()!);
+    UpdateSelectedDay();
 
+    await OnDateChangedCallback.InvokeAsync(selectedDate);
+}
+
+[Parameter]
+public EventCallback<DateTime> OnDateChangedCallback { get; set; }
 private string ToTimeString(TimeSpan? time)
 {
     return time.HasValue 
@@ -248,8 +252,13 @@ else
     existing.Notes = selectedDay.Notes;
 }
 
+    calendar = await Http.GetFromJsonAsync<List<CompanyCalendarModel>>("api/companycalendar") ?? new();
+
     UpdateSelectedDay();
+
     await JS.InvokeVoidAsync("alert", "Izmaiņas saglabātas");
+
+    await OnCalendarChanged.InvokeAsync();
 }
 
 private bool isDayOff
@@ -411,11 +420,13 @@ private async Task ApplyRange()
         }
     }
 
+    calendar = await Http.GetFromJsonAsync<List<CompanyCalendarModel>>("api/companycalendar") ?? new();
     UpdateSelectedDay();
 
     showRangePopup = false;
-
+    await OnCalendarChanged.InvokeAsync();
     await JS.InvokeVoidAsync("alert", "Izmaiņas periodam saglabātas");
+    
 }
 
 
@@ -452,5 +463,9 @@ private bool IsDbDayOff()
 {
     return calendar.Any(x => x.WorkDate.Date == selectedDate.Date && x.WorkStart == null);
 }
+
+[Parameter]
+public EventCallback OnCalendarChanged { get; set; }
+
 
 }

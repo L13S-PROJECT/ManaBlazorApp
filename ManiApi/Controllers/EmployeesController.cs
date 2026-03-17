@@ -51,7 +51,7 @@ public async Task<IActionResult> GetAll()
 
     await using var cmd = conn.CreateCommand();
     cmd.CommandText = @"
-SELECT ID, Employee_Name, WorkCentrTypeID
+SELECT ID, Employee_Name, Role, WorkCentrTypeID, WorkStart, WorkEnd, DefaultDailyHours
 FROM employees
 WHERE IsActive = 1
 ORDER BY Employee_Name;
@@ -63,11 +63,15 @@ ORDER BY Employee_Name;
     while (await r.ReadAsync())
     {
         list.Add(new
-        {
-            Id = r.GetInt32(0),
-            Name = r.GetString(1),
-            WorkCentrTypeID = r.IsDBNull(2) ? (int?)null : r.GetInt32(2)
-        });
+            {
+                Id = r.GetInt32(0),
+                Name = r.GetString(1),
+                Role = r.GetString(2),
+                WorkCentrTypeID = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
+                WorkStart = r.IsDBNull(4) ? (TimeSpan?)null : (TimeSpan?)r.GetValue(4),
+                WorkEnd = r.IsDBNull(5) ? (TimeSpan?)null : (TimeSpan?)r.GetValue(5),
+                DefaultDailyHours = r.GetDecimal(6)
+            });
     }
 
     return Ok(list);
