@@ -1,0 +1,430 @@
+@using ManaApp.Models
+@using ManaApp.Components.PriorityTasks
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+
+<div class="ea-panel-container @(EmployeeId == null ? "ea-panel-empty" : "ea-panel-active")">
+
+    <div class="ea-header">
+        <div>Pieejamība</div>
+        @if (EmployeeId != null)
+                {
+                    <button class="ea-btn-add"
+                            @onclick="AddNew"
+                            title="Pievienot jaunu ierakstu">
+                        + 
+                    </button>
+                }
+        </div>
+@if (!filtered.Any())
+{
+    <div class="ea-empty">Nav ierakstu</div>
+}
+
+@if (showForm && (newItem != null || editingItem != null))
+{
+<div class="ea-popup-overlay">
+    <div class="ea-popup">
+        <div class="ea-popup-header">
+           <div style="flex:1; text-align:center;">
+                @(Employees.FirstOrDefault(x => x.Id == EmployeeId)?.Name ?? "")
+            </div>
+
+            <button type="button"
+                    class="ea-btn info"
+                    title="Apskatīt piešķirtos darbus"
+                    @onclick="ShowTasks">
+                i
+            </button>
+        </div>
+    @{
+    var formItem = editingItem ?? newItem!;
+        }
+        <div class="ea-popup-body">
+            <div class="ea-row-horizontal">
+                <label>Veids:</label>
+
+                <select @bind="formItem.Status" @bind:after="OnStatusChanged">
+                    <option value="VACATION">Atvaļinājums</option>
+                    <option value="SICK">Slimības lapa</option>
+                    <option value="ABSENT">Brīvdiena</option>
+                </select>
+            </div>
+
+            <div class="ea-row-horizontal">
+                <label>Periods</label>
+
+
+<div class="ea-date-row">
+
+    <!-- FROM -->
+    <div class="ea-date-wrap">
+        <input type="date"
+               class="ea-date-hidden"
+               value="@formItem.DateFrom.ToString("yyyy-MM-dd")"
+               @onchange="e => formItem.DateFrom = DateTime.Parse(e.Value!.ToString()!)"
+               @ref="dateFromRef" />
+
+        <button type="button" class="ea-date-btn" @onclick="() => OpenDate(dateFromRef)">
+            📅
+        </button>
+
+        <span class="ea-date-text">
+            @formItem.DateFrom.ToString("dd.MM.yyyy")
+        </span>
+    </div>
+
+    <span>-</span>
+
+    <!-- TO -->
+    <div class="ea-date-wrap">
+        <input type="date"
+               class="ea-date-hidden"
+               value="@(formItem.DateTo?.ToString("yyyy-MM-dd"))"
+               @onchange="e => formItem.DateTo = string.IsNullOrEmpty(e.Value?.ToString()) ? null : DateTime.Parse(e.Value!.ToString()!)"
+               @ref="dateToRef" />
+
+        <button type="button" class="ea-date-btn" @onclick="() => OpenDate(dateToRef)">
+            📅
+        </button>
+
+        <span class="ea-date-text">
+            @(formItem.DateTo?.ToString("dd.MM.yyyy") ?? "—")
+        </span>
+    </div>
+
+</div>
+                </div>
+            </div>
+
+
+            <div class="ea-row">
+                <label>Komentārs</label>
+                <input type="text" @bind="formItem.Notes" />
+            </div>
+
+            <div class="ea-popup-footer">
+                @if (editingItem != null && CanDelete(editingItem))
+                    {
+                        <button class="ea-btn delete"
+                                title="Dzēst šo ierakstu"
+                                @onclick="Delete">
+                            Dzēst
+                        </button>
+                    }
+                <button class="ea-btn save" @onclick="async () => await Save()">Saglabāt</button>
+                <button class="ea-btn cancel" @onclick="() => CancelEdit()">Atcelt</button>
+            </div>
+        </div>
+</div>
+}
+
+<div class="ea-list">
+
+    <div class="ea-list-header">
+        <div>Veids</div>
+        <div>No</div>
+        <div>Līdz</div>
+        <div>Komentārs</div>
+        <div></div>
+    </div>
+
+    <div class="ea-list-body">
+
+    @foreach (var item in filtered)
+    {
+        var isOld = item.DateTo != null && item.DateTo < DateTime.Today;
+
+                <div class="ea-row-item @(isOld ? "ea-item-old" : "")">
+                    <div>@item.Status</div>
+                    <div>@item.DateFrom.ToShortDateString()</div>
+                    <div>@(item.DateTo?.ToShortDateString() ?? "-")</div>
+                    <div>@item.Notes</div>
+                    <div>
+                        <button @onclick="() => StartEditFull(item)">✏</button>
+                    </div>
+                </div>
+    }
+        </div>
+    </div>
+</div>
+
+
+@if (showTasksPopup && EmployeeId != null)
+{
+    <EmployeeLoadPopup
+        EmployeeId="EmployeeId.Value"
+        OnClose="() => showTasksPopup = false" />
+}
+
+@code {
+    [Parameter]
+    public int? EmployeeId { get; set; }
+
+    [Parameter]
+    public DateTime SelectedDate { get; set; }
+
+    [Parameter]
+    public List<EmployeeAvailabilityModel> Availability { get; set; } = new();
+
+    private List<EmployeeAvailabilityModel> filtered = new();
+    EmployeeAvailabilityModel? newItem;
+    bool showForm = false;
+    int? editingItemId = null;
+    DateTime? editingDateTo = null;
+protected override void OnParametersSet()
+{
+    newItem = null;
+    editingItem = null;
+    showForm = false;
+    editingItemId = null;
+    editingDateTo = null;
+
+    if (EmployeeId == null)
+    {
+        filtered = new();
+        return;
+    }
+
+    filtered = Availability
+        .Where(x => x.EmployeeID == EmployeeId)
+        .OrderBy(x => x.DateTo != null && x.DateTo < DateTime.Today ? 1 : 0)
+        .ThenByDescending(x => x.DateFrom)
+        .ToList();
+}
+
+void AddNew()
+{
+newItem = new EmployeeAvailabilityModel
+{
+    EmployeeID = EmployeeId ?? 0,
+    DateFrom = SelectedDate,
+    Status = "VACATION",
+    DateTo = null
+};
+
+    showForm = true;
+    editingItem = null;
+    editingItemId = null;
+}
+
+async Task SaveNew()
+{
+    if (newItem == null)
+        return;
+
+    if (newItem.DateFrom == default)
+    {
+        await JS.InvokeVoidAsync("alert", "Norādi sākuma datumu");
+        return;
+    }
+
+    if (newItem.Status != "SICK" && newItem.DateTo == null)
+    {
+        await JS.InvokeVoidAsync("alert", "Norādi beigu datumu");
+        return;
+    }
+
+    if (newItem.DateTo != null && newItem.DateTo < newItem.DateFrom)
+    {
+        await JS.InvokeVoidAsync("alert", "Nepareizs datumu intervāls");
+        return;
+    }
+
+    await Http.PostAsJsonAsync("api/employeeavailability", newItem);
+
+    Availability = await Http.GetFromJsonAsync<List<EmployeeAvailabilityModel>>(
+    "api/employeeavailability/range?from=2000-01-01&to=2100-01-01"
+) ?? new();
+
+    showForm = false;
+    newItem = null;
+    
+
+    OnParametersSet();
+}
+
+void OnStatusChanged()
+{
+    if (newItem == null)
+        return;
+
+    if (newItem.Status == "SICK")
+    {
+        newItem.DateTo = null;
+    }
+}
+
+void StartEdit(EmployeeAvailabilityModel item)
+{
+    editingItemId = item.ID;
+    editingDateTo = DateTime.Today;
+}
+
+async Task SaveClose(EmployeeAvailabilityModel item)
+{
+if (editingDateTo == null)
+    return;
+
+if (editingDateTo < item.DateFrom)
+{
+    await JS.InvokeVoidAsync("alert", "Beigu datums nevar būt pirms sākuma datuma");
+    return;
+}
+
+item.DateTo = editingDateTo;
+
+    await Http.PostAsJsonAsync("api/employeeavailability", item);
+
+    Availability = await Http.GetFromJsonAsync<List<EmployeeAvailabilityModel>>(
+        "api/employeeavailability/range?from=2000-01-01&to=2100-01-01"
+    ) ?? new();
+
+    editingItemId = null;
+    editingDateTo = null;
+
+    OnParametersSet();
+}
+void CancelEdit()
+{
+    editingItemId = null;
+    editingDateTo = null;
+    editingItem = null;
+    newItem = null;
+    showForm = false;
+}
+
+EmployeeAvailabilityModel? editingItem = null;
+
+void StartEditFull(EmployeeAvailabilityModel item)
+{
+    if (item.DateTo != null && item.DateTo < DateTime.Today)
+        return; // vecos neļaujam editēt
+
+    editingItem = new EmployeeAvailabilityModel
+    {
+        ID = item.ID,
+        EmployeeID = item.EmployeeID,
+        DateFrom = item.DateFrom,
+        DateTo = item.DateTo,
+        Status = item.Status,
+        Notes = item.Notes
+    };
+
+    newItem = null;
+    showForm = true;
+    editingItemId = null;
+}
+
+async Task Save()
+{
+    var item = editingItem ?? newItem;
+
+    if (item == null)
+        return;
+
+    if (item.DateFrom == default)
+    {
+        await JS.InvokeVoidAsync("alert", "Norādi sākuma datumu");
+        return;
+    }
+
+    if (item.Status != "SICK" && item.DateTo == null)
+    {
+        await JS.InvokeVoidAsync("alert", "Norādi beigu datumu");
+        return;
+    }
+
+    if (item.DateTo != null && item.DateTo < item.DateFrom)
+    {
+        await JS.InvokeVoidAsync("alert", "Nepareizs datumu intervāls");
+        return;
+    }
+
+    await Http.PostAsJsonAsync("api/employeeavailability", new
+            {
+                item.ID,
+                item.EmployeeID,
+                item.DateFrom,
+                item.DateTo,
+                item.Status,
+                item.Notes,
+                RemoveAssignedTasks = removeAssignedTasks
+            });
+
+    Availability = await Http.GetFromJsonAsync<List<EmployeeAvailabilityModel>>(
+        "api/employeeavailability/range?from=2000-01-01&to=2100-01-01"
+    ) ?? new();
+
+    showForm = false;
+    newItem = null;
+    editingItem = null;
+
+    OnParametersSet();
+}
+
+[Parameter]
+public List<EmployeeDto> Employees { get; set; } = new();
+
+bool removeAssignedTasks = false;
+
+bool CanDelete(EmployeeAvailabilityModel item)
+{
+    return (DateTime.Today - item.DateFrom).TotalDays <= 5;
+}
+
+async Task Delete()
+{
+    if (editingItem == null)
+        return;
+
+    var confirm = await JS.InvokeAsync<bool>("confirm", "Vai dzēst ierakstu?");
+    if (!confirm)
+        return;
+
+    await Http.DeleteAsync($"api/employeeavailability/{editingItem.ID}");
+
+    Availability = await Http.GetFromJsonAsync<List<EmployeeAvailabilityModel>>(
+        "api/employeeavailability/range?from=2000-01-01&to=2100-01-01"
+    ) ?? new();
+
+    showForm = false;
+    editingItem = null;
+
+    OnParametersSet();
+}
+
+bool showTasksPopup = false;
+void ShowTasks()
+{
+    showTasksPopup = true;
+}
+
+private ElementReference dateFromRef;
+private ElementReference dateToRef;
+
+async Task OpenDate(ElementReference input)
+{
+    await JS.InvokeVoidAsync("openDatePicker", input);
+}
+
+async Task OnRemoveTasksChanged(ChangeEventArgs e)
+{
+    var newValue = (bool)e.Value!;
+
+    if (newValue)
+    {
+        var confirm = await JS.InvokeAsync<bool>("confirm",
+            "Vai tiešām noņemt visus piešķirtos darbus šim darbiniekam?");
+
+        if (!confirm)
+            return;
+    }
+
+    removeAssignedTasks = newValue;
+}
+
+
+
+}

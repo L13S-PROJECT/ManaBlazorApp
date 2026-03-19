@@ -38,6 +38,7 @@ namespace ManiApi.Controllers
             existing.WorkEnd = model.WorkEnd;
             existing.BreakMinutes = model.BreakMinutes;
             existing.Notes = model.Notes;
+            existing.BreaksJson = model.BreaksJson;
         }
 
         await _context.SaveChangesAsync();

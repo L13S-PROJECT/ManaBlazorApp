@@ -2,8 +2,9 @@
 @inject HttpClient Http
 @inject IJSRuntime JS
 
-<h4>Pieejamības saraksts</h4>
+<div class="ea-container">
 
+<h4 class="ea-title">Darbinieku saraksts</h4>
 
 <table class="table ea-table">
 <thead>
@@ -13,18 +14,27 @@
         <th>Default End</th>
         <th>Actual Start</th>
         <th>Actual End</th>
-        <th>Hours</th>
-        <th>Notes</th>
+        <th>Stundas</th>
+        <th class="ea-col-availability">Pieejamība</th>
+        <th class="ea-col-notes">Piezīmes</th>
+        <th class="ea-col-actions"></th>
     </tr>
 </thead>
 <tbody>
 @foreach (var emp in Employees)
 {
+    var isUnavailable = IsUnavailable(emp.Id);
     var item = WorkLogs.FirstOrDefault(x => x.EmployeeID == emp.Id);
 
     var day = calendar.FirstOrDefault(x => x.WorkDate.Date == SelectedDate.Date);
     var isCustomDay = day != null;
-    var isDayOff = day == null || day.WorkStart == null || day.WorkEnd == null;
+
+    var isWeekend = SelectedDate.DayOfWeek == DayOfWeek.Saturday 
+                || SelectedDate.DayOfWeek == DayOfWeek.Sunday;
+
+    var isCompanyDayOff = day != null && (day.WorkStart == null || day.WorkEnd == null);
+
+    var isDayOff = isWeekend || isCompanyDayOff;
 
     var start = emp.WorkStart;
     var end = isDayOff
@@ -33,24 +43,45 @@
         ? day?.WorkEnd
         : emp.WorkEnd;
 
-    var breakMin = item?.BreakMinutes ?? (day?.BreakMinutes ?? 60);
-
     var startTime = item?.TimeFrom ?? start ?? TimeSpan.Zero;
     var endTime = item?.TimeTo ?? end ?? TimeSpan.Zero;
 
-    var hours = isDayOff
-    ? 0
-    : (endTime - startTime).TotalHours - (breakMin / 60.0);
+double hours = 0;
+
+if (!isDayOff)
+{
+    var total = (endTime - startTime).TotalHours;
+
+var breaksList = GetBreaksForDay();
+
+    double breakHours = 0;
+
+    foreach (var b in breaksList)
+    {
+        if (startTime <= b.To && endTime >= b.From)
+        {
+            var overlapStart = startTime > b.From ? startTime : b.From;
+            var overlapEnd = endTime < b.To ? endTime : b.To;
+
+            breakHours += (overlapEnd - overlapStart).TotalHours;
+        }
+    }
+
+    hours = total - breakHours;
+}
 
 <tr class="ea-row 
-    @(isDayOff && item == null ? "ea-row-off" : "")
+    @(isUnavailable ? "ea-row-unavailable" : "")
+    @(isDayOff ? "ea-row-off" : "")
     @(item != null ? "ea-row-modified" : "")
     @(selectedEmployeeId == emp.Id ? "ea-row-selected" : "")"
-    @onclick="() => { selectedEmployeeId = emp.Id; OpenEdit(emp, item); }">
+    style="cursor: default;"
+    @onclick="() => OnEmployeeSelected(emp.Id)">
+
     <td class="ea-emp">@emp.Name</td>
 
-<td class="ea-def-start @(item != null ? "ea-old" : "")">@start?.ToString(@"hh\:mm")</td>
-<td class="ea-def-end @(item != null ? "ea-old" : "")">@end?.ToString(@"hh\:mm")</td>
+<td class="ea-def-start @((item != null || isUnavailable) ? "ea-old" : "")">@start?.ToString(@"hh\:mm")</td>
+<td class="ea-def-end @((item != null || isUnavailable) ? "ea-old" : "")">@end?.ToString(@"hh\:mm")</td>
 <td class="ea-act-start">
 @(item?.TimeFrom != null 
     ? item.TimeFrom.Value.ToString(@"hh\:mm") 
@@ -63,15 +94,30 @@
     : "")
 </td>
 
-<td class="ea-hours">
+<td class="ea-hours @(isUnavailable ? "ea-old" : "")">
     @Math.Max(0, Math.Round(hours, 2))
 </td>
-    <td class="ea-notes">@item?.Notes</td>
+
+<td class="ea-availability ea-col-availability">
+    @(GetAvailabilityText(emp.Id))
+</td>
+
+    <td class="ea-notes ea-col-notes">
+        @item?.Notes</td>
+    <td class="ea-col-actions">
+    <button class="ea-btn-edit"
+        title="Labot ierakstu"
+            @onclick:stopPropagation="true"
+            @onclick="() => { selectedEmployeeId = emp.Id; OpenEdit(emp, item); }">
+        <span class="ea-icon-edit">✎</span>
+    </button>
+</td>
 </tr>
 
 }
 </tbody>
 </table>
+</div>
 
 @if (showPopup && selectedEmployee != null && selectedItem != null)
 {
@@ -87,6 +133,13 @@
 {
     <div style="color:red; font-weight:bold; margin-bottom:10px;">
         ⚠ Uzņēmumā šī diena ir brīvdiena
+    </div>
+}
+
+@if (selectedEmployee != null && IsUnavailable(selectedEmployee.Id))
+{
+    <div style="color:#b45309; font-weight:bold; margin-bottom:10px;">
+        ⚠ Darbinieks nav pieejams (@GetAvailabilityText(selectedEmployee.Id))
     </div>
 }
 
@@ -141,14 +194,7 @@
     </div>
 
     <div>
-        <label>
-            <input type="checkbox" @bind="useDefaultBreak" />
-            Standarta pārtraukums
-        </label>
-
-        <input type="number" class="steps-input" 
-               @bind="selectedItem.BreakMinutes"
-               disabled="@(useDefaultBreak)" />
+ Šeit varētu būt pārtraukumu iestatījumi
     </div>
 
     <div>
@@ -176,7 +222,7 @@
     </div>
 }
 
-<button class="btn btn-primary" @onclick="AddAvailability">Add Availability</button>
+
 
 @code {
     [Parameter]
@@ -187,7 +233,8 @@ public List<EmployeeDto> Employees { get; set; } = new();
 public DateTime SelectedDate { get; set; }
 private List<CompanyCalendarModel> calendar = new();
 private bool _useDefaultBreak = true;
-
+[Parameter]
+public List<EmployeeAvailabilityModel> Availability { get; set; } = new();
 int? selectedEmployeeId;
 bool useDefaultBreak
 {
@@ -272,7 +319,7 @@ selectedItem = new EmployeeWorkLogModel
 
     showPopup = true;
     useDefaultBreak = true;
-    isCompanyDayOff = day == null || day.WorkStart == null || day.WorkEnd == null;
+    isCompanyDayOff = day != null && (day.WorkStart == null || day.WorkEnd == null);
 }
 
 async Task Save()
@@ -327,10 +374,117 @@ double CalculatedHours()
 
     var total = (SelectedDate.Add(selectedItem.TimeTo ?? TimeSpan.Zero) - SelectedDate.Add(selectedItem.TimeFrom ?? TimeSpan.Zero)).TotalHours;
 
-    var breakHours = (selectedItem.BreakMinutes ?? 0) / 60.0;
+var breaksList = GetBreaksForDay();
 
-    return Math.Round(total - breakHours, 2);
+double breakHours = 0;
+
+var start = selectedItem.TimeFrom ?? TimeSpan.Zero;
+var end = selectedItem.TimeTo ?? TimeSpan.Zero;
+
+foreach (var b in breaksList)
+{
+    if (start <= b.To && end >= b.From)
+    {
+        var overlapStart = start > b.From ? start : b.From;
+        var overlapEnd = end < b.To ? end : b.To;
+
+        breakHours += (overlapEnd - overlapStart).TotalHours;
+    }
 }
 
+return Math.Round(total - breakHours, 2);
+}
+
+bool IsUnavailable(int employeeId)
+{
+    return Availability.Any(a =>
+        a.EmployeeID == employeeId &&
+        a.DateFrom <= SelectedDate &&
+        (a.DateTo == null || a.DateTo >= SelectedDate)
+    );
+}
+
+[Parameter]
+public EventCallback<int?> OnEmployeeSelectedCallback { get; set; }
+
+private async Task OnEmployeeSelected(int id)
+{
+    if (selectedEmployeeId == id)
+        selectedEmployeeId = null;
+    else
+        selectedEmployeeId = id;
+
+    await OnEmployeeSelectedCallback.InvokeAsync(selectedEmployeeId);
+}
+
+string GetAvailabilityText(int employeeId)
+{
+    var a = Availability.FirstOrDefault(x =>
+        x.EmployeeID == employeeId &&
+        x.DateFrom <= SelectedDate &&
+        (x.DateTo == null || x.DateTo >= SelectedDate));
+
+    if (a == null)
+        return "";
+
+    return a.Status switch
+    {
+        "VACATION" => "Atvaļinājums",
+        "SICK" => "Slimības lapa",
+        "ABSENT" => "Brīvdiena",
+        _ => a.Status
+    };
+}
+
+private List<BreakItem> breaks = new()
+{
+    new BreakItem(new TimeSpan(10,0,0), new TimeSpan(10,15,0)),
+    new BreakItem(new TimeSpan(12,0,0), new TimeSpan(12,30,0)),
+    new BreakItem(new TimeSpan(15,0,0), new TimeSpan(15,15,0))
+};
+
+class BreakItem
+{
+    public TimeSpan From { get; set; }
+    public TimeSpan To { get; set; }
+
+    public BreakItem(TimeSpan from, TimeSpan to)
+    {
+        From = from;
+        To = to;
+    }
+}
+
+List<BreakItem> GetBreaksForDay()
+{
+    var day = calendar.FirstOrDefault(x => x.WorkDate.Date == SelectedDate.Date);
+
+    if (!string.IsNullOrEmpty(day?.BreaksJson))
+    {
+        var parsed = System.Text.Json.JsonSerializer.Deserialize<List<BreakDto>>(day.BreaksJson);
+
+        if (parsed != null)
+        {
+            return parsed.Select(x => new BreakItem(
+                TimeSpan.Parse(x.From),
+                TimeSpan.Parse(x.To)
+            )).ToList();
+        }
+    }
+
+    // fallback (ja nav DB)
+    return new()
+    {
+        new BreakItem(new TimeSpan(10,0,0), new TimeSpan(10,15,0)),
+        new BreakItem(new TimeSpan(12,0,0), new TimeSpan(12,30,0)),
+        new BreakItem(new TimeSpan(15,0,0), new TimeSpan(15,15,0))
+    };
+}
+
+class BreakDto
+{
+    public string From { get; set; } = "";
+    public string To { get; set; } = "";
+}
 
 }

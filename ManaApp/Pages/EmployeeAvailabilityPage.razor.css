@@ -1,0 +1,25 @@
+.ea-page {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.ea-calendar {
+    flex-shrink: 0;
+}
+
+.ea-table-block {
+    flex-shrink: 0;
+}
+
+.ea-bottom {
+    flex: 1;
+    min-height: 0;
+}
+
+.ea-page {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    gap: 10px; /* ← šis ir tas "gaiss" */
+}

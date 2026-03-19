@@ -4,27 +4,48 @@
 @using ManaApp.Components.EmployeeAvailability
 @inject HttpClient Http
 
-<CompanyCalendarEditor 
-    OnDateChangedCallback="OnCalendarDateChanged"
-    OnCalendarChanged="OnCalendarChanged" />
+<div class="ea-page">
 
-<EmployeeAvailabilityTable 
-    WorkLogs="workLogs"  
-    Employees="employees"
-    SelectedDate="selectedDate" />
+    <div class="ea-calendar">
+        <CompanyCalendarEditor 
+            OnDateChangedCallback="OnCalendarDateChanged"
+            OnCalendarChanged="OnCalendarChanged" />
+    </div>
 
+    <div class="ea-table-block">
+        <EmployeeAvailabilityTable 
+            WorkLogs="workLogs"  
+            Employees="employees"
+            Availability="availability"
+            SelectedDate="selectedDate"
+            OnEmployeeSelectedCallback="OnEmployeeSelected" />
+    </div>
+
+    <div class="ea-bottom">
+        <EmployeeAvailabilityPanel
+            EmployeeId="selectedEmployeeId"
+            SelectedDate="selectedDate"
+            Availability="availability"
+            Employees="employees" />
+    </div>
+
+</div>
 
 @code {
 
 private List<EmployeeDto> employees = new();
     
 private List<EmployeeWorkLogModel> workLogs = new();
-
+private List<EmployeeAvailabilityModel> availability = new();
 private async Task LoadData()
 {
     workLogs = await Http.GetFromJsonAsync<List<EmployeeWorkLogModel>>(
         "api/employeeworklog/date/" + selectedDate.ToString("yyyy-MM-dd")
     ) ?? new();
+
+availability = await Http.GetFromJsonAsync<List<EmployeeAvailabilityModel>>(
+    "api/employeeavailability/range?from=2000-01-01&to=2100-01-01"
+) ?? new();
 
 }
 protected override async Task OnInitializedAsync()
@@ -46,6 +67,13 @@ private DateTime selectedDate = DateTime.Today;
 private async Task OnCalendarChanged()
 {
     await LoadData();
+}
+
+private int? selectedEmployeeId;
+
+private void OnEmployeeSelected(int? id)
+{
+    selectedEmployeeId = id;
 }
 
 }

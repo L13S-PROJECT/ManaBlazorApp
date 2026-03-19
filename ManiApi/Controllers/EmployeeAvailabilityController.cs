@@ -21,7 +21,7 @@ namespace ManiApi.Controllers
         public async Task<IActionResult> GetRange(DateTime from, DateTime to)
         {
             var data = await _db.EmployeeAvailabilities
-                .Where(x => x.DateFrom <= to && x.DateTo >= from)
+                .Where(x => x.DateFrom <= to && (x.DateTo == null || x.DateTo >= from))
                 .ToListAsync();
 
             return Ok(data);
@@ -52,5 +52,20 @@ namespace ManiApi.Controllers
 
             return Ok();
         }
+
+        [HttpDelete("{id}")]
+            public async Task<IActionResult> Delete(int id)
+            {
+                var item = await _db.EmployeeAvailabilities.FindAsync(id);
+
+                if (item == null)
+                    return NotFound();
+
+                _db.EmployeeAvailabilities.Remove(item);
+
+                await _db.SaveChangesAsync();
+
+                return Ok();
+            }
     }
 }

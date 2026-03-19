@@ -27,6 +27,7 @@ namespace ManiApi.Data
         public DbSet<ManiApi.Models.WorkCenter> WorkCentrs { get; set; }
         public DbSet<ManiApi.Models.StockMovement> StockMovements { get; set; }
         public DbSet<StageStepTypeMap> StageStepTypeMaps { get; set; }
+        public DbSet<CompanyCalendarBreak> CompanyCalendarBreaks { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
 
         

@@ -16,9 +16,15 @@
         📅
     </button>
 
-    <span class="cc-date-text">
+<div class="cc-date-main">
+    <div class="cc-date-day">
+        @selectedDate.ToString("dddd")
+    </div>
+
+    <div class="cc-date-text">
         @selectedDate.ToString("dd.MM.yyyy")
-    </span>
+    </div>
+</div>
 
 </div>
 
@@ -78,9 +84,31 @@ else
 </div>
 </div>
 
-        <div>
-            <label>Pārtraukums (min):</label>   
-            <input type="number" @bind="selectedDay.BreakMinutes" style="width:60px;" />
+        <div class="cc-breaks">
+            <label>Pārtraukumi:</label>
+
+            @foreach (var b in breaks)
+            {
+                <div class="cc-break-row">
+                    <input type="number" min="0" max="23"
+                        value="@b.From.Hours"
+                        @onchange="e => UpdateBreak(b, true, int.Parse(e.Value!.ToString()!))" />
+                    :
+                    <input type="number" min="0" max="59"
+                        value="@b.From.Minutes"
+                        @onchange="e => UpdateBreakMinutes(b, true, int.Parse(e.Value!.ToString()!))" />
+
+                    -
+
+                    <input type="number" min="0" max="23"
+                        value="@b.To.Hours"
+                        @onchange="e => UpdateBreak(b, false, int.Parse(e.Value!.ToString()!))" />
+                    :
+                    <input type="number" min="0" max="59"
+                        value="@b.To.Minutes"
+                        @onchange="e => UpdateBreakMinutes(b, false, int.Parse(e.Value!.ToString()!))" />
+                </div>
+            }
         </div>
 </div>
 </div>
@@ -237,6 +265,13 @@ if (!confirm)
         selectedDay.WorkEnd = null;
     }
 
+selectedDay.BreaksJson = System.Text.Json.JsonSerializer.Serialize(
+    breaks.Select(b => new {
+        From = b.From.ToString(@"hh\:mm"),
+        To = b.To.ToString(@"hh\:mm")
+    })
+);
+
     await Http.PostAsJsonAsync("api/companycalendar", selectedDay);
 var existing = calendar.FirstOrDefault(x => x.WorkDate.Date == selectedDay.WorkDate.Date);
 
@@ -250,6 +285,7 @@ else
     existing.WorkEnd = selectedDay.WorkEnd;
     existing.BreakMinutes = selectedDay.BreakMinutes;
     existing.Notes = selectedDay.Notes;
+    existing.BreaksJson = selectedDay.BreaksJson;
 }
 
     calendar = await Http.GetFromJsonAsync<List<CompanyCalendarModel>>("api/companycalendar") ?? new();
@@ -313,7 +349,36 @@ private void UpdateSelectedDay()
                 selectedDay.BreakMinutes = 60;
             }
     }
+
+if (!string.IsNullOrEmpty(selectedDay.BreaksJson))
+{
+    var parsed = System.Text.Json.JsonSerializer.Deserialize<List<BreakDto>>(selectedDay.BreaksJson);
+
+    if (parsed != null)
+    {
+        breaks = parsed.Select(x => new BreakItem(
+            TimeSpan.Parse(x.From),
+            TimeSpan.Parse(x.To)
+        )).ToList();
+    }
 }
+else
+{
+    breaks = new()
+    {
+        new BreakItem(new TimeSpan(10,0,0), new TimeSpan(10,15,0)),
+        new BreakItem(new TimeSpan(12,0,0), new TimeSpan(12,30,0)),
+        new BreakItem(new TimeSpan(15,0,0), new TimeSpan(15,15,0))
+    };
+}
+}
+
+class BreakDto
+{
+    public string From { get; set; } = "";
+    public string To { get; set; } = "";
+}
+
 private async Task Reset()
 {
     if (selectedDay == null)
@@ -333,6 +398,19 @@ private async Task Reset()
         selectedDay.WorkEnd = new TimeSpan(17, 0, 0);
         selectedDay.BreakMinutes = 60;
         isDayOff = false;
+        breaks = new()
+{
+    new BreakItem(new TimeSpan(10,0,0), new TimeSpan(10,15,0)),
+    new BreakItem(new TimeSpan(12,0,0), new TimeSpan(12,30,0)),
+    new BreakItem(new TimeSpan(15,0,0), new TimeSpan(15,15,0))
+};
+
+selectedDay.BreaksJson = System.Text.Json.JsonSerializer.Serialize(
+    breaks.Select(b => new {
+        From = b.From.ToString(@"hh\:mm"),
+        To = b.To.ToString(@"hh\:mm")
+    })
+);
 
         await Http.PostAsJsonAsync("api/companycalendar", selectedDay);
     }
@@ -347,9 +425,22 @@ private double GetWorkingHours(CompanyCalendarModel day)
 
     var total = (day.WorkEnd.Value - day.WorkStart.Value).TotalHours;
 
-    var breakHours = (day.BreakMinutes ?? 0) / 60.0;
+var breaksList = breaks;
 
-    return total - breakHours;
+double breakHours = 0;
+
+foreach (var b in breaksList)
+{
+    if (day.WorkStart <= b.To && day.WorkEnd >= b.From)
+    {
+        var overlapStart = day.WorkStart.Value > b.From ? day.WorkStart.Value : b.From;
+        var overlapEnd = day.WorkEnd.Value < b.To ? day.WorkEnd.Value : b.To;
+
+        breakHours += (overlapEnd - overlapStart).TotalHours;
+    }
+}
+
+return total - breakHours;
 }
 
 private bool isRangeMode = false;
@@ -396,14 +487,20 @@ private async Task ApplyRange()
             selectedDay.BreakMinutes = null;
         }
 
-        var day = new CompanyCalendarModel
-        {
-            WorkDate = date,
-            WorkStart = isDayOffRange ? null : selectedDay?.WorkStart,
-            WorkEnd = isDayOffRange ? null : selectedDay?.WorkEnd,
-            BreakMinutes = isDayOffRange ? null : selectedDay?.BreakMinutes,
-            Notes = existing?.Notes ?? selectedDay?.Notes
-        };
+var day = new CompanyCalendarModel
+{
+    WorkDate = date,
+    WorkStart = isDayOffRange ? null : selectedDay?.WorkStart,
+    WorkEnd = isDayOffRange ? null : selectedDay?.WorkEnd,
+    BreakMinutes = isDayOffRange ? null : selectedDay?.BreakMinutes,
+    Notes = existing?.Notes ?? selectedDay?.Notes,
+    BreaksJson = System.Text.Json.JsonSerializer.Serialize(
+        breaks.Select(b => new {
+            From = b.From.ToString(@"hh\:mm"),
+            To = b.To.ToString(@"hh\:mm")
+        })
+    )
+};
 
         await Http.PostAsJsonAsync("api/companycalendar", day);
 
@@ -417,6 +514,7 @@ private async Task ApplyRange()
             existing.WorkEnd = day.WorkEnd;
             existing.BreakMinutes = day.BreakMinutes;
             existing.Notes = day.Notes;
+            existing.BreaksJson = day.BreaksJson;
         }
     }
 
@@ -466,6 +564,41 @@ private bool IsDbDayOff()
 
 [Parameter]
 public EventCallback OnCalendarChanged { get; set; }
+
+private List<BreakItem> breaks = new()
+{
+    new BreakItem(new TimeSpan(10,0,0), new TimeSpan(10,15,0)),
+    new BreakItem(new TimeSpan(12,0,0), new TimeSpan(12,30,0)),
+    new BreakItem(new TimeSpan(15,0,0), new TimeSpan(15,15,0))
+};
+
+class BreakItem
+{
+    public TimeSpan From { get; set; }
+    public TimeSpan To { get; set; }
+
+    public BreakItem(TimeSpan from, TimeSpan to)
+    {
+        From = from;
+        To = to;
+    }
+}
+
+void UpdateBreak(BreakItem b, bool isFrom, int hour)
+{
+    if (isFrom)
+        b.From = new TimeSpan(hour, b.From.Minutes, 0);
+    else
+        b.To = new TimeSpan(hour, b.To.Minutes, 0);
+}
+
+void UpdateBreakMinutes(BreakItem b, bool isFrom, int min)
+{
+    if (isFrom)
+        b.From = new TimeSpan(b.From.Hours, min, 0);
+    else
+        b.To = new TimeSpan(b.To.Hours, min, 0);
+}
 
 
 }

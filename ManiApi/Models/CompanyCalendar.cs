@@ -18,6 +18,8 @@ namespace ManiApi.Models
 
         [Column("BreakMinutes")]
         public int? BreakMinutes { get; set; }
+        [Column("BreaksJson")]
+        public string? BreaksJson { get; set; }
 
         [Column("Notes")]
         public string? Notes { get; set; }
