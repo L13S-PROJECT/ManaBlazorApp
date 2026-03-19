@@ -1,7 +1,7 @@
 /* Galvenā rinda */
 .cc-row {
     display: flex;
-    align-items: center;
+    align-items: stretch;
     gap: 8px;
 
     padding: 6px 8px;
@@ -16,18 +16,41 @@
     width: 100%;
 }
 
+.cc-hours {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
 
 .cc-hours.hidden {
     visibility: hidden;
+}
+
+
+.cc-breaks {
+    flex: 1 1 auto;
 }
 
 /* Input vienots stils */
 .cc-row input {
     border: 1px solid #d1d5db;
     border-radius: 6px;
-    padding: 3px 6px;
-    font-size: 12px;
+    padding: 2px 4px;
+    font-size: 11px;
     text-align: center;
+}
+
+.cc-break-row input {
+    width: 28px;
+    height: 20px;       /* mazāks augstums */
+    font-size: 10px;    /* mazāki cipari */
+    padding: 0 2px;
+}
+
+.cc-time-group input {
+    width: 38px;
+    font-size: 11px;
+    padding: 2px 4px;
 }
 
 /* Fokus */
@@ -39,10 +62,11 @@
 
 /* Badge */
 .cc-badge {
-    padding: 2px 6px;
+    padding: 1px 5px;
     border-radius: 6px;
-    font-size: 11px;
+    font-size: 10px;
     text-align: center;
+    line-height: 1;
 }
 
 .cc-badge.default {
@@ -58,8 +82,8 @@
 /* Pogas */
 .cc-btn {
     border-radius: 6px;
-    padding: 4px 8px;
-    font-size: 12px;
+    padding: 2px 6px;
+    font-size: 11px;
     cursor: pointer;
     border: 1px solid #d1d5db;
 }
@@ -137,10 +161,13 @@
     gap: 2px;
 }
 
+
+
 .cc-day {
-    padding: 4px 8px;
+    padding: 1px 6px;
+    line-height: 1;
     border-radius: 6px;
-    font-size: 12px;
+    font-size: 11px;
     text-align: center;
 }
 
@@ -177,21 +204,6 @@
     z-index: 1000;
 }
 
-.cc-popup {
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-
-    min-width: 300px;
-}
-
-.cc-popup-title {
-    text-align: center;
-    margin-bottom: 15px;
-}
-
 .cc-popup-row {
     display: flex;
     align-items: center;
@@ -204,12 +216,6 @@
     font-size: 12px;
 }
 
-.cc-popup-actions {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    margin-top: 15px;
-}
 
 .cc-popup-date-block {
     display: flex;
@@ -218,15 +224,6 @@
     flex: 1;
 }
 
-.cc-popup-row {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-}
-
-.cc-row > div {
-    flex: 0 0 auto;
-}
 
 .cc-row input[type="text"] {
     flex: 1 1 auto;
@@ -234,24 +231,45 @@
     max-width: none;
 }
 
-.cc-hours-row {
+.cc-hours-row.cc-hours-row {
     display: flex;
-    align-items: center;
-    gap: 16px;
+    flex-direction: column;   /* šis saliek vienu zem otra */
+    align-items: flex-start;
+    gap: 6px;
 }
 
 .cc-actions {
-    margin-left: auto;
     display: flex;
-    gap: 8px;
+    align-items: flex-start;
+    gap: 6px;
+    margin-bottom: 2px;
+    height: auto;
 }
 
-.cc-row > div {
+.cc-actions .cc-btn {
+    flex: 1 1 0;
+}
+
+.cc-row > div:not(.cc-notes-actions) {
     flex: 0 0 auto;
 }
 
 .cc-notes {
-    flex: 1 1 auto !important;
+    flex: 1;
+
+    display: flex;
+    align-items: flex-start;
+    height: 100%;
+}
+
+.cc-notes input {
+    width: 100%;
+    height: 100%;
+
+    text-align: left;
+    padding: 4px 8px;
+
+    display: block;
 }
 
 .cc-date-main {
@@ -270,4 +288,318 @@
     font-size: 18px;   /* bija 12px */
     font-weight: 700;  /* bold */
     color: #111827;
+}
+
+.cc-break-row.inactive {
+    opacity: 0.7;
+    background-color: #f3f4f6;
+}
+
+.cc-breaks {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap; /* viena rinda */
+}
+
+.cc-break-row {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex: 0 0 auto;
+}
+
+.cc-dayoff-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 80px;
+    padding: 6px 10px;
+
+    border: 1px solid #e5e7eb; /* gaiši pelēks */
+    border-radius: 6px;
+
+    background: #f9fafb;
+
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.cc-status-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    height: 80px;              /* fiksēts augstums */
+    padding: 2px 6px;          /* MAZĀKS */
+
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #f9fafb;
+
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+
+    width: 110px;
+    flex: 0 0 110px;
+
+    gap: 1px;                  /* vēl mazāk */
+}
+
+.cc-status-type {
+    font-size: 11px;
+    line-height: 1.1;
+    height: 14px;          /* fiksē augstumu */
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.cc-status-hours {
+    font-size: 10px;
+    color: #374151;
+    line-height: 1;
+}
+
+.cc-time-box {
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #f9fafb;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+
+    padding: 6px 10px;
+}
+
+.cc-time-container {
+    display: flex;
+    align-items: center;   /* nevis column */
+    gap: 20px;
+    height: 80px;          /* fiksēts augstums */
+    padding: 4px 8px;      /* mazāks augstums */
+
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #f9fafb;
+    min-height: 48px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.cc-time-group label {
+    font-size: 11px;
+}
+
+.cc-time-row {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.cc-breaks-container {
+    display: flex;
+    align-items: center;   /* svarīgi — nelēkā augstums */
+    gap: 10px;
+    height: 80px;          /* fiksēts augstums */   
+    padding: 4px 8px;
+
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #f9fafb;
+
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.cc-breaks-left {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.cc-breaks-list {
+    display: flex;
+    flex-direction: column;   /* rindiņas viena zem otras */
+    gap: 4px;
+}
+
+.cc-break-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+input[type=number] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.cc-break-row input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+}
+
+.cc-btn-add {
+    padding: 2px 6px;
+    font-size: 11px;
+    border: 1px solid #9ca3af;
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.cc-btn-add:hover {
+    background: #f3f4f6;
+}
+
+.cc-btn-remove {
+    width: 18px;
+    height: 18px;
+
+    font-size: 11px;
+    line-height: 1;
+
+    border: 1px solid #d1d5db;
+    background: #f3f4f6;
+    color: #6b7280;
+
+    border-radius: 4px;
+    cursor: pointer;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 0;
+}
+
+.cc-btn-remove:hover {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.cc-notes-actions {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    height: 80px;
+    min-width: 260px;
+    flex: 1 1 auto;
+
+    padding: 0;
+}
+
+.cc-notes textarea {
+    width: 100%;
+    height: 100%;
+
+    resize: none;
+
+    text-align: left;
+    padding: 6px 8px;
+
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 11px;
+}
+
+.cc-popup-header {
+    font-size: 16px;
+    font-weight: 600;
+
+    padding: 12px 18px;
+
+    border-bottom: 2px solid #2563eb;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+
+    background: linear-gradient(
+        to right,
+        #eff6ff,
+        #ffffff
+    );
+
+    color: #1e3a8a;
+}
+
+.cc-popup-footer-wrapper {
+    padding: 12px 18px;
+    border-top: 1px solid #e5e7eb;
+    background: #f8fafc;
+
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* Pielietot */
+.cc-btn-save {
+    background: #dbeafe;
+    border: 1px solid #2563eb;
+    color: #1e40af;
+
+    height: 32px;
+    padding: 0 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.cc-btn-save:hover {
+    background: #bfdbfe;
+}
+
+/* Aizvērt */
+.cc-btn-close {
+    background: #ffffff;
+    border: 1px solid #2563eb;
+    color: #1e40af;
+
+    height: 32px;
+    padding: 0 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.cc-btn-close:hover {
+    background: #eff6ff;
+}
+
+.cc-popup-window {
+    background: white;
+    border-radius: 10px;
+
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+
+    min-width: 300px;
+
+    display: flex;
+    flex-direction: column;
+
+    overflow: hidden; /* VERY IMPORTANT */
+}
+
+.cc-popup-body {
+    padding: 16px 18px;
+    background: #ffffff;
+}
+
+.cc-notes-input {
+    width: 100%;
+    height: 60px;
+
+    padding: 6px 8px;
+
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+
+    font-size: 12px;
+    resize: none;
 }

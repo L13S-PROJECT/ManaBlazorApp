@@ -17,6 +17,8 @@ namespace ManiApi.Models
 
         public decimal? Hours { get; set; }
 
+        public string? BreaksJson { get; set; }
+
         public string? Notes { get; set; }
         public int? BreakMinutes { get; set; }
     }

@@ -30,8 +30,12 @@ namespace ManiApi.Controllers
         [HttpPost]
         public async Task<IActionResult> Save(EmployeeWorkLog model)
         {
-            var existing = await _db.EmployeeWorkLogs
-                .FirstOrDefaultAsync(x => x.EmployeeID == model.EmployeeID && x.WorkDate == model.WorkDate);
+        var workDate = model.WorkDate.Date;
+
+        var existing = await _db.EmployeeWorkLogs
+            .FirstOrDefaultAsync(x =>
+                x.EmployeeID == model.EmployeeID &&
+                x.WorkDate.Date == workDate);
 
             if (existing == null)
             {
@@ -42,11 +46,12 @@ namespace ManiApi.Controllers
 
                     model.Hours = hours - (breakMinutes / 60m);
                 }
-
+                model.WorkDate = workDate;
                 _db.EmployeeWorkLogs.Add(model);
             }
             else
             {
+                existing.WorkDate = workDate;
                 existing.TimeFrom = model.TimeFrom;
                 existing.TimeTo = model.TimeTo;
                 if (model.TimeFrom.HasValue && model.TimeTo.HasValue)
@@ -62,6 +67,7 @@ namespace ManiApi.Controllers
                     }
                 existing.Notes = model.Notes;
                 existing.BreakMinutes = model.BreakMinutes;
+                existing.BreaksJson = model.BreaksJson;
             }
 
             await _db.SaveChangesAsync();

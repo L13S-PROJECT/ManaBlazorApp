@@ -2,7 +2,6 @@
 @inject HttpClient Http
 @inject IJSRuntime JS
 
-<h4>Kalendārs</h4>
 <div class="cc-row">
 <div class="cc-date-wrap">
 
@@ -28,99 +27,34 @@
 
 </div>
 
-@if (calendar.Any(x => x.WorkDate.Date == selectedDate.Date))
-{
-    <span class="cc-badge custom">Pielāgots</span>
-}
-else
-{
-    <span class="cc-badge default">Standarta</span>
-}
+<div class="cc-status-box">
 
-@if (selectedDay != null)
-{
     <div>
-        @GetWorkingHours(selectedDay) h
+        @if (calendar.Any(x => x.WorkDate.Date == selectedDate.Date))
+        {
+            <span class="cc-badge custom">Pielāgots</span>
+        }
+        else
+        {
+            <span class="cc-badge default">Standarta</span>
+        }
     </div>
-}
 
-@if (selectedDay != null)
-{
-                <label title="Atzīmē, ja šī ir brīvdiena (darba laiks nav)">
-                    <input type="checkbox" @bind="isDayOff" disabled="@IsDbDayOff()" />
-                    Brīvdiena
-                </label>
-
-<div class="cc-hours @(isDayOff || IsDbDayOff() ? "hidden" : "")">
-    <div class="cc-hours-row">
-<div class="cc-time-group">
-    <label>Darba dienas sākums:</label>
-<div class="cc-time">
-    <input type="number" min="0" max="23"
-           value="@GetHours(selectedDay.WorkStart)"
-           @onchange="e => selectedDay.WorkStart = SetTime(int.Parse(e.Value!.ToString()!), GetMinutes(selectedDay.WorkStart))"
-           style="width:50px;" />
-    :
-    <input type="number" min="0" max="59"
-           value="@GetMinutes(selectedDay.WorkStart).ToString("D2")"
-           @onchange="e => selectedDay.WorkStart = SetTime(GetHours(selectedDay.WorkStart), int.Parse(e.Value!.ToString()!))"
-           style="width:50px;" />
-</div>
-</div>
-<div class="cc-time-group">       
-    <label>Darba dienas beigas:</label>
-<div class="cc-time">
-    <input type="number" min="0" max="23"
-           value="@GetHours(selectedDay.WorkEnd)"
-           @onchange="e => selectedDay.WorkEnd = SetTime(int.Parse(e.Value!.ToString()!), GetMinutes(selectedDay.WorkEnd))"
-           style="width:50px;" />
-
-    :
-
-    <input type="number" min="0" max="59"
-           value="@GetMinutes(selectedDay.WorkEnd).ToString("D2")"
-           @onchange="e => selectedDay.WorkEnd = SetTime(GetHours(selectedDay.WorkEnd), int.Parse(e.Value!.ToString()!))"
-           style="width:50px;" />
-</div>
-</div>
-
-        <div class="cc-breaks">
-            <label>Pārtraukumi:</label>
-
-            @foreach (var b in breaks)
-            {
-                <div class="cc-break-row">
-                    <input type="number" min="0" max="23"
-                        value="@b.From.Hours"
-                        @onchange="e => UpdateBreak(b, true, int.Parse(e.Value!.ToString()!))" />
-                    :
-                    <input type="number" min="0" max="59"
-                        value="@b.From.Minutes"
-                        @onchange="e => UpdateBreakMinutes(b, true, int.Parse(e.Value!.ToString()!))" />
-
-                    -
-
-                    <input type="number" min="0" max="23"
-                        value="@b.To.Hours"
-                        @onchange="e => UpdateBreak(b, false, int.Parse(e.Value!.ToString()!))" />
-                    :
-                    <input type="number" min="0" max="59"
-                        value="@b.To.Minutes"
-                        @onchange="e => UpdateBreakMinutes(b, false, int.Parse(e.Value!.ToString()!))" />
-                </div>
-            }
+    @if (selectedDay != null)
+    {
+        <div class="cc-status-hours">
+            @GetWorkingHours(selectedDay) h
         </div>
-</div>
-</div>
+    }
 
-@if (!isDayOff)
+    @if (!isDayOff)
 {
-    var isShortDay = selectedDay.WorkStart != new TimeSpan(8, 0, 0)
-                  || selectedDay.WorkEnd != new TimeSpan(17, 0, 0);
+    var isShortDay = selectedDay?.WorkStart != new TimeSpan(8, 0, 0)
+              || selectedDay?.WorkEnd != new TimeSpan(17, 0, 0);
 
     if (isShortDay)
     {
-        <div class="cc-day short">Saīsināta darba diena</div>
+        <div class="cc-day short">Saīsināta diena</div>
     }
     else
     {
@@ -131,86 +65,195 @@ else
 {
     <div class="cc-day off">Brīvdiena</div>
 }
-       
-<div class="cc-notes">
-    <input type="text" @bind="selectedDay.Notes" placeholder="Piezīmes..." />
+
 </div>
 
-<div class="cc-actions">
-    <div>
-        <button class="cc-btn save" @onclick="Save" title="Saglabāt izmaiņas">Saglabāt</button>
-    </div>
-
-    <div>
-        <button class="cc-btn range" @onclick="ToggleRangeMode" title="Iestatīt vairākām dienām">Periods</button>
-    </div>
-@if (showRangePopup)
+@if (selectedDay != null)
 {
-    <div class="cc-popup-overlay">
-        <div class="cc-popup">
-
-            <h3 class="cc-popup-title">Periods</h3>
- <div class="cc-popup-row">
-
-    <div class="cc-popup-date-block">
-        <label>No:</label>
-        <div class="cc-date-wrap">
-            <input type="date"
-                   class="cc-date-hidden"
-                   value="@rangeFrom.ToString("yyyy-MM-dd")"
-                   @onchange="OnRangeFromChanged"
-                   @ref="rangeFromRef" />
-
-            <button class="cc-date-btn" @onclick="OpenRangeFrom">📅</button>
-
-            <span class="cc-date-text">
-                @rangeFrom.ToString("dd.MM.yyyy")
-            </span>
-        </div>
+    <div class="cc-dayoff-box">
+        <label>
+            <input type="checkbox" @bind="isDayOff" />
+            Brīvdiena
+        </label>
     </div>
 
-    <div class="cc-popup-date-block">
-        <label>Līdz:</label>
-        <div class="cc-date-wrap">
-            <input type="date"
-                   class="cc-date-hidden"
-                   value="@rangeTo.ToString("yyyy-MM-dd")"
-                   @onchange="OnRangeToChanged"
-                   @ref="rangeToRef" />
-
-            <button class="cc-date-btn" @onclick="OpenRangeTo">📅</button>
-
-            <span class="cc-date-text">
-                @rangeTo.ToString("dd.MM.yyyy")
-            </span>
-        </div>
+<div class="cc-hours @(isDayOff || IsDbDayOff() ? "hidden" : "")">
+<div class="cc-time-container">  
+    <div class="cc-time-row"> 
+    <div class="cc-time-group">
+        <label>Darba dienas sākums:</label>
+            <div class="cc-time">
+                <input type="number" min="0" max="23"
+                    value="@GetHours(selectedDay.WorkStart)"
+                    @onchange="e => { selectedDay.WorkStart = SetTime(int.Parse(e.Value!.ToString()!), GetMinutes(selectedDay.WorkStart)); UpdateBreakActivity(); }"
+                    style="width:50px;" />
+                :
+                <input type="number" min="0" max="59"
+                    value="@GetMinutes(selectedDay.WorkStart).ToString("D2")"
+                    @onchange="e => { selectedDay.WorkStart = SetTime(GetHours(selectedDay.WorkStart), int.Parse(e.Value!.ToString()!)); UpdateBreakActivity(); }"
+                    style="width:50px;" />
+            </div>
     </div>
 
+    <div class="cc-time-group">       
+        <label>Darba dienas beigas:</label>
+            <div class="cc-time">
+                <input type="number" min="0" max="23"
+                    value="@GetHours(selectedDay.WorkEnd)"
+                    @onchange="e => { selectedDay.WorkEnd = SetTime(int.Parse(e.Value!.ToString()!), GetMinutes(selectedDay.WorkEnd)); UpdateBreakActivity(); }"
+                    style="width:50px;" />
+
+                :
+
+                <input type="number" min="0" max="59"
+                    value="@GetMinutes(selectedDay.WorkEnd).ToString("D2")"
+                    @onchange="e => { selectedDay.WorkEnd = SetTime(GetHours(selectedDay.WorkEnd), int.Parse(e.Value!.ToString()!)); UpdateBreakActivity(); }"
+                    style="width:50px;" />
+            </div>
+    </div>
+    </div>
+</div>
+<div class="cc-breaks-container">
+    <div class="cc-breaks-left">
+        <label>Pārtraukumi:</label>
+        <button class="cc-btn-add"
+        @onclick="AddBreak"
+        title="Pievienot jaunu pārtraukumu">
+    + pievienot
+</button>
+    </div>
+
+    <div class="cc-breaks-list">
+            @foreach (var b in breaks)
+            {
+                <div class="cc-break-item">
+                    <div class="cc-break-row @(b.IsActive ? "" : "inactive")">
+                        <input type="checkbox"
+                            @bind="b.IsActive"
+                            disabled="@(selectedDay?.WorkStart == null || selectedDay?.WorkEnd == null || b.From < selectedDay.WorkStart.Value || b.To > selectedDay.WorkEnd.Value)"
+                            @onclick:stopPropagation="true" />
+                        <input type="number" min="0" max="23"
+                            value="@b.From.Hours"
+                            @onchange="e => UpdateBreak(b, true, int.Parse(e.Value!.ToString()!))" />
+                        :
+                        <input type="number" min="0" max="59"
+                            value="@b.From.Minutes"
+                            @onchange="e => UpdateBreakMinutes(b, true, int.Parse(e.Value!.ToString()!))" />
+
+                        -
+
+                        <input type="number" min="0" max="23"
+                            value="@b.To.Hours"
+                            @onchange="e => UpdateBreak(b, false, int.Parse(e.Value!.ToString()!))" />
+                        :
+                        <input type="number" min="0" max="59"
+                            value="@b.To.Minutes"
+                            @onchange="e => UpdateBreakMinutes(b, false, int.Parse(e.Value!.ToString()!))" />
+                    </div>
+                    <button class="cc-btn-remove"
+                        @onclick="() => RemoveBreak(b)"
+                        @onclick:stopPropagation="true">
+                        ✕
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
 </div>
 
-            <div class="cc-popup-row">
-                <label>
-                    <input type="checkbox" @bind="isDayOff" />
-                    Brīvdiena
-                </label>
-                <label>Komentārs:</label>
-                <input type="text" @bind="selectedDay.Notes" style="width:100%;" />
-            </div>
+<div class="cc-notes-actions">
+            <div class="cc-actions">
+                
+                     <button class="cc-btn save" @onclick="Save" title="Saglabāt izmaiņas">Saglabāt</button>
+                
 
-            <div class="cc-popup-actions">
-                <button class="cc-btn save" @onclick="ApplyRange">Pielietot</button>
-                <button class="cc-btn reset" @onclick="() => showRangePopup = false">Aizvērt</button>
-            </div>
+                
+                    <button class="cc-btn range" @onclick="ToggleRangeMode" title="Iestatīt vairākām dienām">Periods</button>
+                
+    @if (showRangePopup)
+        {
+            <div class="cc-popup-overlay">
+                        <div class="cc-popup-window">
 
-        </div>
-    </div>
-}
-    <div>
-        <button class="cc-btn reset" @onclick="Reset"
-                title="Dzēš izmaiņas tikai šai dienai un atjauno standarta darba laiku">
-            Atjaunot
-        </button>
-    </div>
+                            <div class="cc-popup-header">
+                                Periods
+                            </div>
+            <div class="cc-popup-body">
+                <div class="cc-popup-row">
+                        <div class="cc-popup-date-block">
+                            <label>No:</label>
+                            <div class="cc-date-wrap">
+                                <input type="date"
+                                    class="cc-date-hidden"
+                                    value="@rangeFrom.ToString("yyyy-MM-dd")"
+                                    @onchange="OnRangeFromChanged"
+                                    @ref="rangeFromRef" />
+
+                                <button class="cc-date-btn" @onclick="OpenRangeFrom">📅</button>
+
+                                <span class="cc-date-text">
+                                    @rangeFrom.ToString("dd.MM.yyyy")
+                                </span>
+                            </div>
+                        </div>
+
+                    <div class="cc-popup-date-block">
+                        <label>Līdz:</label>
+                        <div class="cc-date-wrap">
+                            <input type="date"
+                                class="cc-date-hidden"
+                                value="@rangeTo.ToString("yyyy-MM-dd")"
+                                @onchange="OnRangeToChanged"
+                                @ref="rangeToRef" />
+
+                            <button class="cc-date-btn" @onclick="OpenRangeTo">📅</button>
+
+                            <span class="cc-date-text">
+                                @rangeTo.ToString("dd.MM.yyyy")
+                            </span>
+                        </div>
+                    </div>
+
+                </div>
+
+                        <div class="cc-popup-row">
+                            <label class="cc-checkbox-row">
+                                <input type="checkbox" @bind="isDayOff" />
+                                Brīvdiena
+                            </label>
+                        </div>
+
+                        <div class="cc-popup-row">
+                            <label>Komentārs:</label>
+                        </div>
+
+                        <div class="cc-popup-row">
+                            <input type="text" @bind="selectedDay!.Notes" class="cc-notes-input" />
+                        </div>
+                </div>
+                        <div class="cc-popup-footer-wrapper">
+                            <button class="cc-btn-save" @onclick="ApplyRange">Pielietot</button>
+                            <button class="cc-btn-close" @onclick="() => showRangePopup = false">Aizvērt</button>
+                        </div>
+                
+                </div>
+            </div>
+        }
+            
+                <button class="cc-btn reset" @onclick="Reset"
+                        title="Dzēš izmaiņas tikai šai dienai un atjauno standarta darba laiku">
+                    Atjaunot
+                </button>
+            
+            </div>
+    @if (selectedDay != null)
+        {     
+            <div class="cc-notes">
+                <textarea @bind="selectedDay.Notes" placeholder="Piezīmes..."></textarea>
+            </div>
+        }
+
+    
 </div>
 }
 
@@ -252,6 +295,7 @@ private TimeSpan? ParseTime(string? value)
 }
 private async Task Save()
 {
+    
     var confirm = await JS.InvokeAsync<bool>("confirm", "Vai saglabāt izmaiņas?");
 if (!confirm)
     return;
@@ -268,7 +312,8 @@ if (!confirm)
 selectedDay.BreaksJson = System.Text.Json.JsonSerializer.Serialize(
     breaks.Select(b => new {
         From = b.From.ToString(@"hh\:mm"),
-        To = b.To.ToString(@"hh\:mm")
+        To = b.To.ToString(@"hh\:mm"),
+        IsActive = b.IsActive
     })
 );
 
@@ -359,7 +404,10 @@ if (!string.IsNullOrEmpty(selectedDay.BreaksJson))
         breaks = parsed.Select(x => new BreakItem(
             TimeSpan.Parse(x.From),
             TimeSpan.Parse(x.To)
-        )).ToList();
+        )
+        {
+            IsActive = x.IsActive ?? true
+        }).ToList();
     }
 }
 else
@@ -377,6 +425,7 @@ class BreakDto
 {
     public string From { get; set; } = "";
     public string To { get; set; } = "";
+    public bool? IsActive { get; set; }
 }
 
 private async Task Reset()
@@ -408,7 +457,8 @@ private async Task Reset()
 selectedDay.BreaksJson = System.Text.Json.JsonSerializer.Serialize(
     breaks.Select(b => new {
         From = b.From.ToString(@"hh\:mm"),
-        To = b.To.ToString(@"hh\:mm")
+        To = b.To.ToString(@"hh\:mm"),
+        IsActive = b.IsActive
     })
 );
 
@@ -429,7 +479,7 @@ var breaksList = breaks;
 
 double breakHours = 0;
 
-foreach (var b in breaksList)
+foreach (var b in breaksList.Where(x => x.IsActive))
 {
     if (day.WorkStart <= b.To && day.WorkEnd >= b.From)
     {
@@ -576,7 +626,7 @@ class BreakItem
 {
     public TimeSpan From { get; set; }
     public TimeSpan To { get; set; }
-
+    public bool IsActive { get; set; } = true;
     public BreakItem(TimeSpan from, TimeSpan to)
     {
         From = from;
@@ -600,5 +650,39 @@ void UpdateBreakMinutes(BreakItem b, bool isFrom, int min)
         b.To = new TimeSpan(b.To.Hours, min, 0);
 }
 
+void UpdateBreakActivity()
+{
+    if (selectedDay?.WorkStart == null || selectedDay?.WorkEnd == null)
+        return;
+
+    var workStart = selectedDay.WorkStart.Value;
+    var workEnd = selectedDay.WorkEnd.Value;
+
+    foreach (var b in breaks)
+    {
+        var inRange =
+            b.From >= workStart &&
+            b.To <= workEnd;
+
+        // neko nedarām — tikai UI kontrolē disable
+    }
+}
+
+void AddBreak()
+{
+    var last = breaks.LastOrDefault();
+
+    var start = last?.To ?? (selectedDay?.WorkStart ?? new TimeSpan(8,0,0));
+
+    breaks.Add(new BreakItem(
+        start,
+        start.Add(new TimeSpan(0,15,0))
+    ));
+}
+
+void RemoveBreak(BreakItem b)
+{
+    breaks.Remove(b);
+}
 
 }
