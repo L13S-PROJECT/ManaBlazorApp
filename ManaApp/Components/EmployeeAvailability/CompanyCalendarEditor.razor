@@ -309,13 +309,13 @@ if (!confirm)
         selectedDay.WorkEnd = null;
     }
 
-selectedDay.BreaksJson = System.Text.Json.JsonSerializer.Serialize(
-    breaks.Select(b => new {
-        From = b.From.ToString(@"hh\:mm"),
-        To = b.To.ToString(@"hh\:mm"),
-        IsActive = b.IsActive
-    })
-);
+selectedDay.Breaks = breaks.Select(b => new CompanyCalendarBreakModel
+{
+    WorkDate = selectedDay.WorkDate,
+    BreakStart = b.From,
+    BreakEnd = b.To,
+    IsActive = b.IsActive
+}).ToList();
 
     await Http.PostAsJsonAsync("api/companycalendar", selectedDay);
 var existing = calendar.FirstOrDefault(x => x.WorkDate.Date == selectedDay.WorkDate.Date);
@@ -330,7 +330,6 @@ else
     existing.WorkEnd = selectedDay.WorkEnd;
     existing.BreakMinutes = selectedDay.BreakMinutes;
     existing.Notes = selectedDay.Notes;
-    existing.BreaksJson = selectedDay.BreaksJson;
 }
 
     calendar = await Http.GetFromJsonAsync<List<CompanyCalendarModel>>("api/companycalendar") ?? new();
@@ -395,20 +394,15 @@ private void UpdateSelectedDay()
             }
     }
 
-if (!string.IsNullOrEmpty(selectedDay.BreaksJson))
+if (selectedDay.Breaks != null && selectedDay.Breaks.Any())
 {
-    var parsed = System.Text.Json.JsonSerializer.Deserialize<List<BreakDto>>(selectedDay.BreaksJson);
-
-    if (parsed != null)
+    breaks = selectedDay.Breaks.Select(x => new BreakItem(
+        x.BreakStart,
+        x.BreakEnd
+    )
     {
-        breaks = parsed.Select(x => new BreakItem(
-            TimeSpan.Parse(x.From),
-            TimeSpan.Parse(x.To)
-        )
-        {
-            IsActive = x.IsActive ?? true
-        }).ToList();
-    }
+        IsActive = x.IsActive
+    }).ToList();
 }
 else
 {
@@ -419,13 +413,6 @@ else
         new BreakItem(new TimeSpan(15,0,0), new TimeSpan(15,15,0))
     };
 }
-}
-
-class BreakDto
-{
-    public string From { get; set; } = "";
-    public string To { get; set; } = "";
-    public bool? IsActive { get; set; }
 }
 
 private async Task Reset()
@@ -453,14 +440,6 @@ private async Task Reset()
     new BreakItem(new TimeSpan(12,0,0), new TimeSpan(12,30,0)),
     new BreakItem(new TimeSpan(15,0,0), new TimeSpan(15,15,0))
 };
-
-selectedDay.BreaksJson = System.Text.Json.JsonSerializer.Serialize(
-    breaks.Select(b => new {
-        From = b.From.ToString(@"hh\:mm"),
-        To = b.To.ToString(@"hh\:mm"),
-        IsActive = b.IsActive
-    })
-);
 
         await Http.PostAsJsonAsync("api/companycalendar", selectedDay);
     }
@@ -544,12 +523,13 @@ var day = new CompanyCalendarModel
     WorkEnd = isDayOffRange ? null : selectedDay?.WorkEnd,
     BreakMinutes = isDayOffRange ? null : selectedDay?.BreakMinutes,
     Notes = existing?.Notes ?? selectedDay?.Notes,
-    BreaksJson = System.Text.Json.JsonSerializer.Serialize(
-        breaks.Select(b => new {
-            From = b.From.ToString(@"hh\:mm"),
-            To = b.To.ToString(@"hh\:mm")
-        })
-    )
+    Breaks = breaks.Select(b => new CompanyCalendarBreakModel
+    {
+        WorkDate = date,
+        BreakStart = b.From,
+        BreakEnd = b.To,
+        IsActive = b.IsActive
+    }).ToList()
 };
 
         await Http.PostAsJsonAsync("api/companycalendar", day);
@@ -564,7 +544,6 @@ var day = new CompanyCalendarModel
             existing.WorkEnd = day.WorkEnd;
             existing.BreakMinutes = day.BreakMinutes;
             existing.Notes = day.Notes;
-            existing.BreaksJson = day.BreaksJson;
         }
     }
 
@@ -640,6 +619,28 @@ void UpdateBreak(BreakItem b, bool isFrom, int hour)
         b.From = new TimeSpan(hour, b.From.Minutes, 0);
     else
         b.To = new TimeSpan(hour, b.To.Minutes, 0);
+
+    if (b.From >= b.To)
+    {
+        b.To = b.From.Add(new TimeSpan(0, 15, 0));
+    }
+
+    // 🔥 OVERLAP FIX
+    foreach (var other in breaks.Where(x => x != b))
+    {
+        var overlap =
+            b.From < other.To &&
+            b.To > other.From;
+
+        if (overlap)
+        {
+            // nogriež līdz nākamā sākumam
+            if (isFrom)
+                b.From = other.To;
+            else
+                b.To = other.From;
+        }
+    }
 }
 
 void UpdateBreakMinutes(BreakItem b, bool isFrom, int min)
@@ -648,6 +649,27 @@ void UpdateBreakMinutes(BreakItem b, bool isFrom, int min)
         b.From = new TimeSpan(b.From.Hours, min, 0);
     else
         b.To = new TimeSpan(b.To.Hours, min, 0);
+
+    if (b.From >= b.To)
+    {
+        b.To = b.From.Add(new TimeSpan(0, 15, 0));
+    }
+
+    // 🔥 OVERLAP FIX
+    foreach (var other in breaks.Where(x => x != b))
+    {
+        var overlap =
+            b.From < other.To &&
+            b.To > other.From;
+
+        if (overlap)
+        {
+            if (isFrom)
+                b.From = other.To;
+            else
+                b.To = other.From;
+        }
+    }
 }
 
 void UpdateBreakActivity()
@@ -664,7 +686,8 @@ void UpdateBreakActivity()
             b.From >= workStart &&
             b.To <= workEnd;
 
-        // neko nedarām — tikai UI kontrolē disable
+        //GALVENAIS FIX
+        b.IsActive = inRange;
     }
 }
 
@@ -682,7 +705,7 @@ void AddBreak()
 
 void RemoveBreak(BreakItem b)
 {
-    breaks.Remove(b);
+    b.IsActive = false;
 }
 
 }

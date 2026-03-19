@@ -305,3 +305,31 @@ table {
 .ea-btn-edit:hover .ea-icon-edit {
     color: #111827;
 }
+
+.ea-break-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.ea-break-row input[type="number"] {
+    width: 32px;
+    height: 20px;
+
+    font-size: 10px;
+    padding: 0 2px;
+
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #f9fafb;
+}
+
+.ea-break-row input[type="checkbox"] {
+    margin-right: 4px;
+}
+
+.ea-break-disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}

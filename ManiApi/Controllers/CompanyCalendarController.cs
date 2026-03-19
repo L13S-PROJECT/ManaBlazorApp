@@ -19,28 +19,25 @@ namespace ManiApi.Controllers
         [HttpGet]
 public async Task<ActionResult<IEnumerable<CompanyCalendar>>> Get()
 {
-    var data = await _context.CompanyCalendars.ToListAsync();
-
-    var allBreaks = await _context.CompanyCalendarBreaks
-        .Where(x => x.IsActive)
-        .ToListAsync();
-
-    foreach (var day in data)
+var data = await _context.CompanyCalendars
+    .Select(day => new CompanyCalendar
     {
-        var breaks = allBreaks
-            .Where(x => x.WorkDate == day.WorkDate)
-            .Select(x => new
+        WorkDate = day.WorkDate,
+        WorkStart = day.WorkStart,
+        WorkEnd = day.WorkEnd,
+        BreakMinutes = day.BreakMinutes,
+        Notes = day.Notes,
+        Breaks = _context.CompanyCalendarBreaks
+            .Where(b => b.WorkDate == day.WorkDate)
+            .Select(b => new CompanyCalendarBreak
             {
-                From = x.BreakStart.ToString(@"hh\:mm"),
-                To = x.BreakEnd.ToString(@"hh\:mm")
-            })
-            .ToList();
-
-        if (breaks.Any())
-        {
-            day.BreaksJson = System.Text.Json.JsonSerializer.Serialize(breaks);
-        }
-    }
+                WorkDate = b.WorkDate,
+                BreakStart = b.BreakStart,
+                BreakEnd = b.BreakEnd,
+                IsActive = b.IsActive
+            }).ToList()
+    })
+    .ToListAsync();
 
     return Ok(data);
 }
@@ -61,39 +58,30 @@ public async Task<ActionResult<IEnumerable<CompanyCalendar>>> Get()
             existing.WorkEnd = model.WorkEnd;
             existing.BreakMinutes = model.BreakMinutes;
             existing.Notes = model.Notes;
-            existing.BreaksJson = model.BreaksJson;
         }
+// izdzēš vecos breakus
+var existingBreaks = _context.CompanyCalendarBreaks
+    .Where(x => x.WorkDate == model.WorkDate);
 
-        await _context.SaveChangesAsync();
+_context.CompanyCalendarBreaks.RemoveRange(existingBreaks);
 
-        if (!string.IsNullOrEmpty(model.BreaksJson))
-            {
-                var parsed = System.Text.Json.JsonSerializer.Deserialize<List<BreakDto>>(model.BreaksJson);
+// pievieno jaunus
+if (model.Breaks != null)
+{
+    foreach (var b in model.Breaks)
+    {
+        _context.CompanyCalendarBreaks.Add(new CompanyCalendarBreak
+        {
+            WorkDate = model.WorkDate,
+            BreakStart = b.BreakStart,
+            BreakEnd = b.BreakEnd,
+            IsActive = b.IsActive
+        });
+    }
+}
 
-                if (parsed != null)
-                {
-                    // izdzēš vecos breakus šai dienai
-                    var existingBreaks = _context.CompanyCalendarBreaks
-                        .Where(x => x.WorkDate == model.WorkDate);
-
-                    _context.CompanyCalendarBreaks.RemoveRange(existingBreaks);
-
-                    // pievieno jaunus
-                    foreach (var b in parsed)
-                    {
-                        _context.CompanyCalendarBreaks.Add(new CompanyCalendarBreak
-                        {
-                            WorkDate = model.WorkDate,
-                            BreakStart = TimeSpan.Parse(b.From),
-                            BreakEnd = TimeSpan.Parse(b.To),
-                            IsActive = b.IsActive
-                        });
-                    }
-
-                    await _context.SaveChangesAsync();
-                }
-            }
-        model.BreaksJson = null;
+await _context.SaveChangesAsync();
+    
         return Ok();   
     }
 

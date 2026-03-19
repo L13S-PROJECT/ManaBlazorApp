@@ -200,14 +200,13 @@ var breaksList = MergeBreaks(GetBreaksForDay(item));
     </label>
 </div>
 
-@if (!useDefaultBreak)
-{
-    <div>
-        <label>Pārtraukumi:</label>
+<div class="@(useDefaultBreak ? "ea-break-disabled" : "")">
+    <label>Pārtraukumi:</label>
 
         @foreach (var b in breaks)
-        {
-            <div class="cc-break-row">
+{
+    <div @key="b">
+            <div class="cc-break-row ea-break-row">
                 <input type="checkbox" checked="@b.IsActive"
                     @onchange="e => {
                         b.IsActive = (bool)e.Value!;
@@ -244,9 +243,10 @@ var breaksList = MergeBreaks(GetBreaksForDay(item));
                         StateHasChanged();
                     }" />
             </div>
+        </div>
         }
     </div>
-}
+
 
     <div>
         <label>Stundas:</label>
@@ -300,14 +300,7 @@ bool useDefaultBreak
             if (_useDefaultBreak)
             {
                 // noņem individuālos breakus → izmantos CompanyCalendar
-                selectedItem.BreaksJson = null;
-
-                breaks = GetBreaksForDay(selectedItem)
-                    .Select(b => new BreakItem(b.From, b.To)
-                    {
-                        IsActive = b.IsActive
-                    })
-                    .ToList();
+                   breaks = GetBreaksForDay(selectedItem);
             }
         }
 }
@@ -340,7 +333,10 @@ void OpenEdit(EmployeeDto emp, EmployeeWorkLogModel? item)
 
 if (item != null)
 {
-    selectedItem = item;
+    selectedItem = WorkLogs.FirstOrDefault(x =>
+        x.EmployeeID == item.EmployeeID &&
+        x.WorkDate.Date == item.WorkDate.Date
+    );
 }
     else
 {
@@ -373,34 +369,17 @@ selectedItem = new EmployeeWorkLogModel
             ? day?.BreakMinutes ?? 60
             : 60
 };
+
 }
 
-if (!string.IsNullOrEmpty(selectedItem?.BreaksJson))
-{
-    var parsed = System.Text.Json.JsonSerializer.Deserialize<List<BreakDto>>(selectedItem.BreaksJson);
+useDefaultBreak = true;
 
-    if (parsed != null)
-    {
-        breaks = parsed.Select(x => new BreakItem(
-            TimeSpan.Parse(x.From),
-            TimeSpan.Parse(x.To)
-        )
-        {
-            IsActive = x.IsActive ?? true
-        }).ToList();
-    }
-}
-else
-{
-    breaks = GetBreaksForDay(selectedItem)
+breaks = GetBreaksForDay(selectedItem)
     .Select(b => new BreakItem(b.From, b.To)
     {
         IsActive = b.IsActive
     })
     .ToList();
-}
-
-    useDefaultBreak = string.IsNullOrEmpty(selectedItem?.BreaksJson);
     showPopup = true;
     isCompanyDayOff = day != null && (day.WorkStart == null || day.WorkEnd == null);
 }
@@ -419,20 +398,6 @@ if (SelectedDate.Add(selectedItem.TimeTo ?? TimeSpan.Zero) <= SelectedDate.Add(s
     return;
 }
 
-if (useDefaultBreak)
-{
-    selectedItem.BreaksJson = null;
-}
-else
-{
-    selectedItem.BreaksJson = System.Text.Json.JsonSerializer.Serialize(
-        breaks.Select(b => new {
-            From = b.From.ToString(@"hh\:mm"),
-            To = b.To.ToString(@"hh\:mm"),
-            IsActive = b.IsActive
-        })
-    );
-}
 
 var model = new EmployeeWorkLogModel
 {
@@ -442,8 +407,7 @@ var model = new EmployeeWorkLogModel
     TimeTo = SelectedDate.Add(selectedItem.TimeTo ?? TimeSpan.Zero).TimeOfDay,
     BreakMinutes = selectedItem.BreakMinutes,
     Notes = selectedItem.Notes,
-    Hours = (decimal)CalculatedHours(),
-    BreaksJson = selectedItem.BreaksJson
+    Hours = (decimal)CalculatedHours()
 };
 
 await Http.PostAsJsonAsync("api/employeeworklog", model);
@@ -453,13 +417,8 @@ var updated = await Http.GetFromJsonAsync<List<EmployeeWorkLogModel>>(
     "api/employeeworklog/date/" + SelectedDate.ToString("yyyy-MM-dd")
 );
 
-WorkLogs = new List<EmployeeWorkLogModel>(updated ?? new());
-StateHasChanged();
+WorkLogs = updated ?? new();
 
-selectedItem = WorkLogs.FirstOrDefault(x =>
-    x.EmployeeID == selectedItem.EmployeeID &&
-    x.WorkDate.Date == SelectedDate.Date
-);
 
 showPopup = false;
 
@@ -470,15 +429,12 @@ protected override async Task OnParametersSetAsync()
 {
     calendar = await Http.GetFromJsonAsync<List<CompanyCalendarModel>>("api/companycalendar") ?? new();
 
-    if (selectedItem != null)
-{
-    breaks = GetBreaksForDay(selectedItem)
-        .Select(b => new BreakItem(b.From, b.To)
-        {
-            IsActive = b.IsActive
-        })
-        .ToList();
-}
+    // 🔥 JA popup ir atvērts → uzreiz refresh breakus
+    if (showPopup && selectedItem != null && useDefaultBreak)
+    {
+        breaks = GetBreaksForDay(selectedItem);
+        StateHasChanged();
+    }
 }
 
 double CalculatedHours()
@@ -604,8 +560,8 @@ class BreakItem
 
 List<BreakItem> GetBreaksForDay(EmployeeWorkLogModel? item)
 {
-    // 1. employee override
-    if (!string.IsNullOrEmpty(item?.BreaksJson))
+    // ja lieto individuālos → ņem tos
+    if (!_useDefaultBreak && !string.IsNullOrEmpty(item?.BreaksJson))
     {
         var parsed = System.Text.Json.JsonSerializer.Deserialize<List<BreakDto>>(item.BreaksJson);
 
@@ -621,26 +577,28 @@ List<BreakItem> GetBreaksForDay(EmployeeWorkLogModel? item)
         }
     }
 
-    // 2. company calendar
+    // citādi → VIENMĒR no company (live)
     var day = calendar.FirstOrDefault(x => x.WorkDate.Date == SelectedDate.Date);
 
-    if (!string.IsNullOrEmpty(day?.BreaksJson))
+if (day?.Breaks != null && day.Breaks.Any())
+{
+    var workStart = day.WorkStart ?? TimeSpan.Zero;
+    var workEnd = day.WorkEnd ?? TimeSpan.MaxValue;
+
+    return day.Breaks.Select(x =>
     {
-        var parsed = System.Text.Json.JsonSerializer.Deserialize<List<BreakDto>>(day.BreaksJson);
+        var inRange =
+            x.BreakStart >= workStart &&
+            x.BreakEnd <= workEnd;
 
-        if (parsed != null)
+        return new BreakItem(x.BreakStart, x.BreakEnd)
         {
-            return parsed.Select(x => new BreakItem(
-                TimeSpan.Parse(x.From),
-                TimeSpan.Parse(x.To)
-            )
-            {
-                IsActive = x.IsActive ?? true
-            }).ToList();
-        }
-    }
+            IsActive = inRange && x.IsActive
+        };
+    }).ToList();
+}
 
-    // 3. fallback
+    // fallback
     return new()
     {
         new BreakItem(new TimeSpan(10,0,0), new TimeSpan(10,15,0)),
