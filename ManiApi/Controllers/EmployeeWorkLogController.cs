@@ -74,5 +74,18 @@ namespace ManiApi.Controllers
 
             return Ok();
         }
+
+    [HttpDelete("date/{date}")]
+public async Task<IActionResult> DeleteByDate(DateTime date)
+{
+    var items = await _db.EmployeeWorkLogs
+        .Where(x => x.WorkDate.Date == date.Date)
+        .ToListAsync();
+
+    _db.EmployeeWorkLogs.RemoveRange(items);
+    await _db.SaveChangesAsync();
+
+    return Ok();
+}
     }
 }

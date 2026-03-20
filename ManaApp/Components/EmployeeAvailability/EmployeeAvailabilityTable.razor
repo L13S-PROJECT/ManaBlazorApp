@@ -1,3 +1,5 @@
+// EmployeeAvailabilityTable.razor - komponente, kas attēlo darbinieku sarakstu un viņu pieejamību konkrētā dienā
+
 @using ManaApp.Models
 @inject HttpClient Http
 @inject IJSRuntime JS
@@ -23,25 +25,44 @@
 <tbody>
 @foreach (var emp in Employees)
 {
-    var isUnavailable = IsUnavailable(emp.Id);
-    var item = WorkLogs.FirstOrDefault(x => x.EmployeeID == emp.Id);
-
+    var isUnavailable = IsUnavailable(emp.Id); 
+    var item = WorkLogs.FirstOrDefault(x => 
+            x.EmployeeID == emp.Id &&
+            x.WorkDate.Date == SelectedDate.Date
+        );
     var day = calendar.FirstOrDefault(x => x.WorkDate.Date == SelectedDate.Date);
-    var isCustomDay = day != null;
+    var isCustomDay = day != null 
+        && !day.UseEmployeeDefaults
+        && day.WorkStart != null 
+        && day.WorkEnd != null;
+
+    // 🔥 tikai TAGAD drīkst izmantot
+    if (!isCustomDay)
+    {
+        item = null;
+    }
 
     var isWeekend = SelectedDate.DayOfWeek == DayOfWeek.Saturday 
                 || SelectedDate.DayOfWeek == DayOfWeek.Sunday;
 
-    var isCompanyDayOff = day != null && (day.WorkStart == null || day.WorkEnd == null);
+var isDayOff = day != null
+    ? (!day.UseEmployeeDefaults && (day.WorkStart == null || day.WorkEnd == null))
+    : isWeekend;
 
-    var isDayOff = isWeekend || isCompanyDayOff;
+    var useCompany = day != null 
+            && !day.UseEmployeeDefaults 
+            && day.WorkStart != null 
+            && day.WorkEnd != null;
 
-    var start = emp.WorkStart;
-    var end = isDayOff
-    ? emp.WorkEnd
-    : isCustomDay
-        ? day?.WorkEnd
-        : emp.WorkEnd;
+    var useEmployeeDefaults = day == null || day.UseEmployeeDefaults;
+
+    var start = useEmployeeDefaults
+        ? emp.WorkStart
+        : day!.WorkStart ?? emp.WorkStart;
+
+    var end = useEmployeeDefaults
+        ? emp.WorkEnd
+        : day!.WorkEnd ?? emp.WorkEnd;
 
     var startTime = item?.TimeFrom ?? start ?? TimeSpan.Zero;
     var endTime = item?.TimeTo ?? end ?? TimeSpan.Zero;
@@ -284,6 +305,9 @@ public List<EmployeeDto> Employees { get; set; } = new();
 public DateTime SelectedDate { get; set; }
 private List<CompanyCalendarModel> calendar = new();
 private bool _useDefaultBreak = true;
+
+[Parameter]
+public List<CompanyCalendarModel> Calendar { get; set; } = new();
 [Parameter]
 public List<EmployeeAvailabilityModel> Availability { get; set; } = new();
 int? selectedEmployeeId;
@@ -340,12 +364,7 @@ if (item != null)
 }
     else
 {
-var isCustomDay = day != null &&
-    (
-        day.WorkStart != emp.WorkStart ||
-        day.WorkEnd != emp.WorkEnd ||
-        day.BreakMinutes != 60
-    );
+var isCustomDay = day != null && !day.UseEmployeeDefaults;
 var isDayOff = day != null && (day.WorkStart == null || day.WorkEnd == null);
 
 selectedItem = new EmployeeWorkLogModel
@@ -381,7 +400,9 @@ breaks = GetBreaksForDay(selectedItem)
     })
     .ToList();
     showPopup = true;
-    isCompanyDayOff = day != null && (day.WorkStart == null || day.WorkEnd == null);
+    isCompanyDayOff = day != null 
+            && (day.WorkStart == null || day.WorkEnd == null)
+            && !day.UseEmployeeDefaults;
 }
 
 async Task Save()
@@ -576,11 +597,9 @@ List<BreakItem> GetBreaksForDay(EmployeeWorkLogModel? item)
             }).ToList();
         }
     }
-
+var day = calendar.FirstOrDefault(x => x.WorkDate.Date == SelectedDate.Date);
     // citādi → VIENMĒR no company (live)
-    var day = calendar.FirstOrDefault(x => x.WorkDate.Date == SelectedDate.Date);
-
-if (day?.Breaks != null && day.Breaks.Any())
+ if (day?.Breaks != null && day.Breaks.Any() && !day.UseEmployeeDefaults)
 {
     var workStart = day.WorkStart ?? TimeSpan.Zero;
     var workEnd = day.WorkEnd ?? TimeSpan.MaxValue;
@@ -599,12 +618,11 @@ if (day?.Breaks != null && day.Breaks.Any())
 }
 
     // fallback
-    return new()
-    {
-        new BreakItem(new TimeSpan(10,0,0), new TimeSpan(10,15,0)),
-        new BreakItem(new TimeSpan(12,0,0), new TimeSpan(12,30,0)),
-        new BreakItem(new TimeSpan(15,0,0), new TimeSpan(15,15,0))
-    };
+return day?.Breaks?.Select(x => new BreakItem(x.BreakStart, x.BreakEnd)
+{
+    IsActive = x.IsActive
+}).ToList()
+?? new List<BreakItem>();
 }
 
 class BreakDto

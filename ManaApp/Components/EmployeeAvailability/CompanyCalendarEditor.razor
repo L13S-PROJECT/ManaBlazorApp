@@ -1,3 +1,5 @@
+// CompanyCalendarEditor.razor - komponente, kas ļauj rediģēt konkrētas dienas darba laiku,
+
 @using ManaApp.Models
 @inject HttpClient Http
 @inject IJSRuntime JS
@@ -77,7 +79,7 @@ else
         </label>
     </div>
 
-<div class="cc-hours @(isDayOff || IsDbDayOff() ? "hidden" : "")">
+<div class="cc-hours @(isDayOff ? "hidden" : "")">
 <div class="cc-time-container">  
     <div class="cc-time-row"> 
     <div class="cc-time-group">
@@ -303,11 +305,7 @@ if (!confirm)
     if (selectedDay == null)
         return;
 
-    if (isDayOff)
-    {
-        selectedDay.WorkStart = null;
-        selectedDay.WorkEnd = null;
-    }
+selectedDay.UseEmployeeDefaults = !isDayOff;
 
 selectedDay.Breaks = breaks.Select(b => new CompanyCalendarBreakModel
 {
@@ -374,45 +372,62 @@ private void UpdateSelectedDay()
     if (existing != null)
     {
         selectedDay = existing;
-        isDayOff = selectedDay.WorkStart == null || selectedDay.WorkEnd == null;
+
+        //  DB nosaka vai brīvdiena
+    var isWeekend = selectedDate.DayOfWeek == DayOfWeek.Saturday 
+                || selectedDate.DayOfWeek == DayOfWeek.Sunday;
+
+    isDayOff =
+        selectedDay.WorkStart == null &&
+        selectedDay.WorkEnd == null &&
+        !selectedDay.UseEmployeeDefaults;
+
+        //  JA ir UseEmployeeDefaults → piespied darba dienu UI
     }
-
-        else
-    {
-        selectedDay = new CompanyCalendarModel { WorkDate = selectedDate };
-
-        var isWeekend = selectedDate.DayOfWeek == DayOfWeek.Saturday 
-                    || selectedDate.DayOfWeek == DayOfWeek.Sunday;
-
-        isDayOff = isWeekend;
-
-            if (!isDayOff)
-            {
-                selectedDay.WorkStart = new TimeSpan(8, 0, 0);
-                selectedDay.WorkEnd = new TimeSpan(17, 0, 0);
-                selectedDay.BreakMinutes = 60;
-            }
-    }
-
-if (selectedDay.Breaks != null && selectedDay.Breaks.Any())
-{
-    breaks = selectedDay.Breaks.Select(x => new BreakItem(
-        x.BreakStart,
-        x.BreakEnd
-    )
-    {
-        IsActive = x.IsActive
-    }).ToList();
-}
 else
 {
-    breaks = new()
+    selectedDay = new CompanyCalendarModel { WorkDate = selectedDate };
+
+    var isWeekend = selectedDate.DayOfWeek == DayOfWeek.Saturday 
+                || selectedDate.DayOfWeek == DayOfWeek.Sunday;
+
+    isDayOff = isWeekend;
+    selectedDay.UseEmployeeDefaults = !isWeekend;
+
+    if (!isDayOff)
     {
-        new BreakItem(new TimeSpan(10,0,0), new TimeSpan(10,15,0)),
-        new BreakItem(new TimeSpan(12,0,0), new TimeSpan(12,30,0)),
-        new BreakItem(new TimeSpan(15,0,0), new TimeSpan(15,15,0))
-    };
+        selectedDay.WorkStart = new TimeSpan(8, 0, 0);
+        selectedDay.WorkEnd = new TimeSpan(17, 0, 0);
+        selectedDay.BreakMinutes = 60;
+    }
+    else
+    {
+        selectedDay.WorkStart = null;
+        selectedDay.WorkEnd = null;
+        selectedDay.BreakMinutes = null;
+    }
 }
+
+    // 🔥 BREAKI
+    if (selectedDay.Breaks != null && selectedDay.Breaks.Any())
+    {
+        breaks = selectedDay.Breaks.Select(x => new BreakItem(
+            x.BreakStart,
+            x.BreakEnd
+        )
+        {
+            IsActive = x.IsActive
+        }).ToList();
+    }
+    else
+    {
+        breaks = new()
+        {
+            new BreakItem(new TimeSpan(10,0,0), new TimeSpan(10,15,0)),
+            new BreakItem(new TimeSpan(12,0,0), new TimeSpan(12,30,0)),
+            new BreakItem(new TimeSpan(15,0,0), new TimeSpan(15,15,0))
+        };
+    }
 }
 
 private async Task Reset()
@@ -424,27 +439,21 @@ private async Task Reset()
     if (!confirm)
         return;
 
-    calendar.RemoveAll(x => x.WorkDate.Date == selectedDay.WorkDate.Date);
+        selectedDay.UseEmployeeDefaults = true;
+        selectedDay.WorkStart = null;
+        selectedDay.WorkEnd = null;
+        selectedDay.BreakMinutes = null;
+        selectedDay.Breaks = new List<CompanyCalendarBreakModel>();
+
+    await Http.PostAsJsonAsync("api/companycalendar", selectedDay);
+    await Http.DeleteAsync($"api/employeeworklog/date/{selectedDate:yyyy-MM-dd}");
+    calendar = await Http.GetFromJsonAsync<List<CompanyCalendarModel>>("api/companycalendar") ?? new();
 
     UpdateSelectedDay();
-
-    if (selectedDay != null)
-    {
-        selectedDay.WorkStart = new TimeSpan(8, 0, 0);
-        selectedDay.WorkEnd = new TimeSpan(17, 0, 0);
-        selectedDay.BreakMinutes = 60;
-        isDayOff = false;
-        breaks = new()
-{
-    new BreakItem(new TimeSpan(10,0,0), new TimeSpan(10,15,0)),
-    new BreakItem(new TimeSpan(12,0,0), new TimeSpan(12,30,0)),
-    new BreakItem(new TimeSpan(15,0,0), new TimeSpan(15,15,0))
-};
-
-        await Http.PostAsJsonAsync("api/companycalendar", selectedDay);
-    }
+    await OnCalendarChanged.InvokeAsync();
 
     await JS.InvokeVoidAsync("alert", "Diena atjaunota kā darba diena");
+    await OnCalendarChanged.InvokeAsync();
 }
 
 private double GetWorkingHours(CompanyCalendarModel day)

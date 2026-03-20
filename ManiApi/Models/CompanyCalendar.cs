@@ -24,5 +24,8 @@ namespace ManiApi.Models
 
         [NotMapped]
         public List<CompanyCalendarBreak> Breaks { get; set; } = new();
+        
+        [Column("UseEmployeeDefaults")]
+        public bool UseEmployeeDefaults { get; set; }
     }
 }

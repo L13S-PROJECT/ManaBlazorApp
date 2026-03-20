@@ -1,3 +1,5 @@
+// CompanyCalendarController.cs - API kontrolieris, kas apstrādā pieprasījumus saistībā ar uzņēmuma kalendāru (darba laiki, pārtraukumi)
+
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ManiApi.Data;
@@ -23,6 +25,7 @@ var data = await _context.CompanyCalendars
     .Select(day => new CompanyCalendar
     {
         WorkDate = day.WorkDate,
+        UseEmployeeDefaults = day.UseEmployeeDefaults,
         WorkStart = day.WorkStart,
         WorkEnd = day.WorkEnd,
         BreakMinutes = day.BreakMinutes,
@@ -58,6 +61,7 @@ var data = await _context.CompanyCalendars
             existing.WorkEnd = model.WorkEnd;
             existing.BreakMinutes = model.BreakMinutes;
             existing.Notes = model.Notes;
+            existing.UseEmployeeDefaults = model.UseEmployeeDefaults;
         }
 // izdzēš vecos breakus
 var existingBreaks = _context.CompanyCalendarBreaks

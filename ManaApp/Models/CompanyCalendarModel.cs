@@ -8,6 +8,7 @@ public class CompanyCalendarModel
     public int? BreakMinutes { get; set; }
     public string? Notes { get; set; }
     public List<CompanyCalendarBreakModel> Breaks { get; set; } = new();
+    public bool UseEmployeeDefaults { get; set; }
 }
 
 }
