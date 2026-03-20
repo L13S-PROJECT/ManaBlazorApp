@@ -9,7 +9,11 @@
 <div class="ea-panel-container @(EmployeeId == null ? "ea-panel-empty" : "ea-panel-active")">
 
     <div class="ea-header">
-        <div>Pieejamība</div>
+        <div>
+            @(EmployeeId != null 
+                ? $"Pieejamība - {Employees.FirstOrDefault(x => x.Id == EmployeeId)?.Name}" 
+                : "Pieejamība")
+        </div>
         @if (EmployeeId != null)
                 {
                     <button class="ea-btn-add"

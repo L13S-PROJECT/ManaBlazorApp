@@ -22,7 +22,8 @@
             Availability="availability"
             SelectedDate="selectedDate"
             Calendar="calendar"
-            OnEmployeeSelectedCallback="OnEmployeeSelected" />
+            OnEmployeeSelectedCallback="OnEmployeeSelected"
+            OnDataChanged="OnTableDataChanged" />
     </div>
 
     <div class="ea-bottom">
@@ -85,6 +86,11 @@ private int? selectedEmployeeId;
 private void OnEmployeeSelected(int? id)
 {
     selectedEmployeeId = id;
+}
+
+private async Task OnTableDataChanged()
+{
+    await LoadData();
 }
 
 }

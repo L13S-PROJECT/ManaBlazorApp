@@ -4,17 +4,35 @@
     border-top: 3px solid #2563eb;
     border-radius: 8px;
 
-    padding: 8px;
+    padding: 0px;
     height: 500px; /*augstums */
     display: flex;
     flex-direction: column;
 }
 
+.ea-table thead th {
+    background: #f1f5f9;      /* gaiši pelēks */
+    color: #1e293b;           /* tumšāks teksts */
+    font-weight: 600;
+
+    border-bottom: 2px solid #cbd5f5; /* neliels akcents */
+}
+
 .ea-title {
     font-size: 14px;
     font-weight: 600;
-    margin-bottom: 8px;
-    color: #1e3a8a;
+
+    padding: 10px 12px;
+
+    background: #2563eb;
+    color: white;
+
+    text-align: center;
+
+    /* 🔥 iziet līdz malām */
+    margin: -8px -8px 8px -8px;
+
+    border-radius: 8px 8px 0 0;
 }
 
 .ea-emp {
@@ -332,4 +350,24 @@ table {
 .ea-break-disabled {
     opacity: 0.5;
     pointer-events: none;
+}
+
+.ea-container {
+    padding: 0;          /*  noņem ārējo padding */
+    overflow: hidden;    /*  nogriež tukšumu */
+}
+
+.ea-table-wrapper {
+    flex: 1;             /*  aizpilda visu augstumu */
+    overflow-y: auto;    /*  scroll tikai saturam */
+}
+
+.ea-table {
+    margin: 0;           /*  noņem lieko atstarpi */
+}
+
+.ea-table td,
+.ea-table th {
+    vertical-align: middle;
+    padding: 2px 2px; /* mazliet vairāk gaiss */
 }

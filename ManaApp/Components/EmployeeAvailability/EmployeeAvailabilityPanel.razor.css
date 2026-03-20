@@ -3,11 +3,11 @@
 
 .ea-panel-container {
     background: white;
-    border: 1px solid #2563eb;
     border-top: 3px solid #2563eb;
-    border-radius: 8px;
+    border-radius: 6px;
+    overflow: hidden;
     font-size: 12px;
-    padding: 4px 8px 8px 8px;
+    padding: 0px;
     width: 100%;
     height: 100%;
     display: flex;
@@ -30,17 +30,6 @@
     color: #9ca3af;
 }
 
-
-.ea-btn-add {
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    border: 1px solid #2563eb;
-    background: #dbeafe;
-    color: #1e40af;
-    font-weight: bold;
-    cursor: pointer;
-}
 
 .ea-btn-add:hover {
     background: #bfdbfe;
@@ -342,9 +331,12 @@
 
     font-weight: 600;
     font-size: 13px;         /* mazāks teksts */
-    color: #1e3a8a;
-
     flex-shrink: 0;
+
+    background: #2563eb;   /* zils */
+    color: white;          /* balts teksts */
+    border-bottom: none;   /* noņem līniju */
+    border-radius: 6px 6px 0 0;
 }
 
 .ea-panel-empty {
@@ -356,16 +348,16 @@
 }
 
 .ea-btn-add {
-    width: 90px;
-    height: 24px;
+    width: 60px;
+    height: 20px;
 
     border-radius: 8px;
-    border: 2px solid #1e3a8a;
+    border: 2px solid white;
 
-    background: #2e8fde;
-    color: white;
+    background: white;
+    color: #2563eb;
 
-    font-size: 22px;
+    font-size: 18px;
     font-weight: 700;
 
     display: flex;
@@ -378,7 +370,8 @@
 }
 
 .ea-btn-add:hover {
-    background: #1f4ecf;
+    background: #dbeafe;
+    transform: scale(1.05); /* klikšķa sajūta */
 }
 
 .ea-list {
