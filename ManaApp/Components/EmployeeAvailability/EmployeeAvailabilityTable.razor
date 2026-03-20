@@ -1,4 +1,4 @@
-// EmployeeAvailabilityTable.razor - komponente, kas attēlo darbinieku sarakstu un viņu pieejamību konkrētā dienā
+@* EmployeeAvailabilityTable.razor - komponente, kas attēlo darbinieku sarakstu un viņu pieejamību konkrētā dienā *@
 
 @using ManaApp.Models
 @inject HttpClient Http
@@ -305,6 +305,8 @@ public List<EmployeeDto> Employees { get; set; } = new();
 public DateTime SelectedDate { get; set; }
 private List<CompanyCalendarModel> calendar = new();
 private bool _useDefaultBreak = true;
+[Parameter]
+public EventCallback OnDataChanged { get; set; }
 
 [Parameter]
 public List<CompanyCalendarModel> Calendar { get; set; } = new();

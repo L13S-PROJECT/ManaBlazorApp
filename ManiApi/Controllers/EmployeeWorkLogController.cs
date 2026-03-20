@@ -1,3 +1,6 @@
+
+// EmployeeWorkLogController.cs - API kontrolieris, kas apstrādā pieprasījumus saistībā ar darbinieku darba laikiem
+
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ManiApi.Data;
@@ -21,7 +24,7 @@ namespace ManiApi.Controllers
         public async Task<IActionResult> GetByDate(DateTime date)
         {
             var data = await _db.EmployeeWorkLogs
-                .Where(x => x.WorkDate.Date == date.Date)
+                .Where(x => x.WorkDate >= date.Date && x.WorkDate < date.Date.AddDays(1))
                 .ToListAsync();
 
             return Ok(data);
@@ -78,9 +81,9 @@ namespace ManiApi.Controllers
     [HttpDelete("date/{date}")]
 public async Task<IActionResult> DeleteByDate(DateTime date)
 {
-    var items = await _db.EmployeeWorkLogs
-        .Where(x => x.WorkDate.Date == date.Date)
-        .ToListAsync();
+var items = await _db.EmployeeWorkLogs
+    .Where(x => x.WorkDate >= date.Date && x.WorkDate < date.Date.AddDays(1))
+    .ToListAsync();
 
     _db.EmployeeWorkLogs.RemoveRange(items);
     await _db.SaveChangesAsync();

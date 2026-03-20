@@ -1,3 +1,5 @@
+@*EmployeeAvailabilityPanel.razor - komponente, kas ļauj redzēt un rediģēt konkrēta darbinieka pieejamību (atvaļinājumi, slimības lapas, brīvdienas) *@
+
 @using ManaApp.Models
 @using ManaApp.Components.PriorityTasks
 @inject HttpClient Http
@@ -17,10 +19,6 @@
                     </button>
                 }
         </div>
-@if (!filtered.Any())
-{
-    <div class="ea-empty">Nav ierakstu</div>
-}
 
 @if (showForm && (newItem != null || editingItem != null))
 {
@@ -122,6 +120,8 @@
 
 <div class="ea-list">
 
+@if (EmployeeId != null)
+{
     <div class="ea-list-header">
         <div>Veids</div>
         <div>No</div>
@@ -129,20 +129,27 @@
         <div>Komentārs</div>
         <div></div>
     </div>
+}
 
     <div class="ea-list-body">
+    @if (!filtered.Any())
+        {
+            <div class="ea-empty">Nav ierakstu</div>
+        }
 
     @foreach (var item in filtered)
     {
         var isOld = item.DateTo != null && item.DateTo < DateTime.Today;
 
                 <div class="ea-row-item @(isOld ? "ea-item-old" : "")">
-                    <div>@item.Status</div>
+                    <div>@GetStatusText(item.Status)</div>
                     <div>@item.DateFrom.ToShortDateString()</div>
                     <div>@(item.DateTo?.ToShortDateString() ?? "-")</div>
                     <div>@item.Notes</div>
                     <div>
-                        <button @onclick="() => StartEditFull(item)">✏</button>
+                        <button class="ea-btn-edit" @onclick="() => StartEditFull(item)">
+    ✎
+</button>
                     </div>
                 </div>
     }
@@ -425,6 +432,15 @@ async Task OnRemoveTasksChanged(ChangeEventArgs e)
     removeAssignedTasks = newValue;
 }
 
-
+string GetStatusText(string status)
+{
+    return status switch
+    {
+        "VACATION" => "Atvaļinājums",
+        "SICK" => "Slimības lapa",
+        "ABSENT" => "Brīvdiena",
+        _ => status
+    };
+}
 
 }
