@@ -22,7 +22,7 @@
     font-size: 14px;
     font-weight: 600;
 
-    padding: 10px 12px;
+    padding: 8px 8px;
 
     background: #2563eb;
     color: white;
@@ -37,7 +37,7 @@
 
 .ea-emp {
     font-weight: 600;
-    width: 180px;
+    width: 20%;
 }
 
 .ea-def-start,
@@ -49,7 +49,7 @@
 }
 
 .ea-hours {
-    width: 80px;
+    width: 70px;
     text-align: center;
 }
 
@@ -267,7 +267,7 @@ table {
 .ea-table td {
     border: 1px solid #e5e7eb;
     padding: 4px 6px; /* bija 8px */
-    font-size: 12px;
+    font-size: 11px;
 }
 
 
@@ -288,7 +288,7 @@ table {
 }
 
 .ea-col-availability {
-    width: 160px;
+    width: 110px;
     white-space: nowrap;
 }
 
@@ -370,4 +370,9 @@ table {
 .ea-table th {
     vertical-align: middle;
     padding: 2px 2px; /* mazliet vairāk gaiss */
+}
+
+.ea-table th {
+    font-size: 12px; /* nedaudz mazāks teksts */
+    text-align: center;
 }
