@@ -38,6 +38,7 @@ namespace ManaApp.Services
                         };
 
                     var detailTasks = tasks.Where(t => t.StepType == 1).ToList();
+                    result.HasDetailNotStarted = detailTasks.Any(t => t.Status == 5);
                     var assemblyTasks = tasks.Where(t => t.StepType == 2).ToList();
 
                     if (!detailTasks.Any())
@@ -289,36 +290,8 @@ else if (result.Status == "Procesā")
 // ASSEMBLY STATUS LOĢIKA
 // =======================
 
-if (!assemblyTasks.Any())
-{
-    result.AssemblyStatus = "-";
-}
-else
-{
-    var assemblyStatuses = assemblyTasks.Select(t => t.Status).ToList();
-
-    var detailStatuses = detailTasks.Select(t => t.Status).ToList();
-
-    // 🔴 GAIDA (ja Detail vēl nav gatavs)
-    if (detailStatuses.Any(s => s != 3))
-    {
-        result.AssemblyStatus = "Gaida";
-    }
-    // 🟡 PROCESĀ
-    else if (assemblyStatuses.Any(s => s == 2))
-    {
-        result.AssemblyStatus = "Procesā";
-    }
-    // 🟢 PABEIGTS
-    else if (assemblyStatuses.All(s => s == 3))
-    {
-        result.AssemblyStatus = "Pabeigts";
-    }
-    else
-    {
-        result.AssemblyStatus = "Gaida";
-    }
-}
+CalculateAssembly(result, tasks, detailTasks, calendarDict, startDate);
+CalculateFinishing(result, tasks, calendarDict, startDate);
 
     return result;
  }
@@ -328,101 +301,217 @@ private DateTime CalculateStepEnd(
     int stepRemaining,
     Dictionary<DateTime, CompanyCalendarModel> calendarDict)
 {
-    var remainingMinutes = stepRemaining;
-    var stepEnd = stepStart;
-        if (remainingMinutes <= 0)
-        return stepStart;
-    var safety = 0;
+            var remainingMinutes = stepRemaining;
+            var stepEnd = stepStart;
+                if (remainingMinutes <= 0)
+                return stepStart;
+            var safety = 0;
 
-while (remainingMinutes > 0)
-{
-    safety++;
-
-if (safety > 365)
-    throw new Exception($"Simulation overflow - stepStart={stepStart}, remaining={remainingMinutes}");
-
-    calendarDict.TryGetValue(stepEnd.Date, out var calendarDay);
-
-if (calendarDay == null || !calendarDay.WorkStart.HasValue || !calendarDay.WorkEnd.HasValue)
-{
-    var fallbackStart = stepEnd.Date.AddHours(8);
-    var fallbackEnd = stepEnd.Date.AddHours(17);
-
-    if (stepEnd < fallbackStart)
-        stepEnd = fallbackStart;
-
-    var fallbackMinutes = (int)(fallbackEnd - stepEnd).TotalMinutes;
-
-    if (fallbackMinutes <= 0)
-    {
-        stepEnd = stepEnd.Date.AddDays(1);
-        continue;
-    }
-
-    if (remainingMinutes <= fallbackMinutes)
-    {
-        stepEnd = stepEnd.AddMinutes(remainingMinutes);
-        remainingMinutes = 0;
-    }
-    else
-    {
-        remainingMinutes -= fallbackMinutes;
-        stepEnd = stepEnd.Date.AddDays(1);
-    }
-
-    continue;
-}
-
-        var workStart = stepEnd.Date.Add(calendarDay.WorkStart.Value);
-        var workEnd = stepEnd.Date.Add(calendarDay.WorkEnd.Value);
-
-        if (stepEnd < workStart)
+        while (remainingMinutes > 0)
         {
-            stepEnd = workStart;
-        }
-        else if (stepEnd >= workEnd)
+            safety++;
+
+        if (safety > 365)
+            throw new Exception($"Simulation overflow - stepStart={stepStart}, remaining={remainingMinutes}");
+
+            calendarDict.TryGetValue(stepEnd.Date, out var calendarDay);
+
+        if (calendarDay == null || !calendarDay.WorkStart.HasValue || !calendarDay.WorkEnd.HasValue)
         {
-            stepEnd = stepEnd.Date.AddDays(1);
+            var fallbackStart = stepEnd.Date.AddHours(8);
+            var fallbackEnd = stepEnd.Date.AddHours(17);
+
+            if (stepEnd < fallbackStart)
+                stepEnd = fallbackStart;
+
+            var fallbackMinutes = (int)(fallbackEnd - stepEnd).TotalMinutes;
+
+            if (fallbackMinutes <= 0)
+            {
+                stepEnd = stepEnd.Date.AddDays(1);
+                continue;
+            }
+
+            if (remainingMinutes <= fallbackMinutes)
+            {
+                stepEnd = stepEnd.AddMinutes(remainingMinutes);
+                remainingMinutes = 0;
+            }
+            else
+            {
+                remainingMinutes -= fallbackMinutes;
+                stepEnd = stepEnd.Date.AddDays(1);
+            }
+
             continue;
         }
 
-        var availableMinutes = Math.Max(0, (int)(workEnd - stepEnd).TotalMinutes);
+                var workStart = stepEnd.Date.Add(calendarDay.WorkStart.Value);
+                var workEnd = stepEnd.Date.Add(calendarDay.WorkEnd.Value);
 
-        if (calendarDay.Breaks != null && calendarDay.Breaks.Any())
-        {
-            foreach (var br in calendarDay.Breaks.Where(b => b.IsActive))
-            {
-                var breakStart = stepEnd.Date.Add(br.BreakStart);
-                var breakEnd = stepEnd.Date.Add(br.BreakEnd);
-
-                if (stepEnd >= breakStart && stepEnd < breakEnd)
+                if (stepEnd < workStart)
                 {
-                    stepEnd = breakEnd;
+                    stepEnd = workStart;
+                }
+                else if (stepEnd >= workEnd)
+                {
+                    stepEnd = stepEnd.Date.AddDays(1);
+                    continue;
+                }
+
+                var availableMinutes = Math.Max(0, (int)(workEnd - stepEnd).TotalMinutes);
+
+                if (calendarDay.Breaks != null && calendarDay.Breaks.Any())
+                {
+                    foreach (var br in calendarDay.Breaks.Where(b => b.IsActive))
+                    {
+                        var breakStart = stepEnd.Date.Add(br.BreakStart);
+                        var breakEnd = stepEnd.Date.Add(br.BreakEnd);
+
+                        if (stepEnd >= breakStart && stepEnd < breakEnd)
+                        {
+                            stepEnd = breakEnd;
+                        }
+                    }
+
+                    availableMinutes = (int)(workEnd - stepEnd).TotalMinutes;
+                }
+
+                if (availableMinutes <= 0)
+                {
+                    stepEnd = stepEnd.Date.AddDays(1);
+                    continue;
+                }
+
+                if (remainingMinutes <= availableMinutes)
+                {
+                    stepEnd = stepEnd.AddMinutes(remainingMinutes);
+                    remainingMinutes = 0;
+                }
+                else
+                {
+                    remainingMinutes -= availableMinutes;
+                    stepEnd = stepEnd.Date.AddDays(1);
                 }
             }
 
-            availableMinutes = (int)(workEnd - stepEnd).TotalMinutes;
-        }
+            return stepEnd;
+}
 
-        if (availableMinutes <= 0)
-        {
-            stepEnd = stepEnd.Date.AddDays(1);
-            continue;
-        }
+private void CalculateAssembly(
+    DetailResult result,
+    List<TaskDto> tasks,
+    List<TaskDto> detailTasks,
+    Dictionary<DateTime, CompanyCalendarModel> calendarDict,
+    DateTime startDate)
+{
+    var assemblyTasks = tasks.Where(t => t.StepType == 2).ToList();
 
-        if (remainingMinutes <= availableMinutes)
+    if (!assemblyTasks.Any())
+    {
+        result.AssemblyStatus = "-";
+        result.AssemblyTimeText = "-";
+        return;
+    }
+
+    var assemblyStatuses = assemblyTasks.Select(t => t.Status).ToList();
+    var detailStatuses = detailTasks.Select(t => t.Status).ToList();
+
+    // 🔴 DETAIL nav gatavs (ir status 5)
+    if (detailStatuses.Any(s => s == 5))
+    {
+        result.AssemblyStatus = "Gaida";
+
+        var totalMinutes = assemblyTasks.Sum(t => t.EstimatedTotalMinutes);
+
+        var d = totalMinutes / (8 * 60);
+        var h = (totalMinutes % (8 * 60)) / 60;
+        var m = totalMinutes % 60;
+
+        result.AssemblyTimeText = totalMinutes == 0
+            ? "-"
+            : $"{d}d {h}h {m}m";
+
+        return;
+    }
+
+    // 🟢 PABEIGTS
+    if (assemblyStatuses.All(s => s == 3))
+    {
+        result.AssemblyStatus = "Pabeigts";
+
+        var finishedAssembly = assemblyTasks
+            .Where(t => t.Status == 3 && t.FinishedAt != null)
+            .Select(t => t.FinishedAt!.Value)
+            .ToList();
+
+        if (finishedAssembly.Any())
         {
-            stepEnd = stepEnd.AddMinutes(remainingMinutes);
-            remainingMinutes = 0;
+            var lastAssemblyDate = finishedAssembly.Max();
+            result.AssemblyFinishDate = lastAssemblyDate;
+            result.AssemblyTimeText = lastAssemblyDate.ToString("dd.MM.yyyy");
         }
         else
         {
-            remainingMinutes -= availableMinutes;
-            stepEnd = stepEnd.Date.AddDays(1);
+            result.AssemblyTimeText = "-";
         }
+
+        return;
     }
 
-    return stepEnd;
+    // 🟡 PROCESĀ
+    if (assemblyStatuses.Any(s => s == 2))
+    {
+        result.AssemblyStatus = "Procesā";
+
+        var assemblyStarted = assemblyTasks
+            .Where(t => t.Status != 5 && t.FinishedAt != null)
+            .Select(t => t.FinishedAt!.Value)
+            .ToList();
+
+        var assemblyStartDate = assemblyStarted.Any()
+            ? assemblyStarted.Max()
+            : DateTime.Today;
+
+        var totalRemaining = assemblyTasks
+            .Sum(t => Math.Max(0, t.EstimatedTotalMinutes - t.ActualMinutes));
+
+        var finishDate = CalculateStepEnd(assemblyStartDate, totalRemaining, calendarDict);
+
+        result.AssemblyFinishDate = finishDate;
+        result.AssemblyTimeText = finishDate.ToString("dd.MM.yyyy");
+
+        return;
+    }
+
+    // 🔵 GAIDA (detail procesā vai pabeigts)
+    result.AssemblyStatus = "Gaida";
+
+    var detailStartPoint = result.FinishDate ?? startDate;
+
+    var remaining = assemblyTasks
+        .Sum(t => Math.Max(0, t.EstimatedTotalMinutes - t.ActualMinutes));
+
+    var assemblyFinish = CalculateStepEnd(detailStartPoint, remaining, calendarDict);
+
+    result.AssemblyFinishDate = assemblyFinish;
+    result.AssemblyTimeText = assemblyFinish.ToString("dd.MM.yyyy");
+}
+
+private void CalculateFinishing(
+    DetailResult result,
+    List<TaskDto> tasks,
+    Dictionary<DateTime, CompanyCalendarModel> calendarDict,
+    DateTime startDate)
+{
+    var finishingTasks = tasks.Where(t => t.StepType == 3).ToList();
+
+    if (!finishingTasks.Any())
+    {
+        return;
+    }
+
+    // TODO: te nāks FINISHING loģika
 }
 
 public async Task<List<EmployeeWorkLogModel>> GetEmployeeWorkLog(DateTime from, DateTime to)
@@ -498,6 +587,13 @@ public class DetailResult
     public string? AssemblyStatus { get; set; }
     public string? AssemblyTimeText { get; set; }
     public DateTime? AssemblyFinishDate { get; set; }
-}
+    public bool HasDetailNotStarted { get; set; }
+
+    // FINISHING
+    public string? FinishingStatus { get; set; }
+    public string? FinishingTimeText { get; set; }
+    public DateTime? FinishingFinishDate { get; set; }
+    }
+
     }
 }

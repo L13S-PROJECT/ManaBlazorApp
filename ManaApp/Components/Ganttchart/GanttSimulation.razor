@@ -24,7 +24,7 @@
         <div class="cell finishing" style="grid-column: span 6;">Finishing</div>
 
     </div>
-
+    
         <div class="header-row bottom">
             <div class="cell">Batch</div>
             <div class="cell">Nosaukums</div>
@@ -76,9 +76,11 @@
 
         <div class="cell">@detail.FinishDateText</div>
 
-<!-- pārējie pagaidām tukši -->
-            <div class="cell"></div>
-            <div class="cell"></div>
+<!-- Assembly posms -->
+        <div class="cell">@detail.AssemblyStatus</div>
+        <div class="cell @GetAssemblyClass(detail)">@detail.AssemblyTimeText</div>
+
+<!-- Finishing posms -->
 
             <div class="cell"></div>
             <div class="cell"></div>
@@ -125,10 +127,12 @@
             .ThenBy(x => x.Priority)
             .ToList();
         
-        var allTasksOrdered = allTasks
-            .OrderBy(t => t.BatchProductId)
-            .ThenBy(t => t.StepOrder)
-            .ToList();
+var allTasksOrdered = allTasks
+    .OrderByDescending(t => t.IsPriority)
+    .ThenBy(t => t.Priority)
+    .ThenBy(t => t.BatchProductId)
+    .ThenBy(t => t.StepOrder)
+    .ToList();
 
 var allDetails = await Service.CalculateDetailGlobal(allTasksOrdered, ordered);
 
@@ -183,7 +187,23 @@ foreach (var step in availableSteps)
 }
 
     }
+private string GetAssemblyClass(GanttSimulationService.DetailResult detail)
+{
+    // 🔘 pelēks – ja Detail vēl ir 5 (rāda tikai ilgumu)
+    if (detail.HasDetailNotStarted)
+        return "text-gray";
 
+    // 🟡 dzeltena – Detail pabeigts, Assembly nav pabeigts
+    if (detail.Status == "Pabeigts" && detail.AssemblyStatus != "Pabeigts")
+        return "bg-yellow";
+
+    // 🟢 zaļš – Assembly pabeigts
+    if (detail.AssemblyStatus == "Pabeigts")
+        return "bg-green";
+
+    // ⚫ default
+    return "";
+}
     public int DetailedInProgress { get; set; }
     public int DetailedFinish { get; set; }
 }
