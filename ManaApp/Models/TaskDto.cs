@@ -14,6 +14,15 @@ namespace ManaApp.Models
         public int? AssignedTo { get; set; }
         public int? WorkCenterId { get; set; }
         public int Capacity { get; set; }
+        public int ProductToPartId { get; set; }
+        public bool IsFinal { get; set; }
+        public bool IsPriority { get; set; }
+        public int Priority { get; set; }
+        public bool TasksPriority { get; set; }
+        public bool TasksPush { get; set; }
+        public int PriorityLevel { get; set; }
+        public bool BatchPriority { get; set; }
+        public int BatchOrder { get; set; }
 
     }
 }

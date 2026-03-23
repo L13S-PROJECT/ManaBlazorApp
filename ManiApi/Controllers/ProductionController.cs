@@ -56,11 +56,21 @@ public async Task<IActionResult> GetGantt([FromQuery] int? batchProductId)
         bp.is_priority,
         bp.Priority,
         t.Tasks_Status,
+        t.Tasks_Priority,
+        t.Tasks_Push,
+            CASE
+                WHEN bp.is_priority = 1 AND t.Tasks_Priority = 1 THEN 3
+                WHEN bp.is_priority = 1 AND t.Tasks_Priority = 0 THEN 2
+                WHEN bp.is_priority = 0 AND t.Tasks_Priority = 1 THEN 1
+                ELSE 0
+            END AS PriorityLevel,
         bp.ID AS BatchProductId,
         ts.Step_Order,
         ts.Step_Name,
         ts.Step_Type,
+        ts.IsFinal,
         tp.TopPart_Name,
+        ptp.ID AS ProductToPartId,
         ts.WorkCentr_ID,
         wc.WorkCentr_Name,
         wc.Capacity,
@@ -128,20 +138,25 @@ WHERE ts2.ProductToPart_ID = ts.ProductToPart_ID
             IsPriority = r.GetBoolean(1),
             Priority = r.GetInt32(2),
             Status = r.GetInt32(3),
-            BatchProductId = r.GetInt32(4),
-            StepOrder = r.GetInt32(5),
-            StepName  = r.IsDBNull(6) ? null : r.GetString(6),
-            StepType  = r.IsDBNull(7) ? 0 : r.GetInt32(7),
-            PartName  = r.IsDBNull(8) ? null : r.GetString(8),
-            WorkCenterId = r.IsDBNull(9) ? (int?)null : r.GetInt32(9),
-            WorkCenterName = r.IsDBNull(10) ? null : r.GetString(10),
-            Capacity = r.IsDBNull(11) ? 1 : r.GetInt32(11),
-            AssignedTo = r.IsDBNull(12) ? (int?)null : r.GetInt32(12),
-            EmployeeName = r.IsDBNull(13) ? null : r.GetString(13),
-            FinishedAt = r.IsDBNull(14) ? (DateTime?)null : r.GetDateTime(14),
-            EstimatedTotalMinutes = r.IsDBNull(15) ? 0 : r.GetInt32(15),
-            EstimatedStartMinutes = r.IsDBNull(16) ? 0 : r.GetInt32(16),
-            ActualMinutes = r.IsDBNull(17) ? 0 : r.GetInt32(17)
+            TasksPriority = !r.IsDBNull(4) && r.GetBoolean(4),
+            TasksPush = !r.IsDBNull(5) && r.GetBoolean(5),
+            PriorityLevel = r.IsDBNull(6) ? 0 : r.GetInt32(6),
+            BatchProductId = r.GetInt32(7),
+            StepOrder = r.GetInt32(8),
+            StepName  = r.IsDBNull(9) ? null : r.GetString(9),
+            StepType  = r.IsDBNull(10) ? 0 : r.GetInt32(10),
+            IsFinal = !r.IsDBNull(11) && r.GetInt32(11) == 1,
+            PartName  = r.IsDBNull(12) ? null : r.GetString(12),
+            ProductToPartId = r.IsDBNull(13) ? 0 : r.GetInt32(13),
+            WorkCenterId = r.IsDBNull(14) ? (int?)null : r.GetInt32(14),
+            WorkCenterName = r.IsDBNull(15) ? null : r.GetString(15),
+            Capacity = r.IsDBNull(16) ? 1 : r.GetInt32(16),
+            AssignedTo = r.IsDBNull(17) ? (int?)null : r.GetInt32(17),
+            EmployeeName = r.IsDBNull(18) ? null : r.GetString(18),
+            FinishedAt = r.IsDBNull(19) ? (DateTime?)null : r.GetDateTime(19),
+            EstimatedTotalMinutes = r.IsDBNull(20) ? 0 : r.GetInt32(20),
+            EstimatedStartMinutes = r.IsDBNull(21) ? 0 : r.GetInt32(21),
+            ActualMinutes = r.IsDBNull(22) ? 0 : r.GetInt32(22)
         });
     }
 

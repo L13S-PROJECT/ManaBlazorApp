@@ -49,15 +49,13 @@ var isDayOff = day != null
             && day.WorkStart != null 
             && day.WorkEnd != null;
 
-    var useEmployeeDefaults = day == null || day.UseEmployeeDefaults;
+    var useCompanyOverride = day != null && day.WorkEnd != null;
 
-    var start = useEmployeeDefaults
-        ? emp.WorkStart
-        : day!.WorkStart ?? emp.WorkStart;
+    var start = emp.WorkStart;
 
-    var end = useEmployeeDefaults
-        ? emp.WorkEnd
-        : day!.WorkEnd ?? emp.WorkEnd;
+    var end = useCompanyOverride
+        ? day!.WorkEnd
+        : emp.WorkEnd;
 
     var startTime = item?.TimeFrom ?? start ?? TimeSpan.Zero;
     var endTime = item?.TimeTo ?? end ?? TimeSpan.Zero;
@@ -389,8 +387,8 @@ selectedItem = new EmployeeWorkLogModel
 
     TimeTo = isDayOff
         ? TimeSpan.Zero
-        : isCustomDay
-            ? (day?.WorkEnd ?? new TimeSpan(17, 0, 0))
+        : (day != null && !day.UseEmployeeDefaults && day.WorkEnd != null)
+            ? day.WorkEnd.Value
             : (emp.WorkEnd ?? new TimeSpan(17, 0, 0)),
 
     BreakMinutes = isDayOff

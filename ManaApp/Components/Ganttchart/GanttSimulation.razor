@@ -102,35 +102,86 @@
     Dictionary<int, List<TaskDto>> tasksByBatch = new();
     Dictionary<int, GanttSimulationService.DetailResult> detailResults = new();
     List<BatchSimulationRow> ordered = new();
+    List<TaskDto> allTasks = new();
     protected override async Task OnInitializedAsync()
     {
         
         data = await Http.GetFromJsonAsync<List<BatchSimulationRow>>("api/batches/list-production") ?? new();
         
-        foreach (var row in data)
-        {
-                var tasks = await Http.GetFromJsonAsync<List<TaskDto>>(
-                    $"api/production/gantt?batchProductId={row.BatchProductId}"
-                );
+    foreach (var row in data)
+    {
+        var tasks = await Http.GetFromJsonAsync<List<TaskDto>>(
+            $"api/production/gantt?batchProductId={row.BatchProductId}"
+        );
 
-            tasksByBatch[row.BatchProductId] = tasks ?? new();
-        }
+        tasksByBatch[row.BatchProductId] = tasks ?? new();
+
+        if (tasks != null)
+            allTasks.AddRange(tasks);
+    }
 
         ordered = data
-    .OrderByDescending(x => x.IsPriority)
-    .ThenBy(x => x.Priority)
+            .OrderByDescending(x => x.IsPriority)
+            .ThenBy(x => x.Priority)
+            .ToList();
+        
+        var allTasksOrdered = allTasks
+            .OrderBy(t => t.BatchProductId)
+            .ThenBy(t => t.StepOrder)
+            .ToList();
+
+var allDetails = await Service.CalculateDetailGlobal(allTasksOrdered, ordered);
+
+foreach (var kvp in allDetails)
+{
+    detailResults[kvp.Key] = kvp.Value;
+}
+
+// TESTS — globālā secība (tikai pārbaudei)
+var debugOrder = allTasksOrdered
+    .Select(t => $"BP:{t.BatchProductId} Step:{t.StepOrder}")
     .ToList();
 
-foreach (var row in ordered)
+foreach (var line in debugOrder)
 {
-    var tasks = tasksByBatch.ContainsKey(row.BatchProductId)
-        ? tasksByBatch[row.BatchProductId]
-        : new List<TaskDto>();
-
-    var detail = await Service.CalculateDetail(tasks);
-
-    detailResults[row.BatchProductId] = detail;
+    Console.WriteLine(line);
 }
+
+// grupējam step pa batch (lai kontrolētu secību)
+var stepsByBatch = allTasksOrdered
+    .GroupBy(t => t.BatchProductId)
+    .ToDictionary(g => g.Key, g => g.OrderBy(x => x.StepOrder).ToList());
+
+// katram batch sekosim līdzi kurš step ir nākamais
+var batchPointers = stepsByBatch
+    .ToDictionary(k => k.Key, v => 0);
+
+// paņemam pirmo pieejamo step no katra batch
+var availableSteps = new List<TaskDto>();
+
+foreach (var kvp in stepsByBatch)
+{
+    var batchId = kvp.Key;
+    var steps = kvp.Value;
+
+    if (steps.Count > 0)
+    {
+        availableSteps.Add(steps[0]);
+    }
+}
+
+// sakārtojam pēc StepOrder (mazākais = pirmais)
+availableSteps = availableSteps
+    .OrderBy(t => t.StepOrder)
+    .ThenBy(t => t.BatchProductId)
+    .ToList();
+
+// DEBUG — kādi darbi ir pieejami startam
+foreach (var step in availableSteps)
+{
+    Console.WriteLine($"QUEUE -> BP:{step.BatchProductId} Step:{step.StepOrder}");
+}
+
     }
 
     public int DetailedInProgress { get; set; }

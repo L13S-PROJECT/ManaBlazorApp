@@ -15,13 +15,17 @@ namespace ManaApp.Services
     {
         _http = http;
     }
-        public async Task<DetailResult> CalculateDetail(List<TaskDto> tasks, DateTime? queueStart = null)
+        public async Task<DetailResult> CalculateDetail(
+            List<TaskDto> tasks,
+            int quantity,
+            DateTime? queueStart = null,
+            Dictionary<int, DateTime>? sharedEmployeeBusy = null,
+            Dictionary<int, List<DateTime>>? sharedWorkCenterBusy = null)
                 {
                     var calendar = _calendarCache ??= await GetCompanyCalendar();
                     var workLogs = _workLogCache ??= await GetEmployeeWorkLog(DateTime.Today.AddDays(-7), DateTime.Today.AddDays(30));
                     var availability = _availabilityCache ??= await GetEmployeeAvailability(DateTime.Today.AddDays(-7), DateTime.Today.AddDays(30));
                     var calendarDict = calendar.ToDictionary(c => c.WorkDate.Date);
-
                     var workLogDict = workLogs
                         .GroupBy(x => (x.EmployeeID, x.WorkDate.Date))
                         .ToDictionary(g => g.Key, g => g.First());
@@ -34,6 +38,7 @@ namespace ManaApp.Services
                         };
 
                     var detailTasks = tasks.Where(t => t.StepType == 1).ToList();
+                    var assemblyTasks = tasks.Where(t => t.StepType == 2).ToList();
 
                     if (!detailTasks.Any())
                         return result;
@@ -73,194 +78,193 @@ namespace ManaApp.Services
                                     : $"{d}d {h}h {m}m";
                             }
                         
-                    // 🔥 laiks (dienās)
-                var orderedSteps = detailTasks
-                    .OrderBy(t => t.StepOrder)
-                    .ToList();
+                    //  laiks (dienās)
 
 var started = detailTasks
     .Where(t => t.Status != 5 && t.FinishedAt != null)
-    .Select(t => t.FinishedAt)
+    .Select(t => t.FinishedAt!.Value)
     .ToList();
 
 var startDate = queueStart ??
     (started.Any()
-        ? started.Max()!.Value
+        ? started.Max()
         : DateTime.Today);
 
-    var currentTime = startDate;
-    var employeeBusy = new Dictionary<int, DateTime>();
-    var workCenterBusy = new Dictionary<int, List<DateTime>>();
+var availableSteps = new List<TaskDto>();
 
-foreach (var step in orderedSteps)
-{
-       // skip pabeigtos
-if (step.Status == 3)
-    continue;
-
-var stepRemaining = step.EstimatedTotalMinutes - step.ActualMinutes;
-
-if (stepRemaining < 0)
-    stepRemaining = 0;
-
-var stepDays = stepRemaining / 60.0 / 8.0;
-
-//  ja ir darbinieks → jāgaida viņš
-DateTime stepStart = currentTime;
-calendarDict.TryGetValue(stepStart.Date, out var dayStart);
-
-if (dayStart != null && dayStart.WorkStart.HasValue)
-{
-    var workStart = stepStart.Date.Add(dayStart.WorkStart.Value);
-
-    if (stepStart < workStart)
-    {
-        stepStart = workStart;
-    }
-}
-
-//  WorkCenter ierobežojums
-if (step.WorkCenterId.HasValue)
-{
-    var wcId = step.WorkCenterId.Value;
-
-if (!workCenterBusy.ContainsKey(wcId))
-{
-    var capacity = step.Capacity > 0 ? step.Capacity : 1;
-
-    workCenterBusy[wcId] = Enumerable
-        .Repeat(currentTime, capacity)
-        .ToList();
-}
-
-// atrodam ātrāko brīvo slotu
-var slots = workCenterBusy[wcId];
-var earliest = slots.Min();
-
-if (earliest > stepStart)
-    stepStart = earliest;
-}
-
-if (step.AssignedTo.HasValue)
-{
-    var empId = step.AssignedTo.Value;
-
-// availability check
-if (availabilityDict.ContainsKey(empId))
-{
-    var safetyAvailability = 0;
-
-    while (true)
-    {
-        safetyAvailability++;
-
-        if (safetyAvailability > 365)
-            break;
-        var empAvailabilityList = availabilityDict[empId];
-
-        var isAvailableNow = empAvailabilityList.Any(a =>
-            a.DateFrom.Date <= stepStart.Date &&
-            (a.DateTo == null || a.DateTo.Value.Date >= stepStart.Date) &&
-            a.Status != "Unavailable"
-        );
-
-        if (isAvailableNow)
-            break;
-
-        stepStart = stepStart.Date.AddDays(1);
-    }
-}
-
- workLogDict.TryGetValue((empId, stepStart.Date), out var empLog);
-
-if (empLog != null && empLog.TimeFrom.HasValue && empLog.TimeTo.HasValue)
-{
-    var workStart = stepStart.Date.Add(empLog.TimeFrom.Value);
-    var workEnd = stepStart.Date.Add(empLog.TimeTo.Value);
-
-    if (stepStart < workStart)
-    {
-        stepStart = workStart;
-    }
-
-    if (stepStart >= workEnd)
+// sākumā – tikai pirmie soļi (StepOrder == 1)
+availableSteps.AddRange(
+    detailTasks
+        .GroupBy(s => s.ProductToPartId)
+        .Select(g =>
         {
-            stepStart = stepStart.Date.AddDays(1);
+            // ja ir iesākts → ņem nākamo nepabeigto
+            var inProgress = g
+                .Where(s => s.Status != 5)
+                .OrderByDescending(s => s.StepOrder)
+                .FirstOrDefault();
 
-            // pārliekam uz nākamās dienas sākumu
-            workLogDict.TryGetValue((empId, stepStart.Date), out var nextDayLog);
-
-            if (nextDayLog != null && nextDayLog.TimeFrom.HasValue)
+            if (inProgress != null)
             {
-                stepStart = stepStart.Date.Add(nextDayLog.TimeFrom.Value);
+                var next = g.FirstOrDefault(s => s.StepOrder == inProgress.StepOrder + 1);
+                return next ?? inProgress;
             }
-        }
-}
 
+            // ja viss nav iesākts → ņem pirmo
+            return g.OrderBy(s => s.StepOrder).First();
+        })
+        .Where(x => x != null)
+        .ToList()
+);
+
+var partStepEndTimes = new Dictionary<int, DateTime>();
+var partFinishTimes = new Dictionary<int, DateTime>();
+
+var employeeBusy = sharedEmployeeBusy ?? new Dictionary<int, DateTime>();
+var workCenterBusy = sharedWorkCenterBusy ?? new Dictionary<int, List<DateTime>>();
+
+while (availableSteps.Any())
+{
+var step = availableSteps
+    .Select(s =>
+    {
+        DateTime possibleStart = startDate;
+
+        if (partStepEndTimes.ContainsKey(s.ProductToPartId))
+            possibleStart = partStepEndTimes[s.ProductToPartId];
+
+        if (s.AssignedTo.HasValue && employeeBusy.ContainsKey(s.AssignedTo.Value))
+        {
+            var empFree = employeeBusy[s.AssignedTo.Value];
+            if (empFree > possibleStart)
+                possibleStart = empFree;
+        }
+
+        if (s.WorkCenterId.HasValue && workCenterBusy.ContainsKey(s.WorkCenterId.Value))
+        {
+            var wcFree = workCenterBusy[s.WorkCenterId.Value].Min();
+            if (wcFree > possibleStart)
+                possibleStart = wcFree;
+        }
+
+        return new
+        {
+            Step = s,
+            Start = possibleStart
+        };
+    })
+    .OrderBy(x => x.Start)                //  GALVENAIS
+    .ThenByDescending(x => x.Step.TasksPush)
+    .ThenByDescending(x => x.Step.PriorityLevel)
+    .ThenByDescending(x => x.Step.TasksPriority)
+    .ThenBy(x => x.Step.IsPriority ? 0 : 1)
+    .ThenBy(x => x.Step.Priority)
+    .Select(x => x.Step)
+    .First();
+
+    availableSteps.Remove(step);
+
+    // ⏱ start
+   DateTime stepStart = partStepEndTimes.ContainsKey(step.ProductToPartId)
+    ? partStepEndTimes[step.ProductToPartId]
+    : startDate;
+
+    if (partStepEndTimes.ContainsKey(step.ProductToPartId))
+        stepStart = partStepEndTimes[step.ProductToPartId];
+
+    // 👷 employee
+    if (step.AssignedTo.HasValue)
+    {
+        var empId = step.AssignedTo.Value;
 
         if (employeeBusy.ContainsKey(empId))
         {
             var empFreeAt = employeeBusy[empId];
-
             if (empFreeAt > stepStart)
                 stepStart = empFreeAt;
         }
+    }
 
-        var stepEnd = CalculateStepEnd(stepStart, stepRemaining, calendarDict);
-
-        //  atjaunojam WorkCenter aizņemtību
-            if (step.WorkCenterId.HasValue)
-            {
-                var slots = workCenterBusy[step.WorkCenterId.Value];
-
-                // atrodam kuru slotu izmantot (agrāko)
-                var index = slots.IndexOf(slots.Min());
-
-                // atjaunojam to slotu
-                slots[index] = stepEnd;
-            }
-
-            // atjaunojam darbinieka aizņemtību
-            employeeBusy[empId] = stepEnd;
-
-            currentTime = stepEnd;
-        while (
-            currentTime.DayOfWeek == DayOfWeek.Saturday ||
-            currentTime.DayOfWeek == DayOfWeek.Sunday ||
-            calendarDict.TryGetValue(currentTime.Date, out var dayCheck) && dayCheck.WorkStart == null
-        )
-        {
-            currentTime = currentTime.AddDays(1);
-        }
-
-        
-}
-else
+    // 🏭 workcenter
+    if (step.WorkCenterId.HasValue)
     {
-        var stepEnd = CalculateStepEnd(stepStart, stepRemaining, calendarDict);
+        var wcId = step.WorkCenterId.Value;
 
-        currentTime = stepEnd;
-
-        while (
-            currentTime.DayOfWeek == DayOfWeek.Saturday ||
-            currentTime.DayOfWeek == DayOfWeek.Sunday ||
-            calendarDict.TryGetValue(currentTime.Date, out var dayCheck) && dayCheck.WorkStart == null
-        )
+        if (!workCenterBusy.ContainsKey(wcId))
         {
-            currentTime = currentTime.AddDays(1);
+            var capacity = step.Capacity > 0 ? step.Capacity : 1;
+
+            workCenterBusy[wcId] = Enumerable
+                .Repeat(stepStart, capacity)
+                .ToList();
         }
+
+        var slots = workCenterBusy[wcId];
+        var earliest = slots.Min();
+
+        if (earliest > stepStart)
+            stepStart = earliest;
+    }
+
+    // ⏱ duration
+    var stepRemaining = step.EstimatedTotalMinutes - step.ActualMinutes;
+    if (stepRemaining < 0) stepRemaining = 0;
+
+    var stepEnd = CalculateStepEnd(stepStart, stepRemaining, calendarDict);
+
+    // 🏭 update WC
+    if (step.WorkCenterId.HasValue)
+    {
+        var slots = workCenterBusy[step.WorkCenterId.Value];
+        var index = slots.IndexOf(slots.Min());
+        slots[index] = stepEnd;
+    }
+
+    // 👷 update employee
+    if (step.AssignedTo.HasValue)
+    {
+        employeeBusy[step.AssignedTo.Value] = stepEnd;
+    }
+
+    // 📦 part timing
+    partStepEndTimes[step.ProductToPartId] = stepEnd;
+
+    if (step.IsFinal)
+    {
+        partFinishTimes[step.ProductToPartId] = stepEnd;
+    }
+
+    //  unlock next step
+var nextStep = detailTasks
+    .Where(s => s.ProductToPartId == step.ProductToPartId &&
+                s.StepOrder > step.StepOrder)
+    .OrderBy(s => s.StepOrder)
+    .FirstOrDefault();
+
+    if (nextStep != null)
+    {
+        availableSteps.Add(nextStep);
     }
 }
+
 if (result.Status == "Nav iesākts")
         {
             result.FinishDateText = "-";
         }
 else if (result.Status == "Procesā")
-            {
-                var finishDate = currentTime;
-                result.FinishDate = finishDate;
-                result.FinishDateText = finishDate.ToString("dd.MM");
-            }
+{
+    if (partFinishTimes.Any())
+    {
+        var finishDate = partFinishTimes.Values.Max();
+
+        result.FinishDate = finishDate;
+        result.FinishDateText = finishDate.ToString("dd.MM.yyyy");
+    }
+    else
+    {
+        result.FinishDateText = "-";
+    }
+}
                     else if (result.Status == "Pabeigts")
                     {
                         var finished = detailTasks
@@ -272,7 +276,7 @@ else if (result.Status == "Procesā")
                                 if (lastDate is DateTime dt)
                                     {
                                         result.FinishDate = dt;
-                                        result.FinishDateText = dt.ToString("dd.MM");
+                                        result.FinishDateText = dt.ToString("dd.MM.yyyy");
                                     }
                         }
                         else
@@ -280,8 +284,44 @@ else if (result.Status == "Procesā")
                             result.FinishDateText = "-";
                         }
                     }
-                        return result;
+
+// =======================
+// ASSEMBLY STATUS LOĢIKA
+// =======================
+
+if (!assemblyTasks.Any())
+{
+    result.AssemblyStatus = "-";
+}
+else
+{
+    var assemblyStatuses = assemblyTasks.Select(t => t.Status).ToList();
+
+    var detailStatuses = detailTasks.Select(t => t.Status).ToList();
+
+    // 🔴 GAIDA (ja Detail vēl nav gatavs)
+    if (detailStatuses.Any(s => s != 3))
+    {
+        result.AssemblyStatus = "Gaida";
     }
+    // 🟡 PROCESĀ
+    else if (assemblyStatuses.Any(s => s == 2))
+    {
+        result.AssemblyStatus = "Procesā";
+    }
+    // 🟢 PABEIGTS
+    else if (assemblyStatuses.All(s => s == 3))
+    {
+        result.AssemblyStatus = "Pabeigts";
+    }
+    else
+    {
+        result.AssemblyStatus = "Gaida";
+    }
+}
+
+    return result;
+ }
 
 private DateTime CalculateStepEnd(
     DateTime stepStart,
@@ -409,14 +449,55 @@ public async Task<List<EmployeeAvailabilityModel>> GetEmployeeAvailability(DateT
     return data ?? new List<EmployeeAvailabilityModel>();
 }
             
-    
-        public class DetailResult
-        {
-            public string? Status { get; set; }
-            public double? NotStartedDays { get; set; }
-            public string? FinishDateText { get; set; }
-            public string? NotStartedText { get; set; }
-            public DateTime? FinishDate { get; set; }
-        }
+public async Task<Dictionary<int, DetailResult>> CalculateDetailGlobal(
+    List<TaskDto> allTasksOrdered,
+    List<BatchSimulationRow> orderedBatches)
+{
+    var result = new Dictionary<int, DetailResult>();
+    var sharedEmployeeBusy = new Dictionary<int, DateTime>();
+    var sharedWorkCenterBusy = new Dictionary<int, List<DateTime>>();
+    var grouped = allTasksOrdered
+        .GroupBy(t => t.BatchProductId)
+        .ToDictionary(g => g.Key, g => g.ToList());
+
+    foreach (var batch in orderedBatches)
+    {
+        var batchTasks = grouped.ContainsKey(batch.BatchProductId)
+            ? grouped[batch.BatchProductId]
+            : new List<TaskDto>();
+
+        var queueIndex = orderedBatches.FindIndex(x => x.BatchProductId == batch.BatchProductId);
+
+        // ✔ prioritāte dod reālu nobīdi (nevis 30min)
+        var queueStart = DateTime.Today.AddHours(queueIndex * 4);
+
+        var detail = await CalculateDetail(
+            batchTasks,
+            batch.Planned,
+            queueStart,
+            sharedEmployeeBusy,
+            sharedWorkCenterBusy
+        );
+
+        result[batch.BatchProductId] = detail;
+    }
+
+    return result;
+}
+   
+public class DetailResult
+{
+    // DETAIL
+    public string? Status { get; set; }
+    public double? NotStartedDays { get; set; }
+    public string? FinishDateText { get; set; }
+    public string? NotStartedText { get; set; }
+    public DateTime? FinishDate { get; set; }
+
+    // ASSEMBLY
+    public string? AssemblyStatus { get; set; }
+    public string? AssemblyTimeText { get; set; }
+    public DateTime? AssemblyFinishDate { get; set; }
+}
     }
 }
