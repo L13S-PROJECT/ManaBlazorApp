@@ -1,0 +1,138 @@
+@*GanttSimulation.razor - laika simulācijas kopsavilkums*@
+
+@using ManaApp.Services
+@inject HttpClient Http
+@inject GanttSimulationService Service
+
+<div class="simulation-table">
+
+    <div class="simulation-toolbar">
+        <input type="text" placeholder="Meklēt..." />
+        <button>Arhīvs</button>
+    </div>
+
+    <div class="simulation-header">
+
+    <div class="header-row top">
+
+        <div class="cell info" style="grid-column: span 5;">Informācija par preci</div>
+
+        <div class="cell detail" style="grid-column: span 3;">Detail</div>
+
+        <div class="cell assembly" style="grid-column: span 2;">Assembly</div>
+
+        <div class="cell finishing" style="grid-column: span 6;">Finishing</div>
+
+    </div>
+
+        <div class="header-row bottom">
+            <div class="cell">Batch</div>
+            <div class="cell">Nosaukums</div>
+            <div class="cell">Kods</div>
+            <div class="cell">Versija</div>
+            <div class="cell">Apjoms</div>
+
+            <div class="cell">Status</div>
+            <div class="cell">Neiesākti</div>
+            <div class="cell">Laiks</div>
+
+            <div class="cell">Status</div>
+            <div class="cell">Laiks</div>
+
+            <div class="cell">Nekrāsoti</div>
+            <div class="cell">Laiks</div>
+            <div class="cell">Status</div>
+            <div class="cell">Apjoms</div>
+            <div class="cell">Laiks</div>
+            <div class="cell">Pabeigti</div>
+        </div>
+
+        <div class="simulation-body">
+        
+   @foreach (var row in ordered)
+    {
+        <div class="header-row bottom">
+
+            <div class="cell">@row.BatchCode</div>
+            <div class="cell">@row.ProductName</div>
+            <div class="cell">@row.ProductCode</div>
+            <div class="cell">@row.VersionName</div>
+            <div class="cell">@row.Planned</div>
+
+<!-- detail lauku -->
+           @{
+                var tasks = tasksByBatch.ContainsKey(row.BatchProductId)
+                    ? tasksByBatch[row.BatchProductId]
+                    : new List<TaskDto>();
+
+                var detail = detailResults[row.BatchProductId];
+            }
+
+        <div class="cell">@detail.Status</div>
+    
+        <div class="cell">
+            @(detail.NotStartedText ?? "-")
+        </div>
+
+        <div class="cell">@detail.FinishDateText</div>
+
+<!-- pārējie pagaidām tukši -->
+            <div class="cell"></div>
+            <div class="cell"></div>
+
+            <div class="cell"></div>
+            <div class="cell"></div>
+            <div class="cell"></div>
+            <div class="cell"></div>
+            <div class="cell"></div>
+            <div class="cell"></div>
+
+        </div>
+    }
+
+</div>
+
+    </div>
+
+</div>
+
+
+@code {
+    List<BatchSimulationRow> data = new();
+    Dictionary<int, List<TaskDto>> tasksByBatch = new();
+    Dictionary<int, GanttSimulationService.DetailResult> detailResults = new();
+    List<BatchSimulationRow> ordered = new();
+    protected override async Task OnInitializedAsync()
+    {
+        
+        data = await Http.GetFromJsonAsync<List<BatchSimulationRow>>("api/batches/list-production") ?? new();
+        
+        foreach (var row in data)
+        {
+                var tasks = await Http.GetFromJsonAsync<List<TaskDto>>(
+                    $"api/production/gantt?batchProductId={row.BatchProductId}"
+                );
+
+            tasksByBatch[row.BatchProductId] = tasks ?? new();
+        }
+
+        ordered = data
+    .OrderByDescending(x => x.IsPriority)
+    .ThenBy(x => x.Priority)
+    .ToList();
+
+foreach (var row in ordered)
+{
+    var tasks = tasksByBatch.ContainsKey(row.BatchProductId)
+        ? tasksByBatch[row.BatchProductId]
+        : new List<TaskDto>();
+
+    var detail = await Service.CalculateDetail(tasks);
+
+    detailResults[row.BatchProductId] = detail;
+}
+    }
+
+    public int DetailedInProgress { get; set; }
+    public int DetailedFinish { get; set; }
+}

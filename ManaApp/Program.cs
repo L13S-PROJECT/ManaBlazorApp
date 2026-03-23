@@ -3,13 +3,13 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Syncfusion.Blazor;
 using Syncfusion.Licensing;
 using ManaApp;
-
+using ManaApp.Services;
 
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
-
+builder.Services.AddScoped<GanttSimulationService>();
 // HttpClient base adrese – kā līdz šim izmanto tiešos URL uz API
 builder.Services.AddScoped(sp => new HttpClient
 {

@@ -1,11 +1,19 @@
+@* ProductionGantt.razor  - divi vienā - laika simulācija un Gantt diagramma *@
+
 @page "/production-gantt"
 @inject HttpClient Http
 @using ManaApp.Models
 @using ManaApp.Components.Ganttchart
 
+<div class="main-layout">
 
-<h3>Production Gantt</h3>
+    <!-- TOP BOX -->
+<div class="top-box">
+    <GanttSimulation />
+</div>
 
+    <!-- BOTTOM BOX -->
+    <div class="bottom-box">
 <div class="gantt-header">
 
     <div class="gantt-left">
@@ -33,6 +41,10 @@
     </div>
 </div>
 }
+
+   </div>
+
+</div>
 
 @code {
 List<GanttRow> data = new();

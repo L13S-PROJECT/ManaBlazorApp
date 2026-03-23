@@ -1,3 +1,5 @@
+// Šis kontrolieris ir paredzēts ražošanas prioritāšu pārvaldībai: prioritāšu iestatīšanai, prioritāšu saraksta skatīšanai, kā arī prioritāšu ietekmes analīzei uz ražošanas procesu.
+
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ManiApi.Data;

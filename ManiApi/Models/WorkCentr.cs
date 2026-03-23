@@ -20,6 +20,9 @@ namespace ManiApi.Models
     [Column("Step_Type_ID")]
     public int? Step_Type_ID { get; set; }
 
+    [Column("Capacity")]
+    public int Capacity { get; set; }
+
     [Column("IsActive")]
     public bool IsActive { get; set; }
 }

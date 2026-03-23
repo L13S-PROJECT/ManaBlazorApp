@@ -1,3 +1,5 @@
+// Šis kontrolieris ir paredzēts ražošanas procesu pārvaldībai: ražošanas uzdevumu pārvaldībai, ražošanas uzdevumu saraksta un detaļas skatīšanai, kā arī ražošanas uzdevumu izveidei un rediģēšanai.
+
 using Microsoft.AspNetCore.Mvc;
 using ManiApi.Data;
 using Microsoft.EntityFrameworkCore;
@@ -61,25 +63,27 @@ public async Task<IActionResult> GetGantt([FromQuery] int? batchProductId)
         tp.TopPart_Name,
         ts.WorkCentr_ID,
         wc.WorkCentr_Name,
+        wc.Capacity,
         t.Assigned_To,
         e.Employee_Name,
+        t.Finished_At,
 
     CASE 
         WHEN ts.Step_Type IN (1,2) 
-            THEN (bp.Planned_Qty * ptp.Qty_Per_product) * ts.Estimated_Minutes
+            THEN (bp.Planned_Qty * ptp.Qty_Per_product) * COALESCE(ts.Estimated_Minutes, 12)
         WHEN ts.Step_Type = 3 
-            THEN t.Qty_Done * ts.Estimated_Minutes
-        ELSE bp.Planned_Qty * ts.Estimated_Minutes
+            THEN t.Qty_Done * COALESCE(ts.Estimated_Minutes, 12)
+        ELSE bp.Planned_Qty * COALESCE(ts.Estimated_Minutes, 12)
     END AS EstimatedTotalMinutes,
 
 (
     SELECT COALESCE(SUM(
         CASE 
             WHEN ts2.Step_Type IN (1,2)
-                THEN (bp.Planned_Qty * ptp.Qty_Per_product) * ts2.Estimated_Minutes
+                THEN (bp.Planned_Qty * ptp.Qty_Per_product) * COALESCE(ts2.Estimated_Minutes, 12)
             WHEN ts2.Step_Type = 3
-                THEN t.Qty_Done * ts2.Estimated_Minutes
-            ELSE bp.Planned_Qty * ts2.Estimated_Minutes
+                THEN t.Qty_Done * COALESCE(ts2.Estimated_Minutes, 12)
+            ELSE bp.Planned_Qty * COALESCE(ts2.Estimated_Minutes, 12)
         END
     ),0)
 FROM toppartsteps ts2
@@ -131,12 +135,13 @@ WHERE ts2.ProductToPart_ID = ts.ProductToPart_ID
             PartName  = r.IsDBNull(8) ? null : r.GetString(8),
             WorkCenterId = r.IsDBNull(9) ? (int?)null : r.GetInt32(9),
             WorkCenterName = r.IsDBNull(10) ? null : r.GetString(10),
-            AssignedTo = r.IsDBNull(11) ? (int?)null : r.GetInt32(11),
-            EmployeeName = r.IsDBNull(12) ? null : r.GetString(12),
-
-            EstimatedTotalMinutes = r.IsDBNull(13) ? 0 : r.GetInt32(13),
-            EstimatedStartMinutes = r.IsDBNull(14) ? 0 : r.GetInt32(14),
-            ActualMinutes = r.IsDBNull(15) ? 0 : r.GetInt32(15)
+            Capacity = r.IsDBNull(11) ? 1 : r.GetInt32(11),
+            AssignedTo = r.IsDBNull(12) ? (int?)null : r.GetInt32(12),
+            EmployeeName = r.IsDBNull(13) ? null : r.GetString(13),
+            FinishedAt = r.IsDBNull(14) ? (DateTime?)null : r.GetDateTime(14),
+            EstimatedTotalMinutes = r.IsDBNull(15) ? 0 : r.GetInt32(15),
+            EstimatedStartMinutes = r.IsDBNull(16) ? 0 : r.GetInt32(16),
+            ActualMinutes = r.IsDBNull(17) ? 0 : r.GetInt32(17)
         });
     }
 

@@ -1,3 +1,5 @@
+// EmployeeAvailabilityController.cs - API controller for managing employee availability data
+
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ManiApi.Data;

@@ -1,3 +1,5 @@
+// Šis kontrolieris ir paredzēts ražošanas uzdevumu (tasks) pārvaldībai: uzdevumu saraksta skatīšanai, uzdevuma pieprasīšanai (claim) un pabeigšanai (finish).
+
 using Microsoft.AspNetCore.Mvc;
 using ManiApi.Data;
 using Microsoft.EntityFrameworkCore;

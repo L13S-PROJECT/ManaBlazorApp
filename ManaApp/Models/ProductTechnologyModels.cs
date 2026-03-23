@@ -38,10 +38,11 @@ namespace ManaApp.Models
             public bool IsActive { get; set; }
         }
     
-    public class WorkCenter
-        {
-            public int Id { get; set; }
-            public string WorkCentr_Name { get; set; } = "";
-            public bool IsActive { get; set; }
-        }
+public class WorkCenter
+    {
+        public int Id { get; set; }
+        public string WorkCentr_Name { get; set; } = "";
+        public int WorkCenter_Order { get; set; }
+    }
+    
 }

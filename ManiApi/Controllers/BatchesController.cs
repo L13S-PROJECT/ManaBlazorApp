@@ -1,11 +1,11 @@
+// Šis kontrolieris ir paredzēts partiju (batch) pārvaldībai: izveidei, rediģēšanai, dzēšanai, kā arī partiju saraksta un detaļas skatīšanai.
+
 using Microsoft.AspNetCore.Mvc;
 using ManiApi.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
 using MySqlConnector;
 namespace ManiApi.Controllers
-
-
 
 {
     [ApiController]

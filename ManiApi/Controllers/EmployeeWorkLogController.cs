@@ -90,5 +90,16 @@ var items = await _db.EmployeeWorkLogs
 
     return Ok();
 }
+
+[HttpGet("range")]
+public async Task<IActionResult> GetRange(DateTime from, DateTime to)
+{
+    var data = await _db.EmployeeWorkLogs
+        .Where(x => x.WorkDate >= from.Date && x.WorkDate < to.Date.AddDays(1))
+        .ToListAsync();
+
+    return Ok(data);
+}
+
     }
 }
