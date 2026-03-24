@@ -360,6 +360,19 @@ if (stepStart == DateTime.MinValue)
             if (earliest > stepStart)
                 stepStart = earliest;
         }
+// 🔥 Assembly nedrīkst sākties pirms Detail pabeigts (FINAL CHECK)
+if (step.StepType == 2)
+{
+    if (result.ContainsKey(step.BatchProductId))
+    {
+        var detailFinish = result[step.BatchProductId].DetailFinish;
+
+        if (detailFinish.HasValue && detailFinish.Value > stepStart)
+        {
+            stepStart = detailFinish.Value;
+        }
+    }
+}
 
 DateTime stepEnd;
 
@@ -367,7 +380,14 @@ DateTime stepEnd;
 if (step.Status == 3 && step.FinishedAt.HasValue)
 {
     stepEnd = step.FinishedAt.Value;
+
+    // 🔥 NEKAD neļaujam būt pirms stepStart
+    if (stepEnd < stepStart)
+    {
+        stepEnd = stepStart;
+    }
 }
+
 else
 {
     var stepRemaining = step.EstimatedTotalMinutes - step.ActualMinutes;
@@ -453,6 +473,7 @@ private void CalculateAssembly(
     var detailAllFinished = detailStatuses.All(s => s == 3);
 
     var hasAssemblyActive = assemblyStatuses.Any(s => s == 1 || s == 2);
+    
     var assemblyAllFinished = assemblyStatuses.All(s => s == 3);
 
     // 🔵 4) Assembly pabeigts → DB
@@ -470,13 +491,15 @@ private void CalculateAssembly(
         return;
     }
 
-    // 🔴 1) Detail ir 5 → rāda tikai laiku
-    var hasOnlyNotStarted = detailStatuses.All(s => s == 5);
 
-if (hasOnlyNotStarted)
+// 🔴 Detail nav pilnībā pabeigts → Assembly GAIDA
+if (!detailAllFinished)
+{
+    result.AssemblyStatus = "Gaida";
+
+    // ja Detail vēl ir neiesākti step, rādam tikai Assembly ilgumu
+    if (detailStatuses.Any(s => s == 5))
     {
-        result.AssemblyStatus = "Gaida";
-
         var totalMinutes = assemblyTasks
             .Sum(t => Math.Max(0, t.EstimatedTotalMinutes - t.ActualMinutes));
 
@@ -493,6 +516,35 @@ if (hasOnlyNotStarted)
         result.AssemblyTimeText = $"{d}d {h}h {m}m";
         return;
     }
+
+// ja Detail vairs nav neviena 5, rādam simulēto Assembly datumu
+if (result.AssemblyFinishDate.HasValue)
+{
+    var assemblyFinish = result.AssemblyFinishDate.Value;
+
+    // 🔥 obligāti jābūt pēc Detail
+    if (result.FinishDate.HasValue)
+    {
+        var minStart = result.FinishDate.Value;
+
+        // NEĻAUJAM sakrist vai būt pirms
+        if (assemblyFinish <= minStart)
+        {
+            assemblyFinish = CalculateStepEnd(
+                minStart,
+                assemblyTasks.Sum(t => Math.Max(0, t.EstimatedTotalMinutes - t.ActualMinutes)),
+                calendarDict
+            );
+        }
+    }
+
+    result.AssemblyTimeText = assemblyFinish.ToString("dd.MM.yyyy");
+    return;
+}
+
+result.AssemblyTimeText = "-";
+return;
+}
 
     // 🟢 3) Detail visi 3 → sāk no DB finish
 DateTime assemblyStart;
@@ -511,10 +563,26 @@ if (result.FinishDate.HasValue)
 
 assemblyStart = baseStart;
 
+DateTime finish;
+
+if (result.AssemblyFinishDate.HasValue)
+{
+    finish = result.AssemblyFinishDate.Value;
+
+    // 🔥 NEKAD nedrīkst būt ātrāk par Detail
+    if (result.FinishDate.HasValue && finish < result.FinishDate.Value)
+    {
+        finish = result.FinishDate.Value;
+    }
+}
+
+else
+{
     var remaining = assemblyTasks
         .Sum(t => Math.Max(0, t.EstimatedTotalMinutes - t.ActualMinutes));
 
- var finish = CalculateStepEnd(assemblyStart, remaining, calendarDict);
+    finish = CalculateStepEnd(assemblyStart, remaining, calendarDict);
+}
 
 if (result.FinishDate.HasValue)
 {
@@ -525,6 +593,18 @@ if (result.FinishDate.HasValue)
 
 result.AssemblyFinishDate = finish;
 result.AssemblyTimeText = finish.ToString("dd.MM.yyyy");
+
+// 🟡 Assembly procesā
+        if (hasAssemblyActive)
+        {
+            result.AssemblyStatus = "Procesā";
+        }
+
+// fallback statuss
+if (string.IsNullOrEmpty(result.AssemblyStatus))
+{
+    result.AssemblyStatus = "Procesā";
+}
 
 var startedAssembly = assemblyTasks
     .Where(t => t.Status != 5 && t.FinishedAt != null)
@@ -538,6 +618,7 @@ if (startedAssembly.Any())
 }
 
 }
+
 
 private void CalculateFinishing(
     DetailResult result,
@@ -696,6 +777,15 @@ if (simulatedBatchFinish.ContainsKey(batch.BatchProductId))
 // =========================
 // 🔥 TAGAD tikai rēķinam Assembly
 // =========================
+if (simulatedBatchFinish.ContainsKey(batch.BatchProductId))
+{
+    var sim = simulatedBatchFinish[batch.BatchProductId];
+
+    if (sim.AssemblyFinish.HasValue)
+    {
+        detail.AssemblyFinishDate = sim.AssemblyFinish.Value;
+    }
+}
 
 CalculateAssembly(
     detail,
@@ -704,6 +794,7 @@ CalculateAssembly(
     calendarDict,
     queueStart
 );
+
 result[batch.BatchProductId] = detail;
 
     }
