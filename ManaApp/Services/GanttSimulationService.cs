@@ -73,8 +73,7 @@ namespace ManaApp.Services
                             }
                         
                     //  laiks (dienās)
-
-var started = detailTasks
+    var started = detailTasks
     .Where(t => t.Status != 5 && t.FinishedAt != null)
     .Select(t => t.FinishedAt!.Value)
     .ToList();
@@ -84,206 +83,29 @@ var startDate = queueStart ??
         ? started.Max()
         : DateTime.Today);
 
-var availableSteps = new List<TaskDto>();
+//  Detail laiku ŠEIT vairs neuzstādām (to darīs CalculateDetailGlobal)
 
-// sākumā – tikai pirmie soļi (StepOrder == 1)
-availableSteps.AddRange(
-    detailTasks
-        .GroupBy(s => s.ProductToPartId)
-        .Select(g =>
-        {
-            // ja ir iesākts → ņem nākamo nepabeigto
-            var inProgress = g
-                .Where(s => s.Status != 5)
-                .OrderByDescending(s => s.StepOrder)
-                .FirstOrDefault();
-
-            if (inProgress != null)
-            {
-                var next = g.FirstOrDefault(s => s.StepOrder == inProgress.StepOrder + 1);
-                return next ?? inProgress;
-            }
-
-            // ja viss nav iesākts → ņem pirmo
-            return g.OrderBy(s => s.StepOrder).First();
-        })
-        .Where(x => x != null)
-        .ToList()
-);
-
-var partStepEndTimes = new Dictionary<int, DateTime>();
-var partFinishTimes = new Dictionary<int, DateTime>();
-
-var employeeBusy = sharedEmployeeBusy ?? new Dictionary<int, DateTime>();
-var workCenterBusy = sharedWorkCenterBusy ?? new Dictionary<int, List<DateTime>>();
-
-while (availableSteps.Any())
+if (result.Status == "Pabeigts" && result.FinishDate == null)
 {
-var step = availableSteps
-    .Select(s =>
+    var finished = detailTasks
+        .Where(t => t.Status == 3 && t.FinishedAt != null);
+
+    if (finished.Any())
     {
-        DateTime possibleStart = startDate;
-
-        if (partStepEndTimes.ContainsKey(s.ProductToPartId))
-            possibleStart = partStepEndTimes[s.ProductToPartId];
-
-        if (s.AssignedTo.HasValue && employeeBusy.ContainsKey(s.AssignedTo.Value))
+        var lastDate = finished.Max(t => t.FinishedAt);
+        if (lastDate is DateTime dt)
         {
-            var empFree = employeeBusy[s.AssignedTo.Value];
-            if (empFree > possibleStart)
-                possibleStart = empFree;
+            result.FinishDate = dt;
+            result.FinishDateText = dt.ToString("dd.MM.yyyy");
         }
-
-        if (s.WorkCenterId.HasValue && workCenterBusy.ContainsKey(s.WorkCenterId.Value))
-        {
-            var wcFree = workCenterBusy[s.WorkCenterId.Value].Min();
-            if (wcFree > possibleStart)
-                possibleStart = wcFree;
-        }
-
-        return new
-        {
-            Step = s,
-            Start = possibleStart
-        };
-    })
-    .OrderBy(x => x.Start)                //  GALVENAIS
-    .ThenByDescending(x => x.Step.TasksPush)
-    .ThenByDescending(x => x.Step.PriorityLevel)
-    .ThenByDescending(x => x.Step.TasksPriority)
-    .ThenBy(x => x.Step.IsPriority ? 0 : 1)
-    .ThenBy(x => x.Step.Priority)
-    .Select(x => x.Step)
-    .First();
-
-    availableSteps.Remove(step);
-
-    // ⏱ start
-   DateTime stepStart = partStepEndTimes.ContainsKey(step.ProductToPartId)
-    ? partStepEndTimes[step.ProductToPartId]
-    : startDate;
-
-    if (partStepEndTimes.ContainsKey(step.ProductToPartId))
-        stepStart = partStepEndTimes[step.ProductToPartId];
-
-    // 👷 employee
-    if (step.AssignedTo.HasValue)
-    {
-        var empId = step.AssignedTo.Value;
-
-        if (employeeBusy.ContainsKey(empId))
-        {
-            var empFreeAt = employeeBusy[empId];
-            if (empFreeAt > stepStart)
-                stepStart = empFreeAt;
-        }
-    }
-
-    // 🏭 workcenter
-    if (step.WorkCenterId.HasValue)
-    {
-        var wcId = step.WorkCenterId.Value;
-
-        if (!workCenterBusy.ContainsKey(wcId))
-        {
-            var capacity = step.Capacity > 0 ? step.Capacity : 1;
-
-            workCenterBusy[wcId] = Enumerable
-                .Repeat(stepStart, capacity)
-                .ToList();
-        }
-
-        var slots = workCenterBusy[wcId];
-        var earliest = slots.Min();
-
-        if (earliest > stepStart)
-            stepStart = earliest;
-    }
-
-    // ⏱ duration
-    var stepRemaining = step.EstimatedTotalMinutes - step.ActualMinutes;
-    if (stepRemaining < 0) stepRemaining = 0;
-
-    var stepEnd = CalculateStepEnd(stepStart, stepRemaining, calendarDict);
-
-    // 🏭 update WC
-    if (step.WorkCenterId.HasValue)
-    {
-        var slots = workCenterBusy[step.WorkCenterId.Value];
-        var index = slots.IndexOf(slots.Min());
-        slots[index] = stepEnd;
-    }
-
-    // 👷 update employee
-    if (step.AssignedTo.HasValue)
-    {
-        employeeBusy[step.AssignedTo.Value] = stepEnd;
-    }
-
-    // 📦 part timing
-    partStepEndTimes[step.ProductToPartId] = stepEnd;
-
-    if (step.IsFinal)
-    {
-        partFinishTimes[step.ProductToPartId] = stepEnd;
-    }
-
-    //  unlock next step
-var nextStep = detailTasks
-    .Where(s => s.ProductToPartId == step.ProductToPartId &&
-                s.StepOrder > step.StepOrder)
-    .OrderBy(s => s.StepOrder)
-    .FirstOrDefault();
-
-    if (nextStep != null)
-    {
-        availableSteps.Add(nextStep);
     }
 }
 
-if (result.Status == "Nav iesākts")
-        {
-            result.FinishDateText = "-";
-        }
-else if (result.Status == "Procesā")
-{
-    if (partFinishTimes.Any())
-    {
-        var finishDate = partFinishTimes.Values.Max();
-
-        result.FinishDate = finishDate;
-        result.FinishDateText = finishDate.ToString("dd.MM.yyyy");
-    }
-    else
-    {
-        result.FinishDateText = "-";
-    }
-}
-                    else if (result.Status == "Pabeigts")
-                    {
-                        var finished = detailTasks
-                            .Where(t => t.Status == 3 && t.FinishedAt != null);
-
-                        if (finished.Any())
-                        {
-                            var lastDate = finished.Max(t => t.FinishedAt);
-                                if (lastDate is DateTime dt)
-                                    {
-                                        result.FinishDate = dt;
-                                        result.FinishDateText = dt.ToString("dd.MM.yyyy");
-                                    }
-                        }
-                        else
-                        {
-                            result.FinishDateText = "-";
-                        }
-                    }
 
 // =======================
 // ASSEMBLY STATUS LOĢIKA
 // =======================
 
-CalculateAssembly(result, tasks, detailTasks, calendarDict, startDate);
 CalculateFinishing(result, tasks, calendarDict, startDate);
 
     return result;
@@ -399,35 +221,59 @@ private Dictionary<int, SimulationResult> SimulateAllSteps(
     Dictionary<int, DateTime> batchStartMap)
 {
     var result = new Dictionary<int, SimulationResult>();
-    var partStepEndTimes = new Dictionary<int, DateTime>();
+    var partStepEndTimes = new Dictionary<(int batchId, int partId), DateTime>();
 
     var availableSteps = new List<TaskDto>();
 
     // 🔥 sākam ar pirmajiem step (katram part)
-    availableSteps.AddRange(
-        allStepsQueue
-            .GroupBy(s => new { s.BatchProductId, s.ProductToPartId })
-            .Select(g => g.OrderBy(s => s.StepOrder).First())
-    );
+availableSteps.AddRange(
+    allStepsQueue
+        .GroupBy(s => new { s.BatchProductId, s.ProductToPartId })
+        .Select(g => g
+            .Where(s => s.Status != 3)
+            .OrderBy(s => s.StepOrder)
+            .FirstOrDefault())
+        .Where(x => x != null)
+        .Select(x => x!)
+);
 
 while (availableSteps.Any())
 {
+
     var step = availableSteps
         .Select(s =>
         {
-            DateTime possibleStart = batchStartMap.ContainsKey(s.BatchProductId)
-                ? batchStartMap[s.BatchProductId]
-                : DateTime.Today;
 
-            if (partStepEndTimes.ContainsKey(s.ProductToPartId))
-                possibleStart = partStepEndTimes[s.ProductToPartId];
+            DateTime possibleStart = DateTime.Today;
+
+            // 🔴 ja jau ir paveikts → sākam no fakta
+            if (s.FinishedAt.HasValue)
+            {
+                possibleStart = s.FinishedAt.Value;
+            }
+
+            if (batchStartMap.ContainsKey(s.BatchProductId))
+                {
+                    var batchStart = batchStartMap[s.BatchProductId];
+                    if (batchStart > possibleStart)
+                        possibleStart = batchStart;
+                }
+
+                if (partStepEndTimes.ContainsKey((s.BatchProductId, s.ProductToPartId)))
+                {
+                    var chainEnd = partStepEndTimes[(s.BatchProductId, s.ProductToPartId)];
+
+                    if (chainEnd > possibleStart)
+                        possibleStart = chainEnd;
+                }
 
             if (s.AssignedTo.HasValue && sharedEmployeeBusy.ContainsKey(s.AssignedTo.Value))
-            {
-                var empFree = sharedEmployeeBusy[s.AssignedTo.Value];
-                if (empFree > possibleStart)
-                    possibleStart = empFree;
-            }
+                {
+                    var empFree = sharedEmployeeBusy[s.AssignedTo.Value];
+
+                    if (empFree > possibleStart)
+                        possibleStart = empFree;
+                }
 
             if (s.WorkCenterId.HasValue && sharedWorkCenterBusy.ContainsKey(s.WorkCenterId.Value))
             {
@@ -442,33 +288,46 @@ while (availableSteps.Any())
                 Start = possibleStart
             };
         })
-        .OrderBy(x => x.Start)
-        .ThenByDescending(x => x.Step.TasksPush)
-        .ThenByDescending(x => x.Step.PriorityLevel)
-        .ThenByDescending(x => x.Step.TasksPriority)
-        .ThenBy(x => x.Step.IsPriority ? 0 : 1)
-        .ThenBy(x => x.Step.Priority)
-        .Select(x => x.Step)
-        .First();
+            .OrderBy(x => x.Start)
+            .ThenByDescending(x => x.Step.TasksPush)
+            .ThenByDescending(x => x.Step.PriorityLevel)
+            .ThenByDescending(x => x.Step.TasksPriority)
+            .ThenBy(x => x.Step.IsPriority ? 0 : 1)
+            .ThenBy(x => x.Step.Priority)
+            .Select(x => x.Step)
+            .First();;
 
     availableSteps.Remove(step);
 
-    DateTime stepStart;
+DateTime stepStart = DateTime.MinValue;
 
-    if (partStepEndTimes.ContainsKey(step.ProductToPartId))
-        {
-            // 🔥 turpinām chain
-            stepStart = partStepEndTimes[step.ProductToPartId];
-        }
-    else if (batchStartMap.ContainsKey(step.BatchProductId))
-        {
-            // 🔥 tikai pirmais step batchā
-            stepStart = batchStartMap[step.BatchProductId];
-        }
-    else
-        {
-            stepStart = DateTime.Today;
-        }
+//  1) ja step jau bijis → ņem faktisko
+if (step.FinishedAt.HasValue)
+{
+    stepStart = step.FinishedAt.Value;
+}
+
+//  2) chain (iepriekšējais step)
+if (partStepEndTimes.ContainsKey((step.BatchProductId, step.ProductToPartId)))
+{
+    var chainEnd = partStepEndTimes[(step.BatchProductId, step.ProductToPartId)];
+    if (chainEnd > stepStart)
+        stepStart = chainEnd;
+}
+
+//  3) batch start
+if (batchStartMap.ContainsKey(step.BatchProductId))
+{
+    var batchStart = batchStartMap[step.BatchProductId];
+    if (batchStart > stepStart)
+        stepStart = batchStart;
+}
+
+//  4) fallback → Today
+if (stepStart == DateTime.MinValue)
+{
+    stepStart = DateTime.Today;
+}
 
     if (step.AssignedTo.HasValue)
         {
@@ -502,10 +361,20 @@ while (availableSteps.Any())
                 stepStart = earliest;
         }
 
+DateTime stepEnd;
+
+// 🔴 JA PABEIGTS → ņem DB laiku, NESIMULĒ
+if (step.Status == 3 && step.FinishedAt.HasValue)
+{
+    stepEnd = step.FinishedAt.Value;
+}
+else
+{
     var stepRemaining = step.EstimatedTotalMinutes - step.ActualMinutes;
     if (stepRemaining < 0) stepRemaining = 0;
 
-    var stepEnd = CalculateStepEnd(stepStart, stepRemaining, calendarDict);
+    stepEnd = CalculateStepEnd(stepStart, stepRemaining, calendarDict);
+}
 
     if (step.WorkCenterId.HasValue)
         {
@@ -514,12 +383,14 @@ while (availableSteps.Any())
             slots[index] = stepEnd;
         }
 
-    if (step.AssignedTo.HasValue)
-        {
-            sharedEmployeeBusy[step.AssignedTo.Value] = stepEnd;
-        }
+if (step.AssignedTo.HasValue)
+{
+    var empId = step.AssignedTo.Value;
 
-    partStepEndTimes[step.ProductToPartId] = stepEnd;
+    sharedEmployeeBusy[empId] = stepEnd;
+}
+
+    partStepEndTimes[(step.BatchProductId, step.ProductToPartId)] = stepEnd;
 
 if (step.IsFinal)
 {
@@ -527,18 +398,28 @@ if (step.IsFinal)
         result[step.BatchProductId] = new SimulationResult();
 
     if (step.StepType == 1)
-        result[step.BatchProductId].DetailFinish = stepEnd;
+    {
+        var current = result[step.BatchProductId].DetailFinish;
+        if (!current.HasValue || stepEnd > current.Value)
+            result[step.BatchProductId].DetailFinish = stepEnd;
+    }
 
     if (step.StepType == 2)
-        result[step.BatchProductId].AssemblyFinish = stepEnd;
+    {
+        var current = result[step.BatchProductId].AssemblyFinish;
+        if (!current.HasValue || stepEnd > current.Value)
+            result[step.BatchProductId].AssemblyFinish = stepEnd;
+    }
 }
 
 var nextStep = allStepsQueue
-        .Where(s => s.BatchProductId == step.BatchProductId &&
-                    s.ProductToPartId == step.ProductToPartId &&
-                    s.StepOrder > step.StepOrder)
-        .OrderBy(s => s.StepOrder)
-        .FirstOrDefault();
+    .Where(s =>
+        s.BatchProductId == step.BatchProductId &&
+        s.ProductToPartId == step.ProductToPartId &&
+        s.StepOrder > step.StepOrder &&
+        s.Status != 3)
+    .OrderBy(s => s.StepOrder)
+    .FirstOrDefault();
 
     if (nextStep != null)
     {
@@ -558,28 +439,6 @@ private void CalculateAssembly(
 {
     var assemblyTasks = tasks.Where(t => t.StepType == 2).ToList();
 
-// 🔥 ja jau ir globālā simulācija → izmanto to
-if (result.AssemblyFinishDate.HasValue)
-{
-    var assemblyStatusesSim = assemblyTasks.Select(t => t.Status).ToList();
-
-    if (assemblyStatusesSim.All(s => s == 3))
-    {
-        result.AssemblyStatus = "Pabeigts";
-    }
-    else if (assemblyStatusesSim.Any(s => s == 2))
-    {
-        result.AssemblyStatus = "Procesā";
-    }
-    else
-    {
-        result.AssemblyStatus = "Gaida";
-    }
-
-    //  DATUMU vairs nepārrēķinam šeit!
-    return;
-}
-
     if (!assemblyTasks.Any())
     {
         result.AssemblyStatus = "-";
@@ -587,88 +446,97 @@ if (result.AssemblyFinishDate.HasValue)
         return;
     }
 
-    var assemblyStatuses = assemblyTasks.Select(t => t.Status).ToList();
     var detailStatuses = detailTasks.Select(t => t.Status).ToList();
+    var assemblyStatuses = assemblyTasks.Select(t => t.Status).ToList();
 
-    // 🔴 DETAIL nav gatavs (ir status 5)
-    if (detailStatuses.Any(s => s == 5))
+    var hasDetailNotStarted = detailStatuses.Any(s => s == 5);
+    var detailAllFinished = detailStatuses.All(s => s == 3);
+
+    var hasAssemblyActive = assemblyStatuses.Any(s => s == 1 || s == 2);
+    var assemblyAllFinished = assemblyStatuses.All(s => s == 3);
+
+    // 🔵 4) Assembly pabeigts → DB
+    if (assemblyAllFinished)
+    {
+        result.AssemblyStatus = "Pabeigts";
+
+        var last = assemblyTasks
+            .Where(t => t.FinishedAt != null)
+            .Select(t => t.FinishedAt!.Value)
+            .Max();
+
+        result.AssemblyFinishDate = last;
+        result.AssemblyTimeText = last.ToString("dd.MM.yyyy");
+        return;
+    }
+
+    // 🔴 1) Detail ir 5 → rāda tikai laiku
+    var hasOnlyNotStarted = detailStatuses.All(s => s == 5);
+
+if (hasOnlyNotStarted)
     {
         result.AssemblyStatus = "Gaida";
 
-        var totalMinutes = assemblyTasks.Sum(t => t.EstimatedTotalMinutes);
+        var totalMinutes = assemblyTasks
+            .Sum(t => Math.Max(0, t.EstimatedTotalMinutes - t.ActualMinutes));
+
+        if (totalMinutes == 0)
+        {
+            result.AssemblyTimeText = "-";
+            return;
+        }
 
         var d = totalMinutes / (8 * 60);
         var h = (totalMinutes % (8 * 60)) / 60;
         var m = totalMinutes % 60;
 
-        result.AssemblyTimeText = totalMinutes == 0
-            ? "-"
-            : $"{d}d {h}h {m}m";
-
+        result.AssemblyTimeText = $"{d}d {h}h {m}m";
         return;
     }
 
-    // 🟢 PABEIGTS
-    if (assemblyStatuses.All(s => s == 3))
-    {
-        result.AssemblyStatus = "Pabeigts";
+    // 🟢 3) Detail visi 3 → sāk no DB finish
+DateTime assemblyStart;
 
-        var finishedAssembly = assemblyTasks
-            .Where(t => t.Status == 3 && t.FinishedAt != null)
-            .Select(t => t.FinishedAt!.Value)
-            .ToList();
+// 🔥 Assembly NEKAD nedrīkst sākties pirms Detail finish
 
-        if (finishedAssembly.Any())
-        {
-            var lastAssemblyDate = finishedAssembly.Max();
-            result.AssemblyFinishDate = lastAssemblyDate;
-            result.AssemblyTimeText = lastAssemblyDate.ToString("dd.MM.yyyy");
-        }
-        else
-        {
-            result.AssemblyTimeText = "-";
-        }
+var baseStart = startDate;
 
-        return;
-    }
+// ja ir detail finish → tas ir obligāts minimums
+if (result.FinishDate.HasValue)
+{
+    baseStart = result.FinishDate.Value > baseStart
+        ? result.FinishDate.Value
+        : baseStart;
+}
 
-    // 🟡 PROCESĀ
-    if (assemblyStatuses.Any(s => s == 2))
-    {
-        result.AssemblyStatus = "Procesā";
-
-        var assemblyStarted = assemblyTasks
-            .Where(t => t.Status != 5 && t.FinishedAt != null)
-            .Select(t => t.FinishedAt!.Value)
-            .ToList();
-
-        var assemblyStartDate = assemblyStarted.Any()
-            ? assemblyStarted.Max()
-            : DateTime.Today;
-
-        var totalRemaining = assemblyTasks
-            .Sum(t => Math.Max(0, t.EstimatedTotalMinutes - t.ActualMinutes));
-
-        var finishDate = CalculateStepEnd(assemblyStartDate, totalRemaining, calendarDict);
-
-        result.AssemblyFinishDate = finishDate;
-        result.AssemblyTimeText = finishDate.ToString("dd.MM.yyyy");
-
-        return;
-    }
-
-    // 🔵 GAIDA (detail procesā vai pabeigts)
-    result.AssemblyStatus = "Gaida";
-
-    var detailStartPoint = result.FinishDate ?? startDate;
+assemblyStart = baseStart;
 
     var remaining = assemblyTasks
         .Sum(t => Math.Max(0, t.EstimatedTotalMinutes - t.ActualMinutes));
 
-    var assemblyFinish = CalculateStepEnd(detailStartPoint, remaining, calendarDict);
+ var finish = CalculateStepEnd(assemblyStart, remaining, calendarDict);
 
-    result.AssemblyFinishDate = assemblyFinish;
-    result.AssemblyTimeText = assemblyFinish.ToString("dd.MM.yyyy");
+if (result.FinishDate.HasValue)
+{
+    finish = finish < result.FinishDate.Value
+        ? result.FinishDate.Value
+        : finish;
+}
+
+result.AssemblyFinishDate = finish;
+result.AssemblyTimeText = finish.ToString("dd.MM.yyyy");
+
+var startedAssembly = assemblyTasks
+    .Where(t => t.Status != 5 && t.FinishedAt != null)
+    .Select(t => t.FinishedAt!.Value);
+
+if (startedAssembly.Any())
+{
+    assemblyStart = startedAssembly.Max() > assemblyStart
+        ? startedAssembly.Max()
+        : assemblyStart;
+}
+
 }
 
 private void CalculateFinishing(
@@ -731,8 +599,22 @@ public async Task<Dictionary<int, DetailResult>> CalculateDetailGlobal(
     var calendarDict = calendar.ToDictionary(c => c.WorkDate.Date);
 
 var batchStartMap = orderedBatches
-    .Select((b, index) => new { b.BatchProductId, Start = DateTime.Today.AddHours(index * 4) })
-    .ToDictionary(x => x.BatchProductId, x => x.Start);
+    .ToDictionary(
+        x => x.BatchProductId,
+        x =>
+        {
+            var batchTasks = allTasksOrdered
+                .Where(t => t.BatchProductId == x.BatchProductId && t.StepType == 1);
+
+            var lastFinished = batchTasks
+                .Where(t => t.FinishedAt != null)
+                .Select(t => t.FinishedAt!.Value)
+                .DefaultIfEmpty(DateTime.Today)
+                .Max();
+
+            return lastFinished;
+        }
+    );
 
     var simulatedBatchFinish = SimulateAllSteps(
         allStepsQueue,
@@ -758,45 +640,70 @@ var batchStartMap = orderedBatches
         // ✔ prioritāte dod reālu nobīdi (nevis 30min)
         var queueStart = DateTime.Today.AddHours(queueIndex * 4);
 
-    var detail = new DetailResult();
+var detail = await CalculateDetail(
+    batchTasks,
+    batch.Planned,
+    queueStart
+);
 
-    // 🔵 Status un NOT STARTED vēl ņemam no esošās loģikas
-    var detailTasks = batchTasks.Where(t => t.StepType == 1).ToList();
-    var statuses = detailTasks.Select(t => t.Status).ToList();
+// =========================
+// 🔵 DETAIL FINISH KOREKCIJA
+// =========================
 
-    if (statuses.All(s => s == 5))
-        detail.Status = "Nav iesākts";
-    else if (statuses.All(s => s == 3))
-        detail.Status = "Pabeigts";
-    else if (statuses.Any(s => s == 1 || s == 2 || s == 3))
-        detail.Status = "Procesā";
+if (simulatedBatchFinish.ContainsKey(batch.BatchProductId))
+{
+    var sim = simulatedBatchFinish[batch.BatchProductId];
 
-    // 🔥 HAS NOT STARTED
-    detail.HasDetailNotStarted = detailTasks.Any(t => t.Status == 5);
-
-    if (simulatedBatchFinish.ContainsKey(batch.BatchProductId))
+    if (detail.Status == "Pabeigts")
     {
-        var sim = simulatedBatchFinish[batch.BatchProductId];
+        // neko
+    }
+    else if (detail.HasDetailNotStarted)
+    {
+        var detailSteps = batchTasks.Where(t => t.StepType == 1).ToList();
 
-    // 🔵 DETAIL
-// 🔴 tikai ja NAV pabeigts
-if (sim.DetailFinish.HasValue && detail.Status != "Pabeigts")
-{
-    detail.FinishDate = sim.DetailFinish.Value;
-    detail.FinishDateText = sim.DetailFinish.Value.ToString("dd.MM.yyyy");
+        var hasActive = detailSteps.Any(t => t.Status == 1 || t.Status == 2);
+        var hasFinished = detailSteps.Any(t => t.Status == 3);
+        var hasOnlyFinishedAndNotStarted =
+            !hasActive && hasFinished && detailSteps.Any(t => t.Status == 5);
+
+        if (hasActive && sim.DetailFinish.HasValue)
+        {
+            detail.FinishDate = sim.DetailFinish.Value;
+            detail.FinishDateText = sim.DetailFinish.Value.ToString("dd.MM.yyyy");
+        }
+        else if (hasOnlyFinishedAndNotStarted)
+        {
+            var lastFinished = detailSteps
+                .Where(t => t.Status == 3 && t.FinishedAt != null)
+                .Select(t => t.FinishedAt!.Value)
+                .Max();
+
+            detail.FinishDate = lastFinished;
+            detail.FinishDateText = lastFinished.ToString("dd.MM.yyyy");
+        }
+    }
+    else
+    {
+        if (sim.DetailFinish.HasValue)
+        {
+            detail.FinishDate = sim.DetailFinish.Value;
+            detail.FinishDateText = sim.DetailFinish.Value.ToString("dd.MM.yyyy");
+        }
+    }
 }
 
-    // 🟡 ASSEMBLY
-// 🔴 tikai ja NAV pabeigts
-if (sim.AssemblyFinish.HasValue 
-    && !detail.HasDetailNotStarted 
-    && detail.AssemblyStatus != "Pabeigts")
-{
-    detail.AssemblyFinishDate = sim.AssemblyFinish.Value;
-    detail.AssemblyTimeText = sim.AssemblyFinish.Value.ToString("dd.MM.yyyy");
-}
-}
+// =========================
+// 🔥 TAGAD tikai rēķinam Assembly
+// =========================
 
+CalculateAssembly(
+    detail,
+    batchTasks,
+    batchTasks.Where(t => t.StepType == 1).ToList(),
+    calendarDict,
+    queueStart
+);
 result[batch.BatchProductId] = detail;
 
     }

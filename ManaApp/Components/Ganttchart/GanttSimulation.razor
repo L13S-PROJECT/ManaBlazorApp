@@ -74,7 +74,9 @@
             @(detail.NotStartedText ?? "-")
         </div>
 
-        <div class="cell">@detail.FinishDateText</div>
+        <div class="cell">
+            @(detail.FinishDateText ?? "-")
+        </div>
 
 <!-- Assembly posms -->
         <div class="cell">@detail.AssemblyStatus</div>
