@@ -27,9 +27,10 @@ namespace ManaApp.Services
                     var availability = _availabilityCache ??= await GetEmployeeAvailability(DateTime.Today.AddDays(-7), DateTime.Today.AddDays(30));
                     var calendarDict = calendar.ToDictionary(c => c.WorkDate.Date);
                     var result = new DetailResult
-                        {
-                            Status = "-"
-                        };
+                    {
+                        Status = "-",
+                        PlannedQty = quantity
+                    };
 
                     var detailTasks = tasks.Where(t => t.StepType == 1).ToList();
                     result.HasDetailNotStarted = detailTasks.Any(t => t.Status == 5);
@@ -101,12 +102,9 @@ if (result.Status == "Pabeigts" && result.FinishDate == null)
     }
 }
 
-
 // =======================
 // ASSEMBLY STATUS LOĢIKA
 // =======================
-
-CalculateFinishing(result, tasks, calendarDict, startDate);
 
     return result;
  }
@@ -341,6 +339,36 @@ if (stepStart == DateTime.MinValue)
             }
         }
 
+//  employee availability (nepieejamība)
+if (step.AssignedTo.HasValue && _availabilityCache != null)
+{
+    var empId = step.AssignedTo.Value;
+
+    var blocks = _availabilityCache
+        .Where(a => a.EmployeeID == empId && a.Status != "Available");
+
+bool adjusted;
+
+do
+{
+    adjusted = false;
+
+    foreach (var block in blocks)
+    {
+        var from = block.DateFrom;
+        var to = block.DateTo ?? block.DateFrom.AddDays(1);
+
+        if (from <= stepStart && to > stepStart)
+        {
+            stepStart = to;
+            adjusted = true;
+        }
+    }
+
+} while (adjusted);
+
+}
+
     if (step.WorkCenterId.HasValue)
         {
             var wcId = step.WorkCenterId.Value;
@@ -394,6 +422,40 @@ else
     if (stepRemaining < 0) stepRemaining = 0;
 
     stepEnd = CalculateStepEnd(stepStart, stepRemaining, calendarDict);
+
+    // 🔥 availability arī stepEnd (ja ieiet blokā)
+if (step.AssignedTo.HasValue && _availabilityCache != null)
+{
+    var empId = step.AssignedTo.Value;
+
+    var blocks = _availabilityCache
+        .Where(a => a.EmployeeID == empId && a.Status != "Available");
+
+    bool adjusted;
+
+    do
+    {
+        adjusted = false;
+
+        foreach (var block in blocks)
+        {
+            var from = block.DateFrom;
+            var to = block.DateTo ?? block.DateFrom.AddDays(1);
+
+            // ja step pārklājas ar unavailable
+            if (stepStart < to && stepEnd > from)
+            {
+                stepStart = to;
+
+                var remaining = stepRemaining;
+                stepEnd = CalculateStepEnd(stepStart, remaining, calendarDict);
+
+                adjusted = true;
+            }
+        }
+
+    } while (adjusted);
+}
 }
 
     if (step.WorkCenterId.HasValue)
@@ -619,23 +681,83 @@ if (startedAssembly.Any())
 
 }
 
-
-private void CalculateFinishing(
+private async Task CalculateFinishing(
     DetailResult result,
     List<TaskDto> tasks,
     Dictionary<DateTime, CompanyCalendarModel> calendarDict,
     DateTime startDate)
 {
-    var finishingTasks = tasks.Where(t => t.StepType == 3).ToList();
-
-    if (!finishingTasks.Any())
+    var batchId = tasks.FirstOrDefault()?.BatchProductId ?? 0;
+    if (batchId == 0)
     {
+        result.FinishingRemainingTimeText = "-";
         return;
     }
 
-    // TODO: te nāks FINISHING loģika
+    var minutesPerUnit = await _http.GetFromJsonAsync<int>(
+        $"api/production/finishing-minutes-per-unit?batchProductId={batchId}"
+    );
+
+    if (minutesPerUnit <= 0)
+        minutesPerUnit = 12;
+
+    var availableQty = result.FinishingAvailableQty ?? 0;
+    if (availableQty <= 0)
+        {
+            result.FinishingRemainingTimeText = "-";
+            return;
+        }
+
+var finishingTasks = tasks
+    .Where(t => t.StepType == 3)
+    .ToList();
+
+result.FinishingInProgressQty = finishingTasks
+    .Where(t => t.Status == 1 || t.Status == 2)
+    .Sum(t => t.QtyDone);
+
+if (!finishingTasks.Any())
+{
+    result.FinishingStatus = "-";
+}
+else
+{
+var activeTasks = finishingTasks
+    .Where(t => t.QtyDone > 0)
+    .ToList();
+
+    if (!activeTasks.Any())
+        {
+            result.FinishingStatus = "-";
+        }
+    else if (activeTasks.Any(t => t.Status == 1 || t.Status == 2))
+        {
+            result.FinishingStatus = "Procesā";
+        }
+    else if (activeTasks.All(t => t.Status == 3))
+        {
+            result.FinishingStatus = "Pabeigts";
+        }
 }
 
+    // ja viss jau nodots uz finishing → nerēķinam laiku
+if (availableQty <= 0)
+{
+    result.FinishingRemainingTimeText = "-";
+    return;
+}
+
+    var totalMinutes = (int)Math.Ceiling(minutesPerUnit * (double)availableQty);
+
+    var d = totalMinutes / (8 * 60);
+    var h = (totalMinutes % (8 * 60)) / 60;
+    var m = totalMinutes % 60;
+
+    result.FinishingRemainingTimeText =
+        totalMinutes == 0 ? "-" : $"{d}d {h}h {m}m";
+
+    return;
+}
 public async Task<List<EmployeeWorkLogModel>> GetEmployeeWorkLog(DateTime from, DateTime to)
 {
     var data = await _http.GetFromJsonAsync<List<EmployeeWorkLogModel>>(
@@ -727,9 +849,20 @@ var detail = await CalculateDetail(
     queueStart
 );
 
-// =========================
-// 🔵 DETAIL FINISH KOREKCIJA
-// =========================
+detail.FinishingAvailableQty = await GetAssemblyAvailable(batch.BatchProductId);
+
+// 🔥 paņemam reālo Planned no DB (tāpat kā UI)
+var summary = await _http.GetFromJsonAsync<List<FinishingSummaryVm>>(
+    $"api/stockmovements/finishing-summary-by-batch?batchId={batch.BatchId}"
+);
+
+var s = summary?.FirstOrDefault(x => x.BatchProductId == batch.BatchProductId);
+
+if (s != null)
+{
+    detail.PlannedQty = s.Planned;
+}
+
 
 if (simulatedBatchFinish.ContainsKey(batch.BatchProductId))
 {
@@ -795,9 +928,27 @@ CalculateAssembly(
     queueStart
 );
 
+await CalculateFinishing(
+    detail,
+    batchTasks,
+    calendarDict,
+    queueStart
+);
+
 result[batch.BatchProductId] = detail;
 
     }
+
+    return result;
+}
+
+// Finishing posmam kodi
+
+public async Task<int> GetAssemblyAvailable(int batchProductId)
+{
+    var result = await _http.GetFromJsonAsync<int>(
+        $"api/stockmovements/assembly-available-real?batchProductId={batchProductId}"
+    );
 
     return result;
 }
@@ -821,12 +972,23 @@ public class DetailResult
     public string? FinishingStatus { get; set; }
     public string? FinishingTimeText { get; set; }
     public DateTime? FinishingFinishDate { get; set; }
+    public int? FinishingAvailableQty { get; set; }
+    public string? FinishingRemainingTimeText { get; set; }
+    public int PlannedQty { get; set; }
+    public int FinishingInProgressQty { get; set; }
+    
 }
 
 public class SimulationResult
 {
     public DateTime? DetailFinish { get; set; }
     public DateTime? AssemblyFinish { get; set; }
+}
+
+private class FinishingSummaryVm
+{
+    public int BatchProductId { get; set; }
+    public int Planned { get; set; }
 }
 
     }

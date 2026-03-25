@@ -735,6 +735,24 @@ public async Task<IActionResult> GetStockByVersionRal([FromQuery] int versionId)
     return Ok(result);
 }
 
+// GET: api/stockmovements/assembly-available-real?batchProductId=123
+[HttpGet("assembly-available-real")]
+public async Task<IActionResult> GetAssemblyAvailableReal([FromQuery] int batchProductId)
+{
+    if (batchProductId <= 0)
+        return BadRequest("batchProductId is required.");
+
+    var available = await _db.StockMovements
+        .Where(x =>
+            x.BatchProduct_ID == batchProductId &&
+            x.IsActive &&
+            x.Move_Type == MoveType.ASSEMBLY)
+        .Select(x => (int?)x.Stock_Qty)
+        .SumAsync() ?? 0;
+
+    return Ok(Math.Max(available, 0));
+}
+
    }
 
     

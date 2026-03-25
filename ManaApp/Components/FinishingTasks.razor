@@ -1,3 +1,5 @@
+@*Finishing Tasks*@
+
 @using ManaApp.Models
 @using ManaApp.Components
 @inject HttpClient Http
@@ -356,6 +358,7 @@ private bool ShowFinishingConfirmPopup = false;
 private async Task OnFinishingOk((int Qty, string? Comment, int? RalColorId) data)
 
 {
+       Console.WriteLine($"[UI] Finishing OK clicked: Qty={data.Qty}, RAL={data.RalColorId}");
         if (data.Qty <= 0 || SelectedBatch is null)
             return;
 
@@ -379,6 +382,7 @@ private async Task OnFinishingOk((int Qty, string? Comment, int? RalColorId) dat
                 RalColorId = data.RalColorId
             });
 
+
     ShowFinishingPopup = false;
   
     // ja viss apjoms nodots → neko nedarām, API iedos green
@@ -386,8 +390,9 @@ private async Task OnFinishingOk((int Qty, string? Comment, int? RalColorId) dat
         IsFinishingSwitchOn = false;
 
     // pārlādējam datus, lai UI atjaunojas
-    await OnParametersSetAsync();
-    await OnDataChanged.InvokeAsync();
+await OnParametersSetAsync();
+StateHasChanged();
+await OnDataChanged.InvokeAsync();
 }
 
 private List<FinishingIndicatorVm> FinishingIndicators = new();

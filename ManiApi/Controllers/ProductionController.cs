@@ -77,6 +77,7 @@ public async Task<IActionResult> GetGantt([FromQuery] int? batchProductId)
         t.Assigned_To,
         e.Employee_Name,
         t.Finished_At,
+        t.Qty_Done,
 
     CASE 
         WHEN ts.Step_Type IN (1,2) 
@@ -154,13 +155,44 @@ WHERE ts2.ProductToPart_ID = ts.ProductToPart_ID
             AssignedTo = r.IsDBNull(17) ? (int?)null : r.GetInt32(17),
             EmployeeName = r.IsDBNull(18) ? null : r.GetString(18),
             FinishedAt = r.IsDBNull(19) ? (DateTime?)null : r.GetDateTime(19),
-            EstimatedTotalMinutes = r.IsDBNull(20) ? 0 : r.GetInt32(20),
-            EstimatedStartMinutes = r.IsDBNull(21) ? 0 : r.GetInt32(21),
-            ActualMinutes = r.IsDBNull(22) ? 0 : r.GetInt32(22)
+            QtyDone = r.IsDBNull(20) ? 0 : r.GetInt32(20),
+            EstimatedTotalMinutes = r.IsDBNull(21) ? 0 : r.GetInt32(21),
+            EstimatedStartMinutes = r.IsDBNull(22) ? 0 : r.GetInt32(22),
+            ActualMinutes = r.IsDBNull(23) ? 0 : r.GetInt32(23)
         });
     }
 
     return Ok(list);
+}
+
+[HttpGet("finishing-minutes-per-unit")]
+public async Task<IActionResult> GetFinishingMinutesPerUnit([FromQuery] int batchProductId)
+{
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+
+    cmd.CommandText = @"
+        SELECT COALESCE(ts.Estimated_Minutes, 12)
+        FROM batches_products bp
+        JOIN producttopparts ptp ON ptp.Version_ID = bp.Version_ID
+        JOIN toppartsteps ts ON ts.ProductToPart_ID = ptp.ID
+        WHERE bp.ID = @bp
+          AND bp.IsActive = 1
+          AND ptp.IsActive = 1
+          AND ts.IsActive = 1
+          AND ts.Step_Type = 3
+        ORDER BY ts.Step_Order
+        LIMIT 1;
+    ";
+
+    cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@bp", batchProductId));
+
+    var value = await cmd.ExecuteScalarAsync();
+    var minutesPerUnit = value == null || value == DBNull.Value ? 12 : Convert.ToInt32(value);
+
+    return Ok(minutesPerUnit);
 }
 
 }

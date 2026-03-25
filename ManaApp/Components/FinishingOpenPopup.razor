@@ -1,3 +1,5 @@
+@*Finishing Open Popup*@
+
 @inject IJSRuntime JS
 
 @if (IsOpen)
@@ -106,6 +108,8 @@
 
 private async Task ConfirmOk()
 {
+    Console.WriteLine($"SEND → qty={SendQty}, ral={SelectedRalId}, comment={CommentText}");
+
     if (SelectedRalId == null)
     {
         await JS.InvokeVoidAsync("alert", "Izvēlies RAL toni.");

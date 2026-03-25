@@ -23,6 +23,7 @@ namespace ManaApp.Models
         public int PriorityLevel { get; set; }
         public bool BatchPriority { get; set; }
         public int BatchOrder { get; set; }
+        public int QtyDone { get; set; }
 
     }
 }

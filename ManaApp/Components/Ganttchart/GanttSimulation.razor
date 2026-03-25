@@ -84,10 +84,20 @@
 
 <!-- Finishing posms -->
 
-            <div class="cell"></div>
-            <div class="cell"></div>
-            <div class="cell"></div>
-            <div class="cell"></div>
+            <div class="cell">
+                @(detail.FinishingAvailableQty > 0 
+                    ? detail.FinishingAvailableQty 
+                    : "-")
+            </div>
+            <div class="cell">
+                @(detail.FinishingRemainingTimeText ?? "-")
+            </div>
+            <div class="cell">@detail.FinishingStatus</div>
+            <div class="cell">
+                @(detail.FinishingInProgressQty > 0 
+                    ? detail.FinishingInProgressQty 
+                    : "-")
+            </div>
             <div class="cell"></div>
             <div class="cell"></div>
 
@@ -148,11 +158,6 @@ var debugOrder = allTasksOrdered
     .Select(t => $"BP:{t.BatchProductId} Step:{t.StepOrder}")
     .ToList();
 
-foreach (var line in debugOrder)
-{
-    Console.WriteLine(line);
-}
-
 // grupējam step pa batch (lai kontrolētu secību)
 var stepsByBatch = allTasksOrdered
     .GroupBy(t => t.BatchProductId)
@@ -181,12 +186,6 @@ availableSteps = availableSteps
     .OrderBy(t => t.StepOrder)
     .ThenBy(t => t.BatchProductId)
     .ToList();
-
-// DEBUG — kādi darbi ir pieejami startam
-foreach (var step in availableSteps)
-{
-    Console.WriteLine($"QUEUE -> BP:{step.BatchProductId} Step:{step.StepOrder}");
-}
 
     }
 private string GetAssemblyClass(GanttSimulationService.DetailResult detail)

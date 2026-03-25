@@ -5,6 +5,8 @@ using ManiApi.Data;
 using Microsoft.EntityFrameworkCore;
 using MySqlConnector;
 using ManiApi.Models;
+using System.Data;
+
 
 namespace ManiApi.Controllers
 {
@@ -28,7 +30,9 @@ public async Task<IActionResult> GetForEmployee(
 
 {
     var conn = _db.Database.GetDbConnection();
-    await conn.OpenAsync();
+
+    if (conn.State != System.Data.ConnectionState.Open)
+        await conn.OpenAsync();
 
     await using var cmd = conn.CreateCommand();
 cmd.CommandText = @"
@@ -1020,6 +1024,9 @@ public async Task<IActionResult> OpenFinishing([FromBody] OpenFinishingDto dto)
 Console.WriteLine(
  $"[open-finishing] bpId={dto.BatchProductId}, ptpId={dto.ProductToPartId}, qty={dto.Qty}, ral={dto.RalColorId}, comment='{dto.Comment}'");
 
+try
+{
+
     if (dto.BatchProductId <= 0 || dto.ProductToPartId <= 0 || dto.Qty <= 0)
         return BadRequest("BatchProductId, ProductToPartId un Qty ir obligāti, Qty > 0.");
 
@@ -1171,26 +1178,10 @@ activeTask = new ManiApi.Models.Tasks
         }
     }
 
-var conn = _db.Database.GetDbConnection();
-await conn.OpenAsync();
-
-int versionId;
-
-await using (var cmd = conn.CreateCommand())
-{
-    cmd.CommandText = @"
-        SELECT Version_Id
-        FROM batches_products
-        WHERE ID = @id
-        LIMIT 1;";
-
-    var p = cmd.CreateParameter();
-    p.ParameterName = "@id";
-    p.Value = batchProductId;
-    cmd.Parameters.Add(p);
-
-    versionId = Convert.ToInt32(await cmd.ExecuteScalarAsync());
-}
+var versionId = await _db.Set<BatchProduct>()
+    .Where(x => x.ID == batchProductId)
+    .Select(x => x.Version_Id)
+    .FirstAsync();
 
 _db.StockMovements.Add(new StockMovement
 {
@@ -1220,10 +1211,19 @@ _db.StockMovements.Add(new StockMovement
 
 await _db.SaveChangesAsync();
 await tx.CommitAsync();
+
+
     return Ok(new OpenFinishingResultDto
     {
         TaskId = activeTask.ID
     });
+
+    }
+catch (Exception ex)
+{
+    Console.WriteLine("ERROR open-finishing: " + ex.ToString());
+    return StatusCode(500, ex.ToString());
+}
 }
 
 /// šo vajag pie ProductioTasks.razor "ķeksim" 5->1
