@@ -320,6 +320,8 @@ if (higherExists)
 {
     Console.WriteLine("BLOCKED BY PRIORITY RULE");
     await tx.RollbackAsync();
+    Console.WriteLine($"DEBUG CLAIM: taskId={dto.TaskId}, emp={dto.EmpId}");
+    Console.WriteLine($"curIsPriority={currentIsPriority}, curBatchOrder={currentBatchOrder}, curStepOrder={currentStepOrder}");
     return Conflict("Ir augstākas prioritātes darbs.");
 }
 }

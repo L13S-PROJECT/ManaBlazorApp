@@ -1,3 +1,6 @@
+// Preču API kontrolieris
+// Šeit ir metodes, kas saistītas ar precēm, to versijām, detaļām un tehnoloģiju soļiem.
+
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ManiApi.Data;

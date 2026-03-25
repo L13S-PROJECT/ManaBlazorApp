@@ -1,3 +1,5 @@
+@*Darbinieku kopskats - ar pieeajmiem darbiem*@
+
 @page "/employeetasks"
 @using System.Net.Http.Json
 @using System.Linq
@@ -8,6 +10,19 @@
 @inject AppState AppState
 
 <div class="employee-page-root">
+
+<div class="employee-switch">
+    <label>Darbinieks:</label>
+
+    <select @onchange="OnEmployeeChanged">
+        @foreach (var emp in employees)
+        {
+            <option value="@emp.Id" selected="@(emp.Id == selectedEmployeeId)">
+                @emp.Name
+            </option>
+        }
+    </select>
+</div>
 
 <div class="employee-main-block">   
     <div class="main-layout">
@@ -209,12 +224,6 @@ private IEnumerable<TaskRow> NormalCanStart =>
 private IEnumerable<TaskRow> NormalWaiting =>
     tasks.Where(t => !t.BatchPriority && t.Priority == 0 && t.Status == 1 && !CanStart(t));
 
-
-protected override async Task OnInitializedAsync()
-{
-    await LoadTasks();
-}
-
 private string StatusText(int s, TaskRow t) => s switch
 {
     1 => "Nav iesākts",
@@ -232,7 +241,7 @@ private async Task ClaimTask(int taskId)
     var body = new
     {
         taskId,
-        empId = 1 // testējam ar vienu darbinieku
+        empId = selectedEmployeeId
     };
 
     var resp = await Http.PostAsJsonAsync("api/tasks/claim", body);
@@ -245,24 +254,17 @@ private async Task ClaimTask(int taskId)
     }
 }
 
-
 private async Task LoadTasks()
 {
-tasks = await Http.GetFromJsonAsync<List<TaskRow>>(
-    "api/tasks/for-employee"
-) ?? new();
+    tasks = await Http.GetFromJsonAsync<List<TaskRow>>(
+        $"api/tasks/for-employee?empId={selectedEmployeeId}"
+    ) ?? new();
 
-foreach (var t in tasks)
-{
-    Console.WriteLine($"BatchPrio={t.BatchPriority} | TaskPrio={t.Priority} | Step={t.StepOrder} | BatchCode={t.BatchCode}");
+    _activeTask = tasks.FirstOrDefault(t => t.Status == 2);
+
+    StateHasChanged();
 }
 
-_activeTask = tasks.FirstOrDefault(t => t.Status == 2);
-
-
-StateHasChanged(); // 
-
-}
 private TaskRow? FirstAvailableTask =>
     tasks.FirstOrDefault(t => t.Status == 1 && CanStart(t));
 
@@ -307,7 +309,17 @@ private Task OpenTaskDialog(TaskRow t)
 
 }
 
+private async Task LoadEmployees()
+{
+    employees = await Http.GetFromJsonAsync<List<EmployeeDto>>(
+        "api/employees"
+    ) ?? new();
 
+    if (employees.Any())
+    {
+        selectedEmployeeId = employees.First().Id;
+    }
+}
 
 private void CloseTaskDialog()
 {
@@ -361,6 +373,28 @@ private void OpenFinishDialog(TaskRow t)
     _selectedTask = t;
     _dialogMode = TaskDialogMode.Finish;
     _isDialogOpen = true;
+}
+
+private int selectedEmployeeId = 1;
+private List<EmployeeDto> employees = new();
+
+private class EmployeeDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+}
+
+protected override async Task OnInitializedAsync()
+{
+    await LoadEmployees();
+    await LoadTasks();
+}
+
+
+private async Task OnEmployeeChanged(ChangeEventArgs e)
+{
+    selectedEmployeeId = int.Parse(e.Value!.ToString()!);
+    await LoadTasks();
 }
 
 }

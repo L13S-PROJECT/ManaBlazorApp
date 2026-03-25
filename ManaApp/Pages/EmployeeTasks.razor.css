@@ -67,3 +67,21 @@
     border: 1px solid #d6d8db;
     opacity: 0.85;
 }
+
+.employee-switch {
+    background: #ffffff;
+    border: 2px solid #1e40af;
+    border-radius: 6px;
+
+    padding: 8px 12px;
+    margin-bottom: 10px;
+
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.employee-switch select {
+    padding: 4px 8px;
+    border-radius: 4px;
+}

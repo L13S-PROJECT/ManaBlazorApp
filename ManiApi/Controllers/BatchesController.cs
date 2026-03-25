@@ -686,7 +686,7 @@ SELECT
     0,
     0,
     0,
-    1,
+    NULL,
     NULL,
     1
 FROM batches_products bp
