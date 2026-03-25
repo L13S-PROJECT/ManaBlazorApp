@@ -228,7 +228,10 @@ availableSteps.AddRange(
     allStepsQueue
         .GroupBy(s => new { s.BatchProductId, s.ProductToPartId })
         .Select(g => g
-            .Where(s => s.Status != 3)
+            .Where(s =>
+                    s.StepType != 3 ||          // Detail + Assembly VISI
+                    (s.StepType == 3 && (s.Status == 1 || s.Status == 2)) // Finishing tikai aktīvie
+                )
             .OrderBy(s => s.StepOrder)
             .FirstOrDefault())
         .Where(x => x != null)
@@ -480,18 +483,25 @@ if (step.IsFinal)
         result[step.BatchProductId] = new SimulationResult();
 
     if (step.StepType == 1)
-    {
-        var current = result[step.BatchProductId].DetailFinish;
-        if (!current.HasValue || stepEnd > current.Value)
-            result[step.BatchProductId].DetailFinish = stepEnd;
-    }
+        {
+            var current = result[step.BatchProductId].DetailFinish;
+            if (!current.HasValue || stepEnd > current.Value)
+                result[step.BatchProductId].DetailFinish = stepEnd;
+        }
 
     if (step.StepType == 2)
-    {
-        var current = result[step.BatchProductId].AssemblyFinish;
-        if (!current.HasValue || stepEnd > current.Value)
-            result[step.BatchProductId].AssemblyFinish = stepEnd;
-    }
+        {
+            var current = result[step.BatchProductId].AssemblyFinish;
+            if (!current.HasValue || stepEnd > current.Value)
+                result[step.BatchProductId].AssemblyFinish = stepEnd;
+        }
+
+    if (step.StepType == 3)
+        {
+            var current = result[step.BatchProductId].FinishingFinish;
+            if (!current.HasValue || stepEnd > current.Value)
+                result[step.BatchProductId].FinishingFinish = stepEnd;
+        }
 }
 
 var nextStep = allStepsQueue
@@ -705,12 +715,16 @@ private async Task CalculateFinishing(
     if (availableQty <= 0)
         {
             result.FinishingRemainingTimeText = "-";
-            return;
         }
 
 var finishingTasks = tasks
     .Where(t => t.StepType == 3)
     .ToList();
+
+// ✔ Pabeigtais apjoms (status = 3)
+result.FinishingDoneQty = finishingTasks
+    .Where(t => t.Status == 3 && t.QtyDone > 0)
+    .Sum(t => t.QtyDone);
 
 result.FinishingInProgressQty = finishingTasks
     .Where(t => t.Status == 1 || t.Status == 2)
@@ -740,14 +754,7 @@ var activeTasks = finishingTasks
         }
 }
 
-    // ja viss jau nodots uz finishing → nerēķinam laiku
-if (availableQty <= 0)
-{
-    result.FinishingRemainingTimeText = "-";
-    return;
-}
-
-    var totalMinutes = (int)Math.Ceiling(minutesPerUnit * (double)availableQty);
+ var totalMinutes = (int)Math.Ceiling(minutesPerUnit * (double)availableQty);
 
     var d = totalMinutes / (8 * 60);
     var h = (totalMinutes % (8 * 60)) / 60;
@@ -755,6 +762,43 @@ if (availableQty <= 0)
 
     result.FinishingRemainingTimeText =
         totalMinutes == 0 ? "-" : $"{d}d {h}h {m}m";
+    
+var finishedTasks = finishingTasks
+    .Where(t => t.Status == 3 && t.FinishedAt != null)
+    .Select(t => t.FinishedAt!.Value)
+    .ToList();
+
+var hasActive = finishingTasks.Any(t => t.Status == 1 || t.Status == 2);
+var allFinished = finishingTasks.Any() && finishingTasks.All(t => t.Status == 3);
+
+// 1) JA ir aktīvi (1/2) → globālā simulācija
+if (hasActive && result.FinishingFinishDate.HasValue)
+{
+    var simDate = result.FinishingFinishDate.Value;
+
+    if (result.AssemblyFinishDate.HasValue && simDate < result.AssemblyFinishDate.Value)
+        simDate = result.AssemblyFinishDate.Value;
+
+    result.FinishingTimeText = simDate.ToString("dd.MM.yyyy");
+}
+
+// 2) JA visi pabeigti → DB max
+else if (allFinished && finishedTasks.Any())
+{
+    var last = finishedTasks.Max();
+
+    // 🔥 drošība pret Assembly
+    if (result.AssemblyFinishDate.HasValue && last < result.AssemblyFinishDate.Value)
+        last = result.AssemblyFinishDate.Value;
+
+    result.FinishingTimeText = last.ToString("dd.MM.yyyy");
+}
+
+// 3) fallback
+else
+{
+    result.FinishingTimeText = "-";
+}
 
     return;
 }
@@ -920,6 +964,16 @@ if (simulatedBatchFinish.ContainsKey(batch.BatchProductId))
     }
 }
 
+if (simulatedBatchFinish.ContainsKey(batch.BatchProductId))
+{
+    var sim = simulatedBatchFinish[batch.BatchProductId];
+
+    if (sim.FinishingFinish.HasValue)
+    {
+        detail.FinishingFinishDate = sim.FinishingFinish.Value;
+    }
+}
+
 CalculateAssembly(
     detail,
     batchTasks,
@@ -976,6 +1030,7 @@ public class DetailResult
     public string? FinishingRemainingTimeText { get; set; }
     public int PlannedQty { get; set; }
     public int FinishingInProgressQty { get; set; }
+    public int FinishingDoneQty { get; set; }
     
 }
 
@@ -983,6 +1038,7 @@ public class SimulationResult
 {
     public DateTime? DetailFinish { get; set; }
     public DateTime? AssemblyFinish { get; set; }
+    public DateTime? FinishingFinish { get; set; }
 }
 
 private class FinishingSummaryVm

@@ -88,20 +88,83 @@
                 @(detail.FinishingAvailableQty > 0 
                     ? detail.FinishingAvailableQty 
                     : "-")
+
+                <div class="info-wrapper">
+
+    <button class="info-btn"
+            @onclick="(e) => TogglePopup(row.BatchProductId, e)">
+        ℹ️
+    </button>
+
+    @if (openedBatchId == row.BatchProductId)
+    {
+        <div class="finishing-popup"
+             style="top:@(popupY + 10)px; left:@(popupX + 10)px;">
+
+            <div class="popup-card">
+
+                <div class="popup-header">
+                    <b>Finishing info</b>
+                    <button class="close-btn" @onclick="() => openedBatchId = null">✖</button>
+                </div>
+
+                <div class="popup-row">
+                    <span>Plānots:</span>
+                    <b>@detail.PlannedQty</b>
+                </div>
+
+                <div class="popup-row">
+                    <span>Nekrāsoti:</span>
+                    <b>@(detail.FinishingAvailableQty ?? 0)</b>
+                </div>
+
+                <div class="popup-section">
+                    <b>Krāsošanā:</b>
+                </div>
+
+                @foreach (var t in tasksByBatch[row.BatchProductId]
+                    .Where(t => t.StepType == 3 && t.QtyDone > 0)
+                    .OrderBy(t => t.Status == 1 ? 0 : t.Status == 2 ? 1 : 2))
+                {
+                    <div class="popup-row small grid">
+                        <span class="col-qty">@t.QtyDone gb</span>
+                        <span class="col-ral">@t.RalColorName</span>
+                        <span class="col-status">
+                            @(t.Status == 1 ? "Gaida" :
+                            t.Status == 2 ? "Procesā" :
+                            t.Status == 3 ? "Pabeigts" : "-")
+                        </span>
+                    </div>
+                }
+
+            </div>
+        </div>
+    }
+
+</div>
             </div>
             <div class="cell">
                 @(detail.FinishingRemainingTimeText ?? "-")
             </div>
             <div class="cell">@detail.FinishingStatus</div>
+
             <div class="cell">
                 @(detail.FinishingInProgressQty > 0 
                     ? detail.FinishingInProgressQty 
                     : "-")
             </div>
-            <div class="cell"></div>
-            <div class="cell"></div>
+
+            <div class="cell">
+                @(detail.FinishingTimeText ?? "-")
+            </div>
+            <div class="cell">
+                @(detail.FinishingDoneQty > 0 
+                    ? detail.FinishingDoneQty 
+                    : "-")
+            </div>
 
         </div>
+
     }
 
 </div>
@@ -109,6 +172,7 @@
     </div>
 
 </div>
+
 
 
 @code {
@@ -207,4 +271,22 @@ private string GetAssemblyClass(GanttSimulationService.DetailResult detail)
 }
     public int DetailedInProgress { get; set; }
     public int DetailedFinish { get; set; }
+
+int? openedBatchId = null;
+double popupX, popupY;
+
+void TogglePopup(int batchId, MouseEventArgs e)
+{
+    if (openedBatchId == batchId)
+    {
+        openedBatchId = null;
+        return;
+    }
+
+    openedBatchId = batchId;
+
+    popupX = e.ClientX;
+    popupY = e.ClientY;
+}
+
 }

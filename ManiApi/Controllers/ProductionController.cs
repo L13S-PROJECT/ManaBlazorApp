@@ -78,6 +78,8 @@ public async Task<IActionResult> GetGantt([FromQuery] int? batchProductId)
         e.Employee_Name,
         t.Finished_At,
         t.Qty_Done,
+        t.RAL_Color_ID,
+        rc.Name AS RalColorName,
 
     CASE 
         WHEN ts.Step_Type IN (1,2) 
@@ -116,6 +118,7 @@ WHERE ts2.ProductToPart_ID = ts.ProductToPart_ID
         LEFT JOIN employees e ON e.ID = t.Assigned_To
         JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
         JOIN toppart tp ON tp.ID = ptp.TopPart_ID
+        LEFT JOIN ral_colors rc ON rc.ID = t.RAL_Color_ID
         WHERE t.IsActive = 1
         AND ts.IsActive = 1
         AND (@bp IS NULL OR t.BatchProduct_ID = @bp)
@@ -156,9 +159,11 @@ WHERE ts2.ProductToPart_ID = ts.ProductToPart_ID
             EmployeeName = r.IsDBNull(18) ? null : r.GetString(18),
             FinishedAt = r.IsDBNull(19) ? (DateTime?)null : r.GetDateTime(19),
             QtyDone = r.IsDBNull(20) ? 0 : r.GetInt32(20),
-            EstimatedTotalMinutes = r.IsDBNull(21) ? 0 : r.GetInt32(21),
-            EstimatedStartMinutes = r.IsDBNull(22) ? 0 : r.GetInt32(22),
-            ActualMinutes = r.IsDBNull(23) ? 0 : r.GetInt32(23)
+            RalColorId = r.IsDBNull(21) ? (int?)null : r.GetInt32(21),
+            RalColorName = r.IsDBNull(22) ? null : r.GetString(22),
+            EstimatedTotalMinutes = r.IsDBNull(23) ? 0 : r.GetInt32(23),
+            EstimatedStartMinutes = r.IsDBNull(24) ? 0 : r.GetInt32(24),
+            ActualMinutes = r.IsDBNull(25) ? 0 : r.GetInt32(25),
         });
     }
 

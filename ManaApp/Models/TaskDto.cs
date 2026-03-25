@@ -24,6 +24,8 @@ namespace ManaApp.Models
         public bool BatchPriority { get; set; }
         public int BatchOrder { get; set; }
         public int QtyDone { get; set; }
+        public int? RalColorId { get; set; }
+    public string? RalColorName { get; set; }
 
     }
 }

@@ -74,3 +74,83 @@
     padding: 2px 2px;
 }
 
+.info-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.finishing-popup {
+    position: fixed;
+    z-index: 9999;
+    top: 24px;   /* zem pogas */
+    left: 0;
+    z-index: 1000;
+}
+
+.popup-card {
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 12px;
+    min-width: 220px;
+    max-width: 280px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.popup-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.close-btn {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+.popup-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 4px 0;
+}
+
+.popup-row.small {
+    font-size: 13px;
+}
+
+.popup-section {
+    margin-top: 8px;
+    border-top: 1px solid #eee;
+    padding-top: 6px;
+}
+
+.info-btn {
+    margin-left: 6px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.popup-row.grid {
+    display: grid;
+    grid-template-columns: 60px 1fr auto;
+    align-items: center;
+    gap: 8px;
+}
+
+.col-qty {
+    text-align: left;
+}
+
+.col-ral {
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.col-status {
+    text-align: right;
+}
