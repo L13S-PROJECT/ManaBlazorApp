@@ -10,11 +10,17 @@
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #e6f0ff;
 }
 
 .simulation-body {
     flex: 1;
-    
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: #ffffff;
 }
 
 .cell {
@@ -22,11 +28,6 @@
     border: 1px solid #ccc;
     font-size: 12px;
     white-space: nowrap;
-}
-
-.top .cell {
-    font-weight: bold;
-    background: #f5f5f5;
 }
 
 .header-row {
@@ -52,16 +53,19 @@
 
 .top .cell {
     font-weight: bold;
-    background: #f5f5f5;
+    background: #137bf2;   /* spilgti zils */
+    color: white;          /* balti burti */
     text-align: center;
     display: flex;
     align-items: center;
     justify-content: center;
+    border: 1px solid #0f5fc2; /* tumšāks border, lai redz sadalījumu */
 }
 
 .simulation-toolbar {
     display: flex;
-    gap: 4px;
+    align-items: center;
+    gap: 8px;
     padding: 4px;
     border-bottom: 1px solid #ccc;
 }
@@ -153,4 +157,205 @@
 
 .col-status {
     text-align: right;
+}
+
+.header-bottom .cell {
+    font-weight: bold;
+}
+
+.data-row {
+    display: grid;
+    width: 100%;
+    grid-template-columns:
+        5% 10% 6% 6% 6%
+        7% 7% 6%
+        7% 7%
+        5% 5% 6% 5% 6% 6%;
+}
+
+.simulation-body .cell {
+    font-weight: normal;
+}
+
+.bg-yellow {
+    background-color: #ffe58a;
+}
+
+.bg-green {
+    background-color: #b7eb8f;
+}
+
+.text-gray {
+    color: #999;
+}
+
+.bg-blue {
+    background-color: #91caff;
+}
+
+.search-box {
+    position: relative;
+    display: inline-block;
+}
+
+.search-box input {
+    padding: 4px 24px 4px 8px;
+    min-width: 220px;
+    border: 1px solid #137bf2;
+    border-radius: 6px;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+/* kad focus (raksta) */
+.search-box input:focus {
+    background-color: #e6f0ff;
+    border-color: #137bf2;
+}
+
+/* X poga */
+.clear-btn {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 12px;
+    color: #137bf2;
+}
+
+/* hover efekts */
+.clear-btn:hover {
+    color: #0f5fc2;
+}
+
+.highlight {
+    background-color: #ffe58a;
+    padding: 0 2px;
+    border-radius: 3px;
+}
+
+.data-row:hover {
+    background-color: #cbe1f7;
+    cursor: pointer;
+}
+
+.status-filter select {
+    padding: 4px 8px;
+    border: 1px solid #137bf2;
+    border-radius: 6px;
+    background-color: white;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.status-filter select:focus {
+    background-color: #e6f0ff;
+}
+
+.simulation-toolbar select {
+    padding: 4px 8px;
+    border: 1px solid #137bf2;
+    border-radius: 6px;
+    background-color: white;
+    outline: none;
+    transition: all 0.2s ease;
+    height: 28px;
+}
+
+/* focus efekts kā search */
+.simulation-toolbar select:focus {
+    background-color: #e6f0ff;
+}
+
+/* label sakārtošana */
+.simulation-toolbar label {
+    margin-left: 6px;
+    font-size: 13px;
+}
+
+.simulation-toolbar button {
+    padding: 5px 12px;
+    background-color: #2f54eb;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.simulation-toolbar button:hover {
+    background-color: #1d39c4;
+}
+
+.archive-switch {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    inset: 0;
+    background-color: #d9d9d9;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.slider::before {
+    content: "";
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 3px;
+    top: 3px;
+    background-color: white;
+    border-radius: 50%;
+    transition: 0.2s;
+}
+
+.switch input:checked + .slider {
+    background-color: #d9d9d9;
+}
+
+.switch input:checked + .slider::before {
+    transform: translateX(20px);
+    background-color: #1677ff;
+}
+
+.finishing-popup {
+    position: fixed;
+    z-index: 1000;
+    pointer-events: auto;
+}
+
+/* hover efekts kartiņai */
+.popup-card {
+    transition: all 0.15s ease;
+}
+
+.popup-card:hover {
+    box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+}
+
+.row-active {
+    background-color: #e6f4ff;
 }

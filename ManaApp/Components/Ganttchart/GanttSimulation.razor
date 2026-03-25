@@ -3,13 +3,55 @@
 @using ManaApp.Services
 @inject HttpClient Http
 @inject GanttSimulationService Service
+@using System.Text.RegularExpressions
 
-<div class="simulation-table">
+<div class="simulation-table" @onclick="ClosePopup">
+<div class="simulation-toolbar">
 
-    <div class="simulation-toolbar">
-        <input type="text" placeholder="Meklēt..." />
-        <button>Arhīvs</button>
+    <div class="search-box">
+        <input type="text"
+               placeholder="Meklēt..."
+               value="@searchText"
+               @oninput="OnSearchInput" />
+
+        @if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            <button class="clear-btn" @onclick="ClearSearch">✖</button>
+        }
     </div>
+
+    <label>Detail:</label>
+        <select @bind="selectedDetailStatus">
+            <option value="">Visi</option>
+            <option value="Nav iesākts">Nav iesākts</option>
+            <option value="Procesā">Procesā</option>
+            <option value="Pabeigts">Pabeigts</option>
+        </select>
+
+<label>Assembly:</label>
+    <select @bind="selectedAssemblyStatus">
+        <option value="">Visi</option>
+        <option value="Gaida">Gaida</option>
+        <option value="Procesā">Procesā</option>
+        <option value="Pabeigts">Pabeigts</option>
+    </select>
+
+<label>Finishing:</label>
+    <select @bind="selectedFinishingStatus">
+        <option value="">Visi</option>
+        <option value="Procesā">Procesā</option>
+        <option value="Pabeigts">Pabeigts</option>
+    </select>
+
+    <div class="archive-switch">
+        <span>Arhīvs</span>
+        <label class="switch">
+            <input type="checkbox" @bind="showArchive" />
+            <span class="slider"></span>
+        </label>
+    </div>
+
+</div>
 
     <div class="simulation-header">
 
@@ -25,7 +67,7 @@
 
     </div>
     
-        <div class="header-row bottom">
+        <div class="header-row bottom header-bottom">
             <div class="cell">Batch</div>
             <div class="cell">Nosaukums</div>
             <div class="cell">Kods</div>
@@ -49,13 +91,50 @@
 
         <div class="simulation-body">
         
-   @foreach (var row in ordered)
+@foreach (var row in ordered.Where(r =>
+    detailResults.ContainsKey(r.BatchProductId)
+    &&
+    // 🟦 ARHĪVS
+        (
+            showArchive
+                ? true
+                : !(detailResults[r.BatchProductId].FinishingStatus == "Pabeigts"
+                    && (detailResults[r.BatchProductId].FinishingAvailableQty ?? 0) == 0)
+        )
+    &&
+    (
+        string.IsNullOrWhiteSpace(searchText) ||
+        (r.ProductName != null && r.ProductName.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
+        (r.ProductCode != null && r.ProductCode.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
+        (r.BatchCode != null && r.BatchCode.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+    )
+    &&
+    // 🔵 Detail filtrs
+    (
+        string.IsNullOrWhiteSpace(selectedDetailStatus) ||
+        detailResults[r.BatchProductId].Status == selectedDetailStatus
+    )
+    &&
+    // 🟣 Assembly filtrs
+    (
+        string.IsNullOrWhiteSpace(selectedAssemblyStatus) ||
+        detailResults[r.BatchProductId].AssemblyStatus == selectedAssemblyStatus
+    )
+    &&
+    // 🟢 Finishing filtrs
+    (
+        string.IsNullOrWhiteSpace(selectedFinishingStatus) ||
+        detailResults[r.BatchProductId].FinishingStatus == selectedFinishingStatus
+    )
+))
     {
-        <div class="header-row bottom">
+        <div class="data-row 
+            @(IsFinished(detailResults[row.BatchProductId]) ? "text-gray" : "")
+            @(openedBatchId == row.BatchProductId ? "row-active" : "")">
 
-            <div class="cell">@row.BatchCode</div>
-            <div class="cell">@row.ProductName</div>
-            <div class="cell">@row.ProductCode</div>
+            <div class="cell">@Highlight(row.BatchCode)</div>
+            <div class="cell">@Highlight(row.ProductName)</div>
+            <div class="cell">@Highlight(row.ProductCode)</div>
             <div class="cell">@row.VersionName</div>
             <div class="cell">@row.Planned</div>
 
@@ -70,11 +149,11 @@
 
         <div class="cell">@detail.Status</div>
     
-        <div class="cell">
+        <div class="cell text-gray">
             @(detail.NotStartedText ?? "-")
         </div>
 
-        <div class="cell">
+        <div class="cell @GetDetailClass(detail)">
             @(detail.FinishDateText ?? "-")
         </div>
 
@@ -92,13 +171,15 @@
                 <div class="info-wrapper">
 
     <button class="info-btn"
-            @onclick="(e) => TogglePopup(row.BatchProductId, e)">
+        @onclick="(e) => TogglePopup(row.BatchProductId, e)"
+        @onclick:stopPropagation>
         ℹ️
     </button>
 
     @if (openedBatchId == row.BatchProductId)
     {
         <div class="finishing-popup"
+                @onclick:stopPropagation
              style="top:@(popupY + 10)px; left:@(popupX + 10)px;">
 
             <div class="popup-card">
@@ -143,7 +224,7 @@
 
 </div>
             </div>
-            <div class="cell">
+            <div class="cell text-gray">
                 @(detail.FinishingRemainingTimeText ?? "-")
             </div>
             <div class="cell">@detail.FinishingStatus</div>
@@ -154,7 +235,7 @@
                     : "-")
             </div>
 
-            <div class="cell">
+            <div class="cell @GetFinishingClass(detail)">
                 @(detail.FinishingTimeText ?? "-")
             </div>
             <div class="cell">
@@ -172,8 +253,6 @@
     </div>
 
 </div>
-
-
 
 @code {
     List<BatchSimulationRow> data = new();
@@ -287,6 +366,104 @@ void TogglePopup(int batchId, MouseEventArgs e)
 
     popupX = e.ClientX;
     popupY = e.ClientY;
+}
+
+private string GetDetailClass(GanttSimulationService.DetailResult detail)
+{
+    if (detail.Status == "Pabeigts")
+        return "bg-green";
+
+    if (detail.Status == "Procesā")
+        return "bg-yellow";
+
+    return "";
+}
+
+private string GetFinishingClass(GanttSimulationService.DetailResult detail)
+{
+    // 1) Procesā (status 1/2)
+    if (detail.FinishingStatus == "Procesā")
+        return "bg-yellow";
+
+    // 2) Pabeigts, bet vēl ir atlikums (nekrāsoti)
+    if (detail.FinishingStatus == "Pabeigts" && (detail.FinishingAvailableQty ?? 0) > 0)
+        return "bg-blue";
+
+    // 3) Viss pabeigts
+    if (detail.FinishingStatus == "Pabeigts" && (detail.FinishingAvailableQty ?? 0) == 0)
+        return "bg-green";
+
+    return "";
+}
+
+void ClearSearch()
+{
+    debounceCts?.Cancel();
+    searchText = "";
+}
+
+private MarkupString Highlight(string? text)
+{
+    if (string.IsNullOrWhiteSpace(searchText) || string.IsNullOrWhiteSpace(text))
+        return (MarkupString)(text ?? "");
+
+    var pattern = Regex.Escape(searchText);
+
+    var result = Regex.Replace(
+        text,
+        pattern,
+        match => $"<span class='highlight'>{match.Value}</span>",
+        RegexOptions.IgnoreCase
+    );
+
+    return (MarkupString)result;
+}
+
+string searchText = "";
+CancellationTokenSource? debounceCts;
+
+async Task OnSearchInput(ChangeEventArgs e)
+{
+    debounceCts?.Cancel();
+    debounceCts = new CancellationTokenSource();
+
+    try
+    {
+        await Task.Delay(300, debounceCts.Token); // 300ms debounce
+        searchText = e.Value?.ToString() ?? "";
+        StateHasChanged();
+    }
+    catch (TaskCanceledException)
+    {
+        // ignorējam
+    }
+}
+
+string selectedStatus = "";
+
+string selectedDetailStatus = "";
+string selectedAssemblyStatus = "";
+string selectedFinishingStatus = "";
+
+void ClearAllFilters()
+{
+    searchText = "";
+    selectedDetailStatus = "";
+    selectedAssemblyStatus = "";
+    selectedFinishingStatus = "";
+}
+
+bool showArchive = false;
+
+bool IsFinished(GanttSimulationService.DetailResult detail)
+{
+    return detail.FinishingStatus == "Pabeigts"
+        && (detail.FinishingAvailableQty ?? 0) == 0;
+}
+
+void ClosePopup()
+{
+    openedBatchId = null;
 }
 
 }
