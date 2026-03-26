@@ -49,49 +49,17 @@ public async Task<IActionResult> Get()
                 bp.Priority      AS Priority,
                 bp.NormalOrder   AS NormalOrder,
 
-                -- Detailed Y = cik detaļu šim BatchProduct (no taskiem)
-                (
-                    SELECT COUNT(DISTINCT ts.ProductToPart_ID)
-                    FROM tasks t
-                    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-                    WHERE t.BatchProduct_ID = bp.ID
-                    AND t.IsActive = 1
-                    AND ts.Step_Type = 1
-                ) AS DetailedY,
-
+             -- Detailed Y = cik detaļu šim BatchProduct (no taskiem)
+                agg.DetailedY,
 
             -- Detailed X = cik detaļu ir aktīvas (status 1/2/3) (šim BatchProduct)
-            (
-                SELECT COUNT(DISTINCT ts.ProductToPart_ID)
-                FROM tasks t
-                JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-                WHERE t.BatchProduct_ID = bp.ID
-                AND t.IsActive = 1
-                AND ts.Step_Type = 1
-                AND t.Tasks_Status IN (1,2,3)
-            ) AS DetailedX,
+            agg.DetailedX,
 
             -- Detailed Started X = cik detaļu ir iesāktas (status 2/3)
-                (
-                    SELECT COUNT(DISTINCT ts.ProductToPart_ID)
-                    FROM tasks t
-                    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-                    WHERE t.BatchProduct_ID = bp.ID
-                    AND t.IsActive = 1
-                    AND ts.Step_Type = 1
-                    AND t.Tasks_Status IN (2,3)
-                ) AS DetailedStartedX,
+            agg.DetailedStartedX,
 
                 -- Detailed DONE X = cik detaļu pabeigtas (status 3)
-                (
-                    SELECT COUNT(DISTINCT ts.ProductToPart_ID)
-                    FROM tasks t
-                    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-                    WHERE t.BatchProduct_ID = bp.ID
-                    AND t.IsActive = 1
-                    AND ts.Step_Type = 1
-                    AND t.Tasks_Status = 3
-                ) AS DetailedDoneX,
+            agg.DetailedDoneX,
 
 (
     CASE
@@ -228,26 +196,10 @@ public async Task<IActionResult> Get()
 
                 -- Finishin X = cik detaļu ir procesā (šim BatchProduct)
 -- Finishing STATUS 2 (procesā)
-(
-    SELECT COALESCE(SUM(t.Qty_Done), 0)
-    FROM tasks t
-    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-    WHERE t.BatchProduct_ID = bp.ID
-      AND t.IsActive = 1
-      AND ts.Step_Type = 3
-      AND t.Tasks_Status = 2
-) AS FinishingStatus2,
+agg.FinishingStatus2,
 
 -- Finishing STATUS 3 (pabeigts)
-(
-    SELECT COALESCE(SUM(t.Qty_Done), 0)
-    FROM tasks t
-    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-    WHERE t.BatchProduct_ID = bp.ID
-      AND t.IsActive = 1
-      AND ts.Step_Type = 3
-      AND t.Tasks_Status = 3
-) AS FinishingStatus3,
+agg.FinishingStatus3,
 
 -- Finishing STOCK (no Assembly)
 (
@@ -256,9 +208,30 @@ public async Task<IActionResult> Get()
     WHERE sm.IsActive = 1
       AND sm.BatchProduct_ID = bp.ID
       AND sm.Move_Type = 'ASSEMBLY'
-) AS FinishingStock,
+) AS FinishingStock
 
             FROM batches_products bp
+            LEFT JOIN (
+                SELECT
+                    t.BatchProduct_ID,
+
+                    COUNT(DISTINCT CASE WHEN ts.Step_Type = 1 THEN ts.ProductToPart_ID END) AS DetailedY,
+
+                    COUNT(DISTINCT CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status IN (1,2,3) THEN ts.ProductToPart_ID END) AS DetailedX,
+
+                    COUNT(DISTINCT CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status IN (2,3) THEN ts.ProductToPart_ID END) AS DetailedStartedX,
+
+                    COUNT(DISTINCT CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status = 3 THEN ts.ProductToPart_ID END) AS DetailedDoneX,
+
+                    SUM(CASE WHEN ts.Step_Type = 3 AND t.Tasks_Status = 2 THEN t.Qty_Done ELSE 0 END) AS FinishingStatus2,
+
+                    SUM(CASE WHEN ts.Step_Type = 3 AND t.Tasks_Status = 3 THEN t.Qty_Done ELSE 0 END) AS FinishingStatus3
+
+                FROM tasks t
+                JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+                WHERE t.IsActive = 1
+                GROUP BY t.BatchProduct_ID
+            ) agg ON agg.BatchProduct_ID = bp.ID
             JOIN batches b ON b.ID = bp.Batch_Id
             JOIN versions v   ON v.ID = bp.Version_Id
             JOIN products p   ON p.ID = v.Product_ID
@@ -272,7 +245,10 @@ public async Task<IActionResult> Get()
                     AND t.IsActive = 1
                     AND t.Tasks_Status <> 3
                 )
-                ORDER BY bp.is_priority DESC, bp.Priority ASC;";
+                ORDER BY 
+                    bp.is_priority DESC,
+                    CASE WHEN bp.is_priority = 1 THEN bp.Priority END ASC,
+                    CASE WHEN bp.is_priority = 0 THEN bp.NormalOrder END ASC;";
 
                 await using var reader = await cmd.ExecuteReaderAsync();
 
@@ -305,8 +281,6 @@ public async Task<IActionResult> Get()
                     FinishingStatus2 = reader.GetInt32(21),
                     FinishingStatus3 = reader.GetInt32(22),
                     FinishingStock   = reader.GetInt32(23),
-                    FinishingStatus1 = reader.GetInt32(24),
-
                 });
 
                 }
@@ -413,111 +387,138 @@ public async Task<IActionResult> GetPriorityImpact()
     await using (var cmd = conn.CreateCommand())
     {
             cmd.CommandText = @"
+WITH task_flags AS (
+    SELECT
+        t.ID,
+        COALESCE(t.Assigned_To, 0) AS Assigned_To,
+        wc2.ID AS WorkCentr_ID,
+        wc2.WorkCentr_Name AS WorkCenterName,
+        wc2.Step_Type_ID AS StepTypeId,
+        t.BatchProduct_ID,
+        COALESCE(bp.is_priority,0) AS IsPriority,
+        CASE
+            WHEN NOT EXISTS (
+                SELECT 1
+                FROM tasks t2
+                JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+                WHERE t2.BatchProduct_ID = t.BatchProduct_ID
+                  AND ts2.ProductToPart_ID = ts.ProductToPart_ID
+                  AND ts2.Step_Order < ts.Step_Order
+                  AND t2.Tasks_Status <> 3
+                  AND t2.IsActive = 1
+            )
+            AND NOT EXISTS (
+                SELECT 1
+                FROM tasks t3
+                JOIN toppartsteps ts3 ON ts3.ID = t3.TopPartStep_ID
+                WHERE t3.BatchProduct_ID = t.BatchProduct_ID
+                AND ts3.ProductToPart_ID = ts.ProductToPart_ID
+                AND t3.IsActive = 1
+                AND t3.Tasks_Status IN (2,3)
+            )
+             THEN 1 ELSE 0
+        END AS CanStart
+    FROM tasks t
+    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+    LEFT JOIN workcentr_type wc2 ON wc2.ID = ts.WorkCentr_ID
+    JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+    WHERE t.IsActive = 1
+    AND t.Tasks_Status = 1
+)
+
 SELECT
     wc.WorkCentr_Name AS WorkCenter,
     COALESCE(wc.Step_Type_ID, 99) AS SortStepType,
-    e.ID AS EmployeeId,
-    e.Employee_Name AS EmployeeName,
+    emp_list.EmployeeId AS EmployeeId,
+    COALESCE(e.Employee_Name, 'Nav piešķirts') AS EmployeeName,
 
-SUM(CASE WHEN bp.is_priority = 1 AND t.ID IS NOT NULL THEN 1 ELSE 0 END) AS PriorityCount,
-SUM(CASE WHEN bp.is_priority = 0 AND t.ID IS NOT NULL THEN 1 ELSE 0 END) AS NormalCount,
-SUM(
-    CASE
-        WHEN bp.is_priority = 1
-    AND t.ID IS NOT NULL
- AND NOT EXISTS (
-    SELECT 1
-    FROM tasks t2
-    JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
-    WHERE t2.BatchProduct_ID = t.BatchProduct_ID
-        AND ts2.ProductToPart_ID = s.ProductToPart_ID
-        AND ts2.Step_Order < s.Step_Order
-      AND t2.Tasks_Status <> 3
-      AND t2.IsActive = 1
-)
+SUM(CASE 
+    WHEN tf.IsPriority = 1
+    AND tf.Assigned_To IS NOT NULL 
+    AND tf.Assigned_To <> 0
+    THEN 1 ELSE 0 END) AS PriorityCount,
 
-        THEN 1 ELSE 0
-    END
-) AS PriorityCanStartCount,
+SUM(CASE 
+    WHEN tf.IsPriority = 0
+    AND tf.Assigned_To IS NOT NULL 
+    AND tf.Assigned_To <> 0
+    THEN 1 ELSE 0 END) AS NormalCount,
 
-SUM(
-    CASE
-        WHEN bp.is_priority = 0
-        AND t.Tasks_Status = 1
-        AND t.ID IS NOT NULL
-        AND NOT EXISTS (
-            SELECT 1
-            FROM tasks t2
-            JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
-            WHERE t2.BatchProduct_ID = t.BatchProduct_ID
-              AND ts2.ProductToPart_ID = s.ProductToPart_ID
-              AND ts2.Step_Order < s.Step_Order
-              AND t2.Tasks_Status <> 3
-              AND t2.IsActive = 1
-        )
-        THEN 1 ELSE 0
-    END
-) AS NormalCanStartCount,
-SUM(
-    CASE 
-WHEN t.ID IS NOT NULL
-AND NOT EXISTS (
-    SELECT 1
-    FROM tasks t2
-    JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
-    WHERE t2.BatchProduct_ID = t.BatchProduct_ID
-      AND ts2.ProductToPart_ID = s.ProductToPart_ID
-      AND ts2.Step_Order < s.Step_Order
-      AND t2.Tasks_Status <> 3
-      AND t2.IsActive = 1
-)
-    
-        THEN 1
-        ELSE 0
-    END
-) AS CanStartCount
+SUM(CASE 
+    WHEN tf.IsPriority = 1
+    AND tf.Assigned_To IS NOT NULL 
+    AND tf.Assigned_To <> 0
+    AND tf.CanStart = 1
+    THEN 1 ELSE 0 END) AS PriorityCanStartCount,
 
-FROM workcentr_type wc
+SUM(CASE 
+    WHEN tf.IsPriority = 0
+    AND tf.Assigned_To IS NOT NULL 
+    AND tf.Assigned_To <> 0
+     AND tf.CanStart = 1
+    THEN 1 ELSE 0 END) AS NormalCanStartCount,
 
-CROSS JOIN (
+SUM(CASE 
+    WHEN tf.CanStart = 1
+    AND tf.Assigned_To IS NOT NULL 
+    AND tf.Assigned_To <> 0
+    THEN 1 ELSE 0 END) AS CanStartCount,
+
+SUM(CASE 
+    WHEN tf.CanStart = 1
+    THEN 1 ELSE 0 END) AS AssignedCanStartCount,
+
+SUM(CASE 
+    WHEN tf.Assigned_To IS NULL OR tf.Assigned_To = 0
+    THEN 1 ELSE 0 END) AS UnassignedTotalCount,
+
+SUM(CASE 
+    WHEN tf.IsPriority = 1
+     AND tf.Assigned_To IS NOT NULL 
+     AND tf.Assigned_To <> 0
+     AND tf.CanStart = 0
+    THEN 1 ELSE 0 END) AS PriorityWaitingCount,
+
+SUM(CASE 
+    WHEN tf.IsPriority = 0
+     AND tf.Assigned_To IS NOT NULL 
+     AND tf.Assigned_To <> 0
+     AND tf.CanStart = 0
+    THEN 1 ELSE 0 END) AS NormalWaitingCount
+
+FROM (
+    SELECT ID AS EmployeeId
+    FROM employees
+    WHERE IsActive = 1
+
+    UNION ALL
+    SELECT 0
+) emp_list
+
+CROSS JOIN workcentr_type wc
+
+LEFT JOIN task_flags tf 
+    ON tf.Assigned_To = emp_list.EmployeeId
+   AND tf.WorkCentr_ID = wc.ID
+
+LEFT JOIN (
     SELECT ID, Employee_Name
     FROM employees
     WHERE IsActive = 1
 
     UNION ALL
-    SELECT 0 AS ID, 'Nav piešķirts' AS Employee_Name
-) e
-
-LEFT JOIN toppartsteps s
-    ON s.WorkCentr_ID = wc.ID
-    AND s.IsActive = 1
-
-LEFT JOIN tasks t
-    ON t.TopPartStep_ID = s.ID
-    AND t.IsActive = 1
-    AND t.Tasks_Status = 1
-    AND (
-        (e.ID = 0 AND (t.Assigned_To IS NULL OR t.Assigned_To = 0))
-        OR
-        (e.ID > 0 AND t.Assigned_To = e.ID)
-    )
-
-LEFT JOIN batches_products bp
-    ON bp.ID = t.BatchProduct_ID
-    AND bp.IsActive = 1
-
-WHERE wc.IsActive = 1
+    SELECT 0 AS ID, 'Nav piešķirts'
+) e ON e.ID = emp_list.EmployeeId
 
 GROUP BY
     wc.WorkCentr_Name,
     wc.Step_Type_ID,
-    e.ID,
-    e.Employee_Name
+    emp_list.EmployeeId
 
 ORDER BY
     SortStepType ASC,
     wc.WorkCentr_Name ASC,
-    EmployeeName ASC;
+    EmployeeId ASC
 
             ";
 
@@ -534,7 +535,11 @@ ORDER BY
                     NormalCount   = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
                     PriorityCanStartCount = reader.IsDBNull(6) ? 0 : reader.GetInt32(6),
                     NormalCanStartCount   = reader.IsDBNull(7) ? 0 : reader.GetInt32(7),
-                    CanStartCount = reader.IsDBNull(8) ? 0 : reader.GetInt32(8)
+                    CanStartCount = reader.IsDBNull(8) ? 0 : reader.GetInt32(8),
+                    AssignedCanStartCount = reader.IsDBNull(9) ? 0 : reader.GetInt32(9),
+                    UnassignedTotalCount  = reader.IsDBNull(10) ? 0 : reader.GetInt32(10),
+                    PriorityWaitingCount = reader.IsDBNull(11) ? 0 : reader.GetInt32(11),
+                    NormalWaitingCount   = reader.IsDBNull(12) ? 0 : reader.GetInt32(12),
                 });
         }
     }

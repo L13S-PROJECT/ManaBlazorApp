@@ -1,3 +1,4 @@
+@*Priority Impact Summary Component*@ 
 @using ManaApp.Components.PriorityTasks
 @using System.Linq
 @using System.Text.Json.Serialization
@@ -24,6 +25,12 @@ else
             .ThenBy(x => x.Name)
             .Select(x => x.Name)
             .ToList();
+        var lookup = rows
+            .GroupBy(r => (r.WorkCenter, r.EmployeeName))
+            .ToDictionary(
+                g => g.Key,
+                g => g.First()
+            );
     
 <div class="priority-impact-box">
 
@@ -37,7 +44,7 @@ else
 
 @foreach (var emp in employees)
 {
-    var empRow = rows.FirstOrDefault(r => r.EmployeeName == emp);
+    var empRow = rows.FirstOrDefault(r => r.EmployeeName == emp && r.EmployeeId != 0);
 
     <div class="impact-cell">
         <span style="cursor:pointer"
@@ -58,15 +65,15 @@ else
     <div class="impact-cell"></div>
 
     @foreach (var emp in employees)
-    {
-        var sum = rows
-            .Where(r => r.EmployeeName == emp)
-            .Sum(r => r.CanStartCount);
+{
+    var sum = rows
+        .Where(r => r.EmployeeName == emp)
+        .Sum(r => r.PriorityCanStartCount + r.NormalCanStartCount);
 
-        <div class="impact-cell">
-            <strong>@sum</strong>
-        </div>
-    }
+    <div class="impact-cell">
+        <strong>@sum</strong>
+    </div>
+}
 
 </div>
 
@@ -79,10 +86,10 @@ else
      style="--emp-count:@employees.Count">
 
 @foreach (var wc in workCenters)
-{
+{     
         var wcCanStart = rows
             .Where(r => r.WorkCenter == wc)
-            .Sum(r => r.PriorityCanStartCount);
+            .Sum(r => r.PriorityCanStartCount + r.NormalCanStartCount);
 
                 <div class="impact-row">
                     <div class="impact-cell impact-wc">
@@ -101,12 +108,12 @@ else
 
                     @foreach (var emp in employees)
                     {
-                        var match = rows.FirstOrDefault(r =>
-                            r.WorkCenter == wc &&
-                            r.EmployeeName == emp);
+                        var value = lookup.TryGetValue((wc, emp), out var match)
+                            ? match.PriorityCount
+                            : 0;
 
                         <div class="impact-cell">
-                            @(match?.PriorityCount ?? 0)
+                            @value
                         </div>
                         
                     }
@@ -142,12 +149,12 @@ else
         </div>
             @foreach (var emp in employees)
             {
-                var match = rows.FirstOrDefault(r =>
-                    r.WorkCenter == wc &&
-                    r.EmployeeName == emp);
+                var value = lookup.TryGetValue((wc, emp), out var match)
+                    ? match.NormalCount
+                    : 0;
 
                 <div class="impact-cell">
-                    @(match?.NormalCount ?? 0)
+                    @value
                 </div>
             }
         </div>
@@ -174,7 +181,7 @@ else
 @code {
 
     private List<PriorityImpactRow>? rows;
-
+        
     private class PriorityImpactRow
     {
         public string WorkCenter { get; set; } = "";
@@ -186,6 +193,11 @@ else
         public int CanStartCount { get; set; }
         public int PriorityCanStartCount { get; set; }
         public int NormalCanStartCount { get; set; }
+        public int AssignedCanStartCount { get; set; }
+        public int UnassignedTotalCount { get; set; }
+        public int PriorityWaitingCount { get; set; }
+        public int NormalWaitingCount { get; set; }
+        
     }
 
     protected override async Task OnInitializedAsync()
