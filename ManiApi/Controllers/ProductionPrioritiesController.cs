@@ -22,6 +22,7 @@ public class UpdatePriorityRequest
 {
     public bool IsPriority { get; set; }
     public int Priority { get; set; }
+    public int NormalOrder { get; set; }
 }
 
 [HttpGet]
@@ -46,6 +47,7 @@ public async Task<IActionResult> Get()
                 bp.Planned_Qty   AS Planned,
                 bp.is_priority   AS IsPriority,
                 bp.Priority      AS Priority,
+                bp.NormalOrder   AS NormalOrder,
 
                 -- Detailed Y = cik detaļu šim BatchProduct (no taskiem)
                 (
@@ -256,17 +258,6 @@ public async Task<IActionResult> Get()
       AND sm.Move_Type = 'ASSEMBLY'
 ) AS FinishingStock,
 
--- Finishing STATUS 1 (rezervēts, nav sācies)
-(
-    SELECT COALESCE(SUM(t.Qty_Done), 0)
-    FROM tasks t
-    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-    WHERE t.BatchProduct_ID = bp.ID
-      AND t.IsActive = 1
-      AND ts.Step_Type = 3
-      AND t.Tasks_Status = 1
-      AND COALESCE(t.Qty_Done, 0) > 0
-) AS FinishingStatus1
             FROM batches_products bp
             JOIN batches b ON b.ID = bp.Batch_Id
             JOIN versions v   ON v.ID = bp.Version_Id
@@ -299,21 +290,22 @@ public async Task<IActionResult> Get()
                     Planned             = reader.GetInt32(7),
                     IsPriority          = reader.GetBoolean(8),
                     Priority = Convert.ToInt32(reader.GetValue(9)),
-                    DetailedY = reader.GetInt32(10),
-                    DetailedX = reader.GetInt32(11),
-                    DetailedStartedX    = reader.GetInt32(12),
-                    DetailedDoneX       = reader.GetInt32(13),
-                    DetailedHasStarted  = reader.GetBoolean(14),
-                    DetailedIsDone      = reader.GetBoolean(15),
+                    NormalOrder = Convert.ToInt32(reader.GetValue(10)),
+                    DetailedY = reader.GetInt32(11),
+                    DetailedX = reader.GetInt32(12),
+                    DetailedStartedX    = reader.GetInt32(13),
+                    DetailedDoneX       = reader.GetInt32(14),
+                    DetailedHasStarted  = reader.GetBoolean(15),
+                    DetailedIsDone      = reader.GetBoolean(16),
 
-                    DetailedInProgress  = reader.GetInt32(16),
-                    DetailedFinish      = reader.GetInt32(17),
-                    Assembly            = reader.GetInt32(18),
-                    Done                = reader.GetInt32(19),
-                    FinishingStatus2 = reader.GetInt32(20),
-                    FinishingStatus3 = reader.GetInt32(21),
-                    FinishingStock   = reader.GetInt32(22),
-                    FinishingStatus1 = reader.GetInt32(23),
+                    DetailedInProgress  = reader.GetInt32(17),
+                    DetailedFinish      = reader.GetInt32(18),
+                    Assembly            = reader.GetInt32(19),
+                    Done                = reader.GetInt32(20),
+                    FinishingStatus2 = reader.GetInt32(21),
+                    FinishingStatus3 = reader.GetInt32(22),
+                    FinishingStock   = reader.GetInt32(23),
+                    FinishingStatus1 = reader.GetInt32(24),
 
                 });
 
@@ -332,8 +324,14 @@ public async Task<IActionResult> Get()
             if (bp == null)
                 return NotFound();
 
-            bp.is_priority = request.IsPriority;
-            bp.Priority = request.Priority;
+bp.is_priority = request.IsPriority;
+bp.Priority = request.Priority;
+
+// tikai NE-prioritārajiem saglabājam NormalOrder
+if (!request.IsPriority)
+{
+    bp.NormalOrder = request.NormalOrder;
+}
 
 Console.WriteLine($"UPDATE: {batchProductId} -> {request.Priority}");
 

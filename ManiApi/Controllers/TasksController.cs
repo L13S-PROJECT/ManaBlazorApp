@@ -1375,6 +1375,8 @@ public async Task<IActionResult> GetFinishingWaves([FromQuery] int batchProductI
                 TaskId = x.t.ID,
                 Status = x.t.Tasks_Status,
                 Qty = x.t.Qty_Done,
+                Assigned_To = x.t.Assigned_To,
+                Claimed_By = x.t.Claimed_By,
                 StartedAt = x.t.Started_At,
                 FinishedAt = x.t.Finished_At,
                 Comment = x.t.Tasks_Comment,

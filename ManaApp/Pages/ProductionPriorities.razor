@@ -6,6 +6,8 @@
 @inject NavigationManager Nav
 
 
+<div class="pp-page">
+
 @if (products == null)
 {
     <div style="height:200px;"></div>
@@ -54,7 +56,9 @@ else
     </div>
 
 </div>
-<div class="pp-section pp-section-priority">
+
+<div class="pp-sections">
+    <div class="pp-section pp-section-priority">
     <div class="pp-section-header">
         Prioritārie produkti
     </div>
@@ -157,7 +161,7 @@ else
     <div class="mt-1">Kopā: @p.Planned</div>
     <div class="d-flex align-items-center gap-2">
         <div class="rounded" style="width:10px;height:10px;background:#3B82F6;"></div>
-        <div>@p.FinishingStock var sākt</div>
+        <div>@blue var sākt</div>
     </div>
     <div class="d-flex align-items-center gap-2">
         <div class="rounded" style="width:10px;height:10px;background:#F59E0B;"></div>
@@ -189,21 +193,27 @@ else
     </div>
 </div>
 
-    <div class="pp-section mt-4">
+        <div class="pp-section pp-section-normal">
     <div class="pp-section-header">
         Parastie produkti
     </div>
     <div class="pp-section-body">
 
-<div class="priority-body">
+<div class="priority-body"
+     @onmouseup="EndDrag">
 
-@foreach (var p in NormalProducts)
+@foreach (var p in _normalList.Where(FilterProduct).ToList())
 {
     <div @key="p.BatchProductId"
-         class="priority-row priority-grid">
+     class="priority-row priority-grid
+        @( _selectedId == p.BatchProductId ? "dragging" : "" )"
+     @onmousemove="() => OnDragEnterNormal(p)">
 
-                <!-- tukšā drag kolonna -->
-                <div></div>
+                <div class="priority-drag-cell"
+                    @onmousedown="() => StartDrag(p)"
+                    @onmousedown:preventDefault="true">
+                    ⋮⋮
+                </div>
 
                 <div>@p.BatchCode</div>
                 <div>@p.ProductCode</div>
@@ -242,7 +252,7 @@ else
                 <div class="d-flex justify-content-center gap-3">
                         @{
                             var blue = p.FinishingStock;   // kopā gatavs krāsošanai = Assembly stock atlikums
-                            if (blue < 0) blue = 0;
+                                if (blue < 0) blue = 0;
                         }
 
 <!-- ZILS = status 1 (stock atlikums) -->
@@ -281,7 +291,7 @@ else
                 <div class="mt-1">Kopā: @p.Planned</div>
                 <div class="d-flex align-items-center gap-2">
                     <div class="rounded" style="width:10px;height:10px;background:#3B82F6;"></div>
-                    <div>@p.FinishingStock var sākt</div>
+                    <div>@blue var sākt</div>
                 </div>
 
                 <div class="d-flex align-items-center gap-2">
@@ -315,10 +325,10 @@ else
         </div>
     </div>
 </div>
+    </div>
+
 }
             
-
-<PriorityImpactSummary @ref="impactSummary" />
 @if (showSavedPopup)
 {
     <div class="popup-overlay">
@@ -334,6 +344,7 @@ else
         </div>
     </div>
 }
+</div>
 
 @code {
 
@@ -353,13 +364,11 @@ private IEnumerable<ProductRow> NormalProducts =>
     ?? Enumerable.Empty<ProductRow>();
 
  private List<ProductRow> _priorityList = new();
-
+private List<ProductRow> _normalList = new();
 protected override async Task OnInitializedAsync()
 {
     await LoadProducts();
 
-    if (impactSummary != null)
-        await impactSummary.Reload();
 }
 
 private async Task LoadProducts()
@@ -372,6 +381,12 @@ private async Task LoadProducts()
     .OrderBy(p => p.Priority)
     .ToList()
     ?? new List<ProductRow>();
+    
+    _normalList = products?
+        .Where(p => !p.IsPriority)
+        .OrderBy(p => p.NormalOrder == 0 ? int.MaxValue : p.NormalOrder)
+        .ToList()
+        ?? new List<ProductRow>();
 
     _batchList = products?
         .Select(p => p.BatchCode)
@@ -467,7 +482,7 @@ private class ProductRow
     public int FinishingStock { get; set; }
     public int FinishingStatus2 { get; set; }
     public int FinishingStatus3 { get; set; }
-    public int FinishingStatus1 { get; set; }
+    public int NormalOrder { get; set; }
 
 }
 
@@ -478,11 +493,18 @@ private async Task SavePriorities()
         return;
 
 
-    // 1️⃣ Piešķiram secību pēc UI kārtības
+// 1️⃣ Piešķiram secību pēc UI kārtības - Prioritāriem
     for (int i = 0; i < _priorityList.Count; i++)
     {
         _priorityList[i].Priority = i + 1;
     }
+
+// 2️⃣ Piešķiram secību pēc UI kārtības - Normālajiem
+
+    for (int i = 0; i < _normalList.Count; i++)
+        {
+            _normalList[i].NormalOrder = i + 1;
+        }
 
     foreach (var p in products)
 {
@@ -502,25 +524,24 @@ private async Task SavePriorities()
         new
         {
             IsPriority = p.IsPriority,
-            Priority = newPriority
+            Priority = newPriority,
+            NormalOrder = p.NormalOrder
         }
     );
+
 }
 
 await LoadProducts();
-
-if (impactSummary != null)
-    await impactSummary.Reload();
 
 showSavedPopup = true;
 
 StateHasChanged();
 }
-private PriorityImpactSummary? impactSummary;
 
 private bool _isDragging = false;
 
 private int? _selectedId = null;
+private bool _draggingPriority = false;
 
 private void GoToBatch(int batchProductId)
 {
@@ -531,12 +552,15 @@ private void StartDrag(ProductRow item)
 {
     _selectedId = item.BatchProductId;
     _isDragging = true;
+Console.WriteLine($"DRAG START: {item.BatchProductId} | priority: {_draggingPriority}");
+    _draggingPriority = _priorityList.Any(x => x.BatchProductId == item.BatchProductId);
+
     StateHasChanged();
 }
 
 private void OnDragEnter(ProductRow target)
 {
-    if (!_isDragging || _selectedId == null)
+    if (!_isDragging || _selectedId == null || !_draggingPriority)
         return;
 
     var currentIndex = _priorityList.FindIndex(x => x.BatchProductId == _selectedId);
@@ -557,6 +581,7 @@ private void EndDrag()
 {
     _isDragging = false;
     _selectedId = null;
+    _draggingPriority = false;
 }
 
 private void OnPriorityToggled(ProductRow p, ChangeEventArgs e)
@@ -570,18 +595,29 @@ private void OnPriorityToggled(ProductRow p, ChangeEventArgs e)
 
     item.IsPriority = isChecked;
 
-    if (isChecked)
+if (isChecked)
+{
+    // noņem no normal list
+    _normalList.RemoveAll(x => x.BatchProductId == item.BatchProductId);
+
+    if (!_priorityList.Any(x => x.BatchProductId == item.BatchProductId))
     {
-        if (!_priorityList.Any(x => x.BatchProductId == item.BatchProductId))
-        {
-            _priorityList.Add(item);
-        }
+        _priorityList.Add(item);
     }
-    else
+}
+else
+{
+    // noņem no priority list
+    _priorityList.RemoveAll(x => x.BatchProductId == item.BatchProductId);
+
+    item.Priority = 0;
+
+    // pievieno normal list (beigās)
+    if (!_normalList.Any(x => x.BatchProductId == item.BatchProductId))
     {
-        _priorityList.RemoveAll(x => x.BatchProductId == item.BatchProductId);
-        item.Priority = 0;
+        _normalList.Add(item);
     }
+}
 }
 
 private string _searchText = "";
@@ -626,9 +662,9 @@ if (!string.IsNullOrWhiteSpace(s))
 if (!string.IsNullOrWhiteSpace(_assemblyFilter))
 {
     var assemblyDone =
-        p.FinishingStock > 0 ||
-        p.FinishingStatus2 > 0 ||
-        p.FinishingStatus3 > 0;
+    p.FinishingStock > 0 ||
+    p.FinishingStatus2 > 0 ||
+    p.FinishingStatus3 > 0;
 
     if (_assemblyFilter == "NotStarted" &&
         (p.Assembly > 0 || assemblyDone || p.DetailedIsDone))
@@ -653,7 +689,9 @@ if (!string.IsNullOrWhiteSpace(_finishingFilter))
         return false;
 
     if (_finishingFilter == "CanStart" &&
-        !(p.FinishingStock > 0 && p.FinishingStatus2 == 0 && p.FinishingStatus3 == 0))
+        !(p.FinishingStock > 0
+        && p.FinishingStatus2 == 0
+        && p.FinishingStatus3 == 0))
         return false;
 
     if (_finishingFilter == "InProgress" && p.FinishingStatus2 == 0)
@@ -664,6 +702,25 @@ if (!string.IsNullOrWhiteSpace(_finishingFilter))
 }
 
 return true;
+}
+
+private void OnDragEnterNormal(ProductRow target)
+{
+    if (!_isDragging || _selectedId == null || _draggingPriority)
+        return;
+
+    var currentIndex = _normalList.FindIndex(x => x.BatchProductId == _selectedId);
+    var newIndex = _normalList.FindIndex(x => x.BatchProductId == target.BatchProductId);
+
+    if (currentIndex == -1 || newIndex == -1 || currentIndex == newIndex)
+        return;
+
+    var item = _normalList[currentIndex];
+
+    _normalList.RemoveAt(currentIndex);
+    _normalList.Insert(newIndex, item);
+
+    StateHasChanged();
 }
 
 }

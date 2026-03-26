@@ -20,4 +20,5 @@ public class BatchProduct
     public bool is_priority { get; set; }
 
     public int Priority { get; set; }
+    public int NormalOrder { get; set; }
 }

@@ -1,3 +1,5 @@
+// EmployeesController.cs - API kontrolieris darbinieku datiem
+
 using Microsoft.AspNetCore.Mvc;
 using ManiApi.Data;
 using Microsoft.EntityFrameworkCore;

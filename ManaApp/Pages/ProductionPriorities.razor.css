@@ -1,4 +1,9 @@
 /* ===== Priority grid layout ===== */
+.pp-page{
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+}
 
 .priority-grid{
     display:grid;
@@ -19,6 +24,19 @@
     align-items:center;
     gap:10px;
     white-space: nowrap;
+}
+
+.pp-sections{
+    display:flex;
+    flex-direction:column;
+    flex:1;
+    min-height:0;
+    gap:6px;
+}
+
+.pp-section-normal {
+    flex: 1;
+    min-height: 0;
 }
 
 .priority-head{
@@ -76,8 +94,8 @@ box-shadow:
 /* ===== OUTER BOX ===== */
 
 .pp-box {
-    height: 60vh;
-    max-height: 60vh;
+    flex: 1;
+    min-height: 0;
 
     border: 1px solid #073c81;
     border-radius: 10px;
@@ -109,6 +127,9 @@ box-shadow:
 
     padding: 4px 6px;   /* mazāks */
     margin: 0;          /* noņem lieko ārējo */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .pp-section-header {
@@ -124,6 +145,9 @@ box-shadow:
 
 .pp-section-body {
     padding: 4px 6px;
+
+    flex: 1;
+    overflow: auto;
 }
 
 /* UPDATE button zona */
@@ -135,7 +159,13 @@ box-shadow:
 
 .pp-box-body {
     padding: 4px 6px;
-    overflow: visible;
+
+    display: flex;
+    flex-direction: column;
+
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
 }
 
 /* UPDATE button – kompaktāks un tumšāks */
@@ -244,6 +274,8 @@ box-shadow:
 .pp-section-priority {
     background: #fdfdfe;      /* tumšāks nekā balts */
     border-color: #3B82F6;
+    flex: 0 0 30%;
+    overflow: hidden;
 }
 
 .popup-overlay{

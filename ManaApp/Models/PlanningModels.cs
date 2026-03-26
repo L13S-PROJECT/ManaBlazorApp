@@ -31,6 +31,7 @@ public sealed class ProductRow
     public int FinishingAllocated { get; set; }
     public List<FinishingRalRow> FinishingRal { get; set; } = new();
     public string? RalCode { get; set; }
+    public int NormalOrder { get; set; }
 }
 
 public sealed class CategoryRow

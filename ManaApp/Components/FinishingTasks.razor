@@ -176,6 +176,7 @@
     [Parameter] public EventCallback OnDataChanged { get; set; }
     private List<FinishingPartVm> Parts = new();
     private List<FinishingTaskRow> Waves = new();
+
     private sealed class FinishingPartVm
     {
         public string PartName { get; set; } = "";
@@ -266,6 +267,12 @@ async Task OnAssignedChanged(int taskId, ChangeEventArgs e)
             ? v
             : (int?)null;
 
+    // 1️⃣ uzreiz atjaunojam UI (tāpat kā Detail)
+    var task = Waves.FirstOrDefault(x => x.TaskId == taskId);
+    if (task != null)
+        task.Assigned_To = empId;
+
+    // 2️⃣ sūtam uz API
     await Http.PostAsJsonAsync(
         "http://localhost:5270/api/tasks/update-assignee",
         new
