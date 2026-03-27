@@ -396,34 +396,33 @@ WITH task_flags AS (
         wc2.Step_Type_ID AS StepTypeId,
         t.BatchProduct_ID,
         COALESCE(bp.is_priority,0) AS IsPriority,
-        CASE
-            WHEN NOT EXISTS (
-                SELECT 1
-                FROM tasks t2
-                JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
-                WHERE t2.BatchProduct_ID = t.BatchProduct_ID
-                  AND ts2.ProductToPart_ID = ts.ProductToPart_ID
-                  AND ts2.Step_Order < ts.Step_Order
-                  AND t2.Tasks_Status <> 3
-                  AND t2.IsActive = 1
-            )
-            AND NOT EXISTS (
-                SELECT 1
-                FROM tasks t3
-                JOIN toppartsteps ts3 ON ts3.ID = t3.TopPartStep_ID
-                WHERE t3.BatchProduct_ID = t.BatchProduct_ID
-                AND ts3.ProductToPart_ID = ts.ProductToPart_ID
-                AND t3.IsActive = 1
-                AND t3.Tasks_Status IN (2,3)
-            )
-             THEN 1 ELSE 0
-        END AS CanStart
+        CASE 
+            WHEN ts.Step_Type IN (1,2) THEN (bp.Planned_Qty * ptp.Qty_Per_product) * ts.Estimated_Minutes
+            WHEN ts.Step_Type = 3 THEN t.Qty_Done * ts.Estimated_Minutes
+            ELSE bp.Planned_Qty * ts.Estimated_Minutes
+        END AS Estimated_Minutes,
+        
+CASE
+    WHEN NOT EXISTS (
+        SELECT 1
+        FROM tasks t2
+        JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+        WHERE t2.BatchProduct_ID = t.BatchProduct_ID
+          AND ts2.ProductToPart_ID = ts.ProductToPart_ID
+          AND ts2.Step_Order < ts.Step_Order
+          AND t2.Tasks_Status <> 3
+          AND t2.IsActive = 1
+    )
+    THEN 1 ELSE 0
+END AS CanStart
+
     FROM tasks t
     JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+    JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
     LEFT JOIN workcentr_type wc2 ON wc2.ID = ts.WorkCentr_ID
     JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
     WHERE t.IsActive = 1
-    AND t.Tasks_Status = 1
+    AND t.Tasks_Status IN (1)
 )
 
 SELECT
@@ -458,19 +457,80 @@ SUM(CASE
      AND tf.CanStart = 1
     THEN 1 ELSE 0 END) AS NormalCanStartCount,
 
+COUNT(CASE 
+    WHEN tf.CanStart = 1
+    AND tf.Assigned_To IS NOT NULL 
+    AND tf.Assigned_To <> 0
+    THEN tf.ID 
+END) AS CanStartCount,
+
+SUM(CASE 
+    WHEN tf.CanStart = 1
+    THEN tf.Estimated_Minutes ELSE 0 END) AS CanStartMinutes,
+
 SUM(CASE 
     WHEN tf.CanStart = 1
     AND tf.Assigned_To IS NOT NULL 
     AND tf.Assigned_To <> 0
-    THEN 1 ELSE 0 END) AS CanStartCount,
-
-SUM(CASE 
-    WHEN tf.CanStart = 1
     THEN 1 ELSE 0 END) AS AssignedCanStartCount,
 
 SUM(CASE 
     WHEN tf.Assigned_To IS NULL OR tf.Assigned_To = 0
     THEN 1 ELSE 0 END) AS UnassignedTotalCount,
+
+SUM(
+    CASE 
+        WHEN tf.CanStart = 1
+        AND (tf.Assigned_To IS NULL OR tf.Assigned_To = 0)
+        THEN 1 ELSE 0 
+    END
+) AS UnassignedCanStartCount,
+
+-- 🔥 JAUNAIS – pilns sadalījums (NEAIZTIEC esošos laukus)
+
+SUM(
+    CASE 
+        WHEN tf.CanStart = 1
+        AND (tf.Assigned_To IS NULL OR tf.Assigned_To = 0)
+        AND tf.IsPriority = 1
+        THEN 1 ELSE 0 
+    END
+) AS UnassignedPriorityCanStartCount,
+
+SUM(
+    CASE 
+        WHEN tf.CanStart = 0
+        AND (tf.Assigned_To IS NULL OR tf.Assigned_To = 0)
+        AND tf.IsPriority = 1
+        THEN 1 ELSE 0 
+    END
+) AS UnassignedPriorityWaitingCount,
+
+SUM(
+    CASE 
+        WHEN tf.CanStart = 1
+        AND (tf.Assigned_To IS NULL OR tf.Assigned_To = 0)
+        AND tf.IsPriority = 0
+        THEN 1 ELSE 0 
+    END
+) AS UnassignedNormalCanStartCount,
+
+SUM(
+    CASE 
+        WHEN tf.CanStart = 0
+        AND (tf.Assigned_To IS NULL OR tf.Assigned_To = 0)
+        AND tf.IsPriority = 0
+        THEN 1 ELSE 0 
+    END
+) AS UnassignedNormalWaitingCount,
+
+SUM(
+    CASE 
+        WHEN tf.CanStart = 0
+        AND (tf.Assigned_To IS NULL OR tf.Assigned_To = 0)
+        THEN 1 ELSE 0 
+    END
+) AS UnassignedWaitingCount,
 
 SUM(CASE 
     WHEN tf.IsPriority = 1
@@ -484,7 +544,17 @@ SUM(CASE
      AND tf.Assigned_To IS NOT NULL 
      AND tf.Assigned_To <> 0
      AND tf.CanStart = 0
-    THEN 1 ELSE 0 END) AS NormalWaitingCount
+    THEN 1 ELSE 0 END) AS NormalWaitingCount,
+
+SUM(CASE 
+    WHEN (tf.Assigned_To IS NULL OR tf.Assigned_To = 0)
+    AND tf.IsPriority = 1
+    THEN 1 ELSE 0 END) AS UnassignedPriorityTotalCount,
+
+SUM(CASE 
+    WHEN (tf.Assigned_To IS NULL OR tf.Assigned_To = 0)
+    AND tf.IsPriority = 0
+    THEN 1 ELSE 0 END) AS UnassignedNormalTotalCount
 
 FROM (
     SELECT ID AS EmployeeId
@@ -498,7 +568,11 @@ FROM (
 CROSS JOIN workcentr_type wc
 
 LEFT JOIN task_flags tf 
-    ON tf.Assigned_To = emp_list.EmployeeId
+   ON (
+        (emp_list.EmployeeId = 0 AND (tf.Assigned_To IS NULL OR tf.Assigned_To = 0))
+        OR
+        (emp_list.EmployeeId <> 0 AND tf.Assigned_To = emp_list.EmployeeId)
+      )
    AND tf.WorkCentr_ID = wc.ID
 
 LEFT JOIN (
@@ -536,10 +610,25 @@ ORDER BY
                     PriorityCanStartCount = reader.IsDBNull(6) ? 0 : reader.GetInt32(6),
                     NormalCanStartCount   = reader.IsDBNull(7) ? 0 : reader.GetInt32(7),
                     CanStartCount = reader.IsDBNull(8) ? 0 : reader.GetInt32(8),
-                    AssignedCanStartCount = reader.IsDBNull(9) ? 0 : reader.GetInt32(9),
-                    UnassignedTotalCount  = reader.IsDBNull(10) ? 0 : reader.GetInt32(10),
-                    PriorityWaitingCount = reader.IsDBNull(11) ? 0 : reader.GetInt32(11),
-                    NormalWaitingCount   = reader.IsDBNull(12) ? 0 : reader.GetInt32(12),
+
+                    // 👇 JAUNAIS
+                    CanStartMinutes = reader.IsDBNull(9) ? 0 : reader.GetInt32(9),
+
+                    // 👇 VISIEM PĀRĒJIEM +1
+                    AssignedCanStartCount = reader.IsDBNull(10) ? 0 : reader.GetInt32(10),
+                    UnassignedTotalCount = reader.IsDBNull(11) ? 0 : reader.GetInt32(11),
+                    UnassignedCanStartCount = reader.IsDBNull(12) ? 0 : reader.GetInt32(12),
+                    UnassignedWaitingCount = reader.IsDBNull(17) ? 0 : reader.GetInt32(17),
+                    PriorityWaitingCount = reader.IsDBNull(18) ? 0 : reader.GetInt32(18),
+                    NormalWaitingCount = reader.IsDBNull(19) ? 0 : reader.GetInt32(19),
+                    UnassignedPriorityTotalCount = reader.IsDBNull(20) ? 0 : reader.GetInt32(20),
+                    UnassignedNormalTotalCount = reader.IsDBNull(21) ? 0 : reader.GetInt32(21),
+
+                    // 🔥 JAUNIE (pareizās vietās)
+                    UnassignedPriorityCanStartCount = reader.IsDBNull(13) ? 0 : reader.GetInt32(13),
+                    UnassignedPriorityWaitingCount = reader.IsDBNull(14) ? 0 : reader.GetInt32(14),
+                    UnassignedNormalCanStartCount = reader.IsDBNull(15) ? 0 : reader.GetInt32(15),
+                    UnassignedNormalWaitingCount = reader.IsDBNull(16) ? 0 : reader.GetInt32(16),
                 });
         }
     }

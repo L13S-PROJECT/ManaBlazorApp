@@ -26,54 +26,134 @@ else
             .Select(x => x.Name)
             .ToList();
         var lookup = rows
-            .GroupBy(r => (r.WorkCenter, r.EmployeeName))
+            .GroupBy(r => (r.WorkCenter, r.EmployeeId))
             .ToDictionary(
                 g => g.Key,
-                g => g.First()
+                g => new PriorityImpactRow
+                {
+                    WorkCenter = g.Key.WorkCenter,
+                    EmployeeName = rows.First(x => x.EmployeeId == g.Key.EmployeeId).EmployeeName,
+                    PriorityCount = g.Sum(x => x.PriorityCount),
+                    NormalCount = g.Sum(x => x.NormalCount),
+                    PriorityCanStartCount = g.Sum(x => x.PriorityCanStartCount),
+                    NormalCanStartCount = g.Sum(x => x.NormalCanStartCount),
+                    CanStartCount = g.Sum(x => x.CanStartCount),
+                    CanStartMinutes = g.Sum(x => x.CanStartMinutes),
+                    PriorityWaitingCount = g.Sum(x => x.PriorityWaitingCount),
+                    NormalWaitingCount = g.Sum(x => x.NormalWaitingCount),
+                    UnassignedCanStartCount = g.Sum(x => x.UnassignedCanStartCount)
+                }
             );
+                    var employeeCanStartLookup = rows
+                        .GroupBy(r => r.EmployeeId)
+                        .ToDictionary(
+                            g => g.Key,
+                            g => g.Key == 0
+                                ? g.Sum(x => x.UnassignedCanStartCount)
+                                : g.Sum(x => x.PriorityCanStartCount + x.NormalCanStartCount)
+                        );
+                    
+                    var unassignedCanStartLookup = rows
+                        .GroupBy(r => r.WorkCenter)
+                        .ToDictionary(
+                            g => g.Key,
+                            g => g.Sum(x => x.UnassignedCanStartCount)
+                        );
+                    var employeeIdLookup = rows
+                        .GroupBy(r => r.EmployeeName)
+                        .ToDictionary(g => g.Key, g => g.First().EmployeeId);
     
 <div class="priority-impact-box">
+    <div class="impact-columns-header">
+            <div class="impact-row"
+                style="--emp-count:@employees.Count">
 
-<div class="impact-columns-header">
-<div class="impact-row"
-     style="--emp-count:@employees.Count">
+                <div class="impact-cell"><strong>Workcentrs</strong></div>
+                <div class="impact-cell"><strong>Var sākt</strong></div>
+                <div class="impact-cell"><strong>Kopā</strong></div>
 
-    <div class="impact-cell"><strong>Workcentrs</strong></div>
-    <div class="impact-cell"><strong>Var sākt</strong></div>
-    <div class="impact-cell"><strong>Kopā</strong></div>
+            @foreach (var emp in employees)
+            {
+                var empRow = rows.FirstOrDefault(r => r.EmployeeName == emp && r.EmployeeId != 0);
 
-@foreach (var emp in employees)
-{
-    var empRow = rows.FirstOrDefault(r => r.EmployeeName == emp && r.EmployeeId != 0);
+                <div class="impact-cell @(selectedEmployee == emp ? "selected-col" : "")">
+                    <span style="cursor:pointer"
+                        @onclick="() => OpenPopup(empRow?.EmployeeId ?? 0, emp)">
+                        <strong>@emp</strong>
+                    </span>
+                </div>
+            }
 
-    <div class="impact-cell">
-        <span style="cursor:pointer"
-              @onclick="() => OpenPopup(empRow?.EmployeeId ?? 0, emp)">
-            <strong>@emp</strong>
-        </span>
+            </div>
     </div>
-}
 
-</div>
-</div>
+        <div class="impact-row impact-summary-row" style="--emp-count:@employees.Count">
 
-<div class="impact-row" style="--emp-count:@employees.Count">
+            <div class="impact-cell var-sakt-cell"><strong>Var sākt</strong></div>
+            
+            <div class="impact-cell"></div>
+            <div class="impact-cell"></div>
 
-    <div class="impact-cell"><strong>Var sākt</strong></div>
+            @foreach (var emp in employees)
+        {
+            var empRow = rows.FirstOrDefault(r => r.EmployeeName == emp);
+            var empId = empRow?.EmployeeId ?? 0;
 
-    <div class="impact-cell"></div>
-    <div class="impact-cell"></div>
+            int sum;
 
-    @foreach (var emp in employees)
-{
-    var sum = rows
-        .Where(r => r.EmployeeName == emp)
-        .Sum(r => r.PriorityCanStartCount + r.NormalCanStartCount);
+                    if (emp == "Nav piešķirts")
+                    {
+                        sum = rows.Sum(x => x.UnassignedCanStartCount);
+                    }
+                    else
+                    {
+                        sum = employeeCanStartLookup.TryGetValue(empId, out var v) ? v : 0;
+                    }
 
-    <div class="impact-cell">
-        <strong>@sum</strong>
-    </div>
-}
+            <div class="impact-cell @(selectedEmployee == emp ? "selected-col" : "")">
+                <strong>@sum</strong>
+            </div>
+        }
+        </div>
+
+        <div class="impact-row impact-summary-row" style="--emp-count:@employees.Count">
+
+            <div class="impact-cell"><strong>Laiks</strong></div>
+
+            <div class="impact-cell"></div>
+            <div class="impact-cell"></div>
+
+                @foreach (var emp in employees)
+                {
+                    int minutes;
+
+                            if (emp == "Nav piešķirts")
+                            {
+                                minutes = rows
+                                    .Where(r => r.EmployeeId == 0)
+                                    .Sum(r => r.CanStartMinutes);
+                            }
+                            else
+                            {
+                                minutes = rows
+                                    .Where(r => r.EmployeeName == emp)
+                                    .Sum(r => r.CanStartMinutes);
+                            }
+
+                    var days = minutes / (8 * 60);
+                    var hours = (minutes % (8 * 60)) / 60;
+                    var mins = minutes % 60;
+
+                    var time = minutes == 0 
+                        ? "" 
+                        : $"{days}d {hours}h {mins}m";
+
+                    <div class="impact-cell @(selectedEmployee == emp ? "selected-col" : "")">
+                        @time
+                    </div>
+                }
+
+        </div>
 
 </div>
 
@@ -87,32 +167,71 @@ else
 
 @foreach (var wc in workCenters)
 {     
-        var wcCanStart = rows
-            .Where(r => r.WorkCenter == wc)
-            .Sum(r => r.PriorityCanStartCount + r.NormalCanStartCount);
+var wcCanStart = rows
+    .Where(r => r.WorkCenter == wc)
+    .Sum(r => r.PriorityCanStartCount);
 
-                <div class="impact-row">
-                    <div class="impact-cell impact-wc">
-                        <strong>@wc</strong>
+// DEBUG
+var debugUnassigned = rows
+    .Where(r => r.WorkCenter == wc && r.EmployeeId == 0)
+    .Sum(r => r.UnassignedCanStartCount);
+
+                <div class="impact-row @(selectedWorkCenter == wc ? "selected-row" : "")">
+                    <div class="impact-cell impact-wc"
+                        @onclick="() => OnWorkCenterClick(wc)">
+                        <strong style="cursor:pointer">@wc</strong>
                     </div>
 
-                <div class="impact-cell">
-                    <strong>@wcCanStart</strong>
+                <div class="impact-cell var-sakt-cell"
+                    @onclick="() => OnWorkCenterClick(wc)">
+                    <strong>@(wcCanStart == 0 ? "" : wcCanStart)</strong>
                 </div>
 
                 <div class="impact-cell">
                     <strong>
-                        @rows.Where(r => r.WorkCenter == wc).Sum(r => r.PriorityCount)
+                        @{
+                            var total = rows
+                                .Where(r => r.WorkCenter == wc)
+                                .Sum(x =>
+                                    x.PriorityCanStartCount +
+                                    x.PriorityWaitingCount +
+                                    x.UnassignedPriorityCanStartCount +
+                                    x.UnassignedPriorityWaitingCount
+                                );
+                        }
+
+                        <div class="impact-cell @(total == 0 ? "zero-cell" : "")">
+                            <strong>@(total == 0 ? "" : total)</strong>
+                        </div>
                     </strong>
                 </div>
 
                     @foreach (var emp in employees)
                     {
-                        var value = lookup.TryGetValue((wc, emp), out var match)
-                            ? match.PriorityCount
-                            : 0;
+                            int value;
 
-                        <div class="impact-cell">
+                            if (emp == "Nav piešķirts")
+                                {
+                                    value = rows
+                                        .Where(r => r.WorkCenter == wc)
+                                        .Sum(r =>
+                                            r.UnassignedPriorityCanStartCount +
+                                            r.UnassignedPriorityWaitingCount
+                                        );
+                                }
+                                else
+                                    {
+                                        var empId = employeeIdLookup.TryGetValue(emp, out var id) ? id : 0;
+
+                                        value = lookup.TryGetValue((wc, empId), out var match)
+                                            ? match.PriorityCanStartCount + match.PriorityWaitingCount
+                                            : 0;
+                                    }
+
+                        <div class="impact-cell @(value == 0 ? "zero-cell" : "") 
+                            @(selectedWorkCenter == wc ? "selected-row" : "") 
+                            @(selectedEmployee == emp ? "selected-col" : "")"
+                            @onclick="() => SelectCell(wc, emp)">
                             @value
                         </div>
                         
@@ -132,28 +251,66 @@ else
 
     @foreach (var wc in workCenters)
     {
-        <div class="impact-row">
-            <div class="impact-cell impact-wc">
-                <strong>@wc</strong>
-        </div>
-        <div class="impact-cell">
-        <strong>
-        @rows.Where(r => r.WorkCenter == wc).Sum(r => r.NormalCanStartCount)
-        </strong>
+        <div class="impact-row @(selectedWorkCenter == wc ? "selected-row" : "")">
+            <div class="impact-cell impact-wc"
+                @onclick="() => OnWorkCenterClick(wc)">
+                <strong style="cursor:pointer">@wc</strong>
+            </div>
+<div class="impact-cell var-sakt-cell"
+     @onclick="() => OnWorkCenterClick(wc)">
+    <strong>
+       @{
+            var val = rows.Where(r => r.WorkCenter == wc)
+                .Sum(r => r.NormalCanStartCount);
+        }
+        @(val == 0 ? "" : val)
+    </strong>
 </div>
 
-        <div class="impact-cell">
-            <strong>
-                @rows.Where(r => r.WorkCenter == wc).Sum(r => r.NormalCount)
-            </strong>
-        </div>
+<div class="impact-cell">
+    <strong>
+            @{
+                var total = rows
+                    .Where(r => r.WorkCenter == wc)
+                    .Sum(r =>
+                        r.NormalCanStartCount +
+                        r.NormalWaitingCount +
+                        r.UnassignedNormalCanStartCount +
+                        r.UnassignedNormalWaitingCount
+                    );
+            }
+
+            <div class="impact-cell @(total == 0 ? "zero-cell" : "")">
+                <strong>@(total == 0 ? "" : total)</strong>
+            </div>
+    </strong>
+</div>
             @foreach (var emp in employees)
             {
-                var value = lookup.TryGetValue((wc, emp), out var match)
-                    ? match.NormalCount
-                    : 0;
+                int value;
 
-                <div class="impact-cell">
+                    if (emp == "Nav piešķirts")
+                        {
+                            value = rows
+                                .Where(r => r.WorkCenter == wc)
+                                .Sum(r =>
+                                    r.UnassignedNormalCanStartCount +
+                                    r.UnassignedNormalWaitingCount
+                                );
+                        }
+                        else
+                            {
+                                var empId = employeeIdLookup.TryGetValue(emp, out var id) ? id : 0;
+
+                                value = lookup.TryGetValue((wc, empId), out var match)
+                                    ? match.NormalCanStartCount + match.NormalWaitingCount
+                                    : 0;
+                            }
+
+                <div class="impact-cell @(value == 0 ? "zero-cell" : "") 
+                    @(selectedWorkCenter == wc ? "selected-row" : "") 
+                    @(selectedEmployee == emp ? "selected-col" : "")"
+                    @onclick="() => SelectCell(wc, emp)">
                     @value
                 </div>
             }
@@ -161,7 +318,7 @@ else
     }
 </div>
     </div>
-</div>
+
 }
 
 @if (selectedEmployeeId != null)
@@ -197,7 +354,15 @@ else
         public int UnassignedTotalCount { get; set; }
         public int PriorityWaitingCount { get; set; }
         public int NormalWaitingCount { get; set; }
-        
+        public int CanStartMinutes { get; set; }
+        public int UnassignedCanStartCount { get; set; }
+        public int UnassignedPriorityTotalCount { get; set; }
+        public int UnassignedNormalTotalCount { get; set; }
+        public int UnassignedWaitingCount { get; set; }
+        public int UnassignedPriorityCanStartCount { get; set; }
+        public int UnassignedPriorityWaitingCount { get; set; }
+        public int UnassignedNormalCanStartCount { get; set; }
+        public int UnassignedNormalWaitingCount { get; set; }
     }
 
     protected override async Task OnInitializedAsync()
@@ -233,4 +398,30 @@ private async Task ClosePopup()
     selectedEmployeeId = null;
     await Reload();
 }
+
+private string? selectedWorkCenter;
+private string? selectedEmployee;
+
+private void SelectCell(string wc, string emp)
+{
+    if (selectedWorkCenter == wc && selectedEmployee == emp)
+    {
+        selectedWorkCenter = null;
+        selectedEmployee = null;
+    }
+    else
+    {
+        selectedWorkCenter = string.IsNullOrEmpty(wc) ? null : wc;
+        selectedEmployee = emp;
+    }
+}
+
+private void OnWorkCenterClick(string wc)
+{
+    if (selectedWorkCenter == wc)
+        selectedWorkCenter = null;
+    else
+        selectedWorkCenter = wc;
+}
+
 }
