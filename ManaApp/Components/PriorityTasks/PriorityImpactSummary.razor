@@ -363,6 +363,9 @@ var debugUnassigned = rows
         public int UnassignedPriorityWaitingCount { get; set; }
         public int UnassignedNormalCanStartCount { get; set; }
         public int UnassignedNormalWaitingCount { get; set; }
+        public int PushCount { get; set; }
+        public int PushCanStartCount { get; set; }
+        public int PushWaitingCount { get; set; }
     }
 
     protected override async Task OnInitializedAsync()
@@ -396,7 +399,7 @@ private void OpenPopup(int employeeId, string employeeName)
 private async Task ClosePopup()
 {
     selectedEmployeeId = null;
-    await Reload();
+    _ = Reload();
 }
 
 private string? selectedWorkCenter;

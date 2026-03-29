@@ -12,16 +12,18 @@
 <div class="employee-page-root">
 
 <div class="employee-switch">
-    <label>Darbinieks:</label>
+    <button @onclick="PrevEmployee">◀</button>
 
-    <select @onchange="OnEmployeeChanged">
+    <select @bind="selectedEmployeeId" @bind:after="OnEmployeeChangedAfter">
         @foreach (var emp in employees)
         {
-            <option value="@emp.Id" selected="@(emp.Id == selectedEmployeeId)">
+            <option value="@emp.Id">
                 @emp.Name
             </option>
         }
     </select>
+
+    <button @onclick="NextEmployee">▶</button>
 </div>
 
 <div class="employee-main-block">   
@@ -394,6 +396,32 @@ protected override async Task OnInitializedAsync()
 private async Task OnEmployeeChanged(ChangeEventArgs e)
 {
     selectedEmployeeId = int.Parse(e.Value!.ToString()!);
+    await LoadTasks();
+}
+
+private async Task PrevEmployee()
+{
+    var index = employees.FindIndex(e => e.Id == selectedEmployeeId);
+    if (index > 0)
+    {
+        selectedEmployeeId = employees[index - 1].Id;
+        await LoadTasks();
+    }
+}
+
+private async Task NextEmployee()
+{
+    var index = employees.FindIndex(e => e.Id == selectedEmployeeId);
+    if (index < employees.Count - 1)
+    {
+        selectedEmployeeId = employees[index + 1].Id;
+        await LoadTasks();
+    }
+}
+
+
+private async Task OnEmployeeChangedAfter()
+{
     await LoadTasks();
 }
 

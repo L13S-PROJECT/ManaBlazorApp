@@ -84,8 +84,10 @@ else
                     </tbody>
                 </table>
             </div>
+     }
+}
 
-            @if (PushTasks.Any())
+ @if (PushTasks.Any())
 {
     <div class="elp-section">
         <h6 class="mt-3">Push darbi</h6>
@@ -125,8 +127,9 @@ else
                         </td>
 
                         <td>
-                            <select class="form-select form-select-sm"
-                                    @bind="t.Assigned_To">
+                    <select class="form-select form-select-sm"
+                            @bind="t.Assigned_To"
+                            @bind:after="() => OnAssigneeChanged(t)">
                                 <option value="">Nav piešķirts</option>
                                 @foreach (var emp in employees)
                                 {
@@ -159,8 +162,6 @@ else
             </tbody>
         </table>
     </div>
-}
-            }
 }
 
         @if (PrioritySuper.Any())
@@ -701,8 +702,9 @@ private void CloseTaskDetails()
     selectedTaskId = null;
 }
 private IEnumerable<TaskRow> PushTasks =>
-    (model?.Priority?.Where(t => t.Tasks_Push) ?? Enumerable.Empty<TaskRow>())
-    .Concat(model?.Normal?.Where(t => t.Tasks_Push) ?? Enumerable.Empty<TaskRow>());
+    (model?.Priority ?? Enumerable.Empty<TaskRow>())
+    .Concat(model?.Normal ?? Enumerable.Empty<TaskRow>())
+    .Where(t => t.Tasks_Push);
 private IEnumerable<TaskRow> PrioritySuper =>
     model?.Priority?.Where(t => t.Tasks_Priority && !t.Tasks_Push)
     ?? Enumerable.Empty<TaskRow>();
@@ -756,6 +758,7 @@ private async Task OnPartPriorityChanged(TaskRow t, ChangeEventArgs e)
     }
 
     StateHasChanged();
+    
 }
 
 private async Task TogglePush(TaskRow t)
@@ -770,11 +773,8 @@ private async Task TogglePush(TaskRow t)
 
     t.Tasks_Push = newValue;
 
-    // svarīgi: push nedrīkst piešķirt darbinieku
-    if (EmployeeId == 0)
-        t.Assigned_To = null;
-
     StateHasChanged();
+    await OnClose.InvokeAsync();
 }
 
 private string FormatTime(int minutes)
@@ -800,6 +800,19 @@ private string FormatTime(int minutes)
         parts.Add($"{minutes} m");
 
     return string.Join(" ", parts);
+}
+
+private async Task OnAssigneeChanged(TaskRow t)
+{
+    int? empId = t.Assigned_To;
+
+    await Http.PostAsJsonAsync("api/tasks/update-assignee", new
+    {
+        TaskId = t.TaskId,
+        Assigned_To = empId
+    });
+
+    await ReloadData();
 }
 
 }

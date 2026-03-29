@@ -119,8 +119,8 @@ AND NOT EXISTS (
 )
 
 AND (
-    (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To = 0 OR t.Assigned_To IS NULL))
- OR (@empId = 0 AND (t.Assigned_To IS NULL OR t.Assigned_To = 0))
+    (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To IS NULL))
+ OR (@empId = 0 AND t.Assigned_To IS NULL)
 )
 
 ORDER BY
@@ -274,7 +274,7 @@ WHERE t.IsActive = 1
   AND bp.IsActive = 1
   AND t.Tasks_Status = 2
   AND t.ID <> @taskId
-  AND (t.Assigned_To = @emp OR t.Assigned_To = 0)
+  AND (t.Assigned_To = @emp OR t.Assigned_To IS NULL)
 AND (
         (bp.is_priority = 1 AND @curIsPriority = 0)
 
@@ -881,6 +881,7 @@ public async Task<IActionResult> UpdateSteps([FromBody] List<UpdateStepDto> step
 
     foreach (var dto in steps)
     {
+        
         if (dto == null || dto.TaskId <= 0)
             continue;
 
@@ -892,10 +893,13 @@ public async Task<IActionResult> UpdateSteps([FromBody] List<UpdateStepDto> step
             setParts.Add("Tasks_Priority = @prio");
         }
 
-        if (dto.Assigned_To.HasValue)
+        if (dto.Tasks_Push.HasValue)
         {
-            setParts.Add("Assigned_To = @assigned");
+            setParts.Add("Tasks_Push = @push");
         }
+
+// Assigned_To vienmēr iekļaujam (arī NULL gadījumā)
+setParts.Add("Assigned_To = @assigned");
 
         // Ja nav ko mainīt – ejam tālāk
         if (setParts.Count == 0)
@@ -926,19 +930,12 @@ UPDATE tasks
             cmd.Parameters.Add(pPrio);
         }
 
-        if (dto.Tasks_Push.HasValue)
-            {
-                setParts.Add("Tasks_Push = @push");
-            }
 
         // ja jāmaina Assigned_To (var būt arī null -> noņem assignment)
-        if (dto.Assigned_To.HasValue)
-        {
-            var pAss = cmd.CreateParameter();
-            pAss.ParameterName = "@assigned";
-            pAss.Value = dto.Assigned_To.Value;
-            cmd.Parameters.Add(pAss);
-        }
+            var pAssigned = cmd.CreateParameter();
+            pAssigned.ParameterName = "@assigned";
+            pAssigned.Value = (object?)dto.Assigned_To ?? DBNull.Value;
+            cmd.Parameters.Add(pAssigned);
 
             if (dto.Tasks_Push.HasValue)
             {
@@ -2119,12 +2116,13 @@ WHERE t.IsActive = 1
   AND t.Tasks_Status = 1
   AND bp.is_priority = 1
 AND (
-    (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To = 0 OR t.Assigned_To IS NULL))
- OR (@empId = 0 AND (t.Assigned_To IS NULL OR t.Assigned_To = 0))
+    (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To IS NULL))
+ OR (@empId = 0 AND t.Assigned_To IS NULL)
 )
 ORDER BY
+  CASE WHEN t.Tasks_Push = 1 THEN 0 ELSE 1 END,
   t.Tasks_Priority DESC,
-  bp.Priority ASC,
+  CASE WHEN bp.is_priority = 1 THEN bp.Priority END ASC,
   ts.Step_Order ASC;
 ";
 
@@ -2218,12 +2216,14 @@ WHERE t.IsActive = 1
   AND t.Tasks_Status = 1
   AND bp.is_priority = 0
 AND (
-    (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To = 0 OR t.Assigned_To IS NULL))
- OR (@empId = 0 AND (t.Assigned_To IS NULL OR t.Assigned_To = 0))
+    (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To IS NULL))
+ OR (@empId = 0 AND t.Assigned_To IS NULL)
 )
 ORDER BY
+  CASE WHEN t.Tasks_Push = 1 THEN 0 ELSE 1 END,
   t.Tasks_Priority DESC,
-  bp.Priority ASC,
+  CASE WHEN bp.is_priority = 1 THEN bp.Priority END ASC,
+  CASE WHEN bp.is_priority = 0 THEN bp.NormalOrder END ASC,
   ts.Step_Order ASC;
 ";
 
@@ -2308,6 +2308,121 @@ public async Task<IActionResult> GetStepsForPart(
             ClaimedName = ec != null ? ec.EmployeeName : null
         }
     ).ToListAsync();
+
+    return Ok(list);
+}
+
+// GET: /api/tasks/unassigned
+[HttpGet("unassigned")]
+public async Task<IActionResult> GetUnassignedTasks()
+{
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+SELECT
+    wc.Workcentr_Name AS WorkCenter,
+    wc.ID AS WorkCenterSort,
+    t.ID AS TaskId,
+    t.BatchProduct_ID,
+    ts.ProductToPart_ID,
+    b.Batches_Code AS BatchCode,
+    p.Product_Name AS ProductName,
+    tp.TopPart_Name,
+    ts.Step_Name,
+
+    CASE 
+        WHEN ts.Step_Type IN (1,2) THEN bp.Planned_Qty * ptp.Qty_Per_product
+        WHEN ts.Step_Type = 3 THEN t.Qty_Done
+        ELSE bp.Planned_Qty
+    END AS Qty,
+
+    t.Tasks_Status AS Status,
+
+    CASE
+        WHEN t.Tasks_Status = 1 AND NOT EXISTS (
+            SELECT 1
+            FROM tasks t2
+            JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+            WHERE t2.BatchProduct_ID = t.BatchProduct_ID
+              AND ts2.ProductToPart_ID = ts.ProductToPart_ID
+              AND ts2.Step_Order < ts.Step_Order
+              AND t2.Tasks_Status <> 3
+              AND t2.IsActive = 1
+        )
+        THEN 1
+        ELSE 0
+    END AS CanStart,
+
+    ts.Step_Order,
+    ts.Step_Type,
+    ts.Estimated_Minutes,
+
+    t.Assigned_To,
+    t.Tasks_Priority,
+    t.Tasks_Push
+
+FROM tasks t
+JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+JOIN batches b ON b.ID = bp.Batch_Id
+JOIN versions v ON v.ID = bp.Version_Id
+JOIN products p ON p.ID = v.Product_ID
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+LEFT JOIN workcentr_type wc ON wc.ID = ts.WorkCentr_ID AND wc.IsActive = 1
+JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
+JOIN toppart tp ON tp.ID = ptp.TopPart_ID
+
+WHERE t.IsActive = 1
+  AND t.Tasks_Status = 1
+  AND t.Assigned_To IS NULL
+
+ORDER BY
+  CASE WHEN t.Tasks_Push = 1 THEN 0 ELSE 1 END,
+  t.Tasks_Priority DESC,
+  wc.ID,
+  ts.Step_Order;
+";
+
+    var list = new List<object>();
+
+    await using var r = await cmd.ExecuteReaderAsync();
+    while (await r.ReadAsync())
+    {
+        list.Add(new
+        {
+            WorkCenter = r.IsDBNull(0) ? null : r.GetString(0),
+            WorkCenterSort = r.IsDBNull(1) ? (int?)null : r.GetInt32(1),
+            TaskId = r.GetInt32(2),
+            BatchProductId = r.GetInt32(3),
+            ProductToPartId = r.GetInt32(4),
+            BatchCode = r.GetString(5),
+            ProductName = r.GetString(6),
+            TopPartName = r.GetString(7),
+            StepName = r.GetString(8),
+            Qty = r.IsDBNull(9) ? 0 : r.GetInt32(9),
+            Status = r.GetInt32(10),
+            CanStart = r.GetInt32(11) == 1,
+            StepOrder = r.GetInt32(12),
+            StepType = r.GetInt32(13),
+            EstimatedMinutes = r.IsDBNull(14) ? 0 : r.GetInt32(14),
+            Assigned_To = r.IsDBNull(15) ? (int?)null : r.GetInt32(15),
+            Tasks_Priority = !r.IsDBNull(16) && r.GetBoolean(16),
+            Tasks_Push = !r.IsDBNull(17) && r.GetBoolean(17)
+        });
+    }
+
+    return Ok(list);
+}
+
+[HttpGet("workcenters")]
+public async Task<IActionResult> GetWorkCenters()
+{
+    var list = await _db.WorkCenters
+        .Where(x => x.IsActive)
+        .OrderBy(x => x.WorkCenter_Order)
+        .Select(x => x.WorkCentr_Name)
+        .ToListAsync();
 
     return Ok(list);
 }

@@ -1,3 +1,5 @@
+@*Manager Assign Popup*@ 
+
 @inject HttpClient Http
 @using System.Net.Http.Json
 @namespace ManaApp.Components.PriorityTasks
@@ -20,24 +22,32 @@
 @foreach (var wc in WorkCenters)
 {
     var tasks = AllTasks
-        .Where(t => (t.Assigned_To == null || t.Assigned_To == 0) && t.WorkCenter == wc)
-        .ToList();
+    .Where(t => (t.WorkCenter ?? "") == wc)
+    .OrderBy(t => t.Tasks_Push ? 0 : 1)
+    .ThenBy(t => t.Tasks_Priority ? 0 : 1)
+    .ThenBy(t => t.BatchProductId)
+    .ToList();
 
     var pushTasks = tasks.Where(t => t.Tasks_Push).ToList();
     var priorityTasks = tasks.Where(t => !t.Tasks_Push && t.Tasks_Priority).ToList();
     var ordinaryTasks = tasks.Where(t => !t.Tasks_Push && !t.Tasks_Priority).ToList();
 
-    if (!tasks.Any())
-        continue;
 
 <div class="elp-section">
 
 <div class="wc-header">
     @wc
     <span class="wc-time">
-        (@FormatTime(tasks.Sum(t => t.Qty * t.EstimatedMinutes)))
+        (@tasks.Count | @FormatTime(tasks.Sum(t => t.Qty * t.EstimatedMinutes)))
     </span>
 </div>
+
+@if (!tasks.Any())
+{
+    <div class="text-muted p-2">Nav uzdevumu</div>
+}
+else
+{
 
         <table class="table table-sm elp-table">
 
@@ -84,8 +94,8 @@
 
     <td>
     <select class="form-select form-select-sm"
-            value="@t.Assigned_To"
-            @onchange="e => OnAssigneeChanged(t, e)">
+        value="@t.Assigned_To"
+        @onchange="e => OnAssigneeChanged(t, e)">
 
             <option value="">Nav piešķirts</option>
 
@@ -142,8 +152,8 @@
 
         <td>
     <select class="form-select form-select-sm"
-            value="@t.Assigned_To"
-            @onchange="e => OnAssigneeChanged(t, e)">
+        value="@t.Assigned_To"
+        @onchange="e => OnAssigneeChanged(t, e)">
 
                 <option value="">Nav piešķirts</option>
 
@@ -200,8 +210,8 @@
 
         <td>
     <select class="form-select form-select-sm"
-            value="@t.Assigned_To"
-            @onchange="e => OnAssigneeChanged(t, e)">
+        value="@t.Assigned_To"
+        @onchange="e => OnAssigneeChanged(t, e)">
 
                 <option value="">Nav piešķirts</option>
 
@@ -238,7 +248,7 @@
             </tbody>
 
         </table>
-
+}
     </div>
 }
 
@@ -264,11 +274,10 @@
 
 @code {
     [Parameter] public int EmployeeId { get; set; }
-    [Parameter] public EventCallback OnClose { get; set; }
-
+    [Parameter] public EventCallback OnClose { get; set; }        
     private EmployeeLoadModel? model;
     private List<EmployeeDto> employees = new();
-
+    private List<string> allWorkCenters = new();
     private int? detailsBatchProductId;
     private int? detailsProductToPartId;
     private int? selectedTaskId;
@@ -280,14 +289,27 @@
     }
     protected override async Task OnParametersSetAsync()
 {
+
     if (employees.Count == 0)
     {
         employees = await Http.GetFromJsonAsync<List<EmployeeDto>>("api/employees")
                     ?? new List<EmployeeDto>();
     }
 
-    model = await Http.GetFromJsonAsync<EmployeeLoadModel>(
-        $"api/tasks/employee-load?empId={EmployeeId}");
+var data = await Http.GetFromJsonAsync<List<TaskRow>>("/api/tasks/unassigned")
+           ?? new List<TaskRow>();
+
+model = new EmployeeLoadModel
+{
+    Priority = data,
+    Normal = new List<TaskRow>()
+};
+
+if (allWorkCenters.Count == 0)
+{
+    allWorkCenters = await Http.GetFromJsonAsync<List<string>>("api/tasks/workcenters")
+                        ?? new List<string>();
+}
 }
 
 private class EmployeeLoadModel
@@ -331,16 +353,9 @@ private class EmployeeDto
 }
 
 private IEnumerable<TaskRow> AllTasks =>
-    (model?.Priority ?? Enumerable.Empty<TaskRow>())
-    .Concat(model?.Normal ?? Enumerable.Empty<TaskRow>());
+    (model?.Priority ?? Enumerable.Empty<TaskRow>());
 
-private IEnumerable<string?> WorkCenters =>
-    AllTasks
-        .Where(t => (t.Assigned_To == null || t.Assigned_To == 0) && !string.IsNullOrEmpty(t.WorkCenter))
-        .Select(t => new { t.WorkCenter, t.WorkCenterSort })
-        .Distinct()
-        .OrderBy(x => x.WorkCenterSort)
-        .Select(x => x.WorkCenter);
+private IEnumerable<string> WorkCenters => allWorkCenters;
 
 private async Task OnAssigneeChanged(TaskRow t, ChangeEventArgs e)
 {
@@ -352,13 +367,22 @@ private async Task OnAssigneeChanged(TaskRow t, ChangeEventArgs e)
     t.Assigned_To = empId;
 
     await Http.PostAsJsonAsync("api/tasks/update-assignee", new
-    {
-        TaskId = t.TaskId,
-        Assigned_To = empId
-    });
+{
+    TaskId = t.TaskId,
+    Assigned_To = empId
+});
 
-    model = await Http.GetFromJsonAsync<EmployeeLoadModel>(
-    $"api/tasks/employee-load?empId={EmployeeId}");
+// 🔽 pārlādē UNASSIGNED listu
+var data = await Http.GetFromJsonAsync<List<TaskRow>>("/api/tasks/unassigned");
+
+model = new EmployeeLoadModel
+{
+    Priority = data,
+    Normal = new List<TaskRow>()
+};
+
+StateHasChanged();
+
 }
 
 private async Task OnPriorityChanged(TaskRow t, ChangeEventArgs e)
@@ -374,8 +398,15 @@ private async Task OnPriorityChanged(TaskRow t, ChangeEventArgs e)
         Tasks_Priority = isChecked
     });
 
-    model = await Http.GetFromJsonAsync<EmployeeLoadModel>(
-    $"api/tasks/employee-load?empId={EmployeeId}");
+var data = await Http.GetFromJsonAsync<List<TaskRow>>("/api/tasks/unassigned")
+           ?? new List<TaskRow>();
+
+model = new EmployeeLoadModel
+{
+    Priority = data,
+    Normal = new List<TaskRow>()
+};
+
 }
 
 private async Task TogglePush(TaskRow t)
@@ -392,9 +423,14 @@ private async Task TogglePush(TaskRow t)
     });
 
     t.Tasks_Push = newValue;
+var data = await Http.GetFromJsonAsync<List<TaskRow>>("/api/tasks/unassigned")
+           ?? new List<TaskRow>();
 
-    model = await Http.GetFromJsonAsync<EmployeeLoadModel>(
-        $"api/tasks/employee-load?empId={EmployeeId}");
+model = new EmployeeLoadModel
+{
+    Priority = data,
+    Normal = new List<TaskRow>()
+};
 }
 
 private void OpenTaskDetails(TaskRow t)
