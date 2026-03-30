@@ -449,24 +449,26 @@ public async Task<IActionResult> GetWorksByVersion([FromQuery] int versionId)
                 .Where(s => s.ProductToPartId == x.pt.Id && s.IsActive)
                 .OrderBy(s => s.StepOrder)
                 .Join(_db.StepTypes.Where(st => st.IsActive),
-                      s => s.StepType,
-                      st => st.Id,
-                      (s, st) => new { s, StepTypeName = st.StepTypeName })
+                    s => s.StepType,
+                    st => st.Id,
+                    (s, st) => new { s, StepTypeName = st.StepTypeName })
                 .Join(_db.WorkCentrs.Where(wc => wc.IsActive),
-                      temp => temp.s.WorkCentrId,
-                      wc => wc.Id,
-                      (temp, wc) => new
-                      {
-                          temp.s.StepOrder,
-                          temp.s.StepName,
-                          StepType = temp.StepTypeName,
-                          WorkCenter = wc.WorkCentr_Name,
-                          temp.s.IsFinal,
-                          temp.s.IsMandatory,
-                          temp.s.Comments
-                      })
+                    temp => temp.s.WorkCentrId,
+                    wc => wc.Id,
+                    (temp, wc) => new
+                    {
+                        temp.s.StepOrder,
+                        temp.s.StepName,
+                        StepType = temp.StepTypeName,
+                        WorkCenter = wc.WorkCentr_Name,
+                        temp.s.IsFinal,
+                        temp.s.IsMandatory,
+                        temp.s.Comments
+                    })
                 .ToList()
+                
         })
+        
         .ToListAsync();
 
     return Ok(result);
@@ -768,10 +770,21 @@ var map = oldParts
 
             // 1) Part must be active and belong to an ACTIVE version
             var ptp = await _db.ProductTopParts
-      .FirstOrDefaultAsync(p => p.Id == dto.ProductToPartId && p.IsActive);
+                .FirstOrDefaultAsync(p => p.Id == dto.ProductToPartId && p.IsActive);
 
             if (ptp is null)
                 return NotFound("Part not found or inactive.");
+
+            var hasTasks = await _db.Tasks
+                .AnyAsync(t => 
+                    _db.TopPartSteps
+                        .Where(s => s.ProductToPartId == ptp.Id)
+                        .Select(s => s.Id)
+                        .Contains(t.TopPartStep_ID)
+                    && t.IsActive);
+
+            if (hasTasks)
+                return BadRequest("Nevar pievienot soli – šai detaļai jau ir uzdevumi.");
 
             // papildus pārbaudām, vai saistītā versija ir aktīva
             var versionActive = await _db.ProductVersions
@@ -914,6 +927,12 @@ dto.StepType = (int)await _db.StageStepTypeMaps
             if (ptp is null) return BadRequest("Part is inactive.");
             var versionActive = await _db.ProductVersions.AnyAsync(v => v.Id == ptp.VersionId && v.IsActive);
             if (!versionActive) return BadRequest("Steps can be edited only for active version.");
+
+            var hasTasks = await _db.Tasks
+                .AnyAsync(t => t.TopPartStep_ID == step.Id && t.IsActive);
+
+            if (hasTasks)
+                return BadRequest("Šo soli nevar dzēst – tam jau ir izveidoti uzdevumi.");
 
             step.IsActive = false;
 

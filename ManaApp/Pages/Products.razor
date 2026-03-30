@@ -910,7 +910,9 @@ var resp = await Http.PostAsJsonAsync("http://localhost:5270/api/products/step",
 
 if (!resp.IsSuccessStatusCode)
 {
-    stepsError = await resp.Content.ReadAsStringAsync();
+    var error = await resp.Content.ReadAsStringAsync();
+    stepsError = error;
+    await JS.InvokeVoidAsync("alert", error);   
     await InvokeAsync(StateHasChanged);
     return;
 }

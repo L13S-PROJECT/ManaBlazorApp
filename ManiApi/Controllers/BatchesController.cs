@@ -546,7 +546,10 @@ LEFT JOIN (
         0 AS FinishingStartedQty
 
     FROM tasks t
-    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+    JOIN toppartsteps ts 
+    ON ts.ID = t.TopPartStep_ID
+    AND ts.IsActive = 1
+    AND t.IsActive = 1
     WHERE t.IsActive = 1
     GROUP BY t.BatchProduct_ID
 ) tsum ON tsum.BatchProduct_ID = bp.ID
@@ -702,6 +705,8 @@ LEFT JOIN tasks t
     AND t.IsActive = 1
 WHERE bp.Batch_Id = @bid
   AND bp.IsActive = 1
+  AND ptp.IsActive = 1
+  AND ts.IsActive = 1
   AND t.ID IS NULL;";
 
         var pbid = tcmd.CreateParameter();
@@ -1309,7 +1314,9 @@ COUNT(DISTINCT CASE
       THEN ptp.ID
   END) AS DetailedStarted
     FROM tasks t
-    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+    JOIN toppartsteps ts 
+  ON ts.ID = t.TopPartStep_ID
+ AND ts.IsActive = 1
     JOIN producttopparts ptp 
         ON ptp.ID = ts.ProductToPart_ID
         AND ptp.IsActive = 1
