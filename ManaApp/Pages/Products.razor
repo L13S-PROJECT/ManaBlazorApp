@@ -84,7 +84,7 @@
     OnOpenStepTypes="OpenStepTypeDialogAsync"
     OnOpenWorkCenters="OpenWorkCenterDialogAsync"
     OnDeletePart="DeletePartByCode"
-    OnToggleTopPart="ToggleTopPartAsync">
+    OnToggleTopPart="@(dto => ToggleTopPartAsync(dto))">
 </ProductTechnologyBox>
 
     </div>
@@ -1320,80 +1320,86 @@ private class AddPartResponse
 {
     public int Id { get; set; }
 }
-private async Task ToggleTopPartAsync(TopPartDto part)
+private async Task ToggleTopPartAsync(ProductTechnologyBox.TogglePartDto dto)
 {
     if (selected is null)
         return;
 
     selectedPartDetails ??= new List<ProductDetailDto>();
 
+var part = dto.Part;
+
 var existing = selectedPartDetails
     .FirstOrDefault(x => x.TopPartId == part.Id);
 
-    if (existing is null)
-    {
-        // ===== ADD =====
-        var resp = await Http.PostAsJsonAsync(
-            "http://localhost:5270/api/products/add-part",
-            new
-            {
-                productId = selected.id,
-                topPartId = part.Id,
-                qtyPerProduct = 1
-            });
-
-        if (!resp.IsSuccessStatusCode)
-            {
-                var msg = await resp.Content.ReadAsStringAsync();
-
-                if (msg.Contains("jau ir pievienota"))
-                {
-                    await JS.InvokeVoidAsync("alert", "Detaļa jau ir šai versijai.");
-                    return;
-                }
-
-                await JS.InvokeVoidAsync("alert", msg);
-                return;
-            }
-
-        var result = await resp.Content.ReadFromJsonAsync<AddPartResponse>();
-
-        if (result is null)
+// ===== JA IR → toggle =====
+if (existing is not null)
+{
+    var resp = await Http.PutAsJsonAsync(
+        "http://localhost:5270/api/products/toggle-part",
+        new
         {
-            await JS.InvokeVoidAsync("alert", "Serveris neatgrieza ID.");
-            return;
-        }
-
-        // 👇 pievienojam lokāli bez reload
-        selectedPartDetails.Add(new ProductDetailDto
-        {
-            ProductToPartId = result.Id,
-            TopPartId = part.Id,
-            TopPartName = part.TopPartName,
-            TopPartCode = part.TopPartCode,
-            Quantity = 1
+            ProductToPartId = existing.ProductToPartId,
+            IsActive = dto.IsActive
         });
-    }
-    else
+
+    if (!resp.IsSuccessStatusCode)
     {
-        // ===== REMOVE =====
-        var resp = await Http.PutAsJsonAsync(
-            "http://localhost:5270/api/products/toggle-part",
-            new
-            {
-                ProductToPartId = existing.ProductToPartId,
-                IsActive = false
-            });
-
-        if (!resp.IsSuccessStatusCode)
-        {
-            await JS.InvokeVoidAsync("alert", await resp.Content.ReadAsStringAsync());
-            return;
-        }
-
-        // 👇 izņemam lokāli bez reload
-        selectedPartDetails.Remove(existing);
+        await JS.InvokeVoidAsync("alert", await resp.Content.ReadAsStringAsync());
+        return;
     }
+
+if (!dto.IsActive)
+{
+    selectedPartDetails.Remove(existing);
+}
+else
+{
+    // ON → jāieliek atpakaļ UI
+    selectedPartDetails.Add(new ProductDetailDto
+    {
+        ProductToPartId = existing.ProductToPartId,
+        TopPartId = part.Id,
+        TopPartName = part.TopPartName,
+        TopPartCode = part.TopPartCode,
+        Quantity = existing.Quantity
+    });
+}
+
+    StateHasChanged();
+    return;
+}
+
+// ===== JA NAV → ADD =====
+if (dto.IsActive)
+{
+    var resp = await Http.PostAsJsonAsync(
+        "http://localhost:5270/api/products/add-part",
+        new
+        {
+            productId = selected.id,
+            topPartId = part.Id,
+            qtyPerProduct = 1
+        });
+
+    if (!resp.IsSuccessStatusCode)
+    {
+        var msg = await resp.Content.ReadAsStringAsync();
+        await JS.InvokeVoidAsync("alert", msg);
+        return;
+    }
+
+    var result = await resp.Content.ReadFromJsonAsync<AddPartResponse>();
+
+    selectedPartDetails.Add(new ProductDetailDto
+    {
+        ProductToPartId = result!.Id,
+        TopPartId = part.Id,
+        TopPartName = part.TopPartName,
+        TopPartCode = part.TopPartCode,
+        Quantity = 1
+    });
+}
 
     StateHasChanged();
 }

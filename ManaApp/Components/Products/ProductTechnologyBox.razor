@@ -168,7 +168,7 @@ else
     [Parameter] public EventCallback<string?> OnDeletePart { get; set; }
     [Parameter] public EventCallback OnOpenStepTypes { get; set; }
     [Parameter] public EventCallback OnOpenWorkCenters { get; set; }
-    [Parameter] public EventCallback<TopPartDto> OnToggleTopPart { get; set; }
+    [Parameter] public EventCallback<TogglePartDto> OnToggleTopPart { get; set; }
     [Parameter] public bool IsReadOnly { get; set; }
     private HashSet<string> openParts = new();
 
@@ -189,12 +189,21 @@ private async Task OnTogglePart(TopPartDto part, object? value)
 {
     var isChecked = value is bool b && b;
 
-if (OnToggleTopPart.HasDelegate)
-{
-    await OnToggleTopPart.InvokeAsync(part);
-}
+    if (OnToggleTopPart.HasDelegate)
+    {
+        await OnToggleTopPart.InvokeAsync(new TogglePartDto
+        {
+            Part = part,
+            IsActive = isChecked
+        });
+    }
 }
 
+public class TogglePartDto
+{
+    public required TopPartDto Part { get; set; }
+    public bool IsActive { get; set; }
+}
 private int GetQty(TopPartDto part)
 {
     return SelectedPartDetails?

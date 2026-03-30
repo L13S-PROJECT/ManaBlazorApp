@@ -1315,17 +1315,6 @@ public async Task<IActionResult> TogglePart([FromBody] TogglePartRequest dto)
     // 1️⃣ mainām pašas detaļas statusu
     entity.IsActive = dto.IsActive;
 
-    // 2️⃣ atrodam visus šīs detaļas soļus
-    var steps = await _db.TopPartSteps
-        .Where(s => s.ProductToPartId == entity.Id)
-        .ToListAsync();
-
-    // 3️⃣ sinhronizējam soļus ar detaļas statusu
-    foreach (var step in steps)
-    {
-        step.IsActive = dto.IsActive;
-    }
-
     await _db.SaveChangesAsync();
 
     return Ok();
