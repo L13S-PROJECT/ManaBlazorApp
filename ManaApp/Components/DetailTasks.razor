@@ -363,7 +363,7 @@ var batchCode = SelectedBatch?.BatchCode ?? "—";
 
 var ok = await JS.InvokeAsync<bool>(
     "confirm",
-    $"Vai detaļa partijā {batchCode} ir gatava?"
+    $"Vai detaļa \"{part.TopPartName}\" (produkts: {SelectedBatch?.ProductCode}) partijā {batchCode} ir gatava?"
 );
 
 if (!ok)

@@ -774,7 +774,7 @@ private async Task TogglePush(TaskRow t)
     t.Tasks_Push = newValue;
 
     StateHasChanged();
-    await OnClose.InvokeAsync();
+  
 }
 
 private string FormatTime(int minutes)

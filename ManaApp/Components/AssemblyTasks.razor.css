@@ -102,18 +102,6 @@
     box-shadow: 0 0 0 1px rgba(156, 163, 175, 0.5);
 }
 
-/* Hover efekts STEP rindām */
-/* Hover uz TASK (step) rindām */
-.ptv2-tasks-row.sub.task:hover {
-    background: #eef7ef;
-    cursor: pointer;
-}
-
-/* Asāki borderi hover laikā */
-.ptv2-tasks-row.sub.task:hover {
-    border-top: 1px solid #88f472;
-    border-bottom: 1px solid #88f472;
-}
 
 /* GATAVS poga – TIKAI detaļas (PART) rindām, 2. kolonna */
 .ptv2-tasks-row:not(.sub) > div:nth-child(2) {
@@ -392,9 +380,9 @@
 }
 
 .ptv2-tasks-row.assembly.sub.task:hover {
-    background: #e6f0ff;
-    border-top: 1px solid #2563EB;
-    border-bottom: 1px solid #2563EB;
+    background: #EEF4FF;
+    box-shadow: inset 0 1px 0 #93C5FD,
+                inset 0 -1px 0 #93C5FD;
 }
 
 .ptv2-tasks-row.assembly .ptv2-switch:checked {

@@ -105,12 +105,15 @@
 
 /* Hover efekts STEP rindām */
 /* Hover uz TASK (step) rindām */
+.ptv2-tasks-row.sub.task {
+    border-top: 1px solid transparent;
+    border-bottom: 1px solid transparent;
+}
+
 .ptv2-tasks-row.sub.task:hover {
     background: #EEF4FF;
-    cursor: pointer;
     border-top: 1px solid #93C5FD;
     border-bottom: 1px solid #93C5FD;
-
 }
 
 /* GATAVS poga – TIKAI detaļas (PART) rindām, 2. kolonna */
