@@ -592,6 +592,22 @@ private PlanningBatchPanel? batchPanelRef;
 
 private async Task OnPlannedPlus(ProductGroupRow row)
 {
+    var version = row.Versions?
+    .FirstOrDefault(v => IsLatestVersion(v));
+
+if (version is null)
+    return;
+
+    // ✅ VALIDĀCIJA PIRMS popup
+   var result = await Http.GetFromJsonAsync<ValidateResult>(
+    $"http://localhost:5270/api/batches/validate-for-planning?versionId={version.VersionId}");
+    
+    if (result is null || !result.isValid)
+    {
+        await JS.InvokeVoidAsync("alert", result?.message ?? "Kļūda validācijā");
+        return;
+    }
+    
     if (row.Versions == null || row.Versions.Count == 0)
         return;
 
@@ -659,7 +675,11 @@ var createDto = new
         createDto);
 
     if (!createResp.IsSuccessStatusCode)
-        return;
+            {
+                var err = await createResp.Content.ReadAsStringAsync();
+                await JS.InvokeVoidAsync("alert", err);
+                return;
+            }
 
     var data = await createResp.Content.ReadFromJsonAsync<Dictionary<string, int>>();
     if (data != null && data.TryGetValue("batchId", out var id))
@@ -1344,5 +1364,10 @@ private sealed class SalesDraftItemDto
 
 private int? addProductId;
 
+private class ValidateResult
+{
+    public bool isValid { get; set; }
+    public string? message { get; set; }
+}
 
 }

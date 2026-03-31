@@ -29,8 +29,17 @@
     .ToList();
 
     var pushTasks = tasks.Where(t => t.Tasks_Push).ToList();
-    var priorityTasks = tasks.Where(t => !t.Tasks_Push && t.Tasks_Priority).ToList();
-    var ordinaryTasks = tasks.Where(t => !t.Tasks_Push && !t.Tasks_Priority).ToList();
+    var priorityTasks = tasks
+    .Where(t => !t.Tasks_Push && t.Tasks_Priority)
+    .OrderBy(t => t.BatchProductId)
+    .ThenBy(t => t.StepOrder)
+    .ToList();
+
+var ordinaryTasks = tasks
+    .Where(t => !t.Tasks_Push && !t.Tasks_Priority)
+    .OrderBy(t => t.BatchProductId)
+    .ThenBy(t => t.StepOrder)
+    .ToList();
 
 
 <div class="elp-section">
@@ -344,6 +353,7 @@ private class TaskRow
 
     public bool Tasks_Priority { get; set; }
     public bool Tasks_Push { get; set; }
+    public int StepOrder { get; set; }
 }
 
 private class EmployeeDto
@@ -353,7 +363,8 @@ private class EmployeeDto
 }
 
 private IEnumerable<TaskRow> AllTasks =>
-    (model?.Priority ?? Enumerable.Empty<TaskRow>());
+    (model?.Priority ?? Enumerable.Empty<TaskRow>())
+    .Concat(model?.Normal ?? Enumerable.Empty<TaskRow>());
 
 private IEnumerable<string> WorkCenters => allWorkCenters;
 
@@ -373,7 +384,8 @@ private async Task OnAssigneeChanged(TaskRow t, ChangeEventArgs e)
 });
 
 // 🔽 pārlādē UNASSIGNED listu
-var data = await Http.GetFromJsonAsync<List<TaskRow>>("/api/tasks/unassigned");
+var data = await Http.GetFromJsonAsync<List<TaskRow>>("/api/tasks/unassigned")
+           ?? new List<TaskRow>();
 
 model = new EmployeeLoadModel
 {

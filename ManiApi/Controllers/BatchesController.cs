@@ -15,9 +15,9 @@ namespace ManiApi.Controllers
         private readonly AppDbContext _db;
         public BatchesController(AppDbContext db) => _db = db;
 
-        // POST: /api/batches/draft/create
-        [HttpPost("draft/create")]
-        public async Task<IActionResult> CreateDraft([FromBody] BatchCartModel dto)
+// POST: /api/batches/draft/create
+[HttpPost("draft/create")]
+    public async Task<IActionResult> CreateDraft([FromBody] BatchCartModel dto)
         {
             if (dto is null) return BadRequest("Tukšs pieprasījums.");
             var code = (dto.Title ?? "").Trim();
@@ -28,12 +28,75 @@ if (string.IsNullOrWhiteSpace(code))
     code = "__DRAFT__" + Guid.NewGuid().ToString("N")[..8];
 }
 
+if (dto.Items is null || dto.Items.Count == 0)
+{
+    return BadRequest("Nav nevienas produkta rindas.");
+}
 
-            // DB savienojums + transakcija
+// DB savienojums + transakcija
             var conn = _db.Database.GetDbConnection();
             await conn.OpenAsync();
-            await using var tx = await conn.BeginTransactionAsync();
 
+await using var tx = await conn.BeginTransactionAsync();
+
+// 🔒 VALIDĀCIJA (tā pati kā CreateDraft)
+if (dto.Items is not null)
+{
+    foreach (var it in dto.Items)
+    {
+        await using var cmd = conn.CreateCommand();
+        cmd.Transaction = tx;
+
+        cmd.CommandText = @"
+SELECT 
+    COUNT(ptp.ID) AS TopPartsCnt,
+    SUM(
+        CASE 
+            WHEN NOT EXISTS (
+                SELECT 1 
+                FROM toppartsteps ts
+                WHERE ts.ProductToPart_ID = ptp.ID
+                  AND ts.IsActive = 1
+            )
+            THEN 1 ELSE 0 
+        END
+    ) AS InvalidCnt
+FROM producttopparts ptp
+WHERE ptp.Version_ID = @vid
+  AND ptp.IsActive = 1;
+";
+
+        var p = cmd.CreateParameter();
+        p.ParameterName = "@vid";
+        p.Value = it.VersionId;
+        cmd.Parameters.Add(p);
+
+        await using var reader = await cmd.ExecuteReaderAsync();
+
+        int topPartsCnt = 0;
+        int invalidCnt = 0;
+
+        if (await reader.ReadAsync())
+        {
+            topPartsCnt = reader.IsDBNull(0) ? 0 : reader.GetInt32(0);
+            invalidCnt  = reader.IsDBNull(1) ? 0 : reader.GetInt32(1);
+        }
+
+        await reader.CloseAsync();
+
+        if (topPartsCnt == 0)
+        {
+            await tx.RollbackAsync();
+            return BadRequest($"Produktam (VersionId={it.VersionId}) nav neviena TopPart.");
+        }
+
+        if (invalidCnt > 0)
+        {
+            await tx.RollbackAsync();
+            return BadRequest($"Produktam (VersionId={it.VersionId}) ir TopPart bez STEP.");
+        }
+    }
+}           
             // 1) Unikuma pārbaude (starp VISIEM statusiem)
             await using (var chk = conn.CreateCommand())
             {
@@ -291,6 +354,8 @@ WHERE ID = @id AND IsActive = 1;";
 
             if (oldVid != it.VersionId)
                 return BadRequest("Produkta maiņa nav atļauta rediģēšanas režīmā.");
+
+                
         }
 
         await using var row = conn.CreateCommand();
@@ -1482,6 +1547,88 @@ WHERE BatchProduct_ID = @bpId
     return Ok(qty);
 }
 
+[HttpGet("validate-for-planning")]
+public async Task<IActionResult> ValidateForPlanning([FromQuery] int versionId)
+{
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+SELECT 
+    COUNT(ptp.ID) AS TopPartsCnt,
+
+    SUM(
+        CASE 
+            WHEN NOT EXISTS (
+                SELECT 1 
+                FROM toppartsteps ts
+                WHERE ts.ProductToPart_ID = ptp.ID
+                  AND ts.IsActive = 1
+            )
+            THEN 1 ELSE 0 
+        END
+    ) AS InvalidCnt,
+
+    -- ✅ ja NAV neviena step DETAIL stage
+    SUM(CASE WHEN ts.Step_Type = 1 THEN 1 ELSE 0 END) AS DetailCnt,
+
+    -- ✅ ja NAV neviena step ASSEMBLY stage
+    SUM(CASE WHEN ts.Step_Type = 2 THEN 1 ELSE 0 END) AS AssemblyCnt,
+
+    -- ✅ ja NAV neviena step FINISHING stage
+    SUM(CASE WHEN ts.Step_Type = 3 THEN 1 ELSE 0 END) AS FinishingCnt
+
+FROM producttopparts ptp
+
+LEFT JOIN toppartsteps ts 
+    ON ts.ProductToPart_ID = ptp.ID
+   AND ts.IsActive = 1
+
+WHERE ptp.Version_ID = @vid
+  AND ptp.IsActive = 1;
+";
+
+    var p = cmd.CreateParameter();
+    p.ParameterName = "@vid";
+    p.Value = versionId;
+    cmd.Parameters.Add(p);
+
+    await using var r = await cmd.ExecuteReaderAsync();
+
+    int topParts = 0;
+    int invalid = 0;
+    int detailCnt = 0;
+    int assemblyCnt = 0;
+    int finishingCnt = 0;
+
+    if (await r.ReadAsync())
+    {
+        topParts = r.IsDBNull(0) ? 0 : r.GetInt32(0);
+        invalid  = r.IsDBNull(1) ? 0 : r.GetInt32(1);
+        detailCnt = r.IsDBNull(2) ? 0 : r.GetInt32(2);
+        assemblyCnt = r.IsDBNull(3) ? 0 : r.GetInt32(3);
+        finishingCnt = r.IsDBNull(4) ? 0 : r.GetInt32(4);
+    }
+
+    if (topParts == 0)
+    return Ok(new { isValid = false, message = "Nav nevienas Pamatdetaļas" });
+
+if (invalid > 0)
+    return Ok(new { isValid = false, message = "Ir Pamatdetaļa bez tehnoloģijas soļiem." });
+
+if (detailCnt == 0)
+    return Ok(new { isValid = false, message = "Nav DETAIL posmā tehnoloģijas soļu." });
+
+if (assemblyCnt == 0)
+    return Ok(new { isValid = false, message = "Nav ASSEMBLY posmā tehnoloģijas soļu." });
+
+if (finishingCnt == 0)
+    return Ok(new { isValid = false, message = "Nav FINISHING posmā tehnoloģijas soļu." });
+
+    return Ok(new { isValid = true });
+}
+
     } // <-- beidzas public class BatchesController
 
     // === DTO (tie paši nosaukumi, ko izmanto Blazor) ===
@@ -1500,8 +1647,8 @@ public sealed class BatchCartItem
     public string Code { get; set; } = "";
     public int Qty { get; set; }
 
-    public string? Comment { get; set; }   // ✅ JAUNS
-
+    public string? Comment { get; set; }   //  JAUNS
+    public List<int> SelectedTopPartIds { get; set; } = new();
     public int? ItemId { get; set; }
 }
 

@@ -2360,7 +2360,7 @@ SELECT
     ts.Estimated_Minutes,
 
     t.Assigned_To,
-    t.Tasks_Priority,
+    COALESCE(t.Tasks_Priority, bp.is_priority) AS Tasks_Priority,
     t.Tasks_Push
 
 FROM tasks t
@@ -2375,11 +2375,11 @@ JOIN toppart tp ON tp.ID = ptp.TopPart_ID
 
 WHERE t.IsActive = 1
   AND t.Tasks_Status = 1
-  AND t.Assigned_To IS NULL
+  
 
 ORDER BY
   CASE WHEN t.Tasks_Push = 1 THEN 0 ELSE 1 END,
-  t.Tasks_Priority DESC,
+  COALESCE(t.Tasks_Priority, bp.is_priority) DESC,
   wc.ID,
   ts.Step_Order;
 ";
