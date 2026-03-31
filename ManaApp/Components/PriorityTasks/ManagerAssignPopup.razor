@@ -23,23 +23,16 @@
 {
     var tasks = AllTasks
     .Where(t => (t.WorkCenter ?? "") == wc)
-    .OrderBy(t => t.Tasks_Push ? 0 : 1)
-    .ThenBy(t => t.Tasks_Priority ? 0 : 1)
-    .ThenBy(t => t.BatchProductId)
     .ToList();
 
     var pushTasks = tasks.Where(t => t.Tasks_Push).ToList();
     var priorityTasks = tasks
-    .Where(t => !t.Tasks_Push && t.Tasks_Priority)
-    .OrderBy(t => t.BatchProductId)
-    .ThenBy(t => t.StepOrder)
-    .ToList();
+    .Where(t => !t.Tasks_Push && t.BatchPriority)
+    .ToList();   
 
-var ordinaryTasks = tasks
-    .Where(t => !t.Tasks_Push && !t.Tasks_Priority)
-    .OrderBy(t => t.BatchProductId)
-    .ThenBy(t => t.StepOrder)
-    .ToList();
+    var ordinaryTasks = tasks
+    .Where(t => !t.Tasks_Push && !t.BatchPriority)
+    .ToList();   
 
 
 <div class="elp-section">
@@ -350,10 +343,11 @@ private class TaskRow
     public bool? CanStart { get; set; }
 
     public int? Assigned_To { get; set; }
-
+    public bool BatchPriority { get; set; }
     public bool Tasks_Priority { get; set; }
     public bool Tasks_Push { get; set; }
     public int StepOrder { get; set; }
+    
 }
 
 private class EmployeeDto

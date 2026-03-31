@@ -2360,7 +2360,8 @@ SELECT
     ts.Estimated_Minutes,
 
     t.Assigned_To,
-    COALESCE(t.Tasks_Priority, bp.is_priority) AS Tasks_Priority,
+    bp.is_priority AS BatchPriority,
+    COALESCE(t.Tasks_Priority, 0) AS Tasks_Priority,
     t.Tasks_Push
 
 FROM tasks t
@@ -2376,10 +2377,26 @@ JOIN toppart tp ON tp.ID = ptp.TopPart_ID
 WHERE t.IsActive = 1
   AND t.Tasks_Status = 1
   
-
-ORDER BY
+  ORDER BY
   CASE WHEN t.Tasks_Push = 1 THEN 0 ELSE 1 END,
-  COALESCE(t.Tasks_Priority, bp.is_priority) DESC,
+
+  -- 1️⃣ Batch priority (priority batchi augšā)
+  bp.is_priority DESC,
+
+  -- 2️⃣ Ja priority → lieto Priority
+  CASE 
+      WHEN bp.is_priority = 1 THEN bp.Priority
+  END ASC,
+
+  -- 3️⃣ Ja ordinary → lieto NormalOrder
+  CASE 
+      WHEN bp.is_priority = 0 THEN bp.NormalOrder
+  END ASC,
+
+  -- 4️⃣ Task priority (iekš batch)
+  t.Tasks_Priority DESC,
+
+  -- 5️⃣ Step secība
   wc.ID,
   ts.Step_Order;
 ";
@@ -2407,8 +2424,9 @@ ORDER BY
             StepType = r.GetInt32(13),
             EstimatedMinutes = r.IsDBNull(14) ? 0 : r.GetInt32(14),
             Assigned_To = r.IsDBNull(15) ? (int?)null : r.GetInt32(15),
-            Tasks_Priority = !r.IsDBNull(16) && r.GetBoolean(16),
-            Tasks_Push = !r.IsDBNull(17) && r.GetBoolean(17)
+            BatchPriority = !r.IsDBNull(16) && r.GetBoolean(16),
+            Tasks_Priority = !r.IsDBNull(17) && r.GetBoolean(17),
+            Tasks_Push = !r.IsDBNull(18) && r.GetBoolean(18)
         });
     }
 
