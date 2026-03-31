@@ -2376,6 +2376,7 @@ JOIN toppart tp ON tp.ID = ptp.TopPart_ID
 
 WHERE t.IsActive = 1
   AND t.Tasks_Status = 1
+  AND t.Assigned_To IS NULL
   
   ORDER BY
   CASE WHEN t.Tasks_Push = 1 THEN 0 ELSE 1 END,

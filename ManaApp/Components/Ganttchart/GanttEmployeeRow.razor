@@ -23,7 +23,7 @@
                         t.Status == 1 ? "#f97316" :
                         "#9ca3af"
                     );
-                left:@((Tasks.IndexOf(t)) * 42)px;
+                left:@((t.EstimatedStartMinutes / 480.0) * 40)px;
                 width:@Math.Max(10, (t.EstimatedTotalMinutes / 480.0) * 40)px;">
 
                     @t.EstimatedTotalMinutes

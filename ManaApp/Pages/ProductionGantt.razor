@@ -63,21 +63,34 @@ int daysInMonth = DateTime.DaysInMonth(DateTime.Today.Year, DateTime.Today.Month
         WorkCenterId = wc.Key,
         WorkCenterName = wc.First().WorkCenterName,
 
-        Employees = employees
-            .Where(e => e.WorkCentrTypeID == wc.Key)
-            .Select(e => new EmployeeGroup
-            {
-                EmployeeId = e.Id,
-                EmployeeName = e.Name,
-                Tasks = wc
-                    .Where(t => t.AssignedTo == e.Id || t.AssignedTo == 0 || t.AssignedTo == null)
-                    .OrderByDescending(t => t.IsPriority)
-                    .ThenBy(t => t.Priority)
-                    .ThenBy(t => t.BatchProductId)
-                    .ThenBy(t => t.StepOrder)
-                    .ToList()
-            })
-            .ToList()
+                Employees = employees
+    .Where(e => e.WorkCentrTypeID == wc.Key)
+    .Select(e =>
+    {
+        var tasks = wc
+            .Where(t => t.AssignedTo == e.Id || t.AssignedTo == 0 || t.AssignedTo == null)
+            .OrderByDescending(t => t.IsPriority)
+            .ThenBy(t => t.Priority)
+            .ThenBy(t => t.BatchProductId)
+            .ThenBy(t => t.StepOrder)
+            .ToList();
+
+        int current = 0;
+
+        foreach (var t in tasks)
+        {
+            t.EstimatedStartMinutes = current;
+            current += t.EstimatedTotalMinutes;
+        }
+
+        return new EmployeeGroup
+        {
+            EmployeeId = e.Id,
+            EmployeeName = e.Name,
+            Tasks = tasks
+        };
+    })
+    .ToList()
     })
     .ToList();
 }
