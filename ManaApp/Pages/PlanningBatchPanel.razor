@@ -82,11 +82,17 @@
             {
                 var parent = GetParentItem(pair.group);
                 if (parent is null)
-                {
-                    continue;
-                }
+                    {
+                        continue;
+                    }
 
-                var children = GetChildItems(pair.group).ToList();
+            var children = GetChildItems(pair.group).ToList();
+
+                // ⬇️ PIEVIENO ŠO
+                if (parent.Qty <= 0 && !children.Any())
+                    {
+                        continue;
+                    }
 
                 <div class="batch-row"
                      @ondblclick="() => OnEdit.InvokeAsync(parent)">
@@ -107,7 +113,9 @@
                     </div>
 
                     <div class="col-code">@parent.Code</div>
-                    <div class="col-qty">@parent.Qty</div>
+                    <div class="col-qty">
+                        @(parent.Qty > 0 ? parent.Qty.ToString() : "")
+                    </div>
                     <div class="col-actions">
                         <button class="icon-btn edit-btn"
                                 title="Labot apjomu"
@@ -159,12 +167,18 @@
             @foreach (var pair in adapterGroups.Select((group, i) => new { group, index = i + 1 }))
             {
                 var parent = GetParentItem(pair.group);
-                if (parent is null)
-                {
-                    continue;
-                }
+                    if (parent is null)
+                    {
+                        continue;
+                    }
 
                 var children = GetChildItems(pair.group).ToList();
+
+                    // ⬇️ PIEVIENO ŠO
+                if (parent.Qty <= 0 && !children.Any())
+                    {
+                        continue;
+                    }
 
                 <div class="batch-row"
                      @ondblclick="() => OnEdit.InvokeAsync(parent)">
@@ -185,7 +199,9 @@
                     </div>
 
                     <div class="col-code">@parent.Code</div>
-                    <div class="col-qty">@parent.Qty</div>
+                    <div class="col-qty">
+                        @(parent.Qty > 0 ? parent.Qty.ToString() : "")
+                    </div>
                     <div class="col-actions">
                         <button class="icon-btn edit-btn"
                                 title="Labot apjomu"
