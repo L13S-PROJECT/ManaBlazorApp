@@ -326,9 +326,9 @@ await using (var clear = conn.CreateCommand())
 {
     clear.Transaction = tx;
     clear.CommandText = @"
-UPDATE batches_products
-SET IsActive = 0
+DELETE FROM batches_products
 WHERE Batch_Id = @bid;";
+
     var p = clear.CreateParameter();
     p.ParameterName = "@bid";
     p.Value = dto.BatchId!.Value;

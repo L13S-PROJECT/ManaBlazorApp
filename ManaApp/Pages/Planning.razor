@@ -626,6 +626,14 @@ private async Task OnPlannedPlus(ProductGroupRow row)
 
     addProductId = ver.id;
     addParts = await LoadProductParts(ver.VersionId!.Value);
+
+            // ⬇️ reset stāvokli katrai atvēršanai
+            foreach (var p in addParts)
+            {
+                p.IsSelected = false;
+                p.Qty = 0;
+            }
+
     addLine = new ProductionTasks.BatchLine
     {
         BatchId     = draftBatchId ?? 0,
@@ -738,12 +746,12 @@ var dto = new DraftUpdateDto
     BatchId = draftBatchId.Value
 };
 
+var newItems = new List<DraftItemDto>();
 
-// 1️⃣ Produkts (galvenā rinda)
-// 1️⃣ VISI esošie batchItems
+// esošie (no UI)
 foreach (var it in batchItems)
 {
-    dto.Items.Add(new DraftItemDto
+    newItems.Add(new DraftItemDto
     {
         VersionId = it.VersionId,
         ProductToPartId = it.ProductToPartId,
@@ -752,14 +760,16 @@ foreach (var it in batchItems)
     });
 }
 
-// 2️⃣ jaunais produkts
-dto.Items.Add(new DraftItemDto
+// jaunais parent
+newItems.Add(new DraftItemDto
 {
     VersionId = line.VersionId,
     ProductToPartId = null,
     Qty = line.Planned,
     Comment = line.Comment
 });
+
+dto.Items = newItems;
 
 // 3️⃣ jaunās detaļas
 if (line.SelectedParts != null)
