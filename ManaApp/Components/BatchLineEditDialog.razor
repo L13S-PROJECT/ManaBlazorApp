@@ -53,6 +53,18 @@ else
                 </div>
 
                 <div style="margin-bottom:12px;">
+                    <b>Detaļa:</b><br />
+                    <select @bind="_selectedPartId" style="width:100%;">
+                        <option value="">-- Produkts (nav detaļa) --</option>
+
+                        @foreach (var p in Parts)
+                        {
+                            <option value="@p.Id">@p.TopPart_Name</option>
+                        }
+                    </select>
+                </div>
+
+                <div style="margin-bottom:12px;">
                     <b>Komentārs:</b><br />
                     <textarea rows="3"
                               style="width:100%;"
@@ -87,6 +99,9 @@ else
 
     // Rinda, ko labo (no ProductionTasks BatchLine)
     [Parameter] public ProductionTasks.BatchLine? Line { get; set; }
+    [Parameter] public List<ManaApp.Pages.Planning.ProductToPartDto> Parts { get; set; } = new();
+    
+    private int? _selectedPartId;
 
 [Parameter] public string? ProductName { get; set; }
 
@@ -182,6 +197,7 @@ if (!IsAddMode && qtyChanged && _canEditQty)
             BatchCode      = Line.BatchCode,
             BatchProductId = Line.BatchProductId,
             VersionId      = Line.VersionId,
+            ProductToPartId = _selectedPartId,
             Planned        = _planned,
             Detailed       = Line.Detailed,
             Assembly       = Line.Assembly,
@@ -198,5 +214,6 @@ if (!IsAddMode && qtyChanged && _canEditQty)
 
     }
 [Parameter] public bool IsAddMode { get; set; } = false;
+
 
 }

@@ -104,6 +104,7 @@
 <BatchLineEditDialog
     @bind-IsOpen="isAddOpen"
     Line="addLine"
+    Parts="addParts"
     IsAddMode="true"
     ProductName="@addProductName"
     OnSaved="OnAddSaved" />
@@ -163,6 +164,7 @@ private List<SalesAllocateDialog.BatchRow> sellBatches = new();
    
 private string? addProductName;
 private string? editProductName;
+private List<ProductToPartDto> addParts = new();
 
 // EDIT dialoga stāvoklis
 private bool isEditOpen = false;
@@ -621,7 +623,7 @@ if (version is null)
     addProductName = row.ProductName;
 
     addProductId = ver.id;
-
+    addParts = await LoadProductParts(ver.VersionId!.Value);
     addLine = new ProductionTasks.BatchLine
     {
         BatchId     = draftBatchId ?? 0,
@@ -659,14 +661,15 @@ var createDto = new
     Title = "", // ⬅️ SVARĪGI: ļaujam backendam ģenerēt unikālu kodu
     Comment = "Melnraksts",
     Items = new[]
-    {
-        new
         {
-            VersionId = line.VersionId,
-            Qty       = line.Planned,
-            Comment   = line.Comment
+            new
+            {
+                VersionId = line.VersionId,
+                ProductToPartId = (int?)null, 
+                Qty       = line.Planned,
+                Comment   = line.Comment
+            }
         }
-    }
 };
 
 
@@ -696,6 +699,7 @@ var createDto = new
             Code = product?.ProductCode ?? line.BatchCode,
             Qty = line.Planned,
             Comment = line.Comment,
+            ProductToPartId = line.ProductToPartId,
             CategoryId = rowData?.CategoryId,
             ParentCategoryId = rowData?.ParentCategoryId
         });
@@ -718,6 +722,7 @@ foreach (var it in batchItems)
     dto.Items.Add(new DraftItemDto
     {
         VersionId = it.VersionId,
+        ProductToPartId = it.ProductToPartId, 
         Qty       = it.Qty,
         Comment   = it.Comment
     });
@@ -727,6 +732,7 @@ foreach (var it in batchItems)
 dto.Items.Add(new DraftItemDto
 {
     VersionId = line.VersionId,
+    ProductToPartId = line.ProductToPartId, 
     Qty       = line.Planned,
     Comment   = line.Comment
 });
@@ -747,6 +753,7 @@ batchItems.Add(new BatchCartItem
     Code = product?.ProductCode ?? line.BatchCode,
     Qty = line.Planned,
     Comment = line.Comment,
+    ProductToPartId = line.ProductToPartId,
     CategoryId = rowData?.CategoryId,
     ParentCategoryId = rowData?.ParentCategoryId
 });
@@ -798,6 +805,7 @@ private sealed class DraftDto
 private sealed class DraftItemDto
 {
     public int VersionId { get; set; }
+    public int? ProductToPartId { get; set; }
     public int Qty { get; set; }
     public string? Comment { get; set; }
 }
@@ -853,6 +861,7 @@ foreach (var it in draft.Items)
                         Name      = row?.productName ?? "",
                         Qty       = it.Qty,
                         Comment   = it.Comment,
+                        ProductToPartId = it.ProductToPartId,
                         CategoryId = row?.CategoryId,
                         ParentCategoryId = row?.ParentCategoryId
                     });
@@ -1368,6 +1377,27 @@ private class ValidateResult
 {
     public bool isValid { get; set; }
     public string? message { get; set; }
+}
+
+private async Task<List<ProductToPartDto>> LoadProductParts(int versionId)
+{
+    try
+    {
+        return await Http.GetFromJsonAsync<List<ProductToPartDto>>(
+            $"http://localhost:5270/api/topparts/by-version?versionId={versionId}"
+        ) ?? new();
+    }
+    catch
+    {
+        return new();
+    }
+}
+
+public class ProductToPartDto
+{
+    public int Id { get; set; }
+    public int TopPart_Id { get; set; }
+    public string TopPart_Name { get; set; } = "";
 }
 
 }

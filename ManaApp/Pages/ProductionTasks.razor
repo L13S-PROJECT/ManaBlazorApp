@@ -659,6 +659,7 @@ public sealed class BatchLine
     [JsonPropertyName("Done")]           public int Done { get; set; }      // <- Done = STOCK
     [JsonPropertyName("Stock")]          public int Stock { get; set; }
     [JsonPropertyName("Comment")]        public string? Comment { get; set; }
+    [JsonPropertyName("ProductToPartId")] public int? ProductToPartId { get; set; }
     [JsonPropertyName("StartedAt")]      public DateTime? StartedAt { get; set; }
     [JsonPropertyName("BatchStatus")]    public int BatchStatus { get; set; }
 }

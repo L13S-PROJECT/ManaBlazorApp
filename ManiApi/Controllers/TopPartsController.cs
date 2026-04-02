@@ -85,5 +85,28 @@ public async Task<IActionResult> Create([FromBody] TopPart dto)
 
             return Ok();
         }
+
+        // GET: api/topparts/by-version?versionId=5
+[HttpGet("by-version")]
+public async Task<IActionResult> GetByVersion(int versionId)
+{
+    var rows = await (
+        from ptp in _db.ProductTopParts
+        join tp in _db.TopParts on ptp.TopPartId equals tp.Id
+        where ptp.VersionId == versionId 
+            && ptp.IsActive
+            && tp.Stage == 1
+        select new
+        {
+            Id = ptp.Id,
+            TopPart_Id = tp.Id,
+            TopPart_Name = tp.TopPartName
+        }
+    )
+    .OrderBy(x => x.TopPart_Name)
+    .ToListAsync();
+
+    return Ok(rows);
+}
     }
 }

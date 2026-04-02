@@ -136,9 +136,9 @@ if (dto.Items is not null)
         row.Transaction = tx;
     row.CommandText = @"
 INSERT INTO batches_products
-    (Batch_Id, Version_Id, Planned_Qty, Done_Qty, Priority, BatchProduct_Comments, IsActive)
+    (Batch_Id, Version_Id, ProductToPart_ID, Planned_Qty, Done_Qty, Priority, BatchProduct_Comments, IsActive)
 VALUES
-    (@bid, @vid, @qty, 0, 0, @comment, 1)
+    (@bid, @vid, @ptpId, @qty, 0, 0, @comment, 1)
 ON DUPLICATE KEY UPDATE
     Planned_Qty           = VALUES(Planned_Qty),
     BatchProduct_Comments = VALUES(BatchProduct_Comments),
@@ -164,6 +164,11 @@ ON DUPLICATE KEY UPDATE
         pc.ParameterName = "@comment";
         pc.Value = (object?)it.Comment ?? DBNull.Value;
         row.Parameters.Add(pc);
+
+        var p3 = row.CreateParameter();
+        p3.ParameterName = "@ptpId";
+        p3.Value = (object?)it.ProductToPartId ?? DBNull.Value;
+        row.Parameters.Add(p3);
 
         await row.ExecuteNonQueryAsync();
     }
@@ -362,14 +367,15 @@ WHERE ID = @id AND IsActive = 1;";
         row.Transaction = tx;
    row.CommandText = @"
 INSERT INTO batches_products 
-    (Batch_Id, Version_Id, Planned_Qty, Done_Qty, Priority, BatchProduct_Comments, IsActive)
+    (Batch_Id, Version_Id, ProductToPart_ID, Planned_Qty, Done_Qty, Priority, BatchProduct_Comments, IsActive)
 VALUES 
-    (@bid, @vid, @qty, 0, 0, @comment, 1)
+    (@bid, @vid, @ptpId, @qty, 0, 0, @comment, 1)
 ON DUPLICATE KEY UPDATE
     Planned_Qty           = VALUES(Planned_Qty),
     BatchProduct_Comments = VALUES(BatchProduct_Comments),
-    IsActive              = 1;";
-
+    ProductToPart_ID      = VALUES(ProductToPart_ID),
+    IsActive              = 1;
+    ";
 
         var pb = row.CreateParameter();
         pb.ParameterName = "@bid";
@@ -390,6 +396,11 @@ ON DUPLICATE KEY UPDATE
         pc.ParameterName = "@comment";
         pc.Value = (object?)it.Comment ?? DBNull.Value;
         row.Parameters.Add(pc);
+
+        var p3 = row.CreateParameter();
+        p3.ParameterName = "@ptpId";
+        p3.Value = (object?)it.ProductToPartId ?? DBNull.Value;
+        row.Parameters.Add(p3);
 
         await row.ExecuteNonQueryAsync();
     }
@@ -1646,7 +1657,7 @@ public sealed class BatchCartItem
     public string Name { get; set; } = "";
     public string Code { get; set; } = "";
     public int Qty { get; set; }
-
+    public int? ProductToPartId { get; set; }
     public string? Comment { get; set; }   //  JAUNS
     public List<int> SelectedTopPartIds { get; set; } = new();
     public int? ItemId { get; set; }

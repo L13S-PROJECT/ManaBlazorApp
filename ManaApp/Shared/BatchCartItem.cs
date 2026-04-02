@@ -9,6 +9,7 @@ namespace ManaApp.Shared
         public int Qty { get; set; }
         public string? Comment { get; set; }
         public int? CategoryId { get; set; }
+        public int? ProductToPartId { get; set; }
         public int? ParentCategoryId { get; set; }
         public BatchCartItem Clone() => new()
         {
