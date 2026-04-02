@@ -1,0 +1,49 @@
+.parts-main {
+    display: flex;
+    gap: 20px;
+}
+
+.parts-left {
+    flex: 1;
+    border: 1px solid #ccc;
+    padding: 10px;
+}
+
+.parts-right {
+    flex: 1;
+    border: 1px solid #ccc;
+    padding: 10px;
+}
+
+.part-group-header,
+.part-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
+    align-items: center;
+}
+
+.part-group-header {
+    display: grid;
+    grid-template-columns: 2fr 1fr repeat(4, 80px);
+    background: #7fb3c9;
+    color: black;
+    font-weight: bold;
+    padding: 6px;
+    margin-top: 10px;
+}
+
+.part-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr repeat(4, 80px); 
+    padding: 4px 6px;
+    border-bottom: 1px solid #ddd;
+}
+
+.col-num {
+    text-align: center;
+}
+
+.col-index {
+    text-align: center;
+    color: #666;
+}

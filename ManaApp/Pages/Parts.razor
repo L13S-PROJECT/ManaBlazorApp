@@ -1,0 +1,234 @@
+@*Parts lapa - atsevišķa detaļu uzskaites lapa - DETAIL posmam*@
+@page "/parts"
+@page "/parts/{ProductId:int}/{VersionId:int}"
+@using ManaApp.Models
+@using System.Net.Http.Json
+@using System.Text.Json.Serialization
+
+@inject HttpClient Http
+@layout MainLayout
+
+<div class="parts-main">
+
+    <!-- KREISĀ PUSE: saraksts -->
+        <div class="parts-left">
+            <h4>Detaļu saraksts</h4>
+
+            @foreach (var group in groupedData)
+            {
+                <!-- HEADER (Product + Version) -->
+                <div class="part-group-header">
+                    <div>@group.ProductName</div>   <!-- ✔ -->
+                    <div>@group.VersionName</div>   <!-- ✔ -->
+                    <div>Ražošanā</div>
+                    <div>Ok</div>
+                    <div>Rezervēts</div>
+                    <div>Brīvs</div>
+                </div>
+
+                <!-- CHILD ROWS (TopParts) -->
+                @foreach (var part in group.Parts)
+                    {
+                        <div class="part-row">
+                            <div>@part.TopPartName</div>
+                            <div></div> <!-- tukšs version -->
+                            <div>@part.InProduction</div>
+                            <div>@part.OkQty</div>
+                            <div>@part.ReservedQty</div>
+                            <div style="color:@(part.FreeQty < 0 ? "red" : "inherit")">
+                                @part.FreeQty
+                            </div>
+                        </div>
+                    }
+            }
+        </div>
+
+    <!-- LABĀ PUSE: informācija + actions -->
+    <div class="parts-right">
+        <h4>Detaļas informācija</h4>
+
+        <p>(šeit būs izvēlētās detaļas info + darbības)</p>
+    </div>
+
+</div>
+
+@code {
+    [Parameter] public int? ProductId { get; set; }
+    [Parameter] public int? VersionId { get; set; }
+
+    private List<PartRow> rows = new();
+    public class PartRow
+    {
+        public int ProductToPartId { get; set; }
+        public string? TopPartCode { get; set; }
+        public string? TopPartName { get; set; }
+        public int Quantity { get; set; }
+        public int TopPartId { get; set; }
+        public int OkQty { get; set; }
+        public int ReservedQty { get; set; }
+        public int InProduction { get; set; }
+        public int StockQty { get; set; }
+        public int FreeQty => StockQty - ReservedQty;
+    }
+
+    private List<ProductPartGroup> groupedData = new();
+
+    public class ProductPartGroup
+    {
+        public string ProductName { get; set; } = "";
+        public string VersionName { get; set; } = "";
+
+        public int InProduction { get; set; }   // vēlāk no batch
+        public int OkQty { get; set; }
+        public int ReservedQty { get; set; }
+        public int StockQty { get; set; }
+        public int FreeQty => StockQty - ReservedQty;
+
+        public List<PartItem> Parts { get; set; } = new();
+    }
+
+public class PartItem
+{
+    public int Index { get; set; }
+    public string TopPartName { get; set; } = "";
+
+    public int InProduction { get; set; }
+    public int OkQty { get; set; }
+    public int ReservedQty { get; set; }
+    public int StockQty { get; set; }
+    public int FreeQty => StockQty - ReservedQty;
+}
+
+public class ProductSummaryDto
+{
+    public int ProductId { get; set; }
+    public string ProductName { get; set; } = "";
+
+    public int VersionId { get; set; }
+    public string VersionName { get; set; } = "";
+
+    public int InProduction { get; set; }
+    public int OkQty { get; set; }
+    public int ReservedQty { get; set; }
+    public int FreeQty { get; set; }
+}
+
+protected override async Task OnInitializedAsync()
+{
+    var products = await Http.GetFromJsonAsync<List<ProductSummaryDto>>(
+        "http://localhost:5270/api/products/planning-list");
+
+    // ✅ VIENREIZ
+    var production = await Http.GetFromJsonAsync<List<PartProductionDto>>(
+        "http://localhost:5270/api/parts/in-production");
+
+    var productionMap = production?
+    .ToDictionary(x => $"{x.VersionId}_{x.TopPartId}", x => x.InProduction)
+    ?? new Dictionary<string, int>();
+
+    var okData = await Http.GetFromJsonAsync<List<OkDto>>(
+        "http://localhost:5270/api/parts/ok-by-version");
+
+    var okMap = okData?
+        .ToDictionary(x => $"{x.VersionId}_{x.TopPartId}", x => x.OkQty)
+        ?? new Dictionary<string, int>();
+    
+    var reservedData = await Http.GetFromJsonAsync<List<ReservedDto>>(
+    "http://localhost:5270/api/parts/reserved-by-version");
+
+    var reservedMap = reservedData?
+        .ToDictionary(x => $"{x.VersionId}_{x.TopPartId}", x => x.ReservedQty)
+        ?? new Dictionary<string, int>();
+    
+    var stockData = await Http.GetFromJsonAsync<List<StockDto>>(
+    "http://localhost:5270/api/parts/stock-by-version");
+
+    var stockMap = stockData?
+        .ToDictionary(x => $"{x.VersionId}_{x.TopPartId}", x => x.StockQty)
+        ?? new Dictionary<string, int>();
+
+    groupedData = new();
+
+    foreach (var p in products ?? new())
+    {
+        var parts = await Http.GetFromJsonAsync<List<PartRow>>(
+            $"http://localhost:5270/api/parts/details-by-version?versionId={p.VersionId}");
+
+        groupedData.Add(new ProductPartGroup
+        {
+            ProductName = p.ProductName,
+            VersionName = p.VersionName ?? "",
+
+            Parts = (parts ?? new()).Select((r, i) => new PartItem
+            {
+                Index = i + 1,
+                TopPartName = r.TopPartName ?? "",
+                InProduction = productionMap.GetValueOrDefault($"{p.VersionId}_{r.TopPartId}", 0),
+                OkQty = okMap.TryGetValue($"{p.VersionId}_{r.TopPartId}", out var val) ? val : 0,
+                ReservedQty = reservedMap.TryGetValue($"{p.VersionId}_{r.TopPartId}", out var res)
+                    ? res
+                    : 0,
+                StockQty = stockMap.GetValueOrDefault($"{p.VersionId}_{r.TopPartId}", 0),
+            }).ToList()
+        });
+    }
+}
+
+public class OkDto
+{
+    public int VersionId { get; set; }
+    public int TopPartId { get; set; }
+    public int OkQty { get; set; }
+}
+
+public class ReservedDto
+{
+    public int VersionId { get; set; }
+    public int TopPartId { get; set; }
+    public int ReservedQty { get; set; }
+}
+
+public class StockDto
+{
+    public int VersionId { get; set; }
+    public int TopPartId { get; set; }
+    public int StockQty { get; set; }
+}
+
+public class PartSummaryDto
+{
+    [JsonPropertyName("topPartId")]
+    public int TopPartId { get; set; }
+
+    [JsonPropertyName("topPartName")]
+    public string TopPartName { get; set; } = "";
+
+    [JsonPropertyName("okQty")]
+    public int OkQty { get; set; }
+
+    [JsonPropertyName("reservedQty")]
+    public int ReservedQty { get; set; }
+
+    [JsonPropertyName("freeQty")]
+    public int FreeQty { get; set; }
+
+    [JsonPropertyName("versionId")] 
+    public int VersionId { get; set; }
+}
+
+public class PartProductionDto
+{
+    [JsonPropertyName("topPartId")]
+    public int TopPartId { get; set; }
+
+    [JsonPropertyName("topPartName")]
+    public string TopPartName { get; set; } = "";
+
+    [JsonPropertyName("inProduction")]
+    public int InProduction { get; set; }
+
+    [JsonPropertyName("versionId")]
+    public int VersionId { get; set; }
+}
+
+}
