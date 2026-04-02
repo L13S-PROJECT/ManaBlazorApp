@@ -1,3 +1,5 @@
+@*batch line edit dialog*@ 
+
 @using ManaApp.Pages
 @inject IJSRuntime JS
 
@@ -54,14 +56,22 @@ else
 
                 <div style="margin-bottom:12px;">
                     <b>Detaļa:</b><br />
-                    <select @bind="_selectedPartId" style="width:100%;">
-                        <option value="">-- Produkts (nav detaļa) --</option>
-
+            
                         @foreach (var p in Parts)
-                        {
-                            <option value="@p.Id">@p.TopPart_Name</option>
-                        }
-                    </select>
+                            {
+                                <div style="display:flex; gap:8px; margin-bottom:6px;">
+                                    <input type="checkbox"
+                                        @bind="p.IsSelected" />
+
+                                    <span style="flex:1">@p.TopPart_Name</span>
+
+                                    <input type="number"
+                                        min="0"
+                                        style="width:70px;"
+                                        @bind="p.Qty"
+                                        disabled="@(!p.IsSelected)" />
+                                </div>
+                            }
                 </div>
 
                 <div style="margin-bottom:12px;">
@@ -100,10 +110,7 @@ else
     // Rinda, ko labo (no ProductionTasks BatchLine)
     [Parameter] public ProductionTasks.BatchLine? Line { get; set; }
     [Parameter] public List<ManaApp.Pages.Planning.ProductToPartDto> Parts { get; set; } = new();
-    
-    private int? _selectedPartId;
-
-[Parameter] public string? ProductName { get; set; }
+    [Parameter] public string? ProductName { get; set; }
 
 
     // Notikums, kad saglabāts
@@ -163,57 +170,54 @@ else
     }
 
 private async Task SaveClicked()
-    {
-        if (Line is null)
-            return;
-
-        var qtyChanged     = _planned != Line.Planned;
-        var commentChanged = _comment != Line.Comment;
-
-        // Ja nekas nav mainīts – vienkārši aizveram
-        if (!qtyChanged && !commentChanged)
-        {
-            if (OnSaved.HasDelegate)
-                await OnSaved.InvokeAsync(Line);
-
-            await Close();
-
-            return;
-        }
-
-        // Ja daudzums mainās un drīkst labot – paprasi apstiprinājumu
-        // ❗ apstiprinājumu prasa TIKAI labojot, nevis pievienojot
-if (!IsAddMode && qtyChanged && _canEditQty)
 {
-    var ok = await JS.InvokeAsync<bool>("confirm", "Vai labot apjomu?");
-    if (!ok)
+    if (Line is null)
         return;
-}
 
-        // Sagatavojam atjaunoto rindu
-        var updated = new ProductionTasks.BatchLine
-        {
-            BatchId        = Line.BatchId,
-            BatchCode      = Line.BatchCode,
-            BatchProductId = Line.BatchProductId,
-            VersionId      = Line.VersionId,
-            ProductToPartId = _selectedPartId,
-            Planned        = _planned,
-            Detailed       = Line.Detailed,
-            Assembly       = Line.Assembly,
-            Done           = Line.Done,
-            Comment        = _comment,
-            StartedAt      = Line.StartedAt,
-            BatchStatus    = Line.BatchStatus
-        };
+    var qtyChanged     = _planned != Line.Planned;
+    var commentChanged = _comment != Line.Comment;
 
+    if (!qtyChanged && !commentChanged)
+    {
         if (OnSaved.HasDelegate)
-            await OnSaved.InvokeAsync(updated);
+            await OnSaved.InvokeAsync(Line);
 
         await Close();
-
+        return;
     }
-[Parameter] public bool IsAddMode { get; set; } = false;
 
+    if (!IsAddMode && qtyChanged && _canEditQty)
+    {
+        var ok = await JS.InvokeAsync<bool>("confirm", "Vai labot apjomu?");
+        if (!ok)
+            return;
+    }
+Console.WriteLine($"Selected parts count: {Parts.Count(x => x.IsSelected)}");
+    
+    var updated = new ProductionTasks.BatchLine
+    {
+        BatchId        = Line.BatchId,
+        BatchCode      = Line.BatchCode,
+        BatchProductId = Line.BatchProductId,
+        VersionId      = Line.VersionId,
+        Planned        = _planned,
+        Detailed       = Line.Detailed,
+        Assembly       = Line.Assembly,
+        Done           = Line.Done,
+        Comment        = _comment,
+        StartedAt      = Line.StartedAt,
+        BatchStatus    = Line.BatchStatus,
+        SelectedParts = Parts
+            .Where(x => x.IsSelected && x.Qty > 0)
+            .ToList()
+    };
+
+    if (OnSaved.HasDelegate)
+        await OnSaved.InvokeAsync(updated);
+
+    await Close();
+}
+
+[Parameter] public bool IsAddMode { get; set; } = false;
 
 }

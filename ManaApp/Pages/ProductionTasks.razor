@@ -649,9 +649,8 @@ public sealed class BatchLine
     [JsonPropertyName("BatchCode")]      public string BatchCode { get; set; } = "";
     [JsonPropertyName("BatchProductId")] public int BatchProductId { get; set; }
     [JsonPropertyName("Version_Id")]     public int VersionId { get; set; }
-
-    public string? VersionName { get; set; }
-
+    [JsonPropertyName("versionName")] public string? VersionName { get; set; }
+    [JsonPropertyName("SelectedParts")] public List<ManaApp.Pages.Planning.ProductToPartDto>? SelectedParts { get; set; }
     [JsonPropertyName("Planned")]        public int Planned { get; set; }
     [JsonPropertyName("Detailed")]       public int Detailed { get; set; }
     [JsonPropertyName("Assembly")]       public int Assembly { get; set; }
@@ -2179,7 +2178,6 @@ private string GetSummaryKey(PartLine part)
     return $"{_activeBatch.BatchProductId}:{part.ProductToPartId}";
 }
 
-// Batch labošana no ProductionTasks
 // Batch labošana no ProductionTasks
 private bool _isBatchEditOpen = false;
 private BatchLine? _batchEditDraft;

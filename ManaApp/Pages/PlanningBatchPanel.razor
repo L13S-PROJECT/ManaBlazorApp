@@ -1,3 +1,5 @@
+@*batch panel line edit dialog*@ 
+
 @using ManaApp.Shared
 @using ManaApp.Components
 @using ManaApp.Models
@@ -71,26 +73,64 @@
         {
             <div class="batch-empty">Nav pievienotu preču</div>
         }
-        else
+                else
         {
-        @foreach (var pair in KaussItems.Select((item, i) => new { item, index = i + 1 }))
+            var kaussGroups = GetGroupedItems(KaussItems).ToList();
+
+            @foreach (var pair in kaussGroups.Select((group, i) => new { group, index = i + 1 }))
             {
+                var parent = GetParentItem(pair.group);
+                if (parent is null)
+                {
+                    continue;
+                }
+
+                var children = GetChildItems(pair.group).ToList();
+
                 <div class="batch-row"
-                    @ondblclick="() => OpenEdit(pair.item)">
+                     @ondblclick="() => OpenEdit(parent)">
                     <div class="col-nr">@($"{pair.index}.")</div>
-                    <div class="col-name">@pair.item.Name</div>
-                    <div class="col-code">@pair.item.Code</div>
-                    <div class="col-qty">@pair.item.Qty</div>
+
+                    <div class="col-name" style="display:flex; align-items:center; gap:6px;">
+                        @if (children.Any())
+                        {
+                            <button type="button"
+                                    class="icon-btn"
+                                    title="Atvērt / aizvērt detaļas"
+                                    @onclick="() => ToggleExpand(parent)">
+                                @(parent.IsExpanded ? "▼" : "▶")
+                            </button>
+                        }
+
+                        <span>@parent.Name</span>
+                    </div>
+
+                    <div class="col-code">@parent.Code</div>
+                    <div class="col-qty">@parent.Qty</div>
                     <div class="col-actions">
                         <button class="icon-btn edit-btn"
                                 title="Labot apjomu"
-                                @onclick="() => OpenEdit(pair.item)">✎</button>
+                                @onclick="() => OpenEdit(parent)">✎</button>
 
                         <button class="icon-btn delete-btn"
                                 title="Dzēst"
-                                @onclick="() => DeleteItem(pair.item)">🗑️</button>
+                                @onclick="() => DeleteItem(parent)">🗑️</button>
                     </div>
                 </div>
+
+                @if (parent.IsExpanded && children.Any())
+                {
+                    @foreach (var child in children)
+                    {
+                        <div class="batch-row child-row">
+                            <div class="col-nr"></div>
+                            <div class="col-name" style="padding-left:28px;">↳ @child.Name</div>
+                            <div class="col-code">@child.Code</div>
+                            <div class="col-qty">@child.Qty</div>
+                            <div class="col-actions"></div>
+                        </div>
+                    }
+                }
             }
         }
 
@@ -113,25 +153,63 @@
         }
         else
         {
-            @foreach (var pair in AdapterItems.Select((item, i) => new { item, index = i + 1 }))
-                {
-                    <div class="batch-row"
-                         @ondblclick="() => OpenEdit(pair.item)">
-                        <div class="col-nr">@($"{pair.index}.")</div>
-                        <div class="col-name">@pair.item.Name</div>
-                        <div class="col-code">@pair.item.Code</div>
-                        <div class="col-qty">@pair.item.Qty</div>
-                        <div class="col-actions">
-                            <button class="icon-btn edit-btn"
-                                    title="Labot apjomu"
-                                    @onclick="() => OpenEdit(pair.item)">✎</button>
+            var adapterGroups = GetGroupedItems(AdapterItems).ToList();
 
-                            <button class="icon-btn delete-btn"
-                                    title="Dzēst"
-                                    @onclick="() => DeleteItem(pair.item)">🗑️</button>
-                        </div>
-                    </div>
+            @foreach (var pair in adapterGroups.Select((group, i) => new { group, index = i + 1 }))
+            {
+                var parent = GetParentItem(pair.group);
+                if (parent is null)
+                {
+                    continue;
                 }
+
+                var children = GetChildItems(pair.group).ToList();
+
+                <div class="batch-row"
+                     @ondblclick="() => OpenEdit(parent)">
+                    <div class="col-nr">@($"{pair.index}.")</div>
+
+                    <div class="col-name" style="display:flex; align-items:center; gap:6px;">
+                        @if (children.Any())
+                        {
+                            <button type="button"
+                                    class="icon-btn"
+                                    title="Atvērt / aizvērt detaļas"
+                                    @onclick="() => ToggleExpand(parent)">
+                                @(parent.IsExpanded ? "▼" : "▶")
+                            </button>
+                        }
+
+                        <span>@parent.Name</span>
+                    </div>
+
+                    <div class="col-code">@parent.Code</div>
+                    <div class="col-qty">@parent.Qty</div>
+                    <div class="col-actions">
+                        <button class="icon-btn edit-btn"
+                                title="Labot apjomu"
+                                @onclick="() => OpenEdit(parent)">✎</button>
+
+                        <button class="icon-btn delete-btn"
+                                title="Dzēst"
+                                @onclick="() => DeleteItem(parent)">🗑️</button>
+                    </div>
+                </div>
+
+                @if (parent.IsExpanded && children.Any())
+                {
+                    @foreach (var child in children)
+                    {
+                        <div class="batch-row child-row">
+                            <div class="col-nr"></div>
+                            <div class="col-name" style="padding-left:28px;">↳ @child.Name</div>
+                            <div class="col-code">@child.Code</div>
+                            <div class="col-qty">@child.Qty</div>
+                            <div class="col-actions"></div>
+                        </div>
+                    }
+                }
+            }
         }
 
     </div>
@@ -344,14 +422,12 @@ private async Task DeleteItem(BatchCartItem it)
         return;
 
     // 1️⃣ UI — izņemam rindu
-    var idx = Items.ToList().FindIndex(x => x.VersionId == it.VersionId);
-    if (idx < 0)
-        return;
+    var list = Items
+    .Where(x => x.VersionId != it.VersionId)
+    .ToList();
 
-    var list = Items.ToList();
-    list.RemoveAt(idx);
     Items = list;
-
+    
     // 2️⃣ DB — update draft
     var dto = new
     {
@@ -359,16 +435,13 @@ private async Task DeleteItem(BatchCartItem it)
         Items = Items.Select(x => new
         {
             VersionId = x.VersionId,
+            ProductToPartId = x.ProductToPartId,   
             Qty       = x.Qty,
             Comment   = x.Comment
         })
     };
 
-    await Http.PostAsJsonAsync(
-        "http://localhost:5270/api/batches/draft/update",
-        dto
-    );
-
+    await OnDelete.InvokeAsync(it);
     StateHasChanged();
 }
 
@@ -685,5 +758,19 @@ private IEnumerable<BatchCartItem> KaussItems =>
 
 private IEnumerable<BatchCartItem> AdapterItems =>
     Items.Where(x => x.ParentCategoryId == 2);
+
+private IEnumerable<IGrouping<int, BatchCartItem>> GetGroupedItems(IEnumerable<BatchCartItem> items) =>
+    items.GroupBy(x => x.VersionId);
+
+private BatchCartItem? GetParentItem(IGrouping<int, BatchCartItem> group) =>
+    group.FirstOrDefault(x => x.ProductToPartId == null);
+
+private IEnumerable<BatchCartItem> GetChildItems(IGrouping<int, BatchCartItem> group) =>
+    group.Where(x => x.ProductToPartId != null);
+
+private void ToggleExpand(BatchCartItem item)
+{
+    item.IsExpanded = !item.IsExpanded;
+}
 
 }

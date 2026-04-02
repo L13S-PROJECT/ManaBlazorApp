@@ -369,12 +369,7 @@ WHERE ID = @id AND IsActive = 1;";
 INSERT INTO batches_products 
     (Batch_Id, Version_Id, ProductToPart_ID, Planned_Qty, Done_Qty, Priority, BatchProduct_Comments, IsActive)
 VALUES 
-    (@bid, @vid, @ptpId, @qty, 0, 0, @comment, 1)
-ON DUPLICATE KEY UPDATE
-    Planned_Qty           = VALUES(Planned_Qty),
-    BatchProduct_Comments = VALUES(BatchProduct_Comments),
-    ProductToPart_ID      = VALUES(ProductToPart_ID),
-    IsActive              = 1;
+    (@bid, @vid, @ptpId, @qty, 0, 0, @comment, 1);
     ";
 
         var pb = row.CreateParameter();
@@ -1101,7 +1096,7 @@ LIMIT 1;
     await using (var cmd = conn.CreateCommand())
     {
         cmd.CommandText = @"
-SELECT Version_Id, Planned_Qty, BatchProduct_Comments
+SELECT Version_Id, Planned_Qty, BatchProduct_Comments, ProductToPart_ID
 FROM batches_products
 WHERE Batch_Id = @bid
   AND IsActive = 1;
@@ -1118,7 +1113,8 @@ WHERE Batch_Id = @bid
             {
                 VersionId = reader.GetInt32(0),
                 Qty       = reader.GetInt32(1),
-                Comment   = reader.IsDBNull(2) ? null : reader.GetString(2)
+                Comment   = reader.IsDBNull(2) ? null : reader.GetString(2),
+                ProductToPartId = reader.IsDBNull(3) ? (int?)null : reader.GetInt32(3)
             });
         }
     }

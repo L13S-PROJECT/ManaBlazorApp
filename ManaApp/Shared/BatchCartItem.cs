@@ -11,16 +11,21 @@ namespace ManaApp.Shared
         public int? CategoryId { get; set; }
         public int? ProductToPartId { get; set; }
         public int? ParentCategoryId { get; set; }
+        public bool IsExpanded { get; set; } = true;
         public BatchCartItem Clone() => new()
-        {
-            ProductId = ProductId,
-            VersionId = VersionId,
-            Name = Name,
-            Code = Code,
-            Qty = Qty,
-            Comment = Comment,
-            CategoryId = CategoryId,
-            ParentCategoryId = ParentCategoryId
-        };
+            {
+                ProductId = ProductId,
+                VersionId = VersionId,
+                Name = Name,
+                Code = Code,
+                Qty = Qty,
+                Comment = Comment,
+                CategoryId = CategoryId,
+                ParentCategoryId = ParentCategoryId,
+
+                // 👇 SVARĪGI
+                ProductToPartId = ProductToPartId,
+                IsExpanded = IsExpanded
+            };
     }
 }

@@ -90,7 +90,8 @@
             EditSalesRequested="OpenEditSalesPopup"
             @ref="batchPanelRef"
             OnCreateConfirmed="CreatePlanAsync"
-            OnDeleteDraft="DeleteDraftAsync" />
+            OnDeleteDraft="DeleteDraftAsync"
+            OnDelete="OnBatchItemDeleted" />
     </div>
 
 </div>
@@ -597,9 +598,10 @@ private async Task OnPlannedPlus(ProductGroupRow row)
     var version = row.Versions?
     .FirstOrDefault(v => IsLatestVersion(v));
 
-if (version is null)
-    return;
-
+    if (version is null)
+        return;
+    if (batchItems.Any(x => x.VersionId == version.VersionId))
+        return;
     // ✅ VALIDĀCIJA PIRMS popup
    var result = await Http.GetFromJsonAsync<ValidateResult>(
     $"http://localhost:5270/api/batches/validate-for-planning?versionId={version.VersionId}");
@@ -692,17 +694,37 @@ var createDto = new
 
     // ⬇️ KRITISKI SVARĪGI — UI fiksē pirmo preci
 
+// 1️⃣ PARENT
+batchItems.Add(new BatchCartItem
+{
+    VersionId = line.VersionId,
+    Name = product?.ProductName ?? "",
+    Code = product?.ProductCode ?? line.BatchCode,
+    Qty = line.Planned,
+    Comment = line.Comment,
+    ProductToPartId = null,
+    CategoryId = rowData?.CategoryId,
+    ParentCategoryId = rowData?.ParentCategoryId
+});
+
+// 2️⃣ CHILDREN
+if (line.SelectedParts != null)
+{
+    foreach (var part in line.SelectedParts)
+    {
         batchItems.Add(new BatchCartItem
         {
             VersionId = line.VersionId,
-            Name = product?.ProductName ?? "",
-            Code = product?.ProductCode ?? line.BatchCode,
-            Qty = line.Planned,
+            Name = part.TopPart_Name,
+            Code = "", // ja nav — OK
+            Qty = part.Qty,
             Comment = line.Comment,
-            ProductToPartId = line.ProductToPartId,
+            ProductToPartId = part.Id,
             CategoryId = rowData?.CategoryId,
             ParentCategoryId = rowData?.ParentCategoryId
         });
+    }
+}
 
     isAddOpen = false;
     addLine = null;
@@ -716,26 +738,43 @@ var dto = new DraftUpdateDto
     BatchId = draftBatchId.Value
 };
 
-// esošās preces
+
+// 1️⃣ Produkts (galvenā rinda)
+// 1️⃣ VISI esošie batchItems
 foreach (var it in batchItems)
 {
     dto.Items.Add(new DraftItemDto
     {
         VersionId = it.VersionId,
-        ProductToPartId = it.ProductToPartId, 
-        Qty       = it.Qty,
-        Comment   = it.Comment
+        ProductToPartId = it.ProductToPartId,
+        Qty = it.Qty,
+        Comment = it.Comment
     });
 }
 
-// ⬇️ KRITISKI: PIEVIENO JAM JAUNO RINDU
+// 2️⃣ jaunais produkts
 dto.Items.Add(new DraftItemDto
 {
     VersionId = line.VersionId,
-    ProductToPartId = line.ProductToPartId, 
-    Qty       = line.Planned,
-    Comment   = line.Comment
+    ProductToPartId = null,
+    Qty = line.Planned,
+    Comment = line.Comment
 });
+
+// 3️⃣ jaunās detaļas
+if (line.SelectedParts != null)
+{
+    foreach (var part in line.SelectedParts)
+    {
+        dto.Items.Add(new DraftItemDto
+        {
+            VersionId = line.VersionId,
+            ProductToPartId = part.Id,
+            Qty = part.Qty,
+            Comment = line.Comment
+        });
+    }
+}
 
 var resp = await Http.PostAsJsonAsync(
     "http://localhost:5270/api/batches/draft/update",
@@ -746,6 +785,7 @@ if (!resp.IsSuccessStatusCode)
 
 // UI atjauninām TIKAI PĒC veiksmīga API
 
+// 1️⃣ PARENT
 batchItems.Add(new BatchCartItem
 {
     VersionId = line.VersionId,
@@ -753,12 +793,30 @@ batchItems.Add(new BatchCartItem
     Code = product?.ProductCode ?? line.BatchCode,
     Qty = line.Planned,
     Comment = line.Comment,
-    ProductToPartId = line.ProductToPartId,
+    ProductToPartId = null,
     CategoryId = rowData?.CategoryId,
     ParentCategoryId = rowData?.ParentCategoryId
 });
 
-await LoadDraftAsync();
+// 2️⃣ CHILDREN
+if (line.SelectedParts != null)
+{
+    foreach (var part in line.SelectedParts)
+    {
+        batchItems.Add(new BatchCartItem
+        {
+            VersionId = line.VersionId,
+            Name = part.TopPart_Name,
+            Code = "", // ja nav — OK
+            Qty = part.Qty,
+            Comment = line.Comment,
+            ProductToPartId = part.Id,
+            CategoryId = rowData?.CategoryId,
+            ParentCategoryId = rowData?.ParentCategoryId
+        });
+    }
+}
+
 
 isAddOpen = false;
 addLine = null;
@@ -854,17 +912,36 @@ foreach (var it in draft.Items)
 {
     var row = rows.FirstOrDefault(r => r.VersionId == it.VersionId);
 
-                batchItems.Add(new BatchCartItem
-                    {
-                        VersionId = it.VersionId,
-                        Code      = row?.productCode ?? "",
-                        Name      = row?.productName ?? "",
-                        Qty       = it.Qty,
-                        Comment   = it.Comment,
-                        ProductToPartId = it.ProductToPartId,
-                        CategoryId = row?.CategoryId,
-                        ParentCategoryId = row?.ParentCategoryId
-                    });
+if (it.ProductToPartId == null)
+{
+    // PARENT
+    batchItems.Add(new BatchCartItem
+    {
+        VersionId = it.VersionId,
+        Code      = row?.productCode ?? "",
+        Name      = row?.productName ?? "",
+        Qty       = it.Qty,
+        Comment   = it.Comment,
+        ProductToPartId = null,
+        CategoryId = row?.CategoryId,
+        ParentCategoryId = row?.ParentCategoryId
+    });
+}
+else
+{
+    // CHILD
+    batchItems.Add(new BatchCartItem
+    {
+        VersionId = it.VersionId,
+        Code      = "", // detaļai nav koda
+        Name      = $"Detaļa #{it.ProductToPartId}", // pagaidām
+        Qty       = it.Qty,
+        Comment   = it.Comment,
+        ProductToPartId = it.ProductToPartId,
+        CategoryId = row?.CategoryId,
+        ParentCategoryId = row?.ParentCategoryId
+    });
+}
 
 }
 
@@ -1398,6 +1475,17 @@ public class ProductToPartDto
     public int Id { get; set; }
     public int TopPart_Id { get; set; }
     public string TopPart_Name { get; set; } = "";
+    public bool IsSelected { get; set; }   
+    public int Qty { get; set; }           
+}
+
+private async Task OnBatchItemDeleted(BatchCartItem it)
+{
+    batchItems = batchItems
+        .Where(x => x.VersionId != it.VersionId)
+        .ToList();
+
+    StateHasChanged();
 }
 
 }
