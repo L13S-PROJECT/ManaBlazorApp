@@ -3,6 +3,7 @@
 @using ManaApp.Shared
 @using ManaApp.Components
 @using ManaApp.Models
+@using ManaApp.Pages
 
 <div class="planning-batch-panel">
     
@@ -88,7 +89,7 @@
                 var children = GetChildItems(pair.group).ToList();
 
                 <div class="batch-row"
-                     @ondblclick="() => OpenEdit(parent)">
+                     @ondblclick="() => OnEdit.InvokeAsync(parent)">
                     <div class="col-nr">@($"{pair.index}.")</div>
 
                     <div class="col-name" style="display:flex; align-items:center; gap:6px;">
@@ -110,7 +111,7 @@
                     <div class="col-actions">
                         <button class="icon-btn edit-btn"
                                 title="Labot apjomu"
-                                @onclick="() => OpenEdit(parent)">✎</button>
+                                @onclick="() => OnEdit.InvokeAsync(parent)">✎</button>
 
                         <button class="icon-btn delete-btn"
                                 title="Dzēst"
@@ -166,7 +167,7 @@
                 var children = GetChildItems(pair.group).ToList();
 
                 <div class="batch-row"
-                     @ondblclick="() => OpenEdit(parent)">
+                     @ondblclick="() => OnEdit.InvokeAsync(parent)">
                     <div class="col-nr">@($"{pair.index}.")</div>
 
                     <div class="col-name" style="display:flex; align-items:center; gap:6px;">
@@ -188,7 +189,7 @@
                     <div class="col-actions">
                         <button class="icon-btn edit-btn"
                                 title="Labot apjomu"
-                                @onclick="() => OpenEdit(parent)">✎</button>
+                                @onclick="() => OnEdit.InvokeAsync(parent)">✎</button>
 
                         <button class="icon-btn delete-btn"
                                 title="Dzēst"
@@ -498,23 +499,8 @@ private int editIndex = -1;
 
 private string? editProductName;
 
-private void OpenEdit(BatchCartItem it)
-{
-    // izveidojam rindu dialogam
-editProductName = it.Name;
 
-editLine = new ProductionTasks.BatchLine
-{
-    BatchCode   = it.Code,
-    VersionId   = it.VersionId,
-    Planned     = it.Qty,
-    Comment     = it.Comment,
-    BatchStatus = 4
-};
-
-isEditOpen = true;
-
-}
+private List<ManaApp.Pages.Planning.ProductToPartDto> editParts = new();
 
 private enum BatchPanelSheet
 {

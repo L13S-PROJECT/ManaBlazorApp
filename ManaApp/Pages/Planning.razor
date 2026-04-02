@@ -91,7 +91,8 @@
             @ref="batchPanelRef"
             OnCreateConfirmed="CreatePlanAsync"
             OnDeleteDraft="DeleteDraftAsync"
-            OnDelete="OnBatchItemDeleted" />
+            OnDelete="OnBatchItemDeleted"
+            OnEdit="OpenEdit" />
     </div>
 
 </div>
@@ -111,13 +112,12 @@
     OnSaved="OnAddSaved" />
 
 <BatchLineEditDialog
-    @bind-IsOpen="isEditOpen"
+    IsOpen="isEditOpen"
+    IsOpenChanged="v => isEditOpen = v"
     Line="editLine"
-    IsAddMode="false"
+    Parts="editParts"
     ProductName="@editProductName"
     OnSaved="OnEditSaved" />
-
-
 
 @*
 @if (isMinusOpen && minusRow is not null)
@@ -162,7 +162,7 @@ private List<CategoryRow> categories = new();
 private List<CategoryRow> categoriesFiltered = new();
 
 private List<SalesAllocateDialog.BatchRow> sellBatches = new();
-   
+private List<ProductToPartDto> editParts = new();  
 private string? addProductName;
 private string? editProductName;
 private List<ProductToPartDto> addParts = new();
@@ -175,26 +175,112 @@ private ProductionTasks.BatchLine? editLine;
 
 // nosaukums edit dialogam
 
-private async Task OnEditSaved(ProductionTasks.BatchLine updated)
+private async Task OnEditSaved(ProductionTasks.BatchLine line)
 {
-    if (updated is null)
+    if (line is null || isSaving)
         return;
 
-    // atrodam rindu panelī
-    var idx = batchItems.FindIndex(x => x.VersionId == updated.VersionId);
-    if (idx >= 0)
+    isSaving = true;
+
+    try
     {
-        batchItems[idx].Qty = updated.Planned;
-        batchItems[idx].Comment = updated.Comment;
+            
+        var oldItem = batchItems.FirstOrDefault(x =>
+            x.VersionId == line.VersionId &&
+            x.ProductToPartId == null);
+
+        var hasChanges =
+            line.Planned != oldItem?.Qty ||
+            line.Comment != oldItem?.Comment ||
+            editParts.Any(p =>
+                {
+                    var existing = batchItems.FirstOrDefault(x =>
+                        x.VersionId == line.VersionId &&
+                        x.ProductToPartId == p.Id);
+
+                    var existsNow = existing != null;
+                    var shouldExist = p.IsSelected && p.Qty > 0;
+
+                    if (existsNow != shouldExist)
+                        return true;
+
+                    if (existsNow && existing!.Qty != p.Qty)
+                        return true;
+
+                    return false;
+                });
+
+        if (!hasChanges)
+            {
+                isEditOpen = false;
+                return;
+            }
+
+        batchItems = batchItems
+            .Where(x => x.VersionId != line.VersionId)
+            .ToList();
+
+        var rowData = rows.FirstOrDefault(r => r.VersionId == line.VersionId);
+
+        var categoryId = rowData?.CategoryId ?? oldItem?.CategoryId;
+        var parentCategoryId = rowData?.ParentCategoryId ?? oldItem?.ParentCategoryId;
+
+        batchItems.Add(new BatchCartItem
+        {
+            VersionId = line.VersionId,
+            Name = editProductName ?? "",
+            Code = line.BatchCode,
+            Qty = line.Planned,
+            Comment = line.Comment,
+            ProductToPartId = null,
+            CategoryId = categoryId,
+            ParentCategoryId = parentCategoryId
+        });
+
+        var selectedParts = editParts
+            .Where(p => p.IsSelected && p.Qty > 0)
+            .ToList();
+        
+                foreach (var part in selectedParts)
+                {
+                    batchItems.Add(new BatchCartItem
+                    {
+                        VersionId = line.VersionId,
+                        Name = part.TopPart_Name,
+                        Code = "",
+                        Qty = part.Qty,
+                        Comment = line.Comment,
+                        ProductToPartId = part.Id,
+                        CategoryId = categoryId,
+                        ParentCategoryId = parentCategoryId
+                    });
+                }
+
+        var dto = new
+        {
+            BatchId = draftBatchId,
+            Items = batchItems.Select(x => new
+            {
+                VersionId = x.VersionId,
+                ProductToPartId = x.ProductToPartId,
+                Qty = x.Qty,
+                Comment = x.Comment
+            })
+        };
+
+        await Http.PostAsJsonAsync(
+            "http://localhost:5270/api/batches/draft/update",
+            dto
+        );
+
+        isEditOpen = false;
     }
-
-    // TODO (vēlāk): draft/update API
-
-    isEditOpen = false;
-    StateHasChanged();
+    finally
+    {
+        isSaving = false;
+        StateHasChanged();
+    }
 }
-
-
 
     private int? draftBatchId = null;
 private bool isCreatingDraft = false;
@@ -1497,5 +1583,45 @@ private async Task OnBatchItemDeleted(BatchCartItem it)
 
     StateHasChanged();
 }
+
+private async Task OpenEdit(BatchCartItem it)
+{
+    editProductName = it.Name;
+
+    editLine = new ProductionTasks.BatchLine
+    {
+        BatchCode   = it.Code,
+        VersionId   = it.VersionId,
+        Planned     = it.Qty,
+        Comment     = it.Comment,
+        BatchStatus = 4
+    };
+
+    // 🔥 ielādē visas detaļas
+    editParts = await LoadProductParts(it.VersionId);
+
+    // 🔥 atzīmē esošās (no batchItems)
+    foreach (var p in editParts)
+    {
+        var existing = batchItems.FirstOrDefault(x =>
+            x.VersionId == it.VersionId &&
+            x.ProductToPartId == p.Id);
+
+        if (existing != null)
+        {
+            p.IsSelected = true;
+            p.Qty = existing.Qty;
+        }
+        else
+        {
+            p.IsSelected = false;
+            p.Qty = 0;
+        }
+    }
+
+    isEditOpen = true;
+}
+
+private bool isSaving = false;
 
 }
