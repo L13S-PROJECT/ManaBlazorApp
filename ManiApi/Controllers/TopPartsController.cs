@@ -161,7 +161,7 @@ public async Task<IActionResult> GetPlannedParts([FromQuery] int versionId)
 
                 where bp.Version_Id == versionId
                     && bp.IsActive
-                    && bp.ProductTopPart_Id != 0
+                    && ptp != null   // ✅ TIKAI detaļas
 
                 group bp by new 
                 { 

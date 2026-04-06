@@ -307,6 +307,7 @@ JOIN toppart tp
     AND tp.IsActive = 1
 
 WHERE t.IsActive = 1
+AND bp.ProductToPart_ID IS NULL
 
 AND NOT EXISTS (
     SELECT 1
