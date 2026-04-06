@@ -25,7 +25,8 @@
 
         <thead>
 <tr>
-    <th>Batch</th>
+    <th class="ptv3-batch-main">Batch</th>
+    <th class="ptv3-batch-flag"></th>
     <th>Kategorija</th>
     <th>Nosaukums</th>
     <th>Kods</th>
@@ -35,11 +36,12 @@
     <th>Done</th>
 
     <th>Detaļas</th>
-    <th>Detail</th>
-    <th>Assembly</th>
+    <th class="ptv3-details-plus">Det +</th>
+    <th class="ptv3-col-small">Detail</th>
+    <th class="ptv3-col-small">Assembly</th>
     <th>Fin</th>
-    <th>Finishing</th>
-
+    <th class="ptv3-col-wide">Finishing</th>
+    <th class="ptv3-fin-plus">F+</th>
     <th>Komentārs</th>
 </tr>
 </thead>
@@ -59,7 +61,8 @@
 <tr class="@(SelectedBatch?.BatchProductId == b.BatchProductId ? "ptv3-active" : "")"
     @onclick="() => SelectRow(b.BatchProductId)">
 
-    <td>@b.BatchCode</td>
+    <td class="ptv3-batch-main">@b.BatchCode</td>
+    <td class="ptv3-batch-flag"></td>
     <td>@b.CategoryName</td>
     <td>@AllProducts.FirstOrDefault(x => x.productCode == b.ProductCode)?.productName</td>
     <td>@b.ProductCode</td>
@@ -68,7 +71,8 @@
     <td>@b.Sold</td>
     <td>@b.Done</td>
     <td>@($"{b.DetailedStarted}/{b.DetailsTotal}")</td>
-    <td class="@(b.DetailFinish != null ? "ptv3-detail-finish" 
+    <td class="ptv3-details-plus"></td>
+    <td class="ptv3-col-small @(b.DetailFinish != null ? "ptv3-detail-finish" 
                 : b.DetailStart != null ? "ptv3-detail-start" 
                 : "")">
 
@@ -82,7 +86,7 @@
             }
 
     </td>
-    <td class="@(b.AssemblyFinishDate != null ? "ptv3-detail-finish" 
+    <td class="ptv3-col-small @(b.AssemblyFinishDate != null ? "ptv3-detail-finish" 
         : b.AssemblyStart != null ? "ptv3-detail-start" 
         : "")">
 
@@ -101,7 +105,7 @@
     @($"{b.FinishingInProgress}/{b.AssemblyFinish}")
 </td>
 
-<td class="fin-hover">
+<td class="fin-hover ptv3-col-wide">
     <div class="fin-bar">
         @foreach (var seg in GetFinSegments(b))
         {
@@ -113,6 +117,7 @@
         @GetFinHover(b)
     </div>
 </td>
+<td class="ptv3-fin-plus"></td>
 <td class="ptv3-comment"
     title="@b.Comment">
 

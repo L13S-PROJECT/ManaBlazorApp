@@ -26,7 +26,7 @@
     display: grid;
     grid-template-columns: var(--ptv2-cols);
     grid-column: 1 / -1;
-
+    border-radius: 0;
     position: sticky;
     top: 0;
     z-index: 20;
@@ -34,7 +34,7 @@
     background: #2563EB;   /* tas pats kā 2.box */
     color: #ffffff;
     border-bottom: 1px solid #171718;
-    border-radius: 10px 10px 0 0; /* noapaļoti ārējie stūri */
+    border-radius: 0; /* noapaļoti ārējie stūri */
 
         
     height: 28px;
@@ -113,6 +113,13 @@
     border-radius: 8px;
 
     background: #f8fafc;
+
+    border: 2px solid #2563EB;
+    border-top: none;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+    margin: 0;
+    padding-top: 4px;
 }
 
 .ptv2-section .ptv2-tasks-subheader {
@@ -129,3 +136,30 @@
     border-top: 2px solid #2563EB;
     padding-top: 16px;
 }
+
+
+.ptv2-tabs button {
+    padding: 6px 0;
+    border: 1px solid #cbd5f5;
+    background: #eef2ff;
+    cursor: pointer;
+    font-size: 12px;
+    border-radius: 0;
+}
+
+.ptv2-tabs button.active {
+    background: #2563EB;
+    color: white;
+    font-weight: 600;
+    border-bottom: none;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+}
+
+.ptv2-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    margin: 0;
+    border-bottom: 2px solid #2563EB;
+}
+

@@ -170,7 +170,8 @@
 }
 
 .ptv3-comment {
-    max-width: 180px;
+    min-width: 220px;
+    max-width: 320px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -192,4 +193,36 @@
     box-sizing: border-box;
     resize: vertical;
     z-index: 20;
+}
+
+.ptv3-batch-main {
+    width: 80px;
+    max-width: 100px;
+}
+
+.ptv3-batch-flag {
+    width: 28px;
+    text-align: center;
+    font-weight: 700;
+}
+
+.ptv3-details-plus {
+    width: 70px;
+    text-align: center;
+    color: #6b7280; /* pelēks – default */
+}
+
+.ptv3-fin-plus {
+    width: 30px;
+    min-width: 30px;
+}
+
+.ptv3-col-small {
+    width: 70px;
+    max-width: 80px;
+    white-space: nowrap;
+}
+
+.ptv3-col-wide {
+    min-width: 140px;
 }

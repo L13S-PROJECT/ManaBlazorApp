@@ -332,7 +332,8 @@ private sealed class DetailTaskRow
     public int Status { get; set; }
     public int? Assigned_To { get; set; }
     public int Done { get; set; }
-
+    public int? ParentBatchProductId { get; set; }
+    public int? ProductToPartId_BP { get; set; }
     public int TopPartStepId { get; set; }
 
     // 🆕 NO EmployeeTasks

@@ -1872,9 +1872,12 @@ SELECT
     t.Tasks_Comment AS Comment,
     t.Is_Comment_For_Employee AS IsCommentForEmployee,
     tp.TopPart_Name AS PartName,
-    rc.Name AS RalName
+    rc.Name AS RalName,
+    bp.ParentBatchProduct_ID,
+    bp.ProductToPart_ID
 
 FROM tasks t
+JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
 JOIN toppartsteps    ts  ON ts.ID = t.TopPartStep_ID
 JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
 JOIN toppart         tp  ON tp.ID  = ptp.TopPart_ID
@@ -1905,7 +1908,9 @@ ORDER BY ts.Step_Order, t.ID;
                 Comment = r.IsDBNull(9) ? null : r.GetString(9),
                 IsCommentForEmployee = !r.IsDBNull(10) && r.GetBoolean(10),
                 PartName = r.IsDBNull(11) ? null : r.GetString(11),
-                RalName = r.IsDBNull(12) ? null : r.GetString(12)   
+                RalName = r.IsDBNull(12) ? null : r.GetString(12),
+                ParentBatchProductId = r.IsDBNull(13) ? (int?)null : r.GetInt32(13),
+                ProductToPartId_BP   = r.IsDBNull(14) ? (int?)null : r.GetInt32(14),   
             });
 
     }

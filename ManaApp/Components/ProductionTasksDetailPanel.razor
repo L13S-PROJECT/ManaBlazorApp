@@ -4,6 +4,11 @@
 
 <div class="ptv2-tasks-grid">
     <div class="ptv2-tasks-section">
+    <div class="ptv2-tabs">
+        <button class="@(ActiveTab == 1 ? "active" : "")" @onclick="() => ActiveTab = 1">DETAIL</button>
+        <button class="@(ActiveTab == 2 ? "active" : "")" @onclick="() => ActiveTab = 2">ASSEMBLY</button>
+        <button class="@(ActiveTab == 3 ? "active" : "")" @onclick="() => ActiveTab = 3">FINISHING</button>
+    </div>
     <div class="ptv2-tasks-header">
         <div>NOSAUKUMS</div>
         <div>GATAVS</div>
@@ -17,6 +22,8 @@
     </div>
 
     <!-- ŠEIT VĒLĀK NĀKS xxxTasks.razor -->
+@if (ActiveTab == 1)
+{
 <div class="ptv2-section">
     <div class="ptv2-tasks-subheader">DETAIL</div>
 <DetailTasks 
@@ -24,7 +31,10 @@
     SelectedBatch="SelectedBatch"
     OnDataChanged="HandleDataChanged" />
 </div>
+}
 
+@if (ActiveTab == 2)
+{
 <div class="ptv2-section">
     <div class="ptv2-tasks-subheader">ASSEMBLY</div>
     <AssemblyTasks 
@@ -32,7 +42,10 @@
     SelectedBatch="SelectedBatch"
     OnDataChanged="OnDataChanged" />
 </div>
+}
 
+@if (ActiveTab == 3)
+{
 <div class="ptv2-section">
     <div class="ptv2-tasks-subheader">FINISHING</div>
     <FinishingTasks 
@@ -40,6 +53,7 @@
     SelectedBatch="SelectedBatch"
     OnDataChanged="OnDataChanged" />
 </div>
+}
 
 </div>
 </div>
@@ -53,4 +67,5 @@
     {
         OnDataChanged.InvokeAsync(null);
     }
+    private int ActiveTab = 1;
 }
