@@ -1,3 +1,5 @@
+// TopPartsController.cs
+
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ManiApi.Data;
@@ -108,5 +110,75 @@ public async Task<IActionResult> GetByVersion(int versionId)
 
     return Ok(rows);
 }
+
+[HttpGet("stock-from-movements")]
+public async Task<IActionResult> GetStockFromMovements([FromQuery] int versionId)
+{
+    if (versionId <= 0)
+        return BadRequest("versionId is required.");
+
+    var rows = await (
+        from ptp in _db.ProductTopParts
+        join tp in _db.TopParts on ptp.TopPartId equals tp.Id
+        where ptp.VersionId == versionId
+              && ptp.IsActive
+              && tp.IsActive
+              && tp.Stage == 1
+        select new
+        {
+            TopPartId = tp.Id,
+            TopPartName = tp.TopPartName,
+
+            StockQty =
+            _db.StockMovements
+                .Where(sm =>
+                    sm.IsActive &&
+                    sm.Version_ID == ptp.VersionId &&
+                    sm.BatchProduct_ID == ptp.Id)
+                .Sum(sm => (int?)sm.Stock_Qty) ?? 0
+        }
+    ).ToListAsync();
+
+    return Ok(rows);
+}
+
+[HttpGet("planned-parts")]
+public async Task<IActionResult> GetPlannedParts([FromQuery] int versionId)
+{
+    if (versionId <= 0)
+        return BadRequest("versionId is required.");
+
+            var data = await (
+                from bp in _db.BatchProducts
+
+                join ptp in _db.ProductTopParts
+                    on bp.ProductTopPart_Id equals ptp.Id into ptpGroup
+                from ptp in ptpGroup.DefaultIfEmpty()
+
+                join tp in _db.TopParts
+                    on ptp.TopPartId equals tp.Id into tpGroup
+                from tp in tpGroup.DefaultIfEmpty()
+
+                where bp.Version_Id == versionId
+                    && bp.IsActive
+                    && bp.ProductTopPart_Id != 0
+
+                group bp by new 
+                { 
+                    bp.Version_Id, 
+                    TopPartId = tp != null ? tp.Id : bp.ProductTopPart_Id 
+                } into g
+
+                select new
+                {
+                    VersionId = g.Key.Version_Id,
+                    TopPartId = g.Key.TopPartId,
+                    PlannedQty = g.Sum(x => x.Planned_Qty)
+                }
+            ).ToListAsync();
+
+    return Ok(data);
+}
+
     }
 }

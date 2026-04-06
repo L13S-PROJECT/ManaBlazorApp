@@ -3,11 +3,15 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace ManiApi.Models;
 
 [Table("batches_products")]
+
 public class BatchProduct
 {
     public int ID { get; set; }
 
     public int Batch_Id { get; set; }
+
+   [Column("ProductToPart_ID")]
+    public int ProductTopPart_Id { get; set; }
 
     public int Version_Id { get; set; }
 

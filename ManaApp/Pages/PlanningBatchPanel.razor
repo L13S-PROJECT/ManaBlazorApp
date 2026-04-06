@@ -81,10 +81,28 @@
             @foreach (var pair in kaussGroups.Select((group, i) => new { group, index = i + 1 }))
             {
                 var parent = GetParentItem(pair.group);
-                if (parent is null)
-                    {
-                        continue;
-                    }
+
+                        if (parent is null)
+                            {
+                                var firstChild = pair.group.First();
+
+                                _productCache.TryGetValue(firstChild.VersionId, out var info);
+
+                                parent = new BatchCartItem
+                                {
+                                    VersionId = firstChild.VersionId,
+                                    Name = info.Name,
+                                    Code = info.Code,
+                                    Qty = 0,
+                                    ProductToPartId = null,
+                                    IsExpanded = true
+                                };
+                            }
+                    
+                    if (parent is null)
+                        {
+                            continue;
+                        }
 
             var children = GetChildItems(pair.group).ToList();
 
@@ -167,6 +185,24 @@
             @foreach (var pair in adapterGroups.Select((group, i) => new { group, index = i + 1 }))
             {
                 var parent = GetParentItem(pair.group);
+
+                    if (parent is null)
+                        {
+                            var firstChild = pair.group.First();
+
+                            _productCache.TryGetValue(firstChild.VersionId, out var info);
+
+                            parent = new BatchCartItem
+                            {
+                                VersionId = firstChild.VersionId,
+                                Name = info.Name,
+                                Code = info.Code,
+                                Qty = 0,
+                                ProductToPartId = null,
+                                IsExpanded = true
+                            };
+                        }
+
                     if (parent is null)
                     {
                         continue;
@@ -773,6 +809,41 @@ private IEnumerable<BatchCartItem> GetChildItems(IGrouping<int, BatchCartItem> g
 private void ToggleExpand(BatchCartItem item)
 {
     item.IsExpanded = !item.IsExpanded;
+}
+
+private Dictionary<int, (string Name, string Code)> _productCache = new();
+
+private async Task<(string Name, string Code)> GetProductInfo(int versionId)
+{
+    var resp = await Http.GetAsync(
+        $"http://localhost:5270/api/products/content?versionId={versionId}");
+
+    if (!resp.IsSuccessStatusCode)
+        return ("", "");
+
+    var json = await resp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+
+    var name = json.GetProperty("productName").GetString() ?? "";
+    var code = json.GetProperty("productCode").GetString() ?? "";
+
+    return (name, code);
+}
+
+protected override async Task OnParametersSetAsync()
+{
+    var versionIds = Items.Select(x => x.VersionId).Distinct();
+
+    foreach (var vid in versionIds)
+    {
+        if (!_productCache.ContainsKey(vid))
+        {
+            var info = await GetProductInfo(vid);
+            _productCache[vid] = info;
+        }
+    }
+
+await InvokeAsync(StateHasChanged);
+
 }
 
 }

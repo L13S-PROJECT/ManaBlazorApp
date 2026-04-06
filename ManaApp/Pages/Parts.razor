@@ -1,4 +1,4 @@
-@*Parts lapa - atsevišķa detaļu uzskaites lapa - DETAIL posmam*@
+@*Parts.razor lapa - atsevišķa detaļu uzskaites lapa - DETAIL posmam*@
 @page "/parts"
 @page "/parts/{ProductId:int}/{VersionId:int}"
 @using ManaApp.Models
@@ -20,6 +20,7 @@
                 <div class="part-group-header">
                     <div>@group.ProductName</div>   <!-- ✔ -->
                     <div>@group.VersionName</div>   <!-- ✔ -->
+                    <div>Plānots</div>
                     <div>Ražošanā</div>
                     <div>Ok</div>
                     <div>Rezervēts</div>
@@ -32,6 +33,7 @@
                         <div class="part-row">
                             <div>@part.TopPartName</div>
                             <div></div> <!-- tukšs version -->
+                            <div>@part.PlannedQty</div>
                             <div>@part.InProduction</div>
                             <div>@part.OkQty</div>
                             <div>@part.ReservedQty</div>
@@ -91,7 +93,7 @@ public class PartItem
 {
     public int Index { get; set; }
     public string TopPartName { get; set; } = "";
-
+    public int PlannedQty { get; set; }
     public int InProduction { get; set; }
     public int OkQty { get; set; }
     public int ReservedQty { get; set; }
@@ -140,36 +142,62 @@ protected override async Task OnInitializedAsync()
         .ToDictionary(x => $"{x.VersionId}_{x.TopPartId}", x => x.ReservedQty)
         ?? new Dictionary<string, int>();
     
-    var stockData = await Http.GetFromJsonAsync<List<StockDto>>(
-    "http://localhost:5270/api/parts/stock-by-version");
-
-    var stockMap = stockData?
-        .ToDictionary(x => $"{x.VersionId}_{x.TopPartId}", x => x.StockQty)
-        ?? new Dictionary<string, int>();
+    var plannedCache = new Dictionary<int, Dictionary<string, int>>();
 
     groupedData = new();
 
     foreach (var p in products ?? new())
     {
+            var stockData = await Http.GetFromJsonAsync<List<StockDto>>(
+     $"http://localhost:5270/api/topparts/stock-from-movements?versionId={p.VersionId}");
+
+        var stockMap = stockData?
+            .ToDictionary(x => x.TopPartId, x => x.StockQty)
+            ?? new Dictionary<int, int>();
+        
         var parts = await Http.GetFromJsonAsync<List<PartRow>>(
             $"http://localhost:5270/api/parts/details-by-version?versionId={p.VersionId}");
+        
+        if (!plannedCache.TryGetValue(p.VersionId, out var plannedMap))
+            {
+                var plannedData = await Http.GetFromJsonAsync<List<PlannedDto>>(
+                    $"http://localhost:5270/api/topparts/planned-parts?versionId={p.VersionId}");
+
+                plannedMap = plannedData?
+                    .GroupBy(x => $"{x.VersionId}_{x.TopPartId}")
+                    .ToDictionary(g => g.Key, g => g.Sum(x => x.PlannedQty))
+                    ?? new Dictionary<string, int>();
+
+                plannedCache[p.VersionId] = plannedMap;
+            }
 
         groupedData.Add(new ProductPartGroup
         {
             ProductName = p.ProductName,
             VersionName = p.VersionName ?? "",
 
-            Parts = (parts ?? new()).Select((r, i) => new PartItem
-            {
-                Index = i + 1,
-                TopPartName = r.TopPartName ?? "",
-                InProduction = productionMap.GetValueOrDefault($"{p.VersionId}_{r.TopPartId}", 0),
-                OkQty = okMap.TryGetValue($"{p.VersionId}_{r.TopPartId}", out var val) ? val : 0,
-                ReservedQty = reservedMap.TryGetValue($"{p.VersionId}_{r.TopPartId}", out var res)
-                    ? res
-                    : 0,
-                StockQty = stockMap.GetValueOrDefault($"{p.VersionId}_{r.TopPartId}", 0),
-            }).ToList()
+            Parts = (parts ?? new())
+    .GroupBy(r => r.TopPartId)
+    .Select((g, i) =>
+        {
+            var r = g.First();
+
+            return new PartItem
+                {
+                    Index = i + 1,
+                    TopPartName = r.TopPartName ?? "",
+                    PlannedQty = plannedMap.GetValueOrDefault($"{p.VersionId}_{r.TopPartId}", 0),
+                    InProduction = productionMap.GetValueOrDefault($"{p.VersionId}_{r.TopPartId}", 0),
+                    OkQty = okMap.TryGetValue($"{p.VersionId}_{r.TopPartId}", out var val) ? val : 0,
+                    ReservedQty = reservedMap.TryGetValue($"{p.VersionId}_{r.TopPartId}", out var res)
+                        ? res
+                        : 0,
+                    StockQty = stockMap.ContainsKey(r.TopPartId) 
+                        ? stockMap[r.TopPartId] 
+                        : 0,
+                };
+        })
+    .ToList()
         });
     }
 }
@@ -229,6 +257,12 @@ public class PartProductionDto
 
     [JsonPropertyName("versionId")]
     public int VersionId { get; set; }
+}
+public class PlannedDto
+{
+    public int VersionId { get; set; }
+    public int TopPartId { get; set; }
+    public int PlannedQty { get; set; }
 }
 
 }

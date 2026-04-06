@@ -18,7 +18,7 @@ public sealed class MoveRequest
     public int Qty { get; set; }
     public int? Task_ID { get; set; }
     public DateTime? Created_At { get; set; }
-
+    public int? SourceBatchProduct_ID { get; set; }
     // Var sūtīt vai nu gatavu BatchProduct_ID
     public int? BatchProduct_ID { get; set; }
     public int? RalColorId { get; set; }
@@ -90,12 +90,94 @@ public async Task<IActionResult> Move([FromBody] MoveRequest dto)
 
     var fromType = Enum.Parse<MoveType>(dto.From, ignoreCase: true);
     var toType   = Enum.Parse<MoveType>(dto.To,   ignoreCase: true);
+    var sourceBpId = dto.SourceBatchProduct_ID ?? bpId;
+        if (sourceBpId != bpId
+            && fromType == MoveType.ASSEMBLY 
+            && toType == MoveType.ASSEMBLY)
+                {
+                   var existing = await _db.BatchProductMaterials
+                        .FirstOrDefaultAsync(x =>
+                            x.BatchProduct_ID == bpId &&
+                            x.SourceBatchProduct_ID == sourceBpId &&
+                            x.Task_ID == dto.Task_ID &&
+                            x.IsActive);
+                    var available = await _db.StockMovements
+                        .Where(x =>
+                            x.IsActive &&
+                            x.BatchProduct_ID == sourceBpId)
+                        .SumAsync(x => (int?)x.Stock_Qty) ?? 0;
+                    var consumeRow = new StockMovement
+                        {
+                            Version_ID = dto.Version_ID,
+                            BatchProduct_ID = sourceBpId,            // ← NO KURIENES ņem
+                            RAL_Color_ID = dto.RalColorId,
+                            SourceBatchProduct_ID = sourceBpId,
+                            Move_Type = MoveType.ASSEMBLY,
+                            Stock_Qty = -dto.Qty,                    // ← MĪNUSS
+                            Created_At = now,
+                            Task_ID = dto.Task_ID,
+                            IsActive = true
+                        };
+                    if (dto.SourceBatchProduct_ID.HasValue && dto.RalColorId != null)
+                        {
+                            var sourceRal = await _db.StockMovements
+                                .Where(x =>
+                                    x.IsActive &&
+                                    x.BatchProduct_ID == sourceBpId &&
+                                    x.RAL_Color_ID != null)
+                                .GroupBy(x => x.RAL_Color_ID)
+                                .Select(g => new
+                                {
+                                    Ral = g.Key,
+                                    Qty = g.Sum(x => x.Stock_Qty)
+                                })
+                                .Where(x => x.Qty > 0)
+                                .Select(x => x.Ral)
+                                .FirstOrDefaultAsync();
 
-var fromRow = new StockMovement
+                            if (sourceRal != null && sourceRal != dto.RalColorId)
+                            {
+                                return BadRequest("RAL mismatch between source and target.");
+                            }
+                        }
+
+                    if (available < dto.Qty)
+                        {
+                            return BadRequest($"Not enough stock in source batchProduct ({available} available).");
+                        }
+                    
+                        _db.StockMovements.Add(consumeRow);
+
+                    if (existing != null)
+                        {
+                            existing.Qty += dto.Qty;
+                        }
+                    else
+                        {
+                            _db.BatchProductMaterials.Add(new BatchProductMaterial
+                            {
+                                BatchProduct_ID = bpId,
+                                SourceBatchProduct_ID = sourceBpId,
+                                Qty = dto.Qty,
+                                Task_ID = dto.Task_ID,
+                                Created_At = now,
+                                IsActive = true
+                            });
+                        }     
+               }
+
+StockMovement? fromRow = null;
+
+if (!(sourceBpId != bpId 
+      && fromType == MoveType.ASSEMBLY 
+      && toType == MoveType.ASSEMBLY))
+{
+    fromRow = new StockMovement
     {
         Version_ID      = dto.Version_ID,
         BatchProduct_ID = bpId,
         RAL_Color_ID    = dto.RalColorId,
+        SourceBatchProduct_ID = sourceBpId,
         Move_Type       = fromType,
         Stock_Qty       = -dto.Qty,
         Created_At      = now,
@@ -103,12 +185,15 @@ var fromRow = new StockMovement
         IsActive        = true
     };
 
+    _db.StockMovements.Add(fromRow);
+}
 
     var toRow = new StockMovement
     {
         Version_ID      = dto.Version_ID,
         BatchProduct_ID = bpId,
         RAL_Color_ID = dto.RalColorId,
+        SourceBatchProduct_ID = sourceBpId,
         Move_Type       = toType,
         Stock_Qty       = dto.Qty,
         Created_At      = now,
@@ -116,11 +201,10 @@ var fromRow = new StockMovement
         IsActive        = true
     };
 
-    _db.StockMovements.Add(fromRow);
     _db.StockMovements.Add(toRow);
     await _db.SaveChangesAsync();
 
-    return Ok(new { FromId = fromRow.Id, ToId = toRow.Id });
+    return Ok(new { FromId = fromRow?.Id, ToId = toRow.Id });
 }
 
 [HttpGet("summary")]

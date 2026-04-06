@@ -130,48 +130,99 @@ SELECT LAST_INSERT_ID();";
             // 3) Rindas (UPSERT pēc (Batch_Id, Version_Id))
 if (dto.Items is not null)
 {
-    foreach (var it in dto.Items)
+    
+foreach (var it in dto.Items)
+{
+    Console.WriteLine("==== ITEM ====");
+Console.WriteLine($"VersionId: {it.VersionId}");
+Console.WriteLine($"Qty: {it.Qty}");
+
+if (it.SelectedTopPartIds != null)
+{
+    Console.WriteLine("SelectedTopPartIds: " + string.Join(",", it.SelectedTopPartIds));
+}
+else
+{
+    Console.WriteLine("SelectedTopPartIds: NULL");
+}
+    
+    // ✅ JA IR izvēlēti child (TopParts)
+    if (it.SelectedTopPartIds != null && it.SelectedTopPartIds.Any())
     {
-        await using var row = conn.CreateCommand();
-        row.Transaction = tx;
-    row.CommandText = @"
-INSERT INTO batches_products
-    (Batch_Id, Version_Id, ProductToPart_ID, Planned_Qty, Done_Qty, Priority, BatchProduct_Comments, IsActive)
-VALUES
-    (@bid, @vid, @ptpId, @qty, 0, 0, @comment, 1)
-ON DUPLICATE KEY UPDATE
-    Planned_Qty           = VALUES(Planned_Qty),
-    BatchProduct_Comments = VALUES(BatchProduct_Comments),
-    IsActive              = 1;";
+                foreach (var ptpId in it.SelectedTopPartIds)
+                {
+                    await using var row = conn.CreateCommand();
+                    row.Transaction = tx;
 
+                    row.CommandText = @"
+        INSERT INTO batches_products
+            (Batch_Id, Version_Id, ProductToPart_ID, Planned_Qty, Done_Qty, Priority, BatchProduct_Comments, IsActive)
+        VALUES
+            (@bid, @vid, @ptpId, @qty, 0, 0, @comment, 1);";
 
-        var pb = row.CreateParameter();
-        pb.ParameterName = "@bid";
-        pb.Value = batchId;
-        row.Parameters.Add(pb);
+                    var pb = row.CreateParameter();
+                    pb.ParameterName = "@bid";
+                    pb.Value = batchId;
+                    row.Parameters.Add(pb);
 
-        var pv = row.CreateParameter();
-        pv.ParameterName = "@vid";
-        pv.Value = it.VersionId;
-        row.Parameters.Add(pv);
+                    var pv = row.CreateParameter();
+                    pv.ParameterName = "@vid";
+                    pv.Value = it.VersionId;
+                    row.Parameters.Add(pv);
 
-        var pq = row.CreateParameter();
-        pq.ParameterName = "@qty";
-        pq.Value = it.Qty;
-        row.Parameters.Add(pq);
+                    var pq = row.CreateParameter();
+                    pq.ParameterName = "@qty";
+                    pq.Value = it.Qty;
+                    row.Parameters.Add(pq);
 
-        var pc = row.CreateParameter();
-        pc.ParameterName = "@comment";
-        pc.Value = (object?)it.Comment ?? DBNull.Value;
-        row.Parameters.Add(pc);
+                    var pc = row.CreateParameter();
+                    pc.ParameterName = "@comment";
+                    pc.Value = (object?)it.Comment ?? DBNull.Value;
+                    row.Parameters.Add(pc);
 
-        var p3 = row.CreateParameter();
-        p3.ParameterName = "@ptpId";
-        p3.Value = (object?)it.ProductToPartId ?? DBNull.Value;
-        row.Parameters.Add(p3);
+                    var p3 = row.CreateParameter();
+                    p3.ParameterName = "@ptpId";
+                    p3.Value = ptpId; // ✅ child ID
+                    row.Parameters.Add(p3);
 
-        await row.ExecuteNonQueryAsync();
-    }
+                    await row.ExecuteNonQueryAsync();
+                }
+            }
+            else
+            {
+                // ⚠️ fallback (ja nav child izvēlēts)
+                await using var row = conn.CreateCommand();
+                row.Transaction = tx;
+
+                row.CommandText = @"
+        INSERT INTO batches_products
+            (Batch_Id, Version_Id, ProductToPart_ID, Planned_Qty, Done_Qty, Priority, BatchProduct_Comments, IsActive)
+        VALUES
+            (@bid, @vid, NULL, @qty, 0, 0, @comment, 1);";
+
+                var pb = row.CreateParameter();
+                pb.ParameterName = "@bid";
+                pb.Value = batchId;
+                row.Parameters.Add(pb);
+
+                var pv = row.CreateParameter();
+                pv.ParameterName = "@vid";
+                pv.Value = it.VersionId;
+                row.Parameters.Add(pv);
+
+                var pq = row.CreateParameter();
+                pq.ParameterName = "@qty";
+                pq.Value = it.Qty;
+                row.Parameters.Add(pq);
+
+                var pc = row.CreateParameter();
+                pc.ParameterName = "@comment";
+                pc.Value = (object?)it.Comment ?? DBNull.Value;
+                row.Parameters.Add(pc);
+
+                await row.ExecuteNonQueryAsync();
+            }
+        }
 }
 
 
@@ -317,6 +368,10 @@ UPDATE batches
                 await cmd.ExecuteNonQueryAsync();
             }
 
+// 🛡️ drošības filtrs – tikai derīgie ieraksti
+dto.Items = (dto.Items ?? new List<BatchCartItem>())
+    .Where(x => x.Qty > 0)
+    .ToList();
             // 3) Rindas (UPSERT pēc (Batch_Id, Version_Id))
 if (dto.Items is not null && dto.Items.Count > 0)
 
@@ -346,9 +401,9 @@ WHERE Batch_Id = @bid;";
             await using var chk = conn.CreateCommand();
             chk.Transaction = tx;
             chk.CommandText = @"
-SELECT Version_Id 
-FROM batches_products 
-WHERE ID = @id AND IsActive = 1;";
+                SELECT Version_Id 
+                FROM batches_products 
+                WHERE ID = @id AND IsActive = 1;";
             var pid = chk.CreateParameter();
             pid.ParameterName = "@id";
             pid.Value = it.ItemId;

@@ -21,6 +21,9 @@ namespace ManiApi.Models
         [Column("RAL_Color_ID")]
         public int? RAL_Color_ID { get; set; }
 
+        [Column("SourceBatchProduct_ID")]
+        public int? SourceBatchProduct_ID { get; set; }
+
         [Column("Stock_Qty")]
         public int Stock_Qty { get; set; }
 
@@ -32,6 +35,7 @@ namespace ManiApi.Models
 
         [Column("IsActive")]
         public bool IsActive { get; set; } = true;
+        
 
      }
 }

@@ -189,8 +189,14 @@ private async Task OnEditSaved(ProductionTasks.BatchLine line)
             x.VersionId == line.VersionId &&
             x.ProductToPartId == null);
 
+        var oldChildren = batchItems
+            .Where(x =>
+                x.VersionId == line.VersionId &&
+                x.ProductToPartId != null)
+            .ToList();
+
         var hasChanges =
-            line.Planned != oldItem?.Qty ||
+            (line.Planned != (oldItem?.Qty ?? 0)) ||
             line.Comment != oldItem?.Comment ||
             editParts.Any(p =>
                 {
@@ -227,27 +233,51 @@ private async Task OnEditSaved(ProductionTasks.BatchLine line)
                 .ToList();
 
                     
-        if (!selectedParts.Any() && line.Planned <= 0)
-                {
-                    isEditOpen = false;
-                    return;
-                }
+if (!selectedParts.Any() && line.Planned <= 0)
+{
+    batchItems = batchItems
+        .Where(x => x.VersionId != line.VersionId)
+        .ToList();
+
+    var deleteDto = new
+    {
+        BatchId = draftBatchId,
+        Items = batchItems.Select(x => new
+        {
+            VersionId = x.VersionId,
+            ProductToPartId = x.ProductToPartId,
+            Qty = x.Qty,
+            Comment = x.Comment
+        })
+    };
+
+    await Http.PostAsJsonAsync(
+        "http://localhost:5270/api/batches/draft/update",
+        deleteDto
+    );
+
+    isEditOpen = false;
+    return;
+}
 
         batchItems = batchItems
             .Where(x => x.VersionId != line.VersionId)
             .ToList();
 
-        batchItems.Add(new BatchCartItem
-        {
-            VersionId = line.VersionId,
-            Name = editProductName ?? "",
-            Code = line.BatchCode,
-            Qty = line.Planned,
-            Comment = line.Comment,
-            ProductToPartId = null,
-            CategoryId = categoryId,
-            ParentCategoryId = parentCategoryId
-        });
+                    if (line.Planned > 0)
+                    {
+                        batchItems.Add(new BatchCartItem
+                        {
+                            VersionId = line.VersionId,
+                            Name = editProductName ?? "",
+                            Code = line.BatchCode,
+                            Qty = line.Planned,
+                            Comment = line.Comment,
+                            ProductToPartId = null,
+                            CategoryId = categoryId,
+                            ParentCategoryId = parentCategoryId
+                        });
+                    }
 
                 foreach (var part in selectedParts)
                 {
@@ -755,90 +785,117 @@ var hasChildren = line.SelectedParts?.Any(p => p.Qty > 0) == true;
 
 if (line.Planned <= 0 && !hasChildren)
     return;
+// neļaujam bērniem ietekmēt parent
+if (line.Planned < 0)
+    line.Planned = 0;
 
 var rowData = rows.FirstOrDefault(r => r.VersionId == line.VersionId);
 
     // 1) JA NAV draftBatchId -> izveidojam batch (status 4) + ieliekam 1. produktu
 if (!draftBatchId.HasValue || forceNewDraft)
+{
+    var items = new List<object>();
 
-{
-var createDto = new
-{
-    BatchId = (int?)null,
-    Title = "", // ⬅️ SVARĪGI: ļaujam backendam ģenerēt unikālu kodu
-    Comment = "Melnraksts",
-    Items = new[]
+    // ✅ PARENT (tikai ja > 0)
+    if (line.Planned > 0)
+    {
+        items.Add(new
         {
-            new
-            {
-                VersionId = line.VersionId,
-                ProductToPartId = (int?)null, 
-                Qty       = line.Planned,
-                Comment   = line.Comment
-            }
-        }
-};
+            VersionId = line.VersionId,
+            ProductToPartId = (int?)null,
+            Qty = line.Planned,
+            Comment = line.Comment
+        });
+    }
 
+    // ✅ CHILDREN
+    if (line.SelectedParts != null)
+    {
+        foreach (var part in line.SelectedParts.Where(p => p.Qty > 0))
+        {
+            items.Add(new
+                {
+                    VersionId = line.VersionId,
+                    Qty = part.Qty,
+                    Comment = line.Comment,
+                    SelectedTopPartIds = new List<int> { part.Id }
+                });
+        }
+    }
+
+    var createDto = new
+    {
+        BatchId = (int?)null,
+        Title = "",
+        Comment = "Melnraksts",
+        Items = items
+    };
 
     var createResp = await Http.PostAsJsonAsync(
         "http://localhost:5270/api/batches/draft/create",
         createDto);
 
     if (!createResp.IsSuccessStatusCode)
-            {
-                var err = await createResp.Content.ReadAsStringAsync();
-                await JS.InvokeVoidAsync("alert", err);
-                return;
-            }
+    {
+        var err = await createResp.Content.ReadAsStringAsync();
+        await JS.InvokeVoidAsync("alert", err);
+        return;
+    }
 
     var data = await createResp.Content.ReadFromJsonAsync<Dictionary<string, int>>();
     if (data != null && data.TryGetValue("batchId", out var id))
         draftBatchId = id;
+
     forceNewDraft = false;
 
+    // 🔥 UI – dzēš tikai parent (child atstājam)
+        batchItems = batchItems
+            .Where(x => !(x.VersionId == line.VersionId && x.ProductToPartId == null))
+            .ToList();
 
-    // ⬇️ KRITISKI SVARĪGI — UI fiksē pirmo preci
-
-// 1️⃣ PARENT
-var parent = new BatchCartItem
-{
-    VersionId = line.VersionId,
-    Name = product?.ProductName ?? "",
-    Code = product?.ProductCode ?? line.BatchCode,
-    Qty = line.Planned,
-    Comment = line.Comment,
-    ProductToPartId = null,
-    CategoryId = rowData?.CategoryId,
-    ParentCategoryId = rowData?.ParentCategoryId
-};
-
-batchItems.Add(parent);
-
-// 2️⃣ CHILDREN
-if (line.SelectedParts != null)
-{
-    foreach (var part in line.SelectedParts)
+    // parent
+    if (line.Planned > 0)
     {
         batchItems.Add(new BatchCartItem
         {
             VersionId = line.VersionId,
-            Name = part.TopPart_Name,
-            Code = "", // ja nav — OK
-            Qty = part.Qty,
+            Name = product?.ProductName ?? "",
+            Code = product?.ProductCode ?? line.BatchCode,
+            Qty = line.Planned,
             Comment = line.Comment,
-            ProductToPartId = part.Id,
+            ProductToPartId = null,
             CategoryId = rowData?.CategoryId,
             ParentCategoryId = rowData?.ParentCategoryId
         });
     }
+
+    // children
+var selectedParts = line.SelectedParts?
+    .Where(p => p.Qty > 0)
+    .ToList() ?? new();
+
+foreach (var part in selectedParts)
+{
+    batchItems.Add(new BatchCartItem
+    {
+        VersionId = line.VersionId,
+        Name = part.TopPart_Name,
+        Code = "",
+        Qty = part.Qty,
+        Comment = line.Comment,
+        ProductToPartId = part.Id,
+        CategoryId = rowData?.CategoryId,
+        ParentCategoryId = rowData?.ParentCategoryId
+    });
 }
 
-    isAddOpen = false;
-    addLine = null;
-    StateHasChanged();
-    return;
+isAddOpen = false;
+addLine = null;
+StateHasChanged();
+return;
 }
-    // 2) JA draftBatchId jau ir -> update
+
+
 // 2) JA draftBatchId jau ir -> update
 var dto = new DraftUpdateDto
 {
@@ -848,7 +905,8 @@ var dto = new DraftUpdateDto
 var newItems = new List<DraftItemDto>();
 
 // esošie (no UI)
-foreach (var it in batchItems)
+foreach (var it in batchItems
+    .Where(x => x.VersionId != line.VersionId))
 {
     newItems.Add(new DraftItemDto
     {
@@ -859,21 +917,24 @@ foreach (var it in batchItems)
     });
 }
 
-// jaunais parent
-newItems.Add(new DraftItemDto
+// parent tikai ja ir > 0
+if (line.Planned > 0)
 {
-    VersionId = line.VersionId,
-    ProductToPartId = null,
-    Qty = line.Planned,
-    Comment = line.Comment
-});
+    newItems.Add(new DraftItemDto
+    {
+        VersionId = line.VersionId,
+        ProductToPartId = null,
+        Qty = line.Planned,
+        Comment = line.Comment
+    });
+}
 
 dto.Items = newItems;
 
 // 3️⃣ jaunās detaļas
 if (line.SelectedParts != null)
 {
-    foreach (var part in line.SelectedParts)
+    foreach (var part in line.SelectedParts.Where(p => p.Qty > 0))
     {
         dto.Items.Add(new DraftItemDto
         {
@@ -898,22 +959,25 @@ batchItems = batchItems
     .ToList();
 
 // 1️⃣ PARENT
-batchItems.Add(new BatchCartItem
+if (line.Planned > 0)
 {
-    VersionId = line.VersionId,
-    Name = product?.ProductName ?? "",
-    Code = product?.ProductCode ?? line.BatchCode,
-    Qty = line.Planned,
-    Comment = line.Comment,
-    ProductToPartId = null,
-    CategoryId = rowData?.CategoryId,
-    ParentCategoryId = rowData?.ParentCategoryId
-});
+    batchItems.Add(new BatchCartItem
+    {
+        VersionId = line.VersionId,
+        Name = product?.ProductName ?? "",
+        Code = product?.ProductCode ?? line.BatchCode,
+        Qty = line.Planned,
+        Comment = line.Comment,
+        ProductToPartId = null,
+        CategoryId = rowData?.CategoryId,
+        ParentCategoryId = rowData?.ParentCategoryId
+    });
+}
 
 // 2️⃣ CHILDREN
 if (line.SelectedParts != null)
 {
-    foreach (var part in line.SelectedParts)
+    foreach (var part in line.SelectedParts.Where(p => p.Qty > 0))
     {
         batchItems.Add(new BatchCartItem
         {
@@ -1024,7 +1088,7 @@ foreach (var it in draft.Items)
 {
     var row = rows.FirstOrDefault(r => r.VersionId == it.VersionId);
 
-    if (it.ProductToPartId == null)
+    if (it.ProductToPartId == null && it.Qty > 0)
         {
             // PARENT
             batchItems.Add(new BatchCartItem
@@ -1629,21 +1693,6 @@ private async Task OnBatchItemDeleted(BatchCartItem it)
                   x.ProductToPartId == it.ProductToPartId))
             .ToList();
 
-        // 🟦 3. pārrēķinam parent qty
-        var parent = batchItems.FirstOrDefault(x =>
-            x.VersionId == it.VersionId &&
-            x.ProductToPartId == null);
-
-        if (parent != null)
-        {
-            var childrenQty = batchItems
-                .Where(x =>
-                    x.VersionId == it.VersionId &&
-                    x.ProductToPartId != null)
-                .Sum(x => x.Qty);
-
-            parent.Qty = childrenQty;
-        }
     }
 
     // 🔥 4. DB sync

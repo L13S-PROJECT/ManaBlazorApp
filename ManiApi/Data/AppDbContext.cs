@@ -29,8 +29,10 @@ namespace ManiApi.Data
         public DbSet<StageStepTypeMap> StageStepTypeMaps { get; set; }
         public DbSet<CompanyCalendarBreak> CompanyCalendarBreaks { get; set; }
         public DbSet<WorkCenter> WorkCenters { get; set; }
+        public DbSet<BatchProductLink> BatchProductLinks { get; set; }
+        public DbSet<BatchProductMaterial> BatchProductMaterials { get; set; }
+        public DbSet<BatchProduct> BatchProducts { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
-
         
 {
     base.OnModelCreating(modelBuilder);
@@ -61,7 +63,7 @@ namespace ManiApi.Data
 });
     
 }
-    public DbSet<BatchProduct> BatchProducts { get; set; }
+  
 
     }
 
