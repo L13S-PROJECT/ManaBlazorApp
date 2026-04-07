@@ -133,10 +133,7 @@ if (dto.Items is not null)
     
 foreach (var it in dto.Items)
 {
-    Console.WriteLine("==== ITEM ====");
-Console.WriteLine($"VersionId: {it.VersionId}");
-Console.WriteLine($"Qty: {it.Qty}");
-
+    
 if (it.SelectedTopPartIds != null)
 {
     Console.WriteLine("SelectedTopPartIds: " + string.Join(",", it.SelectedTopPartIds));
@@ -562,7 +559,7 @@ public async Task<IActionResult> GetProductionBatches(
 SELECT
     b.ID                               AS BatchId,
     b.Batches_Code                     AS BatchCode,
-    bp.ID                              AS BatchProductId,
+    MIN(bp.ID)                      AS BatchProductId,
     bp.Version_Id                      AS VersionId,
     p.Product_Name                     AS ProductName,
     p.Product_Code                     AS ProductCode,
@@ -573,8 +570,7 @@ SELECT
    -- Planned: tikai 1/5, nav 2/3
 SUM(
     CASE
-        WHEN tsum.DetPlannedCnt > 0
-         AND tsum.DetStartedCnt = 0
+        WHEN bp.ProductToPart_ID IS NULL
         THEN bp.Planned_Qty
         ELSE 0
     END
@@ -585,8 +581,23 @@ SUM(
 -- UN ir vēl kāds Detailed ar 1/2/5 (tātad nav 100% pabeigts)
 SUM(
     CASE
-        WHEN tsum.DetStartedCnt > 0
-         AND tsum.DetNotFinishedCnt > 0
+        WHEN bp.ProductToPart_ID IS NULL
+         AND EXISTS (
+             SELECT 1
+             FROM tasks t2
+             JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+             WHERE t2.BatchProduct_ID = bp.ID
+               AND ts2.Step_Type = 1
+               AND t2.Tasks_Status IN (2,3)
+         )
+         AND EXISTS (
+             SELECT 1
+             FROM tasks t3
+             JOIN toppartsteps ts3 ON ts3.ID = t3.TopPartStep_ID
+             WHERE t3.BatchProduct_ID = bp.ID
+               AND ts3.Step_Type = 1
+               AND t3.Tasks_Status <> 3
+         )
         THEN bp.Planned_Qty
         ELSE 0
     END
@@ -595,11 +606,33 @@ SUM(
     -- Detailed FINISH:
     -- visi Detailed = 3, nav vairs 1/2/5
     -- UN Assembly vēl NAV sācies (nav statusu 2 vai 3)
-    SUM(
+SUM(
     CASE
-        WHEN tsum.DetStartedCnt > 0
-         AND tsum.DetNotFinishedCnt = 0
-         AND tsum.AsmStartedCnt = 0
+        WHEN bp.ProductToPart_ID IS NULL
+         AND EXISTS (
+             SELECT 1
+             FROM tasks t2
+             JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+             WHERE t2.BatchProduct_ID = bp.ID
+               AND ts2.Step_Type = 1
+               AND t2.Tasks_Status IN (2,3)
+         )
+         AND NOT EXISTS (
+             SELECT 1
+             FROM tasks t3
+             JOIN toppartsteps ts3 ON ts3.ID = t3.TopPartStep_ID
+             WHERE t3.BatchProduct_ID = bp.ID
+               AND ts3.Step_Type = 1
+               AND t3.Tasks_Status <> 3
+         )
+         AND NOT EXISTS (
+             SELECT 1
+             FROM tasks t4
+             JOIN toppartsteps ts4 ON ts4.ID = t4.TopPartStep_ID
+             WHERE t4.BatchProduct_ID = bp.ID
+               AND ts4.Step_Type = 2
+               AND t4.Tasks_Status IN (2,3)
+         )
         THEN bp.Planned_Qty
         ELSE 0
     END
@@ -608,10 +641,25 @@ SUM(
     -- Assembly IN PROGRESS:
     -- Ir vismaz viens Assembly ar 2 VAI 3
     -- UN ir vēl kāds Assembly ar 1/2/5 (nav 100% pabeigts)
-    SUM(
+SUM(
     CASE
-        WHEN tsum.AsmStartedCnt > 0
-         AND tsum.AsmNotFinishedCnt > 0
+        WHEN bp.ProductToPart_ID IS NULL
+         AND EXISTS (
+             SELECT 1
+             FROM tasks t2
+             JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+             WHERE t2.BatchProduct_ID = bp.ID
+               AND ts2.Step_Type = 2
+               AND t2.Tasks_Status IN (2,3)
+         )
+         AND EXISTS (
+             SELECT 1
+             FROM tasks t3
+             JOIN toppartsteps ts3 ON ts3.ID = t3.TopPartStep_ID
+             WHERE t3.BatchProduct_ID = bp.ID
+               AND ts3.Step_Type = 2
+               AND t3.Tasks_Status IN (1,2,5)
+         )
         THEN bp.Planned_Qty
         ELSE 0
     END
@@ -621,13 +669,37 @@ SUM(
     -- ir vismaz viens Assembly ar 3
     -- UN vairs nav neviena Assembly ar 1/2/5
 -- Assembly FINISH:
-SUM(COALESCE(sm.AssemblyDone, 0)) AS Done,
+SUM(
+    CASE
+        WHEN bp.ProductToPart_ID IS NULL
+        THEN COALESCE(sm.AssemblyDone, 0)
+        ELSE 0
+    END
+) AS Done,
 
-SUM(COALESCE(sm.AssemblyDone, 0)) 
-- SUM(COALESCE(tsum.FinishingStartedQty, 0)) 
-AS AssemblyFinish,
+SUM(
+    CASE
+        WHEN bp.ProductToPart_ID IS NULL
+        THEN COALESCE(sm.AssemblyDone, 0)
+        ELSE 0
+    END
+)
+-
+SUM(
+    CASE
+        WHEN bp.ProductToPart_ID IS NULL
+        THEN COALESCE(tsum.FinishingStartedQty, 0)
+        ELSE 0
+    END
+) AS AssemblyFinish,
 
-SUM(COALESCE(tsum.FinishingStartedQty, 0)) AS FinishingInProgress
+SUM(
+    CASE
+        WHEN bp.ProductToPart_ID IS NULL
+        THEN COALESCE(tsum.FinishingStartedQty, 0)
+        ELSE 0
+    END
+) AS FinishingInProgress
 
 FROM batches_products bp
 JOIN batches  b ON b.ID = bp.Batch_Id
@@ -669,7 +741,15 @@ LEFT JOIN (
         SUM(CASE WHEN ts.Step_Type = 2 AND t.Tasks_Status IN (1,2,5) THEN 1 ELSE 0 END) AS AsmNotFinishedCnt,
 
         -- Finishing
-        0 AS FinishingStartedQty
+        -- Finishing (FIXED: izmanto Qty_Done, nevis count)
+        SUM(
+            CASE 
+                WHEN ts.Step_Type = 3 
+                AND t.Tasks_Status IN (1,2)
+                THEN t.Qty_Done
+                ELSE 0 
+            END
+        ) AS FinishingStartedQty
 
     FROM tasks t
     JOIN toppartsteps ts 
@@ -825,14 +905,32 @@ JOIN producttopparts ptp
 JOIN toppartsteps ts
      ON ts.ProductToPart_ID = ptp.ID
     AND ts.IsActive = 1
+    AND (
+        bp.ProductToPart_ID IS NULL
+        OR ts.Step_Type = 1
+    )
 LEFT JOIN tasks t
      ON t.BatchProduct_ID = bp.ID
     AND t.TopPartStep_ID = ts.ID
     AND t.IsActive = 1
 WHERE bp.Batch_Id = @bid
   AND bp.IsActive = 1
-  AND ptp.IsActive = 1
   AND ts.IsActive = 1
+  AND (
+    bp.ProductToPart_ID IS NULL
+    OR ptp.ID = bp.ProductToPart_ID
+        )
+AND NOT (
+    bp.ProductToPart_ID IS NULL
+    AND EXISTS (
+        SELECT 1
+        FROM batches_products bp2
+        WHERE bp2.Batch_Id = bp.Batch_Id
+          AND bp2.Version_Id = bp.Version_Id
+          AND bp2.ProductToPart_ID IS NOT NULL
+          AND bp2.IsActive = 1
+            )
+    )       
   AND t.ID IS NULL;";
 
         var pbid = tcmd.CreateParameter();
@@ -1335,7 +1433,8 @@ SELECT
     v.Version_Name  AS VersionName,
     bp.is_priority  AS IsPriority,
     bp.Planned_Qty  AS Planned, 
-    bp.BatchProduct_Comments AS Comment
+    bp.BatchProduct_Comments AS Comment,
+    bp.ProductToPart_ID
 , COALESCE(tsum.DetailedInProgress, 0)  AS DetailedInProgress
 , COALESCE(tsum.DetailedFinish, 0)      AS DetailedFinish
 , COALESCE(tsum.AssemblyInProgress, 0)  AS AssemblyInProgress
@@ -1355,7 +1454,7 @@ FROM batches_products bp
 JOIN batches  b ON b.ID = bp.Batch_Id
 JOIN versions v ON v.ID = bp.Version_Id
 JOIN products p ON p.ID = v.Product_ID
-JOIN categories c ON c.ID = p.Category_ID
+JOIN categories c ON c.ID = p.Category_ID      
 LEFT JOIN (
     SELECT 
         BatchProduct_ID,
@@ -1474,6 +1573,7 @@ LEFT JOIN (
 WHERE bp.IsActive = 1
   AND b.IsActive = 1
   AND b.Batches_Statuss = 1
+  AND bp.ParentBatchProduct_ID IS NULL
 ORDER BY b.ID DESC;
 ";
 
@@ -1495,24 +1595,25 @@ ORDER BY b.ID DESC;
             IsPriority     = r.GetBoolean(8),
             Planned = r.GetInt32(9),
             Comment = r.IsDBNull(10) ? null : r.GetString(10),
-            DetailedInProgress = r.GetInt32(11),
-            DetailedFinish      = r.GetInt32(12),
-            AssemblyInProgress  = r.GetInt32(13),
-            AssemblyFinish      = r.GetInt32(14),
-            Sold                = r.GetInt32(15),
-            FinishingInProgress = r.GetInt32(16),
-            FinStatus1 = r.IsDBNull(17) ? 0 : r.GetInt32(17),
-            FinStatus2 = r.IsDBNull(18) ? 0 : r.GetInt32(18),
-            FinStatus3 = r.IsDBNull(19) ? 0 : r.GetInt32(19),
+            ProductToPartId = r.IsDBNull(11) ? null : (int?)r.GetInt32(11),
+            DetailedInProgress = r.GetInt32(12),
+            DetailedFinish      = r.GetInt32(13),
+            AssemblyInProgress  = r.GetInt32(14),
+            AssemblyFinish      = r.GetInt32(15),
+            Sold                = r.GetInt32(16),
+            FinishingInProgress = r.GetInt32(17),
+            FinStatus1 = r.IsDBNull(18) ? 0 : r.GetInt32(18),
+            FinStatus2 = r.IsDBNull(19) ? 0 : r.GetInt32(19),
+            FinStatus3 = r.IsDBNull(20) ? 0 : r.GetInt32(20),
 
-            DetailStart  = r.IsDBNull(20) ? (DateTime?)null : r.GetFieldValue<DateTime>(20),
-            DetailFinish = r.IsDBNull(21) ? (DateTime?)null : r.GetFieldValue<DateTime>(21),
+            DetailStart  = r.IsDBNull(21) ? (DateTime?)null : r.GetFieldValue<DateTime>(21),
+            DetailFinish = r.IsDBNull(22) ? (DateTime?)null : r.GetFieldValue<DateTime>(22),
 
-            AssemblyStart  = r.IsDBNull(22) ? (DateTime?)null : r.GetFieldValue<DateTime>(22),
-            AssemblyFinishDate = r.IsDBNull(23) ? (DateTime?)null : r.GetFieldValue<DateTime>(23),
+            AssemblyStart  = r.IsDBNull(23) ? (DateTime?)null : r.GetFieldValue<DateTime>(23),
+            AssemblyFinishDate = r.IsDBNull(24) ? (DateTime?)null : r.GetFieldValue<DateTime>(24),
 
-            DetailedStarted = r.GetInt32(24),
-            DetailsTotal = r.GetInt32(25)
+            DetailedStarted = r.GetInt32(25),
+            DetailsTotal = r.GetInt32(26)
         });
     }
 
@@ -1689,6 +1790,54 @@ if (finishingCnt == 0)
     return Ok(new { isValid = false, message = "Nav FINISHING posmā tehnoloģijas soļu." });
 
     return Ok(new { isValid = true });
+}
+
+[HttpGet("batch-flags")]
+public async Task<IActionResult> GetBatchFlags()
+{
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+SELECT 
+    Batch_Id,
+    Version_Id,
+
+    CASE 
+        WHEN SUM(CASE WHEN ProductToPart_ID IS NULL THEN 1 ELSE 0 END) > 0
+         AND SUM(CASE WHEN ProductToPart_ID IS NOT NULL THEN 1 ELSE 0 END) > 0
+            THEN '+'
+        
+        WHEN SUM(CASE WHEN ProductToPart_ID IS NULL THEN 1 ELSE 0 END) = 0
+            THEN '!'
+        
+        ELSE ''
+    END AS BatchFlag
+
+FROM batches_products
+WHERE IsActive = 1
+GROUP BY Batch_Id, Version_Id;
+";
+
+    var dict = new Dictionary<string, string>();
+
+    await using var r = await cmd.ExecuteReaderAsync();
+    while (await r.ReadAsync())
+    {
+        var key = $"{r.GetInt32(0)}_{r.GetInt32(1)}";
+        var flag = r.IsDBNull(2) ? "" : r.GetString(2);
+
+        dict[key] = flag;
+    }
+
+    return Ok(dict);
+}
+
+[HttpGet("list-production-v2")]
+public async Task<IActionResult> GetProductionBatchesRowsV2()
+{
+    return await GetProductionBatchesRows();
 }
 
     } // <-- beidzas public class BatchesController

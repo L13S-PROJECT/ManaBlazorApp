@@ -62,7 +62,9 @@
     @onclick="() => SelectRow(b.BatchProductId)">
 
     <td class="ptv3-batch-main">@b.BatchCode</td>
-    <td class="ptv3-batch-flag"></td>
+    <td class="ptv3-batch-flag">
+        @GetBatchFlag(b)
+    </td>
     <td>@b.CategoryName</td>
     <td>@AllProducts.FirstOrDefault(x => x.productCode == b.ProductCode)?.productName</td>
     <td>@b.ProductCode</td>
@@ -208,6 +210,10 @@ protected override async Task OnInitializedAsync()
 
     VersionSummary = summaries.ToDictionary(x => x.VersionId);
 
+    BatchFlags = await Http.GetFromJsonAsync<Dictionary<string, string>>(
+    "http://localhost:5270/api/batches/batch-flags"
+) ?? new();
+
 if (BatchProductId.HasValue)
 {
     SelectedBatch = ProductBatches
@@ -215,8 +221,14 @@ if (BatchProductId.HasValue)
 
     StateHasChanged();
 }
-
             }
+
+private string GetBatchFlag(ProductBatchRow b)
+{
+    var key = $"{b.BatchId}_{b.VersionId}";
+    return BatchFlags.TryGetValue(key, out var f) ? f : "";
+}
+
 private string GetFinCellClass(ProductBatchRow b)
 {
     var x = b.FinishingInProgress;
@@ -349,5 +361,7 @@ private async Task HandleDetailChanged()
     if (SelectedBatch != null)
         await ReloadBatchRow(SelectedBatch.BatchProductId);
 }
+
+private Dictionary<string, string> BatchFlags = new();
 
 }

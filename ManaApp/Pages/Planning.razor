@@ -502,8 +502,9 @@ private async Task ReloadPlanningDataAsync()
         ?? new();
 
     var plannedByVersion = plannedList
-        .GroupBy(x => x.VersionId)
-        .ToDictionary(g => g.Key, g => g.Sum(x => x.Planned));
+    .Where(x => x.ProductToPartId == null)
+    .GroupBy(x => x.VersionId)
+    .ToDictionary(g => g.Key, g => g.Sum(x => x.Planned));
 
     var detailedInProgressByVersion = plannedList
         .GroupBy(x => x.VersionId)

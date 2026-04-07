@@ -96,6 +96,9 @@ public sealed class BatchPlannedRow
     [JsonPropertyName("productCode")]
     public string ProductCode { get; set; } = "";
 
+    [JsonPropertyName("ProductToPartId")]
+    public int? ProductToPartId { get; set; }
+
     [JsonPropertyName("planned")]
     public int Planned { get; set; }
 
