@@ -1856,6 +1856,7 @@ SELECT
     v.Version_Name AS VersionName,
 
     MAX(bp.is_priority) AS IsPriority,
+    MAX(CASE WHEN bp.ProductToPart_ID IS NULL THEN 1 ELSE 0 END) AS HasParent,
 
     SUM(
         CASE 
@@ -1884,14 +1885,8 @@ SELECT
 ) AS Done
 
 , CASE 
-    WHEN SUM(CASE WHEN bp.ProductToPart_ID IS NULL THEN 1 ELSE 0 END) > 0
-    THEN MAX(
-        CASE 
-            WHEN bp.ProductToPart_ID IS NULL 
-            THEN COALESCE(dt.DetailsTotal, 0)
-            ELSE 0
-        END
-    )
+    WHEN MAX(CASE WHEN bp.ProductToPart_ID IS NULL THEN 1 ELSE 0 END) = 1
+    THEN MAX(dt.DetailsTotal)
     ELSE 0
 END AS DetailsTotal
 
@@ -1950,6 +1945,13 @@ LEFT JOIN (
     JOIN producttopparts ptp 
         ON ptp.Version_ID = v.ID
         AND ptp.IsActive = 1
+    JOIN toppartsteps ts
+        ON ts.ProductToPart_ID = ptp.ID
+        AND ts.IsActive = 1
+    JOIN stage_step_type_map m
+        ON m.Step_Type_ID = ts.Step_Type
+        AND m.Stage = 1
+        AND m.IsActive = 1
     WHERE ptp.IsActive = 1
     GROUP BY v.ID
 ) dt ON dt.VersionId = bp.Version_Id
@@ -1994,16 +1996,99 @@ while (await r.ReadAsync())
         CategoryName   = r.GetString(7),
         VersionName    = r.GetString(8),
         IsPriority     = r.GetBoolean(9),
-        Planned        = r.GetInt32(10),
-        Comment        = r.IsDBNull(11) ? null : r.GetString(11),
-        Sold   = r.GetInt32(12),
-        Done   = r.GetInt32(13),
-        DetailsTotal = r.GetInt32(14),
-        DetailsChildTotal = r.GetInt32(15)
+        
+        Planned        = r.GetInt32(11),
+        Comment        = r.IsDBNull(12) ? null : r.GetString(12),
+        Sold   = r.GetInt32(13),
+        Done   = r.GetInt32(14),
+        DetailsTotal = r.GetInt32(15),
+        DetailsChildTotal = r.GetInt32(16)
     });
 }
 
 return Ok(list);
+}
+
+[HttpGet("detail-qty")]
+public async Task<IActionResult> GetDetailQty([FromQuery] int batchProductId)
+{
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+SELECT 
+    ptp.ID AS ProductToPartId,
+    tp.TopPart_Name AS TopPartName,
+
+    -- Parent = batch planned
+    (
+    SELECT bp2.Planned_Qty
+FROM batches_products bp2
+WHERE bp2.Batch_Id = (
+    SELECT Batch_Id FROM batches_products WHERE ID = @bpId LIMIT 1
+)
+AND bp2.Version_Id = (
+    SELECT Version_Id FROM batches_products WHERE ID = @bpId LIMIT 1
+)
+AND bp2.ProductToPart_ID IS NULL
+LIMIT 1
+) AS ParentQty,
+
+    -- Child = sum of child rows
+    SUM(
+    CASE 
+        WHEN bp.ProductToPart_ID = ptp.ID 
+        THEN bp.Planned_Qty 
+        ELSE 0 
+    END
+) AS ChildQty
+
+FROM batches_products bp
+
+JOIN producttopparts ptp 
+    ON ptp.Version_ID = bp.Version_Id
+    AND ptp.IsActive = 1
+
+JOIN toppartsteps ts 
+    ON ts.ProductToPart_ID = ptp.ID
+    AND ts.IsActive = 1
+
+JOIN stage_step_type_map m
+    ON m.Step_Type_ID = ts.Step_Type
+    AND m.Stage = 1
+    AND m.IsActive = 1
+
+JOIN toppart tp 
+    ON tp.ID = ptp.TopPart_ID
+
+WHERE bp.Batch_Id = (
+    SELECT Batch_Id FROM batches_products WHERE ID = @bpId LIMIT 1
+)
+
+GROUP BY ptp.ID, tp.TopPart_Name;
+";
+
+    var p = cmd.CreateParameter();
+    p.ParameterName = "@bpId";
+    p.Value = batchProductId;
+    cmd.Parameters.Add(p);
+
+    var list = new List<object>();
+
+    await using var r = await cmd.ExecuteReaderAsync();
+    while (await r.ReadAsync())
+    {
+        list.Add(new
+        {
+            ProductToPartId = r.GetInt32(0),
+            TopPartName     = r.GetString(1),
+            ParentQty = r.IsDBNull(2) ? 0 : r.GetInt32(2),
+            ChildQty        = r.GetInt32(3)
+        });
+    }
+
+    return Ok(list);
 }
 
     } // <-- beidzas public class BatchesController

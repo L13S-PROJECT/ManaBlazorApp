@@ -1865,8 +1865,10 @@ SELECT
     t.Assigned_To,
     t.Claimed_By,
     COALESCE(t.Qty_Done, 0) AS Done,
-    t.TopPartStep_ID   AS TopPartStepId,
-    ptp.ID             AS ProductToPartId,
+    ts.ID AS TopPartStepId,
+    COALESCE(ptpParent.ID, ptp.ID) AS ProductToPartId,
+    tp.ID              AS TopPartId,
+    ptp.TopPart_ID     AS TopPartIdRaw,
     t.Started_At,
     t.Finished_At,
     t.Tasks_Comment AS Comment,
@@ -1874,17 +1876,43 @@ SELECT
     tp.TopPart_Name AS PartName,
     rc.Name AS RalName,
     bp.ParentBatchProduct_ID,
-    bp.ProductToPart_ID
+    bp.ProductToPart_ID,
+    bp.Planned_Qty AS BatchPlannedQty,
+    ptp.Qty_Per_product AS QtyPerProduct
 
 FROM tasks t
 JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+
 JOIN toppartsteps    ts  ON ts.ID = t.TopPartStep_ID
+
 JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
 JOIN toppart         tp  ON tp.ID  = ptp.TopPart_ID
+
+LEFT JOIN producttopparts ptpParent
+    ON ptpParent.Version_ID = bp.Version_Id
+    AND ptpParent.TopPart_ID = ptp.TopPart_ID
+    AND ptpParent.IsActive = 1
+
 LEFT JOIN ral_colors rc ON rc.ID = t.RAL_Color_ID
 WHERE t.IsActive = 1
-  AND t.BatchProduct_ID = @bpId
   AND ts.Step_Type = @stepType
+  AND t.BatchProduct_ID IN (
+      SELECT bp2.ID
+      FROM batches_products bp2
+      WHERE bp2.IsActive = 1
+        AND bp2.Batch_Id = (
+            SELECT bp0.Batch_Id
+            FROM batches_products bp0
+            WHERE bp0.ID = @bpId
+            LIMIT 1
+        )
+        AND bp2.Version_Id = (
+            SELECT bp0.Version_Id
+            FROM batches_products bp0
+            WHERE bp0.ID = @bpId
+            LIMIT 1
+        )
+  )
 ORDER BY ts.Step_Order, t.ID;
 ";
     cmd.Parameters.Add(new MySqlParameter("@bpId", batchProductId));
@@ -1903,14 +1931,18 @@ ORDER BY ts.Step_Order, t.ID;
                 Done          = r.IsDBNull(4) ? 0 : r.GetInt32(4),
                 TopPartStepId = r.GetInt32(5),
                 ProductToPartId = r.GetInt32(6),
-                StartedAt     = r.IsDBNull(7) ? (DateTime?)null : r.GetDateTime(7),
-                FinishedAt    = r.IsDBNull(8) ? (DateTime?)null : r.GetDateTime(8),
-                Comment = r.IsDBNull(9) ? null : r.GetString(9),
-                IsCommentForEmployee = !r.IsDBNull(10) && r.GetBoolean(10),
-                PartName = r.IsDBNull(11) ? null : r.GetString(11),
-                RalName = r.IsDBNull(12) ? null : r.GetString(12),
-                ParentBatchProductId = r.IsDBNull(13) ? (int?)null : r.GetInt32(13),
-                ProductToPartId_BP   = r.IsDBNull(14) ? (int?)null : r.GetInt32(14),   
+                TopPartId     = r.GetInt32(7),
+                TopPartIdRaw  = r.GetInt32(8),
+                StartedAt     = r.IsDBNull(9) ? (DateTime?)null : r.GetDateTime(9),
+                FinishedAt    = r.IsDBNull(10) ? (DateTime?)null : r.GetDateTime(10),
+                Comment = r.IsDBNull(11) ? null : r.GetString(11),
+                IsCommentForEmployee = !r.IsDBNull(12) && r.GetBoolean(12),
+                PartName = r.IsDBNull(13) ? null : r.GetString(13),
+                RalName = r.IsDBNull(14) ? null : r.GetString(14),
+                ParentBatchProductId = r.IsDBNull(15) ? (int?)null : r.GetInt32(15),
+                ProductToPartId_BP   = r.IsDBNull(16) ? (int?)null : r.GetInt32(16),   
+                BatchPlannedQty = r.IsDBNull(17) ? 0 : r.GetInt32(17),
+                QtyPerProduct   = r.IsDBNull(18) ? 0 : r.GetInt32(18),  
             });
 
     }
