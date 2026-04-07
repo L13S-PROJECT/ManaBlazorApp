@@ -18,7 +18,7 @@ public sealed class ProductBatchRow
     public int Sold { get; set; }
 
     public int Done { get; set; }
-
+    public int DetailsChildTotal { get; set; }
     public int DetailedInProgress { get; set; }
     public int DetailedFinish { get; set; }
     public int AssemblyInProgress { get; set; }

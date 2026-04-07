@@ -1837,7 +1837,173 @@ GROUP BY Batch_Id, Version_Id;
 [HttpGet("list-production-v2")]
 public async Task<IActionResult> GetProductionBatchesRowsV2()
 {
-    return await GetProductionBatchesRows();
+    var conn = _db.Database.GetDbConnection();
+await conn.OpenAsync();
+
+await using var cmd = conn.CreateCommand();
+cmd.CommandText = @"
+SELECT
+    b.ID AS BatchId,
+    b.Batches_Code AS BatchCode,    
+    bp.RootId,
+
+    MIN(bp.RootId) AS BatchProductId,
+
+    bp.Version_Id AS VersionId,
+    p.Product_Name AS ProductName,
+    p.Product_Code AS ProductCode,
+    c.Category_Name AS CategoryName,
+    v.Version_Name AS VersionName,
+
+    MAX(bp.is_priority) AS IsPriority,
+
+    SUM(
+        CASE 
+            WHEN bp.ProductToPart_ID IS NULL 
+            THEN bp.Planned_Qty 
+            ELSE 0 
+        END
+    ) AS Planned,
+
+    MAX(bp.BatchProduct_Comments) AS Comment
+
+, SUM(
+    CASE 
+        WHEN bp.ProductToPart_ID IS NULL 
+        THEN COALESCE(sm.Sold, 0)
+        ELSE 0
+    END
+) AS Sold
+
+, SUM(
+    CASE 
+        WHEN bp.ProductToPart_ID IS NULL 
+        THEN COALESCE(sm.AssemblyDone, 0)
+        ELSE 0
+    END
+) AS Done
+
+, CASE 
+    WHEN SUM(CASE WHEN bp.ProductToPart_ID IS NULL THEN 1 ELSE 0 END) > 0
+    THEN MAX(
+        CASE 
+            WHEN bp.ProductToPart_ID IS NULL 
+            THEN COALESCE(dt.DetailsTotal, 0)
+            ELSE 0
+        END
+    )
+    ELSE 0
+END AS DetailsTotal
+
+, MAX(COALESCE(ch.ChildCount, 0)) AS DetailsChildTotal
+
+FROM (
+    SELECT
+        bp.*,
+        CASE 
+    WHEN EXISTS (
+        SELECT 1
+        FROM batches_products bp2
+        WHERE bp2.Batch_Id = bp.Batch_Id
+          AND bp2.Version_Id = bp.Version_Id
+          AND bp2.ProductToPart_ID IS NULL
+          AND bp2.IsActive = 1
+    )
+    THEN (
+        SELECT bp2.ID
+        FROM batches_products bp2
+        WHERE bp2.Batch_Id = bp.Batch_Id
+          AND bp2.Version_Id = bp.Version_Id
+          AND bp2.ProductToPart_ID IS NULL
+          AND bp2.IsActive = 1
+        LIMIT 1
+    )
+    ELSE bp.ID
+END AS RootId
+
+    FROM batches_products bp
+    WHERE bp.IsActive = 1
+) bp
+JOIN batches b ON b.ID = bp.Batch_Id
+JOIN versions v ON v.ID = bp.Version_Id
+JOIN products p ON p.ID = v.Product_ID
+JOIN categories c ON c.ID = p.Category_ID
+
+LEFT JOIN (
+    SELECT
+        BatchProduct_ID,
+        SUM(CASE WHEN Move_Type = 'SOLD' THEN ABS(Stock_Qty) ELSE 0 END) AS Sold,
+        SUM(CASE WHEN Move_Type = 'ASSEMBLY' THEN Stock_Qty ELSE 0 END)
+        -
+        SUM(CASE WHEN Move_Type = 'SOLD' THEN ABS(Stock_Qty) ELSE 0 END) AS AssemblyDone
+    FROM stock_movements
+    WHERE IsActive = 1
+    GROUP BY BatchProduct_ID
+) sm ON sm.BatchProduct_ID = bp.ID
+AND bp.ProductToPart_ID IS NULL
+
+LEFT JOIN (
+    SELECT
+        v.ID AS VersionId,
+        COUNT(DISTINCT ptp.ID) AS DetailsTotal
+    FROM versions v
+    JOIN producttopparts ptp 
+        ON ptp.Version_ID = v.ID
+        AND ptp.IsActive = 1
+    WHERE ptp.IsActive = 1
+    GROUP BY v.ID
+) dt ON dt.VersionId = bp.Version_Id
+
+LEFT JOIN (
+    SELECT
+        bp.Batch_Id,
+        bp.Version_Id,
+        COUNT(DISTINCT bp.ProductToPart_ID) AS ChildCount
+    FROM batches_products bp
+    WHERE bp.ProductToPart_ID IS NOT NULL
+      AND bp.IsActive = 1
+    GROUP BY bp.Batch_Id, bp.Version_Id
+) ch 
+ON ch.Batch_Id = bp.Batch_Id 
+AND ch.Version_Id = bp.Version_Id
+
+WHERE bp.IsActive = 1
+  AND b.IsActive = 1
+  AND b.Batches_Statuss = 1
+
+GROUP BY
+    bp.Batch_Id,
+    bp.Version_Id
+
+ORDER BY b.ID DESC;
+";
+
+var list = new List<object>();
+
+await using var r = await cmd.ExecuteReaderAsync();
+while (await r.ReadAsync())
+{
+    list.Add(new
+    {
+        BatchId        = r.GetInt32(0),
+        BatchCode      = r.GetString(1),
+        BatchProductId = r.GetInt32(3), // MIN(bp.ID)
+        VersionId      = r.GetInt32(4),
+        ProductName    = r.GetString(5),
+        ProductCode    = r.GetString(6),
+        CategoryName   = r.GetString(7),
+        VersionName    = r.GetString(8),
+        IsPriority     = r.GetBoolean(9),
+        Planned        = r.GetInt32(10),
+        Comment        = r.IsDBNull(11) ? null : r.GetString(11),
+        Sold   = r.GetInt32(12),
+        Done   = r.GetInt32(13),
+        DetailsTotal = r.GetInt32(14),
+        DetailsChildTotal = r.GetInt32(15)
+    });
+}
+
+return Ok(list);
 }
 
     } // <-- beidzas public class BatchesController

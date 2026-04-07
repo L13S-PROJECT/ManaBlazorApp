@@ -70,10 +70,17 @@
     <td>@b.ProductCode</td>
     <td>@b.VersionName</td>
     <td>@b.Planned</td>
-    <td>@b.Sold</td>
-    <td>@b.Done</td>
-    <td>@($"{b.DetailedStarted}/{b.DetailsTotal}")</td>
-    <td class="ptv3-details-plus"></td>
+    <td>@(b.Planned > 0 ? b.Sold : 0)</td>
+    <td>@(b.Planned > 0 ? b.Done : 0)</td>
+    <td>
+        @(b.DetailsTotal > 0 
+            ? $"0/{b.DetailsTotal}" 
+            : "0/0")
+    </td>
+
+    <td class="ptv3-details-plus">
+        @($"{(b.DetailsChildTotal > 0 ? 0 : 0)}/{b.DetailsChildTotal}")
+    </td>
     <td class="ptv3-col-small @(b.DetailFinish != null ? "ptv3-detail-finish" 
                 : b.DetailStart != null ? "ptv3-detail-start" 
                 : "")">
@@ -182,7 +189,7 @@ private Dictionary<int, string> BatchCodes = new();
 protected override async Task OnInitializedAsync()
 {
         ProductBatches = await Http.GetFromJsonAsync<List<ProductBatchRow>>(
-            "http://localhost:5270/api/batches/list-production"
+            "http://localhost:5270/api/batches/list-production-v2"
         ) ?? new();
 
     AllProducts = await Http.GetFromJsonAsync<List<ProductRow>>(
@@ -328,7 +335,7 @@ private async Task HandleCommentKey(KeyboardEventArgs e)
 private async Task ReloadBatches()
 {
     ProductBatches = await Http.GetFromJsonAsync<List<ProductBatchRow>>(
-        "http://localhost:5270/api/batches/list-production"
+        "http://localhost:5270/api/batches/list-production-v2"
     ) ?? new();
 
     if (SelectedBatch != null)
@@ -342,7 +349,7 @@ private async Task ReloadBatches()
 private async Task ReloadBatchRow(int batchProductId)
 {
     var list = await Http.GetFromJsonAsync<List<ProductBatchRow>>(
-        "http://localhost:5270/api/batches/list-production"
+        "http://localhost:5270/api/batches/list-production-v2"
     ) ?? new();
 
     var updated = list.FirstOrDefault(x => x.BatchProductId == batchProductId);
