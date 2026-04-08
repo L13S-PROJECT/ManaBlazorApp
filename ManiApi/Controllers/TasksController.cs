@@ -2483,6 +2483,221 @@ public async Task<IActionResult> GetWorkCenters()
     return Ok(list);
 }
 
+// GET: /api/tasks/aggregated-by-batch?batchProductId=123&stepType=1
+[HttpGet("aggregated-by-batch")]
+public async Task<IActionResult> GetAggregatedByBatch(
+    [FromQuery] int batchProductId,
+    [FromQuery] int stepType)
+{
+    if (batchProductId <= 0)
+        return BadRequest("batchProductId is required.");
+
+    // TODO: šeit būs agregācijas loģika
+    
+var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+            SELECT
+                t.ID,
+                t.BatchProduct_ID,
+                t.TopPartStep_ID,
+                t.Tasks_Status,
+                t.Assigned_To,
+                t.Claimed_By,
+                t.Started_At,
+                t.Finished_At,
+                1 AS QtyDone,
+                ts.Step_Name,
+                tp.TopPart_Name,
+                ts.ProductToPart_ID
+            FROM tasks t
+            JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+            JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
+            JOIN toppart tp ON tp.ID = ptp.TopPart_ID
+            WHERE t.IsActive = 1
+                AND ts.Step_Type = @stepType
+                AND t.BatchProduct_ID IN (
+                    SELECT bp2.ID
+                    FROM batches_products bp2
+                    WHERE bp2.IsActive = 1
+                    AND bp2.Batch_Id = (
+                        SELECT bp0.Batch_Id
+                        FROM batches_products bp0
+                        WHERE bp0.ID = @bp
+                    )
+                    AND bp2.Version_Id = (
+                        SELECT bp0.Version_Id
+                        FROM batches_products bp0
+                        WHERE bp0.ID = @bp
+                    )
+                );";
+
+    cmd.Parameters.Add(new MySqlParameter("@bp", batchProductId));
+    cmd.Parameters.Add(new MySqlParameter("@stepType", stepType));
+
+        await using var cmdQty = conn.CreateCommand();
+cmdQty.CommandText = @" 
+SELECT 
+    ptp.ID AS ProductToPartId,
+
+    (
+        SELECT bp2.Planned_Qty
+        FROM batches_products bp2
+        WHERE bp2.Batch_Id = (
+            SELECT Batch_Id FROM batches_products WHERE ID = @bp LIMIT 1
+        )
+        AND bp2.Version_Id = (
+            SELECT Version_Id FROM batches_products WHERE ID = @bp LIMIT 1
+        )
+        AND bp2.ProductToPart_ID IS NULL
+        LIMIT 1
+    ) AS ParentQty,
+
+    SUM(
+        CASE 
+            WHEN bp.ProductToPart_ID = ptp.ID 
+            THEN bp.Planned_Qty 
+            ELSE 0 
+        END
+    ) AS ChildQty
+
+FROM batches_products bp
+
+JOIN producttopparts ptp 
+    ON ptp.Version_ID = bp.Version_Id
+    AND ptp.IsActive = 1
+
+JOIN toppartsteps ts 
+    ON ts.ProductToPart_ID = ptp.ID
+    AND ts.IsActive = 1
+
+JOIN stage_step_type_map m
+    ON m.Step_Type_ID = ts.Step_Type
+    AND m.Stage = 1
+    AND m.IsActive = 1
+
+WHERE bp.Batch_Id = (
+    SELECT Batch_Id FROM batches_products WHERE ID = @bp LIMIT 1
+)
+
+GROUP BY ptp.ID;
+";
+
+cmdQty.Parameters.Add(new MySqlParameter("@bp", batchProductId));
+
+var rawTasks = new List<RawTaskRow>();
+
+await using var r = await cmd.ExecuteReaderAsync();
+while (await r.ReadAsync())
+{
+    rawTasks.Add(new RawTaskRow
+        {
+            TaskId = r.GetInt32(0),
+            BatchProductId = r.GetInt32(1),
+            TopPartStepId = r.GetInt32(2),
+            Status = r.GetInt32(3),
+            Assigned_To = r.IsDBNull(4) ? (int?)null : r.GetInt32(4),
+            Claimed_By = r.IsDBNull(5) ? (int?)null : r.GetInt32(5),
+            StartedAt = r.IsDBNull(6) ? (DateTime?)null : r.GetDateTime(6),
+            FinishedAt = r.IsDBNull(7) ? (DateTime?)null : r.GetDateTime(7),
+            Qty = r.GetInt32(8),
+            StepName = r.IsDBNull(9) ? null : r.GetString(9),
+            TopPartName = r.IsDBNull(10) ? null : r.GetString(10),
+            ProductToPartId = r.GetInt32(11),
+        });
+}
+
+await r.DisposeAsync();
+
+var qtyList = new List<DetailQtyRow>();
+
+await using var r2 = await cmdQty.ExecuteReaderAsync();
+while (await r2.ReadAsync())
+{
+    qtyList.Add(new DetailQtyRow
+    {
+        ProductToPartId = r2.GetInt32(0),
+        ParentQty = r2.GetInt32(1),
+        ChildQty = r2.GetInt32(2)
+    });
+}
+
+var grouped = rawTasks
+    .GroupBy(x => x.TopPartStepId)
+    .ToList();
+
+
+var result = grouped
+    .OrderBy(g => g.Key)   // pagaidām pēc StepId
+    .Select(g => new
+{
+    TopPartStepId = g.Key,
+    TotalQty =
+        qtyList
+            .Where(q => g.Select(x => x.ProductToPartId).Contains(q.ProductToPartId))
+            .Select(q => q.ParentQty + q.ChildQty)
+            .FirstOrDefault(),
+    StepName = g.First().StepName,
+    TopPartName = g.First().TopPartName,
+    ProductToPartId = g.First().ProductToPartId,
+
+    // pagaidām vienkārši – ņemam pirmo
+    Assigned_To =
+        g.Select(x => x.Assigned_To)
+        .Distinct()
+        .Count() == 1
+            ? g.First().Assigned_To
+            : null,
+    Claimed_By =
+        g.Select(x => x.Claimed_By)
+        .Distinct()
+        .Count() == 1
+            ? g.First().Claimed_By
+            : null,
+
+    StartedAt =
+        g.Where(x => x.StartedAt != null)
+        .Min(x => x.StartedAt),
+    FinishedAt =
+        g.All(x => x.FinishedAt != null)
+            ? g.Max(x => x.FinishedAt)
+            : null,
+
+    Status =
+    g.Any(x => x.Status == 2) ? 2 :
+    g.All(x => x.Status == 3) ? 3 :
+    g.All(x => x.Status == 1) ? 1 :
+    5 // statuss gaida.
+}).ToList();
+
+    return Ok(result);
+}
+
+private sealed class RawTaskRow
+{
+    public int TaskId { get; set; }
+    public int BatchProductId { get; set; }
+    public int TopPartStepId { get; set; }
+    public int Status { get; set; }
+    public int? Assigned_To { get; set; }
+    public int? Claimed_By { get; set; }
+    public DateTime? StartedAt { get; set; }
+    public DateTime? FinishedAt { get; set; }
+    public int Qty { get; set; }
+    public string? StepName { get; set; }
+    public string? TopPartName { get; set; }
+    public int ProductToPartId { get; set; }
+}
+
+private sealed class DetailQtyRow
+{
+    public int ProductToPartId { get; set; }
+    public int ParentQty { get; set; }
+    public int ChildQty { get; set; }
+}
+
 public sealed class SetPartPriorityDto
 {
     public int BatchProductId { get; set; }

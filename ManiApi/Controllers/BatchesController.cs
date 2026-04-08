@@ -906,8 +906,9 @@ JOIN toppartsteps ts
      ON ts.ProductToPart_ID = ptp.ID
     AND ts.IsActive = 1
     AND (
-        bp.ProductToPart_ID IS NULL
-        OR ts.Step_Type = 1
+        (bp.ProductToPart_ID IS NULL AND ts.Step_Type IN (1,2))
+        OR
+        (bp.ProductToPart_ID IS NOT NULL AND ts.Step_Type = 1)
     )
 LEFT JOIN tasks t
      ON t.BatchProduct_ID = bp.ID
@@ -920,17 +921,6 @@ WHERE bp.Batch_Id = @bid
     bp.ProductToPart_ID IS NULL
     OR ptp.ID = bp.ProductToPart_ID
         )
-AND NOT (
-    bp.ProductToPart_ID IS NULL
-    AND EXISTS (
-        SELECT 1
-        FROM batches_products bp2
-        WHERE bp2.Batch_Id = bp.Batch_Id
-          AND bp2.Version_Id = bp.Version_Id
-          AND bp2.ProductToPart_ID IS NOT NULL
-          AND bp2.IsActive = 1
-            )
-    )       
   AND t.ID IS NULL;";
 
         var pbid = tcmd.CreateParameter();

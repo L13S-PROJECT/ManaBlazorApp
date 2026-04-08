@@ -782,7 +782,7 @@ if (addProductId.HasValue)
     $"http://localhost:5270/api/products/content?versionId={addProductId.Value}");
 };
 
-var hasChildren = line.SelectedParts?.Any(p => p.Qty > 0) == true;
+var hasChildren = addParts != null && addParts.Any(p => p.IsSelected && p.Qty > 0);
 
 if (line.Planned <= 0 && !hasChildren)
     return;
@@ -795,34 +795,37 @@ var rowData = rows.FirstOrDefault(r => r.VersionId == line.VersionId);
     // 1) JA NAV draftBatchId -> izveidojam batch (status 4) + ieliekam 1. produktu
 if (!draftBatchId.HasValue || forceNewDraft)
 {
+
+    var selectedParts = line.SelectedParts?
+    .Where(p => p.Qty > 0)
+    .ToList() ?? new List<ProductToPartDto>();
+
     var items = new List<object>();
 
-    // ✅ PARENT (tikai ja > 0)
-    if (line.Planned > 0)
+// PARENT
+if (line.Planned > 0)
+{
+    items.Add(new
     {
-        items.Add(new
-        {
-            VersionId = line.VersionId,
-            ProductToPartId = (int?)null,
-            Qty = line.Planned,
-            Comment = line.Comment
-        });
-    }
+        VersionId = line.VersionId,
+        ProductToPartId = (int?)null,
+        Qty = line.Planned,
+        Comment = line.Comment
+    });
+}
 
-    // ✅ CHILDREN
-    if (line.SelectedParts != null)
+// CHILDREN
+foreach (var part in selectedParts)
+{
+    items.Add(new
     {
-        foreach (var part in line.SelectedParts.Where(p => p.Qty > 0))
-        {
-            items.Add(new
-                {
-                    VersionId = line.VersionId,
-                    Qty = part.Qty,
-                    Comment = line.Comment,
-                    SelectedTopPartIds = new List<int> { part.Id }
-                });
-        }
-    }
+        VersionId = line.VersionId,
+        ProductToPartId = part.Id,
+        Qty = part.Qty,
+        Comment = line.Comment
+    });
+}
+    
 
     var createDto = new
     {
@@ -871,9 +874,7 @@ if (!draftBatchId.HasValue || forceNewDraft)
     }
 
     // children
-var selectedParts = line.SelectedParts?
-    .Where(p => p.Qty > 0)
-    .ToList() ?? new();
+
 
 foreach (var part in selectedParts)
 {
@@ -935,7 +936,11 @@ dto.Items = newItems;
 // 3️⃣ jaunās detaļas
 if (line.SelectedParts != null)
 {
-    foreach (var part in line.SelectedParts.Where(p => p.Qty > 0))
+    var selectedParts = (addParts ?? new())
+    .Where(p => p.IsSelected && p.Qty > 0)
+    .ToList();
+
+foreach (var part in selectedParts)
     {
         dto.Items.Add(new DraftItemDto
         {

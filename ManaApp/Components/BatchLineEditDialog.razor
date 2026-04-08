@@ -182,7 +182,9 @@ private async Task SaveClicked()
     var qtyChanged     = _planned != Line.Planned;
     var commentChanged = _comment != Line.Comment;
 
-    if (!qtyChanged && !commentChanged)
+    var partsChanged = Parts.Any(p => p.IsSelected && p.Qty > 0);
+
+    if (!qtyChanged && !commentChanged && !partsChanged)
     {
         if (OnSaved.HasDelegate)
             await OnSaved.InvokeAsync(Line);
