@@ -2619,21 +2619,26 @@ while (await r2.ReadAsync())
     qtyList.Add(new DetailQtyRow
     {
         ProductToPartId = r2.GetInt32(0),
-        ParentQty = r2.GetInt32(1),
-        ChildQty = r2.GetInt32(2)
+        ParentQty = r2.IsDBNull(1) ? 0 : r2.GetInt32(1),
+        ChildQty = r2.IsDBNull(2) ? 0 : r2.GetInt32(2)
     });
 }
 
 var grouped = rawTasks
-    .GroupBy(x => x.TopPartStepId)
+    .GroupBy(x => new 
+        {
+            x.ProductToPartId,
+            x.StepName
+        })
     .ToList();
 
 
 var result = grouped
-    .OrderBy(g => g.Key)   // pagaidām pēc StepId
+    .OrderBy(g => g.First().TopPartName)
+    .ThenBy(g => g.First().StepName)
     .Select(g => new
 {
-    TopPartStepId = g.Key,
+    TopPartStepId = g.First().TopPartStepId,
     TotalQty =
         qtyList
             .Where(q => g.Select(x => x.ProductToPartId).Contains(q.ProductToPartId))
@@ -2673,6 +2678,52 @@ var result = grouped
 }).ToList();
 
     return Ok(result);
+}
+
+[HttpPost("update-assignee-aggregated")]
+public async Task<IActionResult> UpdateAssigneeAggregated([FromBody] UpdateAssigneeAggregatedDto dto)
+{
+    if (dto is null || dto.BatchProductId <= 0 || dto.TopPartStepId <= 0 || dto.ProductToPartId <= 0)
+        return BadRequest();
+
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+UPDATE tasks t
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+SET t.Assigned_To = @emp
+WHERE t.IsActive = 1
+  AND t.BatchProduct_ID IN (
+    SELECT bp2.ID
+    FROM batches_products bp2
+    WHERE bp2.IsActive = 1
+      AND bp2.Batch_Id = (
+          SELECT bp0.Batch_Id FROM batches_products bp0 WHERE bp0.ID = @bp LIMIT 1
+      )
+      AND bp2.Version_Id = (
+          SELECT bp0.Version_Id FROM batches_products bp0 WHERE bp0.ID = @bp LIMIT 1
+      )
+)
+AND t.TopPartStep_ID = @step
+";
+
+    cmd.Parameters.Add(new MySqlParameter("@emp", (object?)dto.Assigned_To ?? DBNull.Value));
+    cmd.Parameters.Add(new MySqlParameter("@bp", dto.BatchProductId));
+    cmd.Parameters.Add(new MySqlParameter("@step", dto.TopPartStepId));
+
+    var affected = await cmd.ExecuteNonQueryAsync();
+
+    return Ok(new { updated = affected });
+}
+
+public sealed class UpdateAssigneeAggregatedDto
+{
+    public int BatchProductId { get; set; }
+    public int TopPartStepId { get; set; }
+    public int ProductToPartId { get; set; }
+    public int? Assigned_To { get; set; }
 }
 
 private sealed class RawTaskRow

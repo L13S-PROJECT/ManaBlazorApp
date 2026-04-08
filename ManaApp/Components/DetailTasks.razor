@@ -15,6 +15,18 @@
     return;
 }
 
+@if (AggregatedTasks.Any())
+{
+    <div style="background:#111; color:#0f0; padding:6px; margin-bottom:6px;">
+        AGG:
+        @foreach (var t in AggregatedTasks)
+        {
+            <div>
+                @t.TopPartName | @t.StepName (@t.TopPartStepId) | @t.TotalQty
+            </div>
+        }
+    </div>
+}
 
 @foreach (var p in Parts)
 {
@@ -95,12 +107,14 @@ else if (hasAnyParent)
 @foreach (var step in p.Steps)
 {
 
-    @if (TasksByStep.TryGetValue((step.Id, p.ProductToPartId), out var tasks))
+@if (TasksByStep.TryGetValue((step.Id, p.ProductToPartId), out var tasks))
+{
+    var t = tasks.First();
+    
+    AggregatedByStep.TryGetValue((step.Id, p.ProductToPartId), out var aggList);
+        var agg = aggList?.FirstOrDefault();
 
-    {
-        @foreach (var t in tasks)
-        {
-            <div class="ptv2-tasks-row sub task">
+    <div class="ptv2-tasks-row sub task">
                 <!-- 1. Nosaukums (tukšs – step jau ir augstāk) -->
                     <div title="@step.StepName">
                         @step.StepName
@@ -122,8 +136,12 @@ else if (hasAnyParent)
                                 }
                                 else
                                 {
-                                    <select value="@t.Assigned_To"
-                                            @onchange="e => OnAssignedChanged(t.TaskId, e)">
+                                    <select value="@(agg?.Assigned_To)"
+                                            @onchange="async e => {
+                                                var val = int.TryParse(e.Value?.ToString(), out var v) ? v : (int?)null;
+                                                agg!.Assigned_To = val;
+                                                await OnAssignedChanged(step.Id, p.ProductToPartId, e);
+                                            }">
                                         <option value="">—</option>
                                         @foreach (var emp in Employees)
                                         {
@@ -186,7 +204,7 @@ else if (hasAnyParent)
             </div>
         }
     }
-}
+
 
 
 }
@@ -232,6 +250,12 @@ private sealed class DetailedIndicatorRow
 
 Dictionary<(int TopPartStepId, int ProductToPartId), List<DetailTaskRow>> TasksByStep
     = new();
+
+Dictionary<(int TopPartStepId, int ProductToPartId), List<DetailTaskAggregatedRow>> AggregatedByStep
+    = new();
+
+
+private List<DetailTaskAggregatedRow> AggregatedTasks = new();
 
 private bool hasAnyParent;
 private bool hasAnyChild;
@@ -290,6 +314,21 @@ if (SelectedBatch?.BatchProductId is int batchProductId2 && batchProductId2 > 0)
     var tasks =
         await Http.GetFromJsonAsync<List<DetailTaskRow>>(tasksUrl)
         ?? new();
+
+    var aggTasks =
+    await Http.GetFromJsonAsync<List<DetailTaskRow>>(
+        $"http://localhost:5270/api/tasks/aggregated-by-batch?batchProductId={bpId}&stepType=1"
+    ) ?? new();
+
+    var aggUrl =
+        $"http://localhost:5270/api/tasks/aggregated-by-batch" +
+        $"?batchProductId={bpId}&stepType=1";
+
+    AggregatedTasks =
+        await Http.GetFromJsonAsync<List<DetailTaskAggregatedRow>>(aggUrl)
+        ?? new();
+
+
     qtyList =
     await Http.GetFromJsonAsync<List<DetailQtyRow>>(
         $"http://localhost:5270/api/batches/detail-qty?batchProductId={bpId}"
@@ -310,13 +349,17 @@ if (SelectedBatch?.BatchProductId is int batchProductId2 && batchProductId2 > 0)
     }
         
     // 3) Grupējam pēc TopPartStep_ID
+
+    // 🔵 RAW taski (esošā loģika)
     TasksByStep = tasks
-        .GroupBy(t => (
-            t.TopPartStepId,
-            t.ProductToPartId
-        ))
+        .GroupBy(t => (t.TopPartStepId, t.ProductToPartId))
         .ToDictionary(g => g.Key, g => g.ToList());
-            
+
+    // 🟢 Aggregated (jaunā loģika)
+    AggregatedByStep = AggregatedTasks
+        .GroupBy(t => (t.TopPartStepId, t.ProductToPartId))
+        .ToDictionary(g => g.Key, g => g.ToList());
+
     // 4) Aprēķinām PART Start / End no taskiem
 foreach (var p in Parts)
 {
@@ -355,30 +398,39 @@ public sealed class EmployeeRow
     public string Name { get; set; } = "";
 }
 
-async Task OnAssignedChanged(int taskId, ChangeEventArgs e)
+async Task OnAssignedChanged(int stepId, int partId, ChangeEventArgs e)
 {
     int? empId =
         int.TryParse(e.Value?.ToString(), out var v)
             ? v
             : (int?)null;
 
-    // 1️⃣ atjaunojam UI modeli
-    foreach (var list in TasksByStep.Values)
-    {
-        var task = list.FirstOrDefault(x => x.TaskId == taskId);
-        if (task != null)
-        {
-            task.Assigned_To = empId;
-            break;
-        }
-    }
+    // UI sync
+    // 🔵 sync raw (lai vecā loģika neplīst)
+        if (TasksByStep.TryGetValue((stepId, partId), out var list))
+            {
+                foreach (var task in list)
+                {
+                    task.Assigned_To = empId;
+                }
+            }
 
-    // 2️⃣ sūtam uz API
+// 🟢 sync aggregated (tas ir tas, ko rāda dropdown)
+        if (AggregatedByStep.TryGetValue((stepId, partId), out var aggList))
+            {
+                foreach (var task in aggList)
+                {
+                    task.Assigned_To = empId;
+                }
+            }
+
     await Http.PostAsJsonAsync(
-        "http://localhost:5270/api/tasks/update-assignee",
+        "http://localhost:5270/api/tasks/update-assignee-aggregated",
         new
         {
-            TaskId = taskId,
+            BatchProductId = SelectedBatch!.BatchProductId,
+            TopPartStepId = stepId,
+            ProductToPartId = partId,
             Assigned_To = empId
         });
 }
@@ -402,6 +454,25 @@ private sealed class DetailTaskRow
     public DateTime? FinishedAt { get; set; }
     public string? Comment { get; set; }
     public bool IsCommentForEmployee { get; set; }
+}
+
+private sealed class DetailTaskAggregatedRow
+{
+    public int TopPartStepId { get; set; }
+    public int ProductToPartId { get; set; }
+
+    public string? StepName { get; set; }
+    public string? TopPartName { get; set; }
+
+    public int TotalQty { get; set; }
+
+    public int? Assigned_To { get; set; }
+    public int? Claimed_By { get; set; }
+
+    public DateTime? StartedAt { get; set; }
+    public DateTime? FinishedAt { get; set; }
+
+    public int Status { get; set; }
 }
 
 private sealed class DetailSummaryRow
@@ -536,6 +607,16 @@ private sealed class DetailQtyRow
     public string TopPartName { get; set; } = "";
     public int ParentQty { get; set; }
     public int ChildQty { get; set; }
+}
+
+int? GetAggregatedAssigned(int stepId, int partId)
+{
+    if (AggregatedByStep.TryGetValue((stepId, partId), out var list))
+    {
+        return list.FirstOrDefault()?.Assigned_To;
+    }
+
+    return null;
 }
 
 }
