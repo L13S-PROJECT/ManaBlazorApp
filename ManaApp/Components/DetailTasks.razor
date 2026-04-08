@@ -15,19 +15,6 @@
     return;
 }
 
-@if (AggregatedTasks.Any())
-{
-    <div style="background:#111; color:#0f0; padding:6px; margin-bottom:6px;">
-        AGG:
-        @foreach (var t in AggregatedTasks)
-        {
-            <div>
-                @t.TopPartName | @t.StepName (@t.TopPartStepId) | @t.TotalQty
-            </div>
-        }
-    </div>
-}
-
 @foreach (var p in Parts)
 {
 <div class="ptv2-tasks-row">
@@ -520,7 +507,8 @@ var activeParts =
     $"http://localhost:5270/api/tasks/active-parts?batchProductId={SelectedBatch!.BatchProductId}"
 ) ?? new();
 
-ActivatedParts.Add(productToPartId);
+ActivatedParts = activeParts.ToHashSet();
+
 await InvokeAsync(StateHasChanged);
 
 // pārlādējam arī indikatorus šai rindai

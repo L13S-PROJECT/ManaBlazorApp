@@ -335,23 +335,25 @@ private TaskRow? _activeTask;
     // kas joprojām ir sarakstā (t.i., nav pabeigts).
 private bool CanStart(TaskRow t)
 {
+    // 1️⃣ Vai šai partijai + detaļai ir iepriekšējais solis, kas nav pabeigts
     var hasPrevNotFinished = tasks.Any(other =>
-        other.BatchCode == t.BatchCode &&
+        other.BatchProductId == t.BatchProductId &&
         other.PartName == t.PartName &&
         other.StepOrder < t.StepOrder &&
         other.Status != 3);
 
-    var hasHigherBatchPriority = tasks.Any(other =>
-    other.BatchPriority &&
-    !t.BatchPriority &&
-    other.Status == 1 &&
-    !tasks.Any(prev =>
-        prev.BatchCode == other.BatchCode &&
-        prev.PartName == other.PartName &&
-        prev.StepOrder < other.StepOrder &&
-        prev.Status != 3));
+    // 2️⃣ Vai ir augstākas prioritātes darbs, ko var sākt
+    var hasHigherPriority = tasks.Any(other =>
+        other.Status == 1 &&
+        other.BatchPriority &&
+        !t.BatchPriority &&
+        !tasks.Any(prev =>
+            prev.BatchProductId == other.BatchProductId &&
+            prev.PartName == other.PartName &&
+            prev.StepOrder < other.StepOrder &&
+            prev.Status != 3));
 
-    return !hasPrevNotFinished && !hasHigherBatchPriority;
+    return !hasPrevNotFinished && !hasHigherPriority;
 }
 
 private void SelectTask(TaskRow task)

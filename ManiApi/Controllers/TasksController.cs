@@ -107,17 +107,6 @@ JOIN producttopparts  ptp  ON ptp.ID = ts.ProductToPart_ID
 JOIN toppart          tp   ON tp.ID  = ptp.TopPart_ID
 WHERE t.IsActive = 1
   AND t.Tasks_Status IN (1,2)
-AND NOT EXISTS (
-    SELECT 1
-    FROM tasks t2
-    JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
-    WHERE t2.BatchProduct_ID = t.BatchProduct_ID
-      AND ts2.ProductToPart_ID = ts.ProductToPart_ID
-      AND ts2.Step_Order < ts.Step_Order
-      AND t2.Tasks_Status <> 3
-      AND t2.IsActive = 1
-)
-
 AND (
     (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To IS NULL))
  OR (@empId = 0 AND t.Assigned_To IS NULL)
@@ -148,11 +137,11 @@ ORDER BY
     pEmp.Value = empId;
     cmd.Parameters.Add(pEmp);
 
-    var list = new List<object>();
+    var rawTasks = new List<TaskRowDto>();
    { await using var r = await cmd.ExecuteReaderAsync();
     while (await r.ReadAsync())
     {
-            list.Add(new
+            rawTasks.Add(new TaskRowDto
 {
     TaskId      = r.GetInt32(0),
     Priority    = r.IsDBNull(1) ? (byte)0 : r.GetByte(1),
@@ -191,7 +180,70 @@ ORDER BY
     }
    }
    
-    return Ok(list);
+    // ⚠️ pagaidu – atgriežam raw + sagatavosim vietu agregācijai
+var result = rawTasks
+    .GroupBy(t => new { t.BatchProductId, t.PartName, t.StepOrder, t.TaskId })
+    .Select(g =>
+    {
+        var first = g.First();
+
+        return new TaskRowDto
+        {
+            TaskId = first.TaskId,
+            Priority = first.Priority,
+            BatchPriority = first.BatchPriority,
+
+            // 🔑 status loģika (svarīgi!)
+            Status =
+                g.Any(x => x.Status == 2) ? 2 :
+                g.All(x => x.Status == 3) ? 3 :
+                1,
+
+            PriorityLevel = first.PriorityLevel,
+
+            StartedAt = g.Min(x => x.StartedAt),
+            FinishedAt = g.All(x => x.FinishedAt != null)
+                ? g.Max(x => x.FinishedAt)
+                : null,
+
+            IsCommentForEmployee = g.Any(x => x.IsCommentForEmployee),
+            Comment = first.Comment,
+
+            ProductName = first.ProductName,
+            PartName = first.PartName,
+            StepName = first.StepName,
+
+            EstimatedMinutes = g.Sum(x => x.EstimatedMinutes),
+            ActualMinutes = g.Sum(x => x.ActualMinutes),
+            EstimatedTotalMinutes = g.Sum(x => x.EstimatedTotalMinutes),
+            EstimatedStartMinutes = first.EstimatedStartMinutes,
+
+            BatchCode = first.BatchCode,
+
+            Done = g.Sum(x => x.Done),
+            Planned = g.Sum(x => x.Planned),
+
+            Assigned_To = g.Select(x => x.Assigned_To).Distinct().Count() == 1
+                ? first.Assigned_To
+                : null,
+
+            StepOrder = first.StepOrder,
+            StepType = first.StepType,
+
+            BatchId = first.BatchId,
+            VersionId = first.VersionId,
+            BatchProductId = first.BatchProductId
+        };
+    })
+    .OrderBy(t =>
+    t.BatchPriority ? 0 : 1)               // batch priority augšā
+    .ThenByDescending(t => t.Priority)        // task priority
+    .ThenBy(t => t.StepOrder)                 // secība
+    .ThenBy(t => t.TaskId)                    // stabilitāte
+    .ToList();
+
+return Ok(result);
+
 }
 
         // POST: /api/tasks/claim   body: { "taskId": 123, "empId": 101 }
@@ -316,7 +368,7 @@ LIMIT 1;";
 
     var higherExists = await checkOrder.ExecuteScalarAsync() != null;
 
-if (higherExists)
+    if (higherExists)
 {
     Console.WriteLine("BLOCKED BY PRIORITY RULE");
     await tx.RollbackAsync();
@@ -324,20 +376,79 @@ if (higherExists)
     Console.WriteLine($"curIsPriority={currentIsPriority}, curBatchOrder={currentBatchOrder}, curStepOrder={currentStepOrder}");
     return Conflict("Ir augstākas prioritātes darbs.");
 }
+
 }
 
+bool isDetailed = false;
+
+await using (var stepCmd = conn.CreateCommand())
+{
+    stepCmd.Transaction = tx;
+    stepCmd.CommandText = @"
+SELECT ts.Step_Type
+FROM tasks t
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+WHERE t.ID = @id;";
+
+    stepCmd.Parameters.Add(new MySqlParameter("@id", dto.TaskId));
+
+    var obj = await stepCmd.ExecuteScalarAsync();
+    isDetailed = obj != null && Convert.ToInt32(obj) == 1;
+}
     // 2) Pārejam uz statusu 2 šim taskam
     await using (var upd = conn.CreateCommand())
     {
         upd.Transaction = tx;
-        upd.CommandText = @"
-UPDATE tasks 
+        if (isDetailed)
+{
+    upd.CommandText = @"UPDATE tasks 
    SET Tasks_Status = 2, 
        Claimed_By   = @emp,
        Started_At   = CURRENT_TIMESTAMP
- WHERE ID = @taskId 
+ WHERE ID IN (
+    SELECT t2.ID
+    FROM tasks t2
+    JOIN batches_products bp2 ON bp2.ID = t2.BatchProduct_ID
+    JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+    WHERE t2.IsActive = 1
+      AND t2.Tasks_Status = 1
+      AND ts2.ProductToPart_ID = (
+          SELECT ts.ProductToPart_ID
+          FROM tasks t
+          JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+          WHERE t.ID = @taskId
+      )
+      AND t2.BatchProduct_ID IN (
+          SELECT bp3.ID
+          FROM batches_products bp3
+          WHERE bp3.IsActive = 1
+            AND bp3.Batch_Id = (
+                SELECT bp0.Batch_Id FROM batches_products bp0
+                WHERE bp0.ID = (
+                    SELECT BatchProduct_ID FROM tasks WHERE ID = @taskId
+                )
+            )
+            AND bp3.Version_Id = (
+                SELECT bp0.Version_Id FROM batches_products bp0
+                WHERE bp0.ID = (
+                    SELECT BatchProduct_ID FROM tasks WHERE ID = @taskId
+                )
+            )
+      )
+)
    AND Tasks_Status = 1 
    AND IsActive = 1;";
+}
+else
+{
+    upd.CommandText = @"UPDATE tasks 
+   SET Tasks_Status = 2, 
+       Claimed_By   = @emp,
+       Started_At   = CURRENT_TIMESTAMP
+ WHERE ID = @taskId
+   AND Tasks_Status = 1 
+   AND IsActive = 1;";
+}
 
         var pEmp = upd.CreateParameter();
         pEmp.ParameterName = "@emp";
@@ -403,7 +514,39 @@ WHERE t.ID = @id
 await using (var session = conn.CreateCommand())
 {
     session.Transaction = tx;
-    session.CommandText = @"
+session.CommandText = isDetailed ? @"
+INSERT INTO tasks_work_sessions (Task_ID, Employee_ID, StartTime)
+SELECT t2.ID, @emp, CURRENT_TIMESTAMP
+FROM tasks t2
+JOIN batches_products bp2 ON bp2.ID = t2.BatchProduct_ID
+JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+WHERE t2.IsActive = 1
+  AND t2.Tasks_Status = 2
+  AND ts2.ProductToPart_ID = (
+      SELECT ts.ProductToPart_ID
+      FROM tasks t
+      JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+      WHERE t.ID = @taskId
+  )
+  AND t2.BatchProduct_ID IN (
+      SELECT bp3.ID
+      FROM batches_products bp3
+      WHERE bp3.IsActive = 1
+        AND bp3.Batch_Id = (
+            SELECT bp0.Batch_Id FROM batches_products bp0
+            WHERE bp0.ID = (
+                SELECT BatchProduct_ID FROM tasks WHERE ID = @taskId
+            )
+        )
+        AND bp3.Version_Id = (
+            SELECT bp0.Version_Id FROM batches_products bp0
+            WHERE bp0.ID = (
+                SELECT BatchProduct_ID FROM tasks WHERE ID = @taskId
+            )
+        )
+  );"
+:
+@"
 INSERT INTO tasks_work_sessions
     (Task_ID, Employee_ID, StartTime)
 VALUES
@@ -532,19 +675,45 @@ GROUP BY
     int newDoneOut = currentDone;
 
     // 4) Detailed / Assembly – pabeidzam VISU uzreiz
-    if (stepType == 1 || stepType == 2)
+    if (stepType == 1)
+
     {
         var qtyDone = plannedQty * qtyPerProduct;
-
+        newDoneOut = qtyDone;
         await using (var upd = conn.CreateCommand())
         {
             upd.Transaction = tx;
             upd.CommandText = @"
-UPDATE tasks
-   SET Tasks_Status = 3,
-       Finished_At  = CURRENT_TIMESTAMP,
-       Qty_Done     = @qtyDone
- WHERE ID = @id;";
+UPDATE tasks t
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+SET t.Tasks_Status = 3,
+    t.Finished_At  = CURRENT_TIMESTAMP,
+    t.Qty_Done     = @qtyDone
+WHERE t.IsActive = 1
+  AND t.Tasks_Status = 2
+  AND ts.ProductToPart_ID = (
+      SELECT ts2.ProductToPart_ID
+      FROM tasks t2
+      JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+      WHERE t2.ID = @id
+  )
+  AND t.BatchProduct_ID IN (
+      SELECT bp.ID
+      FROM batches_products bp
+      WHERE bp.IsActive = 1
+        AND bp.Batch_Id = (
+            SELECT bp0.Batch_Id FROM batches_products bp0
+            WHERE bp0.ID = (
+                SELECT BatchProduct_ID FROM tasks WHERE ID = @id
+            )
+        )
+        AND bp.Version_Id = (
+            SELECT bp0.Version_Id FROM batches_products bp0
+            WHERE bp0.ID = (
+                SELECT BatchProduct_ID FROM tasks WHERE ID = @id
+            )
+        )
+  );";
             var p1 = upd.CreateParameter(); p1.ParameterName = "@qtyDone"; p1.Value = qtyDone;    upd.Parameters.Add(p1);
             var p2 = upd.CreateParameter(); p2.ParameterName = "@id";      p2.Value = dto.TaskId; upd.Parameters.Add(p2);
             await upd.ExecuteNonQueryAsync();
@@ -564,7 +733,19 @@ UPDATE tasks
 SELECT COUNT(*)
 FROM tasks t
 JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-WHERE t.BatchProduct_ID = @bpId
+WHERE t.BatchProduct_ID IN (
+    SELECT bp.ID
+    FROM batches_products bp
+    WHERE bp.IsActive = 1
+      AND bp.Batch_Id = (
+          SELECT bp0.Batch_Id FROM batches_products bp0
+          WHERE bp0.ID = @bpId
+      )
+      AND bp.Version_Id = (
+          SELECT bp0.Version_Id FROM batches_products bp0
+          WHERE bp0.ID = @bpId
+      )
+)
   AND t.IsActive = 1
   AND ts.Step_Type = 1
   AND t.Tasks_Status <> 3;";
@@ -671,8 +852,10 @@ VALUES
             }
         }
 
-        // 4.2) Assembly īpašais gadījums – kad VISI Assembly soļi pabeigti -> DETAILED -> ASSEMBLY
-        if (stepType == 2 && batchProductId > 0 && versionId > 0)
+    }
+    
+    // 4.2) Assembly īpašais gadījums – kad VISI Assembly soļi pabeigti -> DETAILED -> ASSEMBLY
+    else if (stepType == 2 && batchProductId > 0 && versionId > 0)
         {
             int notFinishedAssembly = 0;
             await using (var cmdCheckAsm = conn.CreateCommand())
@@ -761,7 +944,7 @@ VALUES
                 }
             }
         }
-    }
+    
     else
     {
         // 5) Finishing — apjoms jau ir Qty_Done (no popup), šeit tikai statusu pabeidzam + kustību uz STOCK.
@@ -977,9 +1160,25 @@ UPDATE tasks t
 JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
 SET t.Tasks_Status = 1
 WHERE t.IsActive = 1
-  AND t.Tasks_Status = 5
-  AND t.BatchProduct_ID = @bp
-  AND ts.ProductToPart_ID = @ptp;
+  AND t.Tasks_Status IN (5)
+  AND t.BatchProduct_ID IN (
+    SELECT bp2.ID
+    FROM batches_products bp2
+    WHERE bp2.IsActive = 1
+      AND bp2.Batch_Id = (
+          SELECT bp0.Batch_Id
+          FROM batches_products bp0
+          WHERE bp0.ID = @bp
+          LIMIT 1
+      )
+      AND bp2.Version_Id = (
+          SELECT bp0.Version_Id
+          FROM batches_products bp0
+          WHERE bp0.ID = @bp
+          LIMIT 1
+      )
+)
+  AND ts.ProductToPart_ID = @ptp
 ";
 
     var pBp = cmd.CreateParameter();
@@ -2902,6 +3101,44 @@ public async Task<IActionResult> SetTaskPush([FromBody] SetTaskPushDto dto)
     await _db.SaveChangesAsync();
 
     return Ok(new { updated = true });
+}
+
+private sealed class TaskRowDto
+{
+    public int TaskId { get; set; }
+    public byte Priority { get; set; }
+    public bool BatchPriority { get; set; }
+
+    public int Status { get; set; }
+    public int PriorityLevel { get; set; }
+
+    public DateTime? StartedAt { get; set; }
+    public DateTime? FinishedAt { get; set; }
+
+    public bool IsCommentForEmployee { get; set; }
+    public string? Comment { get; set; }
+
+    public string? ProductName { get; set; }
+    public string? PartName { get; set; }
+    public string? StepName { get; set; }
+
+    public int EstimatedMinutes { get; set; }
+    public int ActualMinutes { get; set; }
+    public int EstimatedTotalMinutes { get; set; }
+    public int EstimatedStartMinutes { get; set; }
+
+    public string? BatchCode { get; set; }
+
+    public int Done { get; set; }
+    public int? Assigned_To { get; set; }
+    public int Planned { get; set; }
+
+    public int StepOrder { get; set; }
+
+    public int StepType { get; set; }
+    public int BatchId { get; set; }
+    public int VersionId { get; set; }
+    public int BatchProductId { get; set; }
 }
 
     }
