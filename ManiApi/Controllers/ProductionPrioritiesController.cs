@@ -38,6 +38,28 @@ public async Task<IActionResult> Get()
                 cmd.CommandText = @"
             SELECT
                 bp.ID            AS BatchProductId,
+                (
+                    CASE 
+                        WHEN EXISTS (
+                            SELECT 1
+                            FROM batches_products bp2
+                            WHERE bp2.Batch_Id = bp.Batch_Id
+                            AND bp2.Version_Id = bp.Version_Id
+                            AND bp2.ProductToPart_ID IS NULL
+                            AND bp2.IsActive = 1
+                        )
+                        THEN (
+                            SELECT bp2.ID
+                            FROM batches_products bp2
+                            WHERE bp2.Batch_Id = bp.Batch_Id
+                            AND bp2.Version_Id = bp.Version_Id
+                            AND bp2.ProductToPart_ID IS NULL
+                            AND bp2.IsActive = 1
+                            LIMIT 1
+                        )
+                        ELSE bp.ID
+                    END
+                ) AS RootId,
                 b.Batches_Code   AS BatchCode,
                 bp.Version_Id    AS VersionId,
                 p.Product_Code   AS ProductCode,
@@ -257,30 +279,31 @@ agg.FinishingStatus3,
                     list.Add(new
                 {
                     BatchProductId      = reader.GetInt32(0),
-                    BatchCode = reader.GetString(1),
-                    VersionId           = reader.GetInt32(2),
-                    ProductCode         = reader.GetString(3),
-                    ProductName         = reader.GetString(4),
-                    CategoryName        = reader.IsDBNull(5) ? "" : reader.GetString(5),
-                    VersionName         = reader.GetString(6),
-                    Planned             = reader.GetInt32(7),
-                    IsPriority          = reader.GetBoolean(8),
-                    Priority = Convert.ToInt32(reader.GetValue(9)),
-                    NormalOrder = Convert.ToInt32(reader.GetValue(10)),
-                    DetailedY = reader.GetInt32(11),
-                    DetailedX = reader.GetInt32(12),
-                    DetailedStartedX    = reader.GetInt32(13),
-                    DetailedDoneX       = reader.GetInt32(14),
-                    DetailedHasStarted  = reader.GetBoolean(15),
-                    DetailedIsDone      = reader.GetBoolean(16),
+                    RootId = reader.GetInt32(1),
+                    BatchCode = reader.GetString(2),
+                    VersionId           = reader.GetInt32(3),
+                    ProductCode         = reader.GetString(4),
+                    ProductName         = reader.GetString(5),
+                    CategoryName        = reader.IsDBNull(6) ? "" : reader.GetString(6),
+                    VersionName         = reader.GetString(7),
+                    Planned             = reader.GetInt32(8),
+                    IsPriority          = reader.GetBoolean(9),
+                    Priority = Convert.ToInt32(reader.GetValue(10)),
+                    NormalOrder = Convert.ToInt32(reader.GetValue(11)),
+                    DetailedY = reader.GetInt32(12),
+                    DetailedX = reader.GetInt32(13),
+                    DetailedStartedX    = reader.GetInt32(14),
+                    DetailedDoneX       = reader.GetInt32(15),
+                    DetailedHasStarted  = reader.GetBoolean(16),
+                    DetailedIsDone      = reader.GetBoolean(17),
 
-                    DetailedInProgress  = reader.GetInt32(17),
-                    DetailedFinish      = reader.GetInt32(18),
-                    Assembly            = reader.GetInt32(19),
-                    Done                = reader.GetInt32(20),
-                    FinishingStatus2 = reader.GetInt32(21),
-                    FinishingStatus3 = reader.GetInt32(22),
-                    FinishingStock   = reader.GetInt32(23),
+                    DetailedInProgress  = reader.GetInt32(18),
+                    DetailedFinish      = reader.GetInt32(19),
+                    Assembly            = reader.GetInt32(20),
+                    Done                = reader.GetInt32(21),
+                    FinishingStatus2 = reader.GetInt32(22),
+                    FinishingStatus3 = reader.GetInt32(23),
+                    FinishingStock   = reader.GetInt32(24),
                 });
 
                 }

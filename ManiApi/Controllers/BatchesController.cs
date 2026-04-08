@@ -133,92 +133,43 @@ if (dto.Items is not null)
     
 foreach (var it in dto.Items)
 {
-    
-if (it.SelectedTopPartIds != null)
-{
-    Console.WriteLine("SelectedTopPartIds: " + string.Join(",", it.SelectedTopPartIds));
-}
-else
-{
-    Console.WriteLine("SelectedTopPartIds: NULL");
-}
-    
+       
     // ✅ JA IR izvēlēti child (TopParts)
-    if (it.SelectedTopPartIds != null && it.SelectedTopPartIds.Any())
-    {
-                foreach (var ptpId in it.SelectedTopPartIds)
-                {
-                    await using var row = conn.CreateCommand();
-                    row.Transaction = tx;
+    await using var row = conn.CreateCommand();
+row.Transaction = tx;
 
-                    row.CommandText = @"
-        INSERT INTO batches_products
-            (Batch_Id, Version_Id, ProductToPart_ID, Planned_Qty, Done_Qty, Priority, BatchProduct_Comments, IsActive)
-        VALUES
-            (@bid, @vid, @ptpId, @qty, 0, 0, @comment, 1);";
+row.CommandText = @"
+INSERT INTO batches_products
+    (Batch_Id, Version_Id, ProductToPart_ID, Planned_Qty, Done_Qty, Priority, BatchProduct_Comments, IsActive)
+VALUES
+    (@bid, @vid, @ptpId, @qty, 0, 0, @comment, 1);";
 
-                    var pb = row.CreateParameter();
-                    pb.ParameterName = "@bid";
-                    pb.Value = batchId;
-                    row.Parameters.Add(pb);
+var pb = row.CreateParameter();
+pb.ParameterName = "@bid";
+pb.Value = batchId;
+row.Parameters.Add(pb);
 
-                    var pv = row.CreateParameter();
-                    pv.ParameterName = "@vid";
-                    pv.Value = it.VersionId;
-                    row.Parameters.Add(pv);
+var pv = row.CreateParameter();
+pv.ParameterName = "@vid";
+pv.Value = it.VersionId;
+row.Parameters.Add(pv);
 
-                    var pq = row.CreateParameter();
-                    pq.ParameterName = "@qty";
-                    pq.Value = it.Qty;
-                    row.Parameters.Add(pq);
+var pq = row.CreateParameter();
+pq.ParameterName = "@qty";
+pq.Value = it.Qty;
+row.Parameters.Add(pq);
 
-                    var pc = row.CreateParameter();
-                    pc.ParameterName = "@comment";
-                    pc.Value = (object?)it.Comment ?? DBNull.Value;
-                    row.Parameters.Add(pc);
+var pc = row.CreateParameter();
+pc.ParameterName = "@comment";
+pc.Value = (object?)it.Comment ?? DBNull.Value;
+row.Parameters.Add(pc);
 
-                    var p3 = row.CreateParameter();
-                    p3.ParameterName = "@ptpId";
-                    p3.Value = ptpId; // ✅ child ID
-                    row.Parameters.Add(p3);
+var p3 = row.CreateParameter();
+p3.ParameterName = "@ptpId";
+p3.Value = (object?)it.ProductToPartId ?? DBNull.Value;
+row.Parameters.Add(p3);
 
-                    await row.ExecuteNonQueryAsync();
-                }
-            }
-            else
-            {
-                // ⚠️ fallback (ja nav child izvēlēts)
-                await using var row = conn.CreateCommand();
-                row.Transaction = tx;
-
-                row.CommandText = @"
-        INSERT INTO batches_products
-            (Batch_Id, Version_Id, ProductToPart_ID, Planned_Qty, Done_Qty, Priority, BatchProduct_Comments, IsActive)
-        VALUES
-            (@bid, @vid, NULL, @qty, 0, 0, @comment, 1);";
-
-                var pb = row.CreateParameter();
-                pb.ParameterName = "@bid";
-                pb.Value = batchId;
-                row.Parameters.Add(pb);
-
-                var pv = row.CreateParameter();
-                pv.ParameterName = "@vid";
-                pv.Value = it.VersionId;
-                row.Parameters.Add(pv);
-
-                var pq = row.CreateParameter();
-                pq.ParameterName = "@qty";
-                pq.Value = it.Qty;
-                row.Parameters.Add(pq);
-
-                var pc = row.CreateParameter();
-                pc.ParameterName = "@comment";
-                pc.Value = (object?)it.Comment ?? DBNull.Value;
-                row.Parameters.Add(pc);
-
-                await row.ExecuteNonQueryAsync();
-            }
+await row.ExecuteNonQueryAsync();
         }
 }
 

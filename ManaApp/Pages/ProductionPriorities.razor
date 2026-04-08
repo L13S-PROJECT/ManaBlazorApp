@@ -457,6 +457,7 @@ private class ProductRow
 {
     public string BatchCode { get; set; } = "";
     public int BatchProductId { get; set; }
+    public int RootId { get; set; }
     public int VersionId { get; set; }
 
     public string ProductName { get; set; } = "";
@@ -550,10 +551,10 @@ private void GoToBatch(int batchProductId)
 
 private void StartDrag(ProductRow item)
 {
-    _selectedId = item.BatchProductId;
+    _selectedId = item.RootId;
     _isDragging = true;
 Console.WriteLine($"DRAG START: {item.BatchProductId} | priority: {_draggingPriority}");
-    _draggingPriority = _priorityList.Any(x => x.BatchProductId == item.BatchProductId);
+    _draggingPriority = _priorityList.Any(x => x.RootId == item.RootId);
 
     StateHasChanged();
 }
@@ -563,16 +564,24 @@ private void OnDragEnter(ProductRow target)
     if (!_isDragging || _selectedId == null || !_draggingPriority)
         return;
 
-    var currentIndex = _priorityList.FindIndex(x => x.BatchProductId == _selectedId);
-    var newIndex = _priorityList.FindIndex(x => x.BatchProductId == target.BatchProductId);
+        var movingGroup = _priorityList
+            .Where(x => x.RootId == _selectedId)
+            .ToList();
 
-    if (currentIndex == -1 || newIndex == -1 || currentIndex == newIndex)
-        return;
+        if (!movingGroup.Any())
+            return;
 
-    var item = _priorityList[currentIndex];
+        var targetIndex = _priorityList
+            .FindIndex(x => x.BatchProductId == target.BatchProductId);
 
-    _priorityList.RemoveAt(currentIndex);
-    _priorityList.Insert(newIndex, item);
+        if (targetIndex == -1)
+            return;
+
+        // noņem visu grupu
+        _priorityList.RemoveAll(x => x.RootId == _selectedId);
+
+        // ievieto visu grupu vienā vietā
+        _priorityList.InsertRange(targetIndex, movingGroup);
 
     StateHasChanged();
 }
