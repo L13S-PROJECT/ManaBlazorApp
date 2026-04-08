@@ -74,13 +74,14 @@
     <td>@(b.Planned > 0 ? b.Done : 0)</td>
     <td>
         @(b.DetailsTotal > 0 
-            ? $"0/{b.DetailsTotal}" 
+            ? $"{b.DetailsDone}/{b.DetailsTotal}" 
             : "0/0")
     </td>
 
     <td class="ptv3-details-plus">
-        @($"{(b.DetailsChildTotal > 0 ? 0 : 0)}/{b.DetailsChildTotal}")
+        @($"{b.DetailsChildDone}/{b.DetailsChildTotal}")
     </td>
+
     <td class="ptv3-col-small @(b.DetailFinish != null ? "ptv3-detail-finish" 
                 : b.DetailStart != null ? "ptv3-detail-start" 
                 : "")">

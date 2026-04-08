@@ -1881,6 +1881,14 @@ SELECT
 END AS DetailsTotal
 
 , MAX(COALESCE(ch.ChildCount, 0)) AS DetailsChildTotal
+, CASE 
+    WHEN MAX(CASE WHEN bp.ProductToPart_ID IS NULL THEN 1 ELSE 0 END) = 1
+    THEN MAX(dstat.DetailsChildDone)
+    ELSE 0
+END AS DetailsDone
+, COALESCE(dstat.DetailsChildDone,0) AS DetailsChildDone
+, dtask.DetailStart
+, dtask.DetailFinish
 
 FROM (
     SELECT
@@ -1959,6 +1967,125 @@ LEFT JOIN (
 ON ch.Batch_Id = bp.Batch_Id 
 AND ch.Version_Id = bp.Version_Id
 
+LEFT JOIN (
+    SELECT
+        bp.RootId,
+
+        MIN(CASE 
+            WHEN t.Tasks_Status IN (2,3) AND t.Started_At IS NOT NULL
+            THEN t.Started_At 
+        END) AS DetailStart,
+
+        CASE
+            WHEN COALESCE(SUM(CASE WHEN t.Tasks_Status IN (1,2,5) THEN 1 ELSE 0 END),0) = 0
+            THEN MAX(t.Finished_At)
+            ELSE NULL
+        END AS DetailFinish
+
+    FROM (
+        SELECT
+            bp.*,
+            CASE 
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM batches_products bp2
+                    WHERE bp2.Batch_Id = bp.Batch_Id
+                      AND bp2.Version_Id = bp.Version_Id
+                      AND bp2.ProductToPart_ID IS NULL
+                      AND bp2.IsActive = 1
+                )
+                THEN (
+                    SELECT bp2.ID
+                    FROM batches_products bp2
+                    WHERE bp2.Batch_Id = bp.Batch_Id
+                      AND bp2.Version_Id = bp.Version_Id
+                      AND bp2.ProductToPart_ID IS NULL
+                      AND bp2.IsActive = 1
+                    LIMIT 1
+                )
+                ELSE bp.ID
+            END AS RootId
+        FROM batches_products bp
+        WHERE bp.IsActive = 1
+    ) bp
+
+    LEFT JOIN tasks t 
+            ON t.BatchProduct_ID IN (
+                SELECT bp2.ID
+                FROM batches_products bp2
+                WHERE bp2.Batch_Id = bp.Batch_Id
+                AND bp2.Version_Id = bp.Version_Id
+                AND bp2.IsActive = 1
+            )
+            AND t.IsActive = 1
+
+    GROUP BY bp.RootId
+) dtask ON dtask.RootId = bp.RootId
+
+LEFT JOIN (
+    SELECT
+        bp.Batch_Id,
+        bp.Version_Id,
+
+        -- Parent gatavie (visi step=3)
+SUM(
+    CASE 
+        WHEN bp.ProductToPart_ID IS NULL
+         AND EXISTS (
+             SELECT 1
+             FROM batches_products bp2
+             WHERE bp2.Batch_Id = bp.Batch_Id
+               AND bp2.Version_Id = bp.Version_Id
+               AND bp2.IsActive = 1
+         )
+         AND NOT EXISTS (
+             SELECT 1
+             FROM tasks t
+             WHERE t.BatchProduct_ID IN (
+                 SELECT bp2.ID
+                 FROM batches_products bp2
+                 WHERE bp2.Batch_Id = bp.Batch_Id
+                   AND bp2.Version_Id = bp.Version_Id
+                   AND bp2.IsActive = 1
+             )
+             AND t.IsActive = 1
+             AND t.Tasks_Status <> 3
+         )
+        THEN 1 ELSE 0
+    END
+) AS DetailsDone,
+
+        -- Child gatavie
+        SUM(
+            CASE 
+                WHEN bp.ProductToPart_ID IS NOT NULL
+                 AND CASE 
+    WHEN EXISTS (
+        SELECT 1
+        FROM tasks t
+        WHERE t.BatchProduct_ID = bp.ID
+          AND t.IsActive = 1
+    )
+    AND NOT EXISTS (
+        SELECT 1
+        FROM tasks t
+        WHERE t.BatchProduct_ID = bp.ID
+          AND t.IsActive = 1
+          AND t.Tasks_Status <> 3
+    )
+    THEN 1 ELSE 0
+END
+                THEN 1 ELSE 0
+            END
+        ) AS DetailsChildDone
+
+    FROM batches_products bp
+    WHERE bp.IsActive = 1
+    GROUP BY bp.Batch_Id, bp.Version_Id
+) dstat
+ON dstat.Batch_Id = bp.Batch_Id
+AND dstat.Version_Id = bp.Version_Id
+
 WHERE bp.IsActive = 1
   AND b.IsActive = 1
   AND b.Batches_Statuss = 1
@@ -1992,7 +2119,11 @@ while (await r.ReadAsync())
         Sold   = r.GetInt32(13),
         Done   = r.GetInt32(14),
         DetailsTotal = r.GetInt32(15),
-        DetailsChildTotal = r.GetInt32(16)
+        DetailsChildTotal = r.GetInt32(16),
+        DetailsDone = r.GetInt32(17),
+        DetailsChildDone = r.GetInt32(18),
+        DetailStart  = r.IsDBNull(19) ? (DateTime?)null : r.GetDateTime(19),
+        DetailFinish = r.IsDBNull(20) ? (DateTime?)null : r.GetDateTime(20),
     });
 }
 

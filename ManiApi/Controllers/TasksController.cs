@@ -57,7 +57,7 @@ END AS PriorityLevel,
 
   p.Product_Name,            -- 7 ProductName
   tp.TopPart_Name,           -- 8 PartName
-
+    ts.ProductToPart_ID,
 ts.Step_Name,
 
 ts.Estimated_Minutes,
@@ -158,38 +158,45 @@ ORDER BY
 
     ProductName = r.IsDBNull(10) ? null : r.GetString(10),
     PartName    = r.IsDBNull(11) ? null : r.GetString(11),
-    StepName    = r.IsDBNull(12) ? null : r.GetString(12),
+    ProductToPartId = r.IsDBNull(12) ? 0 : r.GetInt32(12),
+    StepName    = r.IsDBNull(13) ? null : r.GetString(13),
 
-    EstimatedMinutes = r.IsDBNull(13) ? 0 : r.GetInt32(13),
-    ActualMinutes    = r.IsDBNull(14) ? 0 : r.GetInt32(14),
-    EstimatedTotalMinutes = r.IsDBNull(15) ? 0 : r.GetInt32(15),
-    EstimatedStartMinutes = r.IsDBNull(16) ? 0 : r.GetInt32(16),
+    EstimatedMinutes = r.IsDBNull(14) ? 0 : r.GetInt32(14),
+    ActualMinutes    = r.IsDBNull(15) ? 0 : r.GetInt32(15),
+    EstimatedTotalMinutes = r.IsDBNull(16) ? 0 : r.GetInt32(16),
+    EstimatedStartMinutes = r.IsDBNull(17) ? 0 : r.GetInt32(17),
 
-    BatchCode   = r.IsDBNull(17) ? null : r.GetString(17),
+    BatchCode   = r.IsDBNull(18) ? null : r.GetString(18),
 
-    Done    = r.IsDBNull(18) ? 0 : r.GetInt32(18),
-    Assigned_To = r.IsDBNull(19) ? (int?)null : r.GetInt32(19),
-    Planned = r.IsDBNull(20) ? 0 : r.GetInt32(20),
-    StepOrder   = r.IsDBNull(21) ? 0 : r.GetInt32(21),
+    Done    = r.IsDBNull(19) ? 0 : r.GetInt32(19),
+    Assigned_To = r.IsDBNull(20) ? (int?)null : r.GetInt32(20),
+    Planned = r.IsDBNull(21) ? 0 : r.GetInt32(21),
+    StepOrder   = r.IsDBNull(22) ? 0 : r.GetInt32(22),
 
-    StepType       = r.IsDBNull(22) ? 0 : r.GetInt32(22),
-    BatchId        = r.IsDBNull(23) ? 0 : r.GetInt32(23),
-    VersionId      = r.IsDBNull(24) ? 0 : r.GetInt32(24),
-    BatchProductId = r.IsDBNull(25) ? 0 : r.GetInt32(25)
+    StepType       = r.IsDBNull(23) ? 0 : r.GetInt32(23),
+    BatchId        = r.IsDBNull(24) ? 0 : r.GetInt32(24),
+    VersionId      = r.IsDBNull(25) ? 0 : r.GetInt32(25),
+    BatchProductId = r.IsDBNull(26) ? 0 : r.GetInt32(26),
     });
     }
    }
    
-    // ⚠️ pagaidu – atgriežam raw + sagatavosim vietu agregācijai
+   
 var result = rawTasks
-    .GroupBy(t => new { t.BatchProductId, t.PartName, t.StepOrder, t.TaskId })
+    .GroupBy(t => new 
+        { 
+            t.BatchId,
+            t.VersionId,
+            t.ProductToPartId,
+            t.StepType
+        })
     .Select(g =>
     {
         var first = g.First();
 
         return new TaskRowDto
         {
-            TaskId = first.TaskId,
+            TaskId = g.Min(x => x.TaskId),
             Priority = first.Priority,
             BatchPriority = first.BatchPriority,
 
@@ -240,6 +247,36 @@ var result = rawTasks
     .ThenByDescending(t => t.Priority)        // task priority
     .ThenBy(t => t.StepOrder)                 // secība
     .ThenBy(t => t.TaskId)                    // stabilitāte
+    .ToList();
+
+result = result
+    .GroupBy(t => new 
+    { 
+        t.BatchProductId, 
+        t.PartName, 
+        t.StepName,
+        t.StepType
+    })
+    .Select(g =>
+    {
+        if (g.Key.StepType != 1)
+            return g.First(); // tikai DETAIL agregējam
+
+        var list = g.ToList();
+
+        var baseTask = list.First();
+
+        baseTask.Planned = list.Sum(x => x.Planned);
+        baseTask.Done = list.Sum(x => x.Done);
+
+        baseTask.Status = list.Any(x => x.Status == 2) ? 2 :
+                        list.Any(x => x.Status == 1) ? 1 : 3;
+
+        baseTask.BatchPriority = list.Any(x => x.BatchPriority);
+        baseTask.Priority = list.Max(x => x.Priority);
+
+        return baseTask;
+    })
     .ToList();
 
 return Ok(result);
@@ -3108,7 +3145,7 @@ private sealed class TaskRowDto
     public int TaskId { get; set; }
     public byte Priority { get; set; }
     public bool BatchPriority { get; set; }
-
+    public int ProductToPartId { get; set; }
     public int Status { get; set; }
     public int PriorityLevel { get; set; }
 

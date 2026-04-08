@@ -35,5 +35,8 @@ public sealed class ProductBatchRow
     public int FinStatus1 { get; set; }
     public int FinStatus2 { get; set; } 
     public int FinStatus3 { get; set; } 
+    public int DetailsDone { get; set; }
+    public int DetailsChildDone { get; set; }
+
 }
 
