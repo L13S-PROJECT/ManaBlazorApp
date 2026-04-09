@@ -10,10 +10,7 @@ public class BatchProduct
 
     public int Batch_Id { get; set; }
 
-   [Column("ProductToPart_ID")]
-    public int ProductTopPart_Id { get; set; }
-
-    public int Version_Id { get; set; }
+     public int Version_Id { get; set; }
 
     public int Planned_Qty { get; set; }
 
@@ -25,4 +22,6 @@ public class BatchProduct
 
     public int Priority { get; set; }
     public int NormalOrder { get; set; }
+    public int? ProductToPart_ID { get; set; }
+
 }

@@ -152,7 +152,7 @@ public async Task<IActionResult> GetPlannedParts([FromQuery] int versionId)
                 from bp in _db.BatchProducts
 
                 join ptp in _db.ProductTopParts
-                    on bp.ProductTopPart_Id equals ptp.Id into ptpGroup
+                    on bp.ProductToPart_ID equals ptp.Id into ptpGroup
                 from ptp in ptpGroup.DefaultIfEmpty()
 
                 join tp in _db.TopParts
@@ -166,7 +166,7 @@ public async Task<IActionResult> GetPlannedParts([FromQuery] int versionId)
                 group bp by new 
                 { 
                     bp.Version_Id, 
-                    TopPartId = tp != null ? tp.Id : bp.ProductTopPart_Id 
+                    TopPartId = tp != null ? tp.Id : bp.ProductToPart_ID 
                 } into g
 
                 select new

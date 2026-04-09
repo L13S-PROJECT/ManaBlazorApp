@@ -45,13 +45,17 @@
     border-bottom:1px solid #e5e7eb;
 }
 
+
 .priority-row{
     padding:3px 0;
     border-bottom:1px solid #f1f5f9;
     transition:
-    background .18s ease,
-    box-shadow .18s ease,
-    transform .12s ease;
+    background .12s ease,
+    box-shadow .12s ease;
+}
+
+.priority-row.dragging{
+    will-change: transform;
 }
 
 .priority-row.dragging{

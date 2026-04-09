@@ -70,14 +70,17 @@ else
 <div class="priority-body"
      @onmouseup="EndDrag">
 
-@foreach (var p in _priorityList.Where(FilterProduct).ToList())
+@foreach (var p in _priorityList
+    .Where(FilterProduct)
+    .Where(p => !p.IsChild || (p.IsChild && !p.HasParent))
+    .ToList())
 {
     
         {
                    
                     <div @key="p.BatchProductId"
                         class="priority-row priority-grid
-                            @( _selectedId == p.BatchProductId ? "dragging" : "" )"
+                            @( _selectedId == p.RootId ? "dragging" : "" )"
                        @onmousemove="() => OnDragEnter(p)">
                         <div class="priority-drag-cell"
                             @onmousedown="() => StartDrag(p)"
@@ -86,7 +89,17 @@ else
                         </div>
                         <div>@p.BatchCode</div>
                         <div>@p.ProductCode</div>
-                        <div>@p.ProductName</div>
+                        <div>
+                            @p.ProductName
+                            @if (p.HasParent && !p.IsChild)
+                            {
+                                <span style="margin-left:4px;">+</span>
+                            }
+                            @if (!p.HasParent && !p.IsChild && !p.IsParentProduct)
+                            {
+                                <span style="margin-left:4px;">*</span>
+                            }
+                        </div>
                         <div>@p.CategoryName</div>
                         <div>@p.VersionName</div>
                         <div>@p.Done / @p.Planned</div>
@@ -202,11 +215,14 @@ else
 <div class="priority-body"
      @onmouseup="EndDrag">
 
-@foreach (var p in _normalList.Where(FilterProduct).ToList())
+@foreach (var p in _normalList
+    .Where(FilterProduct)
+    .Where(p => !p.IsChild || (p.IsChild && !p.HasParent))
+    .ToList())
 {
     <div @key="p.BatchProductId"
      class="priority-row priority-grid
-        @( _selectedId == p.BatchProductId ? "dragging" : "" )"
+        @( _selectedId == p.RootId ? "dragging" : "" )"
      @onmousemove="() => OnDragEnterNormal(p)">
 
                 <div class="priority-drag-cell"
@@ -217,7 +233,17 @@ else
 
                 <div>@p.BatchCode</div>
                 <div>@p.ProductCode</div>
-                <div>@p.ProductName</div>
+                <div>
+                    @p.ProductName
+                    @if (p.HasParent && !p.IsChild)
+                    {
+                        <span style="margin-left:4px;">+</span>
+                    }
+                    @if (!p.HasParent && !p.IsChild && !p.IsParentProduct)
+                    {
+                        <span style="margin-left:4px;">*</span>
+                    }
+                </div>
                 <div>@p.CategoryName</div>
                 <div>@p.VersionName</div>
                 <div>@p.Done / @p.Planned</div>
@@ -354,12 +380,14 @@ else
 private IEnumerable<ProductRow> PriorityProducts =>
     products?
         .Where(p => p.IsPriority)
+        .Where(p => !p.IsChild || (p.IsChild && !p.HasParent))
         .Where(FilterProduct)
     ?? Enumerable.Empty<ProductRow>();
 
 private IEnumerable<ProductRow> NormalProducts =>
     products?
         .Where(p => !p.IsPriority)
+        .Where(p => !p.IsChild || (p.IsChild && !p.HasParent))
         .Where(FilterProduct)
     ?? Enumerable.Empty<ProductRow>();
 
@@ -376,17 +404,42 @@ private async Task LoadProducts()
     products = await Http.GetFromJsonAsync<List<ProductRow>>(
     "http://localhost:5270/api/production-priorities");
 
-    _priorityList = products?
-    .Where(p => p.IsPriority)
-    .OrderBy(p => p.Priority)
-    .ToList()
-    ?? new List<ProductRow>();
-    
-    _normalList = products?
-        .Where(p => !p.IsPriority)
-        .OrderBy(p => p.NormalOrder == 0 ? int.MaxValue : p.NormalOrder)
-        .ToList()
-        ?? new List<ProductRow>();
+    if (products != null)
+        {
+            var groups = products.GroupBy(x => x.RootId);
+
+            foreach (var g in groups)
+            {
+                var hasParentRow = g.Any(x => x.BatchProductId == x.RootId);
+                var hasChildRows = g.Any(x => x.BatchProductId != x.RootId);
+
+                foreach (var item in g)
+                    {
+                        item.IsChild = item.BatchProductId != item.RootId;
+
+                        // tikai ja IR gan parent gan child → tas ir "Parent+Child"
+                        item.HasParent = hasParentRow && hasChildRows;
+                    }
+            }
+        }
+
+        _priorityList = products?
+            .Where(p => p.IsPriority)
+            .Where(p => !p.IsChild || (p.IsChild && !p.HasParent))
+            .GroupBy(p => p.RootId)
+            .OrderBy(g => g.Min(x => x.Priority))
+            .SelectMany(g => g)
+            .ToList()
+            ?? new List<ProductRow>();
+
+        _normalList = products?
+            .Where(p => !p.IsPriority)
+            .Where(p => !p.IsChild || (p.IsChild && !p.HasParent))
+            .GroupBy(p => p.RootId)
+            .OrderBy(g => g.Min(x => x.NormalOrder == 0 ? int.MaxValue : x.NormalOrder))
+            .SelectMany(g => g)
+            .ToList()
+            ?? new List<ProductRow>();
 
     _batchList = products?
         .Select(p => p.BatchCode)
@@ -459,7 +512,7 @@ private class ProductRow
     public int BatchProductId { get; set; }
     public int RootId { get; set; }
     public int VersionId { get; set; }
-
+    public bool IsParentProduct { get; set; }
     public string ProductName { get; set; } = "";
     public string ProductCode { get; set; } = "";
     public string CategoryName { get; set; } = "";
@@ -484,6 +537,8 @@ private class ProductRow
     public int FinishingStatus2 { get; set; }
     public int FinishingStatus3 { get; set; }
     public int NormalOrder { get; set; }
+    public bool HasParent { get; set; }   // Parent eksistē
+    public bool IsChild { get; set; }     // Šis ir child
 
 }
 
@@ -495,41 +550,79 @@ private async Task SavePriorities()
 
 
 // 1️⃣ Piešķiram secību pēc UI kārtības - Prioritāriem
-    for (int i = 0; i < _priorityList.Count; i++)
+var visiblePriority = _priorityList
+    .Where(x => !x.IsChild || (x.IsChild && !x.HasParent))
+    .ToList();
+
+for (int i = 0; i < visiblePriority.Count; i++)
+{
+    var rootId = visiblePriority[i].RootId;
+
+    foreach (var item in _priorityList.Where(x => x.RootId == rootId))
     {
-        _priorityList[i].Priority = i + 1;
+        item.Priority = i + 1;
     }
+}
 
 // 2️⃣ Piešķiram secību pēc UI kārtības - Normālajiem
 
-    for (int i = 0; i < _normalList.Count; i++)
-        {
-            _normalList[i].NormalOrder = i + 1;
-        }
+var visibleNormal = _normalList
+    .Where(x => !x.IsChild || (x.IsChild && !x.HasParent))
+    .ToList();
 
-    foreach (var p in products)
+for (int i = 0; i < visibleNormal.Count; i++)
 {
+    var rootId = visibleNormal[i].RootId;
+
+    foreach (var item in _normalList.Where(x => x.RootId == rootId))
+    {
+        item.NormalOrder = i + 1;
+    }
+}
+
+foreach (var group in products.GroupBy(x => x.RootId))
+{
+    var first = _priorityList
+        .Where(x => x.RootId == group.Key)
+        .OrderByDescending(x => !x.IsChild) // Parent priekšā
+        .FirstOrDefault()
+    ?? _normalList
+        .Where(x => x.RootId == group.Key)
+        .OrderByDescending(x => !x.IsChild)
+        .FirstOrDefault();
+
+        if (first == null)
+            continue;
+
     int newPriority = 0;
 
-    if (p.IsPriority)
+    if (first.IsPriority)
     {
         var index = _priorityList
-            .FindIndex(x => x.BatchProductId == p.BatchProductId);
+            .Where(x => !x.IsChild || (x.IsChild && !x.HasParent))
+            .ToList()
+            .FindIndex(x => x.RootId == first.RootId);
 
         if (index >= 0)
             newPriority = index + 1;
     }
 
-    await Http.PutAsJsonAsync(
-        $"http://localhost:5270/api/production-priorities/{p.BatchProductId}",
-        new
-        {
-            IsPriority = p.IsPriority,
-            Priority = newPriority,
-            NormalOrder = p.NormalOrder
-        }
-    );
+var target = group
+    .FirstOrDefault(x => !x.IsChild)   // parent ja ir
+    ?? group.First();                  // citādi child-only
 
+await Http.PutAsJsonAsync(
+    $"http://localhost:5270/api/production-priorities/{target.BatchProductId}",
+    new
+    {
+        IsPriority = first.IsPriority,
+        Priority = newPriority,
+        NormalOrder = first.IsPriority ? 0 : _normalList
+            .Where(x => !x.IsChild || (x.IsChild && !x.HasParent))
+            .ToList()
+            .FindIndex(x => x.RootId == first.RootId) + 1
+            }
+);
 }
 
 await LoadProducts();
@@ -551,10 +644,22 @@ private void GoToBatch(int batchProductId)
 
 private void StartDrag(ProductRow item)
 {
-    _selectedId = item.RootId;
+    var group = products?
+        .Where(x => x.RootId == item.RootId)
+        .ToList();
+
+    if (group == null || group.Count == 0)
+        return;
+
+    var main = group
+        .OrderByDescending(x => !x.IsChild) // Parent priekšā
+        .First();
+
+    _selectedId = main.RootId;
+
+    _draggingPriority = _priorityList.Any(x => x.RootId == main.RootId);
+
     _isDragging = true;
-Console.WriteLine($"DRAG START: {item.BatchProductId} | priority: {_draggingPriority}");
-    _draggingPriority = _priorityList.Any(x => x.RootId == item.RootId);
 
     StateHasChanged();
 }
@@ -571,16 +676,19 @@ private void OnDragEnter(ProductRow target)
         if (!movingGroup.Any())
             return;
 
-        var targetIndex = _priorityList
-            .FindIndex(x => x.BatchProductId == target.BatchProductId);
-
-        if (targetIndex == -1)
-            return;
-
         // noņem visu grupu
-        _priorityList.RemoveAll(x => x.RootId == _selectedId);
+        _priorityList = _priorityList
+            .Where(x => x.RootId != _selectedId)
+            .ToList();
 
-        // ievieto visu grupu vienā vietā
+        // pārrēķina index pēc remove
+        var targetIndex = _priorityList
+            .FindIndex(x => x.RootId == target.RootId);
+
+        if (targetIndex < 0)
+            targetIndex = _priorityList.Count;
+
+        // ievieto
         _priorityList.InsertRange(targetIndex, movingGroup);
 
     StateHasChanged();
@@ -597,36 +705,45 @@ private void OnPriorityToggled(ProductRow p, ChangeEventArgs e)
 {
     var isChecked = e?.Value is bool b && b;
 
-    // Atrodam īsto produktu no kopējā saraksta
-    var item = products?.FirstOrDefault(x => x.BatchProductId == p.BatchProductId);
-    if (item == null)
+    var allGroupItems = products?
+        .Where(x => x.RootId == p.RootId)
+        .ToList();
+
+    if (allGroupItems == null || allGroupItems.Count == 0)
         return;
 
-    item.IsPriority = isChecked;
-
-if (isChecked)
-{
-    // noņem no normal list
-    _normalList.RemoveAll(x => x.BatchProductId == item.BatchProductId);
-
-    if (!_priorityList.Any(x => x.BatchProductId == item.BatchProductId))
+    foreach (var item in allGroupItems)
     {
-        _priorityList.Add(item);
+        item.IsPriority = isChecked;
     }
-}
-else
-{
-    // noņem no priority list
-    _priorityList.RemoveAll(x => x.BatchProductId == item.BatchProductId);
 
-    item.Priority = 0;
+    _priorityList.RemoveAll(x => x.RootId == p.RootId);
+    _normalList.RemoveAll(x => x.RootId == p.RootId);
 
-    // pievieno normal list (beigās)
-    if (!_normalList.Any(x => x.BatchProductId == item.BatchProductId))
+    var groupRows = allGroupItems
+        .Where(x => !x.IsChild || (x.IsChild && !x.HasParent))
+        .OrderByDescending(x => !x.IsChild)
+        .ToList();
+
+    var visibleRow = groupRows.FirstOrDefault();
+
+    if (visibleRow == null)
+        return;
+
+    if (isChecked)
     {
-        _normalList.Add(item);
+        visibleRow.Priority = 0;
+        visibleRow.NormalOrder = 0;
+        _priorityList.AddRange(groupRows);
     }
-}
+    else
+    {
+        visibleRow.Priority = 0;
+        visibleRow.NormalOrder = 0;
+        _normalList.AddRange(groupRows);
+    }
+
+    StateHasChanged();
 }
 
 private string _searchText = "";
@@ -718,16 +835,27 @@ private void OnDragEnterNormal(ProductRow target)
     if (!_isDragging || _selectedId == null || _draggingPriority)
         return;
 
-    var currentIndex = _normalList.FindIndex(x => x.BatchProductId == _selectedId);
-    var newIndex = _normalList.FindIndex(x => x.BatchProductId == target.BatchProductId);
+    var movingGroup = _normalList
+        .Where(x => x.RootId == _selectedId)
+        .ToList();
 
-    if (currentIndex == -1 || newIndex == -1 || currentIndex == newIndex)
+    if (!movingGroup.Any())
         return;
 
-    var item = _normalList[currentIndex];
+            // noņem visu grupu
+        _normalList = _normalList
+            .Where(x => x.RootId != _selectedId)
+            .ToList();
 
-    _normalList.RemoveAt(currentIndex);
-    _normalList.Insert(newIndex, item);
+        // pārrēķina index pēc remove
+        var targetIndex = _normalList
+            .FindIndex(x => x.RootId == target.RootId);
+
+        if (targetIndex < 0)
+            targetIndex = _normalList.Count;
+
+        // ievieto
+        _normalList.InsertRange(targetIndex, movingGroup);
 
     StateHasChanged();
 }

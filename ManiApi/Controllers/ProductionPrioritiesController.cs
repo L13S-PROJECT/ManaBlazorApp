@@ -70,6 +70,7 @@ public async Task<IActionResult> Get()
                 bp.is_priority   AS IsPriority,
                 bp.Priority      AS Priority,
                 bp.NormalOrder   AS NormalOrder,
+                CASE WHEN bp.ProductToPart_ID IS NULL THEN 1 ELSE 0 END AS IsParentProduct,
 
              -- Detailed Y = cik detaļu šim BatchProduct (no taskiem)
                 agg.DetailedY,
@@ -268,9 +269,21 @@ agg.FinishingStatus3,
                     AND t.Tasks_Status <> 3
                 )
                 ORDER BY 
-                    bp.is_priority DESC,
-                    CASE WHEN bp.is_priority = 1 THEN bp.Priority END ASC,
-                    CASE WHEN bp.is_priority = 0 THEN bp.NormalOrder END ASC;";
+    bp.is_priority DESC,
+
+    CASE 
+        WHEN bp.is_priority = 1 THEN 
+            CASE WHEN bp.ProductToPart_ID IS NULL THEN 0 ELSE 1 END
+    END ASC,
+
+    CASE WHEN bp.is_priority = 1 THEN bp.Priority END ASC,
+
+    CASE 
+        WHEN bp.is_priority = 0 THEN 
+            CASE WHEN bp.ProductToPart_ID IS NULL THEN 0 ELSE 1 END
+    END ASC,
+
+    CASE WHEN bp.is_priority = 0 THEN bp.NormalOrder END ASC;";
 
                 await using var reader = await cmd.ExecuteReaderAsync();
 
@@ -290,21 +303,22 @@ agg.FinishingStatus3,
                     IsPriority          = reader.GetBoolean(9),
                     Priority = Convert.ToInt32(reader.GetValue(10)),
                     NormalOrder = Convert.ToInt32(reader.GetValue(11)),
-                    DetailedY = reader.GetInt32(12),
-                    DetailedX = reader.GetInt32(13),
-                    DetailedStartedX    = reader.GetInt32(14),
-                    DetailedDoneX       = reader.GetInt32(15),
-                    DetailedHasStarted  = reader.GetBoolean(16),
-                    DetailedIsDone      = reader.GetBoolean(17),
+                    IsParentProduct = reader.GetBoolean(12),
+                    DetailedY = reader.GetInt32(13),
+                    DetailedX = reader.GetInt32(14),
+                    DetailedStartedX = reader.GetInt32(15),
+                    DetailedDoneX = reader.GetInt32(16),
+                    DetailedHasStarted = reader.GetBoolean(17),
+                    DetailedIsDone = reader.GetBoolean(18),
 
-                    DetailedInProgress  = reader.GetInt32(18),
-                    DetailedFinish      = reader.GetInt32(19),
-                    Assembly            = reader.GetInt32(20),
-                    Done                = reader.GetInt32(21),
-                    FinishingStatus2 = reader.GetInt32(22),
-                    FinishingStatus3 = reader.GetInt32(23),
-                    FinishingStock   = reader.GetInt32(24),
-                });
+                    DetailedInProgress = reader.GetInt32(19),
+                    DetailedFinish = reader.GetInt32(20),
+                    Assembly = reader.GetInt32(21),
+                    Done = reader.GetInt32(22),
+                    FinishingStatus2 = reader.GetInt32(23),
+                    FinishingStatus3 = reader.GetInt32(24),
+                    FinishingStock = reader.GetInt32(25),
+                    });
 
                 }
             }
@@ -313,29 +327,55 @@ agg.FinishingStatus3,
     }
 
             [HttpPut("{batchProductId}")]
-        public async Task<IActionResult> Put(int batchProductId, [FromBody] UpdatePriorityRequest request)
-        {
-            var bp = await _db.BatchProducts
-                .FirstOrDefaultAsync(x => x.ID == batchProductId);
-
-            if (bp == null)
-                return NotFound();
-
-bp.is_priority = request.IsPriority;
-bp.Priority = request.Priority;
-
-// tikai NE-prioritārajiem saglabājam NormalOrder
-if (!request.IsPriority)
+public async Task<IActionResult> Put(int batchProductId, [FromBody] UpdatePriorityRequest request)
 {
-    bp.NormalOrder = request.NormalOrder;
-}
+    var target = await _db.BatchProducts
+        .FirstOrDefaultAsync(x => x.ID == batchProductId);
 
-Console.WriteLine($"UPDATE: {batchProductId} -> {request.Priority}");
+    if (target == null)
+        return NotFound();
 
-            await _db.SaveChangesAsync();
+    // 🔥 atrodam VISU GRUPU (Root)
+var rootId = await _db.BatchProducts
+    .Where(x =>
+        x.Batch_Id == target.Batch_Id &&
+        x.Version_Id == target.Version_Id &&
+        x.ProductToPart_ID == null &&
+        x.IsActive)
+    .Select(x => x.ID)
+    .FirstOrDefaultAsync();
 
-            return NoContent();
+var group = await _db.BatchProducts
+    .Where(x =>
+        x.IsActive &&
+        x.Batch_Id == target.Batch_Id &&
+        x.Version_Id == target.Version_Id &&
+        (
+            x.ProductToPart_ID == null ||              // parent
+            x.ID == batchProductId                    // child-only
+        ))
+    .ToListAsync();
+
+    foreach (var bp in group)
+    {
+        bp.is_priority = request.IsPriority;
+
+        if (request.IsPriority)
+        {
+            bp.Priority = request.Priority;
+            bp.NormalOrder = 0;
         }
+        else
+        {
+            bp.NormalOrder = request.NormalOrder;
+            bp.Priority = 0;
+        }
+    }
+
+    await _db.SaveChangesAsync();
+
+    return NoContent();
+}
 
 [HttpGet("list")]
 public async Task<IActionResult> GetList()
