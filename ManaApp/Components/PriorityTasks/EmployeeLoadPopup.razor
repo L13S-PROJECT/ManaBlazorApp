@@ -51,7 +51,7 @@ else
                         </tr>
                     </thead>
                     <tbody>
-                    @foreach (var t in MergeTasks(model.InProgress ?? Enumerable.Empty<TaskRow>()))
+                    @foreach (var t in model.InProgress ?? Enumerable.Empty<TaskRow>())
                     {
                         <tr @key="t">
                             <td>@t.BatchCode</td>
@@ -61,7 +61,7 @@ else
                                     <span class="unassigned-mark" title="Nav piešķirts darbiniekam">❗</span>
                                 }
                                 @t.ProductName
-                                    @if (t.RowType == "SingleChild")
+                                    @if (t.ShowChildMark)
                                         {
                                             <span style="margin-left:4px;">*</span>
                                         }
@@ -127,12 +127,12 @@ else
                 </tr>
             </thead>
             <tbody>
-                @foreach (var t in MergeTasks(PushTasks))
+                @foreach (var t in PushTasks)
                 {
                     <tr @key="t">
                         <td>@t.BatchCode</td>
                         <td>@t.ProductName
-                            @if (t.RowType == "SingleChild")
+                            @if (t.ShowChildMark)
                                 {
                                     <span style="margin-left:4px;">*</span>
                                 }       
@@ -231,7 +231,7 @@ else
                             </tr>
                         </thead>
                         <tbody>
-                    @foreach (var t in MergeTasks(PrioritySuper))
+                    @foreach (var t in PrioritySuper)
                         {
                             <tr @key="t">
                                 <td>@t.BatchCode</td>
@@ -241,7 +241,7 @@ else
                                         <span class="unassigned-mark" title="Nav piešķirts darbiniekam">❗</span>
                                     }
                                     @t.ProductName
-                                        @if (t.RowType == "SingleChild")
+                                        @if (t.ShowChildMark)
                                             {
                                                 <span style="margin-left:4px;">*</span>
                                             }
@@ -341,7 +341,7 @@ else
                             </tr>
                         </thead>
                         <tbody>
-                        @foreach (var t in MergeTasks(PriorityNormal))
+                        @foreach (var t in PriorityNormal)
                         {
                             <tr @key="t">
                                 <td>@t.BatchCode</td>
@@ -351,7 +351,7 @@ else
                                         <span class="unassigned-mark" title="Nav piešķirts darbiniekam">❗</span>
                                     }
                                     @t.ProductName
-                                      @if (t.RowType == "SingleChild")
+                                      @if (t.ShowChildMark)
                                         {
                                             <span style="margin-left:4px;">*</span>
                                         }
@@ -448,7 +448,7 @@ else
                             </tr>
                         </thead>
                         <tbody>
-                        @foreach (var t in MergeTasks(NormalSuper))
+                        @foreach (var t in NormalSuper)
                         {
                             <tr @key="t">
                                 <td>@t.BatchCode</td>
@@ -458,7 +458,7 @@ else
                                         <span class="unassigned-mark" title="Nav piešķirts darbiniekam">❗</span>
                                     }
                                     @t.ProductName
-                                        @if (t.RowType == "SingleChild")
+                                        @if (t.ShowChildMark)
                                             {
                                                 <span style="margin-left:4px;">*</span>
                                             }
@@ -557,7 +557,7 @@ else
                             </tr>
                         </thead>
                         <tbody>
-                        @foreach (var t in MergeTasks(NormalNormal))
+                        @foreach (var t in NormalNormal)
                         {
                             <tr @key="t">
                                 <td>@t.BatchCode</td>
@@ -566,8 +566,8 @@ else
                                     {
                                         <span class="unassigned-mark" title="Nav piešķirts darbiniekam">❗</span>
                                     }
-                                    @t.ProductName
-                                        @if (t.RowType == "SingleChild")
+                                    @t.ProductName (@t.RowType)
+                                        @if (t.ShowChildMark)
                                             {
                                                 <span style="margin-left:4px;">*</span>
                                             }
@@ -732,9 +732,10 @@ foreach (var g in groups)
 
     foreach (var item in g)
     {
-        item.IsChild = item.ProductToPartId != item.RootId;
+        item.IsChild = item.BatchProductId != item.RootId;
         item.HasParent = hasParent && hasChild;
-        item.ShowChildMark = item.IsChild && !hasParent;
+        var isSingleChildGroup = !hasParent && hasChild;
+        item.ShowChildMark = item.RowType == "SingleChild";  
     }
 }
 }
@@ -868,7 +869,7 @@ private class TaskRow
     public int TopPartStepId { get; set; }
     public int DisplayQty { get; set; }
     public int DisplayMinutes { get; set; }
-
+    public bool IsPureChild { get; set; }
     public string? RowType { get; set; }
     public bool ShowChildMark { get; set; }
 }
@@ -898,18 +899,22 @@ private IEnumerable<TaskRow> PushTasks =>
     .Where(t => t.Tasks_Push);
 private IEnumerable<TaskRow> PrioritySuper =>
     model?.Priority?.Where(t => t.Tasks_Priority && !t.Tasks_Push)
+        .Where(t => t.Assigned_To == EmployeeId || t.Assigned_To == null || EmployeeId == 0)
     ?? Enumerable.Empty<TaskRow>();
 
 private IEnumerable<TaskRow> PriorityNormal =>
     model?.Priority?.Where(t => !t.Tasks_Priority && !t.Tasks_Push)
+    .Where(t => t.Assigned_To == EmployeeId || t.Assigned_To == null || EmployeeId == 0)
     ?? Enumerable.Empty<TaskRow>();
 
 private IEnumerable<TaskRow> NormalSuper =>
     model?.Normal?.Where(t => t.Tasks_Priority && !t.Tasks_Push)
+    .Where(t => t.Assigned_To == EmployeeId || t.Assigned_To == null || EmployeeId == 0)
     ?? Enumerable.Empty<TaskRow>();
 
 private IEnumerable<TaskRow> NormalNormal =>
     model?.Normal?.Where(t => !t.Tasks_Priority && !t.Tasks_Push)
+    .Where(t => t.Assigned_To == EmployeeId || t.Assigned_To == null || EmployeeId == 0)
     ?? Enumerable.Empty<TaskRow>();
 
 
@@ -1032,53 +1037,5 @@ var response = await Http.PostAsJsonAsync("api/tasks/update-assignee-aggregated"
     StateHasChanged();
 }
 
-private IEnumerable<TaskRow> MergeTasks(IEnumerable<TaskRow> source)
-{
-    var groups = source.GroupBy(x => new { x.RootId, x.StepOrder });
-
-    foreach (var g in groups)
-    {
-        var first = g.First();
-
-        // Parent+Child gadījums
-        if (g.Any(x => x.HasParent))
-        {
-            yield return new TaskRow
-            {
-                TaskId = first.TaskId,
-                BatchCode = first.BatchCode,
-                BatchProductId = first.BatchProductId,
-                ProductToPartId = first.ProductToPartId,
-                TopPartStepId = first.TopPartStepId,
-                ProductName = first.ProductName,
-                TopPartName = first.TopPartName,
-                StepName = first.StepName,
-                StepOrder = first.StepOrder,
-                StepType = first.StepType,
-                Status = first.Status,
-                CanStart = first.CanStart,
-                Assigned_To = first.Assigned_To,
-                Tasks_Priority = first.Tasks_Priority,
-                Tasks_Push = first.Tasks_Push,
-                RootId = first.RootId,
-                IsChild = false,
-                HasParent = true,
-                ShowChildMark = false,
-                RowType = "ParentChildMerged",
-
-
-                Qty = g.Sum(x => x.Qty),
-                DisplayMinutes = g.Sum(x => x.Qty * x.EstimatedMinutes),
-                EstimatedMinutes = 0
-            };
-        }
-        else
-        {
-            // single (parent vai child-only)
-            foreach (var item in g)
-                yield return item;
-        }
-    }
-}
 
 }

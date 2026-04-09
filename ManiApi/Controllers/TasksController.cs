@@ -2301,7 +2301,12 @@ END AS CanStart,
         ELSE bp.ID
     END
 ) AS RootId,
-ts.ID AS TopPartStepId
+ts.ID AS TopPartStepId,
+CASE 
+    WHEN bp.ProductToPart_ID IS NOT NULL 
+         AND bp.ParentBatchProduct_ID IS NULL THEN 'SingleChild'
+    ELSE 'Parent'
+END AS RowType
 
 FROM tasks t
 JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
@@ -2314,7 +2319,10 @@ JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
 JOIN toppart tp ON tp.ID = ptp.TopPart_ID
 WHERE t.IsActive = 1
   AND t.Tasks_Status = 2
-  AND t.Claimed_By = @empId
+  AND (
+    (@empId > 0 AND (t.Claimed_By = @empId OR t.Assigned_To IS NULL))
+ OR (@empId = 0 AND t.Assigned_To IS NULL)
+)
 ORDER BY
   bp.is_priority DESC,
   bp.Priority ASC,
@@ -2354,6 +2362,7 @@ ORDER BY
             Claimed_By = r.IsDBNull(19) ? (int?)null : r.GetInt32(19),
             RootId = r.GetInt32(20),
             TopPartStepId = r.GetInt32(21),
+            RowType = r.IsDBNull(22) ? null : r.GetString(22),
         });
     }
 }
@@ -2424,7 +2433,12 @@ END AS CanStart,
         ELSE bp.ID
     END
 ) AS RootId,
-ts.ID AS TopPartStepId
+ts.ID AS TopPartStepId,
+CASE 
+    WHEN bp.ProductToPart_ID IS NOT NULL 
+         AND bp.ParentBatchProduct_ID IS NULL THEN 'SingleChild'
+    ELSE 'Parent'
+END AS RowType
 
 FROM tasks t
 JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
@@ -2480,7 +2494,9 @@ await using (var r2 = await cmd2.ExecuteReaderAsync())
             Tasks_Push = !r2.IsDBNull(18) && r2.GetBoolean(18),
             Claimed_By = r2.IsDBNull(19) ? (int?)null : r2.GetInt32(19),
             RootId = r2.GetInt32(20),
-            TopPartStepId = r2.GetInt32(21)
+            TopPartStepId = r2.GetInt32(21),
+            RowType = r2.IsDBNull(22) ? null : r2.GetString(22)
+
         });
     }
 }
@@ -2550,7 +2566,12 @@ END AS CanStart,
         ELSE bp.ID
     END
 ) AS RootId,
-ts.ID AS TopPartStepId
+ts.ID AS TopPartStepId,
+CASE 
+    WHEN bp.ProductToPart_ID IS NOT NULL 
+         AND bp.ParentBatchProduct_ID IS NULL THEN 'SingleChild'
+    ELSE 'Parent'
+END AS RowType
 
 FROM tasks t
 JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
@@ -2607,7 +2628,8 @@ await using (var r3 = await cmd3.ExecuteReaderAsync())
             Tasks_Push = !r3.IsDBNull(18) && r3.GetBoolean(18),
             Claimed_By = r3.IsDBNull(19) ? (int?)null : r3.GetInt32(19),
             RootId = r3.GetInt32(20),  
-            TopPartStepId = r3.GetInt32(21),     
+            TopPartStepId = r3.GetInt32(21),   
+            RowType = r3.IsDBNull(22) ? null : r3.GetString(22)  
         });
     }
 }
@@ -3249,6 +3271,7 @@ foreach (var g in groups)
 
     var hasParent = items.Any(x => (int)x.BatchProductId == (int)x.RootId);
     var hasChild = items.Any(x => (int)x.BatchProductId != (int)x.RootId);
+    var hasOnlyChild = !hasParent && hasChild;
 
     if (hasParent && !hasChild)
             {
@@ -3275,7 +3298,7 @@ foreach (var g in groups)
                         Tasks_Priority = t.Tasks_Priority,
                         Tasks_Push = t.Tasks_Push,
 
-                        RowType = "Parent",
+                        RowType = t.RowType,
                         ShowChildMark = false
                     });
                 }
@@ -3284,7 +3307,7 @@ foreach (var g in groups)
             }
 
     if (hasParent && hasChild)
-            {
+            {               
                 var stepGroups = items
                     .GroupBy(x => new { x.ProductToPartId, x.StepOrder });
 
@@ -3326,45 +3349,46 @@ foreach (var g in groups)
                         Tasks_Priority = first.Tasks_Priority,
                         Tasks_Push = first.Tasks_Push,
 
-                        RowType = "ParentChildMerged",
-                        ShowChildMark = false
+                        RowType = hasParent && hasChild ? "ParentChildMerged" : first.RowType,
+                        ShowChildMark = sg.Any(x => (int)x.BatchProductId != (int)x.RootId)
                     });
                 }
 
                 continue;
             }
 
-    if (!hasParent && hasChild)
+    if (!items.Any(x => (int)x.BatchProductId == (int)x.RootId))
             {
                 foreach (var t in items)
-                {
-                    result.Add(new EmployeeTaskRowV2
                     {
-                        RootId = (int)t.RootId,
-                        BatchCode = t.BatchCode,
-                        BatchProductId = (int)t.BatchProductId,
-                        ProductToPartId = (int)t.ProductToPartId,
-                        ProductName = t.ProductName,
-                        TopPartName = t.TopPartName,
-                        StepName = t.StepName,
+                        var isParent = (int)t.BatchProductId == (int)t.RootId;
+                        var isPureChild = (int?)t.ProductToPartId != null;
+                        result.Add(new EmployeeTaskRowV2
+                        {
+                            RootId = (int)t.RootId,
+                            BatchCode = t.BatchCode,
+                            BatchProductId = (int)t.BatchProductId,
+                            ProductToPartId = (int)t.ProductToPartId,
+                            ProductName = t.ProductName,
+                            TopPartName = t.TopPartName,
+                            StepName = t.StepName,
 
-                        DisplayQty = (int)t.Qty,
-                        DisplayMinutes = (int)t.Qty * (int)t.EstimatedMinutes,
+                            DisplayQty = (int)t.Qty,
+                            DisplayMinutes = (int)t.Qty * (int)t.EstimatedMinutes,
 
-                        Status = (int)t.Status,
-                        CanStart = t.CanStart,
+                            Status = (int)t.Status,
+                            CanStart = t.CanStart,
 
-                        Assigned_To = t.Assigned_To,
-                        TopPartStepId = (int?)t.TopPartStepId ?? 0,
-                        Tasks_Priority = t.Tasks_Priority,
-                        Tasks_Push = t.Tasks_Push,
+                            Assigned_To = t.Assigned_To,
+                            TopPartStepId = (int?)t.TopPartStepId ?? 0,
+                            Tasks_Priority = t.Tasks_Priority,
+                            Tasks_Push = t.Tasks_Push,
 
-                        RowType = "SingleChild",
-                        ShowChildMark = true // ← priekš "*"
-                    });
-                }
-
-                continue;
+                            RowType = t.RowType,
+                            ShowChildMark = isPureChild
+                        });
+                    }
+                    continue;
             }
 }
 
