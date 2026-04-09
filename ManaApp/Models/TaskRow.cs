@@ -23,7 +23,9 @@ public sealed class TaskRow
     public int BatchId { get; set; }
     public int VersionId { get; set; }
     public int BatchProductId { get; set; }
-
+    public int RootId { get; set; }
+    public bool IsChild { get; set; }
+    public bool HasParent { get; set; }
     public string? Comment { get; set; }
     public bool IsCommentForEmployee { get; set; }
 

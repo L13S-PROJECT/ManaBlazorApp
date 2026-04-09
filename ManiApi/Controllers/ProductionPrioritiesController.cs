@@ -66,6 +66,19 @@ public async Task<IActionResult> Get()
                 p.Product_Name   AS ProductName,
                 c.Category_Name  AS CategoryName,
                 v.Version_Name   AS VersionName,
+                CASE 
+                    WHEN bp.ProductToPart_ID IS NOT NULL
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM batches_products bp2
+                            WHERE bp2.Batch_Id = bp.Batch_Id
+                            AND bp2.Version_Id = bp.Version_Id
+                            AND bp2.ProductToPart_ID IS NULL
+                            AND bp2.IsActive = 1
+                        )
+                    THEN tp.TopPart_Name
+                    ELSE ''
+                END AS TopPartName,
                 bp.Planned_Qty   AS Planned,
                 bp.is_priority   AS IsPriority,
                 bp.Priority      AS Priority,
@@ -234,6 +247,8 @@ agg.FinishingStatus3,
 ) AS FinishingStock
 
             FROM batches_products bp
+            LEFT JOIN producttopparts ptp ON ptp.ID = bp.ProductToPart_ID
+            LEFT JOIN toppart tp ON tp.ID = ptp.TopPart_ID
             LEFT JOIN (
                 SELECT
                     t.BatchProduct_ID,
@@ -299,25 +314,26 @@ agg.FinishingStatus3,
                     ProductName         = reader.GetString(5),
                     CategoryName        = reader.IsDBNull(6) ? "" : reader.GetString(6),
                     VersionName         = reader.GetString(7),
-                    Planned             = reader.GetInt32(8),
-                    IsPriority          = reader.GetBoolean(9),
-                    Priority = Convert.ToInt32(reader.GetValue(10)),
-                    NormalOrder = Convert.ToInt32(reader.GetValue(11)),
-                    IsParentProduct = reader.GetBoolean(12),
-                    DetailedY = reader.GetInt32(13),
-                    DetailedX = reader.GetInt32(14),
-                    DetailedStartedX = reader.GetInt32(15),
-                    DetailedDoneX = reader.GetInt32(16),
-                    DetailedHasStarted = reader.GetBoolean(17),
-                    DetailedIsDone = reader.GetBoolean(18),
+                    TopPartName = reader.IsDBNull(8) ? "" : reader.GetString(8),
+                    Planned             = reader.GetInt32(9),
+                    IsPriority          = reader.GetBoolean(10),
+                    Priority = Convert.ToInt32(reader.GetValue(11)),
+                    NormalOrder = Convert.ToInt32(reader.GetValue(12)),
+                    IsParentProduct = reader.GetBoolean(13),
+                    DetailedY = reader.GetInt32(14),
+                    DetailedX = reader.GetInt32(15),
+                    DetailedStartedX = reader.GetInt32(16),
+                    DetailedDoneX = reader.GetInt32(17),
+                    DetailedHasStarted = reader.GetBoolean(18),
+                    DetailedIsDone = reader.GetBoolean(19),
 
-                    DetailedInProgress = reader.GetInt32(19),
-                    DetailedFinish = reader.GetInt32(20),
-                    Assembly = reader.GetInt32(21),
-                    Done = reader.GetInt32(22),
-                    FinishingStatus2 = reader.GetInt32(23),
-                    FinishingStatus3 = reader.GetInt32(24),
-                    FinishingStock = reader.GetInt32(25),
+                    DetailedInProgress = reader.GetInt32(20),
+                    DetailedFinish = reader.GetInt32(21),
+                    Assembly = reader.GetInt32(22),
+                    Done = reader.GetInt32(23),
+                    FinishingStatus2 = reader.GetInt32(24),
+                    FinishingStatus3 = reader.GetInt32(25),
+                    FinishingStock = reader.GetInt32(26),
                     });
 
                 }

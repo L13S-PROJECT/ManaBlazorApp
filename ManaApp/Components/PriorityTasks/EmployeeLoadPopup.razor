@@ -51,7 +51,7 @@ else
                         </tr>
                     </thead>
                     <tbody>
-                    @foreach (var t in model.InProgress)
+                    @foreach (var t in MergeTasks(model.InProgress ?? Enumerable.Empty<TaskRow>()))
                     {
                         <tr @key="t">
                             <td>@t.BatchCode</td>
@@ -61,11 +61,29 @@ else
                                     <span class="unassigned-mark" title="Nav piešķirts darbiniekam">❗</span>
                                 }
                                 @t.ProductName
+                                    @if (t.RowType == "SingleChild")
+                                        {
+                                            <span style="margin-left:4px;">*</span>
+                                        }
                             </td>
                             <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
                             <td>@t.StepName</td>
-                            <td>@t.Qty</td>
-                            <td>@FormatTime(t.Qty * t.EstimatedMinutes)</td>
+                                <td>
+@if (t.RowType == "ParentChildMerged")
+{
+    <span>@t.QtyBreakdown</span>
+}
+else
+{
+    <span>@(t.DisplayQty > 0 ? t.DisplayQty : t.Qty)</span>
+}
+</td>
+                            <td>@FormatTime(
+    t.DisplayMinutes > 0
+        ? t.DisplayMinutes
+        : t.Qty * t.EstimatedMinutes
+)
+)</td>
                             <td>
                                 @if (t.Status == 2)
                                 {
@@ -109,15 +127,33 @@ else
                 </tr>
             </thead>
             <tbody>
-                @foreach (var t in PushTasks)
+                @foreach (var t in MergeTasks(PushTasks))
                 {
                     <tr @key="t">
                         <td>@t.BatchCode</td>
-                        <td>@t.ProductName</td>
+                        <td>@t.ProductName
+                            @if (t.RowType == "SingleChild")
+                                {
+                                    <span style="margin-left:4px;">*</span>
+                                }       
+                            </td>
                         <td>@t.TopPartName</td>
                         <td>@t.StepName</td>
-                        <td>@t.Qty</td>
-                        <td>@FormatTime(t.Qty * t.EstimatedMinutes)</td>
+                        <td>
+@if (t.RowType == "ParentChildMerged")
+{
+    <span>@t.QtyBreakdown</span>
+}
+else
+{
+    <span>@(t.DisplayQty > 0 ? t.DisplayQty : t.Qty)</span>
+}
+</td>
+                        <td>@FormatTime(
+    t.DisplayMinutes > 0
+        ? t.DisplayMinutes
+        : t.Qty * t.EstimatedMinutes
+)</td>
 
                         <td>
                             @if (t.Status == 1)
@@ -128,9 +164,18 @@ else
 
                         <td>
                     <select class="form-select form-select-sm"
-                            @bind="t.Assigned_To"
-                            @bind:after="() => OnAssigneeChanged(t)">
-                                <option value="">Nav piešķirts</option>
+                            value="@(t.Assigned_To?.ToString() ?? "0")"
+                            @onchange="async e => {
+    var val = e.Value?.ToString();
+    int parsed = 0;
+    if (!string.IsNullOrWhiteSpace(val))
+        int.TryParse(val, out parsed);
+
+    t.Assigned_To = parsed == 0 ? null : parsed;
+
+    await OnAssigneeChanged(t, e);
+}">
+                                <option value="0">Nav piešķirts</option>
                                 @foreach (var emp in employees)
                                 {
                                     <option value="@emp.Id">@emp.Name</option>
@@ -186,7 +231,7 @@ else
                             </tr>
                         </thead>
                         <tbody>
-                        @foreach (var t in PrioritySuper)
+                    @foreach (var t in MergeTasks(PrioritySuper))
                         {
                             <tr @key="t">
                                 <td>@t.BatchCode</td>
@@ -196,11 +241,29 @@ else
                                         <span class="unassigned-mark" title="Nav piešķirts darbiniekam">❗</span>
                                     }
                                     @t.ProductName
+                                        @if (t.RowType == "SingleChild")
+                                            {
+                                                <span style="margin-left:4px;">*</span>
+                                            }
                                 </td>
                                 <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
                                 <td>@t.StepName</td>
-                                <td>@t.Qty</td>
-                                <td>@FormatTime(t.Qty * t.EstimatedMinutes)</td>
+                                <td>
+@if (t.RowType == "ParentChildMerged")
+{
+    <span>@t.QtyBreakdown</span>
+}
+else
+{
+    <span>@(t.DisplayQty > 0 ? t.DisplayQty : t.Qty)</span>
+}
+</td>
+                                <td>@FormatTime(
+    t.DisplayMinutes > 0
+        ? t.DisplayMinutes
+        : t.Qty * t.EstimatedMinutes
+)
+)</td>
                                 <td>
                                     @if (t.Status == 1)
                                     {
@@ -208,10 +271,20 @@ else
                                     }
                                 </td>
                                 <td>
-                                <select class="form-select form-select-sm @(t.Status == 2 || t.Status == 3 ? "assigned-disabled" : "")"
-                                        @bind="t.Assigned_To"
-                                        disabled="@(t.Status == 2 || t.Status == 3)">
-                                        <option value="">Nav piešķirts</option>
+                                    <select class="form-select form-select-sm @(t.Status == 2 || t.Status == 3 ? "assigned-disabled" : "")"
+                                            value="@(t.Assigned_To?.ToString() ?? "0")"
+                                            @onchange="async e => {
+    var val = e.Value?.ToString();
+    int parsed = 0;
+    if (!string.IsNullOrWhiteSpace(val))
+        int.TryParse(val, out parsed);
+
+    t.Assigned_To = parsed == 0 ? null : parsed;
+
+    await OnAssigneeChanged(t, e);
+}"
+                                            disabled="@(t.Status == 2 || t.Status == 3)">
+                                        <option value="0">Nav piešķirts</option>
                                         @foreach (var emp in employees)
                                         {
                                             <option value="@emp.Id">@emp.Name</option>
@@ -268,7 +341,7 @@ else
                             </tr>
                         </thead>
                         <tbody>
-                        @foreach (var t in PriorityNormal)
+                        @foreach (var t in MergeTasks(PriorityNormal))
                         {
                             <tr @key="t">
                                 <td>@t.BatchCode</td>
@@ -278,11 +351,29 @@ else
                                         <span class="unassigned-mark" title="Nav piešķirts darbiniekam">❗</span>
                                     }
                                     @t.ProductName
+                                      @if (t.RowType == "SingleChild")
+                                        {
+                                            <span style="margin-left:4px;">*</span>
+                                        }
                                 </td>
                                 <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
                                 <td>@t.StepName</td>
-                                <td>@t.Qty</td>
-                                <td>@FormatTime(t.Qty * t.EstimatedMinutes)</td>
+                                <td>
+@if (t.RowType == "ParentChildMerged")
+{
+    <span>@t.QtyBreakdown</span>
+}
+else
+{
+    <span>@(t.DisplayQty > 0 ? t.DisplayQty : t.Qty)</span>
+}
+</td>
+                                <td>@FormatTime(
+    t.DisplayMinutes > 0
+        ? t.DisplayMinutes
+        : t.Qty * t.EstimatedMinutes
+)
+)</td>
                                 <td>
                                     @if (t.Status == 1)
                                     {
@@ -290,10 +381,20 @@ else
                                     }
                                 </td>
                                 <td>
-                                    <select class="form-select form-select-sm @(t.Status == 2 || t.Status == 3 ? "assigned-disabled" : "")"
-                                            @bind="t.Assigned_To"
-                                            disabled="@(t.Status == 2 || t.Status == 3)">
-                                        <option value="">Nav piešķirts</option>
+                    <select class="form-select form-select-sm @(t.Status == 2 || t.Status == 3 ? "assigned-disabled" : "")"
+                                    value="@(t.Assigned_To?.ToString() ?? "0")"
+                                    @onchange="async e => {
+    var val = e.Value?.ToString();
+    int parsed = 0;
+    if (!string.IsNullOrWhiteSpace(val))
+        int.TryParse(val, out parsed);
+
+    t.Assigned_To = parsed == 0 ? null : parsed;
+
+    await OnAssigneeChanged(t, e);
+}"
+                                    disabled="@(t.Status == 2 || t.Status == 3)">
+                                                <option value="0">Nav piešķirts</option>
                                         @foreach (var emp in employees)
                                         {
                                             <option value="@emp.Id">@emp.Name</option>
@@ -347,7 +448,7 @@ else
                             </tr>
                         </thead>
                         <tbody>
-                        @foreach (var t in NormalSuper)
+                        @foreach (var t in MergeTasks(NormalSuper))
                         {
                             <tr @key="t">
                                 <td>@t.BatchCode</td>
@@ -357,11 +458,28 @@ else
                                         <span class="unassigned-mark" title="Nav piešķirts darbiniekam">❗</span>
                                     }
                                     @t.ProductName
+                                        @if (t.RowType == "SingleChild")
+                                            {
+                                                <span style="margin-left:4px;">*</span>
+                                            }
                                 </td>
                                 <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
                                 <td>@t.StepName</td>
-                                <td>@t.Qty</td>
-                                <td>@FormatTime(t.Qty * t.EstimatedMinutes)</td>
+                                <td>
+@if (t.RowType == "ParentChildMerged")
+{
+    <span>@t.QtyBreakdown</span>
+}
+else
+{
+    <span>@(t.DisplayQty > 0 ? t.DisplayQty : t.Qty)</span>
+}
+</td>
+                                <td>@FormatTime(
+    t.DisplayMinutes > 0
+        ? t.DisplayMinutes
+        : t.Qty * t.EstimatedMinutes
+)</td>
                                 <td>
                                     @if (t.Status == 1)
                                     {
@@ -369,10 +487,20 @@ else
                                     }
                                 </td>
                                 <td>
-                                    <select class="form-select form-select-sm @(t.Status == 2 || t.Status == 3 ? "assigned-disabled" : "")"
-                                            @bind="t.Assigned_To"
-                                            disabled="@(t.Status == 2 || t.Status == 3)">
-                                        <option value="">Nav piešķirts</option>
+                            <select class="form-select form-select-sm @(t.Status == 2 || t.Status == 3 ? "assigned-disabled" : "")"
+                                    value="@(t.Assigned_To?.ToString() ?? "0")"
+                                    @onchange="async e => {
+    var val = e.Value?.ToString();
+    int parsed = 0;
+    if (!string.IsNullOrWhiteSpace(val))
+        int.TryParse(val, out parsed);
+
+    t.Assigned_To = parsed == 0 ? null : parsed;
+
+    await OnAssigneeChanged(t, e);
+}"
+                                    disabled="@(t.Status == 2 || t.Status == 3)">
+                                        <option value="0">Nav piešķirts</option>
                                         @foreach (var emp in employees)
                                         {
                                             <option value="@emp.Id">@emp.Name</option>
@@ -429,7 +557,7 @@ else
                             </tr>
                         </thead>
                         <tbody>
-                        @foreach (var t in NormalNormal)
+                        @foreach (var t in MergeTasks(NormalNormal))
                         {
                             <tr @key="t">
                                 <td>@t.BatchCode</td>
@@ -439,11 +567,28 @@ else
                                         <span class="unassigned-mark" title="Nav piešķirts darbiniekam">❗</span>
                                     }
                                     @t.ProductName
+                                        @if (t.RowType == "SingleChild")
+                                            {
+                                                <span style="margin-left:4px;">*</span>
+                                            }
                                 </td>
                                 <td>@t.TopPartName <span class="text-muted" style="font-size:12px;">(#@t.ProductToPartId)</span></td>
                                 <td>@t.StepName</td>
-                                <td>@t.Qty</td>
-                                <td>@FormatTime(t.Qty * t.EstimatedMinutes)</td>
+                                <td>
+@if (t.RowType == "ParentChildMerged")
+{
+    <span>@t.QtyBreakdown</span>
+}
+else
+{
+    <span>@(t.DisplayQty > 0 ? t.DisplayQty : t.Qty)</span>
+}
+</td>
+                                <td>@FormatTime(
+    t.DisplayMinutes > 0
+        ? t.DisplayMinutes
+        : t.Qty * t.EstimatedMinutes
+)</td>
                                 <td>
                                     @if (t.Status == 1)
                                     {
@@ -451,10 +596,20 @@ else
                                     }
                                 </td>
                                 <td>
-                                    <select class="form-select form-select-sm @(t.Status == 2 || t.Status == 3 ? "assigned-disabled" : "")"
-                                            @bind="t.Assigned_To"
-                                            disabled="@(t.Status == 2 || t.Status == 3)">
-                                        <option value="">Nav piešķirts</option>
+                            <select class="form-select form-select-sm @(t.Status == 2 || t.Status == 3 ? "assigned-disabled" : "")"
+                                    value="@(t.Assigned_To?.ToString() ?? "0")"
+                                    @onchange="async e => {
+    var val = e.Value?.ToString();
+    int parsed = 0;
+    if (!string.IsNullOrWhiteSpace(val))
+        int.TryParse(val, out parsed);
+
+    t.Assigned_To = parsed == 0 ? null : parsed;
+
+    await OnAssigneeChanged(t, e);
+}"
+                                    disabled="@(t.Status == 2 || t.Status == 3)">
+                                        <option value="0">Nav piešķirts</option>
                                         @foreach (var emp in employees)
                                         {
                                             <option value="@emp.Id">@emp.Name</option>
@@ -547,13 +702,41 @@ protected override async Task OnParametersSetAsync()
     if (EmployeeId > 0)
         {
             model = await Http.GetFromJsonAsync<EmployeeLoadModel>(
-                $"api/tasks/employee-load?empId={EmployeeId}");
+                $"api/tasks/employee-load-v2?empId={EmployeeId}");
         }
     else
         {
             model = await Http.GetFromJsonAsync<EmployeeLoadModel>(
-                $"api/tasks/employee-load?empId=0");
+                $"api/tasks/employee-load-v2?empId=0");
         }
+    
+var allTasks = (model?.InProgress ?? new List<TaskRow>())
+    .Concat(model?.Priority ?? new List<TaskRow>())
+    .Concat(model?.Normal ?? new List<TaskRow>())
+    .ToList();
+
+foreach (var t in allTasks)
+{
+    if (t.BatchProductId == 0 || t.ProductToPartId == 0)
+    {
+        await JS.InvokeVoidAsync("console.warn", t);
+    }
+}
+
+var groups = allTasks.GroupBy(x => x.RootId);
+
+foreach (var g in groups)
+{
+    var hasParent = g.Any(x => x.BatchProductId == x.RootId);
+    var hasChild = g.Any(x => x.BatchProductId != x.RootId);
+
+    foreach (var item in g)
+    {
+        item.IsChild = item.ProductToPartId != item.RootId;
+        item.HasParent = hasParent && hasChild;
+        item.ShowChildMark = item.IsChild && !hasParent;
+    }
+}
 }
 
 private async Task ReloadData()
@@ -563,12 +746,12 @@ private async Task ReloadData()
     if (EmployeeId > 0)
     {
         model = await Http.GetFromJsonAsync<EmployeeLoadModel>(
-            $"api/tasks/employee-load?empId={EmployeeId}");
+            $"api/tasks/employee-load-v2?empId={EmployeeId}");
     }
     else
     {
         model = await Http.GetFromJsonAsync<EmployeeLoadModel>(
-            $"api/tasks/employee-load?empId=0");
+            $"api/tasks/employee-load-v2?empId=0");
     }
 
 showSavedPopup = true;
@@ -671,15 +854,23 @@ private class TaskRow
     public bool? CanStart { get; set; }
     public int StepOrder { get; set; }
     public int StepType { get; set; }
-
+    public string? QtyBreakdown { get; set; }   
     public bool IsFinal { get; set; }
 
     public int? Assigned_To { get; set; }
     public bool Tasks_Priority { get; set; }
     public bool Tasks_Push { get; set; }
     public int? Claimed_By { get; set; }
-
+    public int RootId { get; set; }
+    public bool IsChild { get; set; }
+    public bool HasParent { get; set; }
     public bool IsPriority { get; set; }
+    public int TopPartStepId { get; set; }
+    public int DisplayQty { get; set; }
+    public int DisplayMinutes { get; set; }
+
+    public string? RowType { get; set; }
+    public bool ShowChildMark { get; set; }
 }
 
 private class StepDetailRow
@@ -802,17 +993,92 @@ private string FormatTime(int minutes)
     return string.Join(" ", parts);
 }
 
-private async Task OnAssigneeChanged(TaskRow t)
+private async Task OnAssigneeChanged(TaskRow t, ChangeEventArgs e)
 {
-    int? empId = t.Assigned_To;
+    var raw = e?.Value?.ToString();
+    int parsed = 0;
 
-    await Http.PostAsJsonAsync("api/tasks/update-assignee", new
+    if (!string.IsNullOrWhiteSpace(raw))
+        int.TryParse(raw, out parsed);
+
+    t.Assigned_To = parsed == 0 ? null : parsed;
+
+await JS.InvokeVoidAsync("console.log", new {
+    t.BatchProductId,
+    t.TopPartStepId,
+    t.ProductToPartId,
+    t.Assigned_To
+});
+
+var payload = new
+{
+    BatchProductId = t.BatchProductId,
+    TopPartStepId = t.TopPartStepId,
+    ProductToPartId = t.ProductToPartId,
+    Assigned_To = t.Assigned_To
+};
+
+await JS.InvokeVoidAsync("console.log", payload);
+
+var response = await Http.PostAsJsonAsync("api/tasks/update-assignee-aggregated", payload);
+
+    if (!response.IsSuccessStatusCode)
+{
+    var err = await response.Content.ReadAsStringAsync();
+    await JS.InvokeVoidAsync("console.error", err);
+    return;
+}
+
+    StateHasChanged();
+}
+
+private IEnumerable<TaskRow> MergeTasks(IEnumerable<TaskRow> source)
+{
+    var groups = source.GroupBy(x => new { x.RootId, x.StepOrder });
+
+    foreach (var g in groups)
     {
-        TaskId = t.TaskId,
-        Assigned_To = empId
-    });
+        var first = g.First();
 
-    await ReloadData();
+        // Parent+Child gadījums
+        if (g.Any(x => x.HasParent))
+        {
+            yield return new TaskRow
+            {
+                TaskId = first.TaskId,
+                BatchCode = first.BatchCode,
+                BatchProductId = first.BatchProductId,
+                ProductToPartId = first.ProductToPartId,
+                TopPartStepId = first.TopPartStepId,
+                ProductName = first.ProductName,
+                TopPartName = first.TopPartName,
+                StepName = first.StepName,
+                StepOrder = first.StepOrder,
+                StepType = first.StepType,
+                Status = first.Status,
+                CanStart = first.CanStart,
+                Assigned_To = first.Assigned_To,
+                Tasks_Priority = first.Tasks_Priority,
+                Tasks_Push = first.Tasks_Push,
+                RootId = first.RootId,
+                IsChild = false,
+                HasParent = true,
+                ShowChildMark = false,
+                RowType = "ParentChildMerged",
+
+
+                Qty = g.Sum(x => x.Qty),
+                DisplayMinutes = g.Sum(x => x.Qty * x.EstimatedMinutes),
+                EstimatedMinutes = 0
+            };
+        }
+        else
+        {
+            // single (parent vai child-only)
+            foreach (var item in g)
+                yield return item;
+        }
+    }
 }
 
 }

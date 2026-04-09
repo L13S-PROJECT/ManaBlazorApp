@@ -97,7 +97,9 @@ else
                             }
                             @if (!p.HasParent && !p.IsChild && !p.IsParentProduct)
                             {
-                                <span style="margin-left:4px;">*</span>
+                                <span class="pp-child-label">
+                                    @p.TopPartName
+                                </span>
                             }
                         </div>
                         <div>@p.CategoryName</div>
@@ -239,10 +241,12 @@ else
                     {
                         <span style="margin-left:4px;">+</span>
                     }
-                    @if (!p.HasParent && !p.IsChild && !p.IsParentProduct)
-                    {
-                        <span style="margin-left:4px;">*</span>
-                    }
+                        @if (!p.HasParent && !p.IsChild && !p.IsParentProduct)
+                        {
+                            <span class="pp-child-label">
+                                @p.TopPartName
+                            </span>
+                        }
                 </div>
                 <div>@p.CategoryName</div>
                 <div>@p.VersionName</div>
@@ -517,7 +521,7 @@ private class ProductRow
     public string ProductCode { get; set; } = "";
     public string CategoryName { get; set; } = "";
     public string VersionName { get; set; } = "";   // ← TE
-
+    public string TopPartName { get; set; } = "";
     public bool IsPriority { get; set; }
     public int Priority { get; set; }
     public int Planned { get; set; }
@@ -668,6 +672,11 @@ private void OnDragEnter(ProductRow target)
 {
     if (!_isDragging || _selectedId == null || !_draggingPriority)
         return;
+    
+    if (_lastTargetId == target.RootId)
+    return;
+
+        _lastTargetId = target.RootId;
 
         var movingGroup = _priorityList
             .Where(x => x.RootId == _selectedId)
@@ -680,7 +689,7 @@ private void OnDragEnter(ProductRow target)
         _priorityList = _priorityList
             .Where(x => x.RootId != _selectedId)
             .ToList();
-
+        
         // pārrēķina index pēc remove
         var targetIndex = _priorityList
             .FindIndex(x => x.RootId == target.RootId);
@@ -699,6 +708,7 @@ private void EndDrag()
     _isDragging = false;
     _selectedId = null;
     _draggingPriority = false;
+    _lastTargetId = null;   
 }
 
 private void OnPriorityToggled(ProductRow p, ChangeEventArgs e)
@@ -859,5 +869,8 @@ private void OnDragEnterNormal(ProductRow target)
 
     StateHasChanged();
 }
+
+private int? _lastTargetId = null;
+
 
 }

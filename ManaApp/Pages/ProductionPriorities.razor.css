@@ -345,3 +345,11 @@ box-shadow:
 
     border-bottom:2px solid #3B82F6;
 }
+
+.pp-child-label{
+    margin-left:6px;
+    font-size:10px;
+    color:#6b7280;
+    text-transform:uppercase;
+    letter-spacing:0.4px;
+}
