@@ -85,7 +85,16 @@ else
     <td>@t.ProductName</td>
     <td>@t.TopPartName</td>
     <td>@t.StepName</td>
-    <td>@t.Qty</td>
+    <td>
+@if (t.RowType == "ParentChildMerged")
+{
+    <span>@t.QtyBreakdown</span>
+}
+else
+{
+    <span>@t.Qty</span>
+}
+</td>
     <td>@FormatTime(t.Qty * t.EstimatedMinutes)</td>
     <td>
         @if (t.Status == 1)
@@ -143,7 +152,16 @@ else
         <td>@t.ProductName</td>
         <td>@t.TopPartName</td>
         <td>@t.StepName</td>
-        <td>@t.Qty</td>
+        <td>
+@if (t.RowType == "ParentChildMerged")
+{
+    <span>@t.QtyBreakdown</span>
+}
+else
+{
+    <span>@t.Qty</span>
+}
+</td>
         <td>@FormatTime(t.Qty * t.EstimatedMinutes)</td>
         <td>
             @if (t.Status == 1)
@@ -201,7 +219,16 @@ else
         <td>@t.ProductName</td>
         <td>@t.TopPartName</td>
         <td>@t.StepName</td>
-        <td>@t.Qty</td>
+        <td>
+@if (t.RowType == "ParentChildMerged")
+{
+    <span>@t.QtyBreakdown</span>
+}
+else
+{
+    <span>@t.Qty</span>
+}
+</td>
         <td>@FormatTime(t.Qty * t.EstimatedMinutes)</td>
         <td>
             @if (t.Status == 1)
@@ -341,6 +368,8 @@ private class TaskRow
     public int EstimatedMinutes { get; set; }
     public int Status { get; set; }
     public bool? CanStart { get; set; }
+    public string? RowType { get; set; }
+    public string? QtyBreakdown { get; set; }
 
     public int? Assigned_To { get; set; }
     public bool BatchPriority { get; set; }

@@ -2092,6 +2092,15 @@ public async Task<IActionResult> GetDetailQty([FromQuery] int batchProductId)
 SELECT 
     ptp.ID AS ProductToPartId,
     tp.TopPart_Name AS TopPartName,
+    (
+        SELECT bp2.ID
+        FROM batches_products bp2
+        WHERE bp2.Batch_Id = bp.Batch_Id
+        AND bp2.Version_Id = bp.Version_Id
+        AND bp2.ProductToPart_ID = ptp.ID
+        AND bp2.IsActive = 1
+        LIMIT 1
+    ) AS BatchProductId,
 
     -- Parent = batch planned
     (
@@ -2155,8 +2164,9 @@ GROUP BY ptp.ID, tp.TopPart_Name;
         {
             ProductToPartId = r.GetInt32(0),
             TopPartName     = r.GetString(1),
-            ParentQty = r.IsDBNull(2) ? 0 : r.GetInt32(2),
-            ChildQty        = r.GetInt32(3)
+            BatchProductId = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
+            ParentQty = r.IsDBNull(3) ? 0 : r.GetInt32(3),
+            ChildQty        = r.GetInt32(4)
         });
     }
 

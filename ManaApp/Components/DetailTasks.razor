@@ -48,25 +48,31 @@
     var baseQty   = p.Quantity;
 }
 
-@if (parentQty > 0 && childQty > 0)
+@if (isChildOnly)
 {
-    @($"{parentQty}+{childQty}")
-}
-
-// tikai Parent
-else if (parentQty > 0)
-{
-    @($"{baseQty * parentQty}")
-}
-// tikai Child
-else if (childQty > 0)
-{
+    // tikai Child scenārijs
     @($"+{childQty}")
 }
-// Parent scenārijs bet nav konkrētai detaļai → katalogs
-else if (hasAnyParent)
+else
 {
-    @($"{baseQty}")
+    // Parent vai Parent+Child scenārijs
+
+    if (parentQty > 0 && childQty > 0)
+    {
+        @($"{parentQty}+{childQty}")
+    }
+    else if (parentQty > 0)
+    {
+        @($"{baseQty * parentQty}")
+    }
+    else if (childQty > 0)
+    {
+        @($"+{childQty}")
+    }
+    else if (hasAnyParent)
+    {
+        @($"{baseQty}")
+    }
 }
 
 
@@ -246,6 +252,7 @@ private List<DetailTaskAggregatedRow> AggregatedTasks = new();
 
 private bool hasAnyParent;
 private bool hasAnyChild;
+private bool isChildOnly;
 
 protected override async Task OnParametersSetAsync()
 {
@@ -323,9 +330,10 @@ if (SelectedBatch?.BatchProductId is int batchProductId2 && batchProductId2 > 0)
 
     hasAnyParent = qtyList.Any(x => x.ParentQty > 0);
     hasAnyChild  = qtyList.Any(x => x.ChildQty > 0);
+    isChildOnly = !hasAnyParent && hasAnyChild;
 
     // tikai Child scenārijs
-    if (!hasAnyParent && hasAnyChild)
+    if (isChildOnly)
     {
         Parts = Parts
             .Where(p =>
@@ -334,6 +342,13 @@ if (SelectedBatch?.BatchProductId is int batchProductId2 && batchProductId2 > 0)
                     && x.ChildQty > 0))
             .ToList();
     }
+
+    // Parent + Child scenārijs – NEFILTRĒJAM detaļas
+    // (rādām pilnu tehnoloģiju, pat ja child nav visām detaļām)
+    if (hasAnyParent && hasAnyChild)
+        {
+            // neko nedaram – Parts paliek pilns saraksts
+        }
         
     // 3) Grupējam pēc TopPartStep_ID
 
@@ -471,8 +486,8 @@ private sealed class DetailSummaryRow
 // switch pogas funkcija 27.01.2026
 async Task OnActivatePart(int productToPartId)
 {
-    if (SelectedBatch?.BatchId is not int batchId || batchId <= 0)
-        return;
+    if (SelectedBatch?.BatchProductId is not int batchProductId || batchProductId <= 0)
+    return;
 
     var part = Parts.FirstOrDefault(p => p.ProductToPartId == productToPartId);
     if (part is null)
@@ -485,26 +500,45 @@ var ok = await JS.InvokeAsync<bool>(
     $"Vai detaļa \"{part.TopPartName}\" (produkts: {SelectedBatch?.ProductCode}) partijā {batchCode} ir gatava?"
 );
 
+var hasTasks = part.Steps.Any(s =>
+    TasksByStep.ContainsKey((s.Id, productToPartId)));
+
+
+
 if (!ok)
     return;
 
-Console.WriteLine(
-    $"[UI] BatchProductId={SelectedBatch?.BatchProductId}, ProductToPartId={productToPartId}"
-);
+var targetBatchProductId = SelectedBatch!.BatchProductId;
 
+// Child only gadījumā jāņem konkrētās detaļas batchProduct
+if (isChildOnly)
+{
+   var matches = qtyList
+    .Where(x => x.ProductToPartId == productToPartId)
+    .ToList();
 
-    await Http.PostAsJsonAsync(
+var match = matches
+    .FirstOrDefault(x => x.BatchProductId == SelectedBatch!.BatchProductId)
+    ?? matches.FirstOrDefault();
+
+if (match?.BatchProductId != null && match.BatchProductId > 0)
+    {
+        targetBatchProductId = match.BatchProductId.Value;
+    }
+}
+
+await Http.PostAsJsonAsync(
     "http://localhost:5270/api/tasks/activate-part",
     new
     {
-        BatchProductId = SelectedBatch!.BatchProductId,
+        BatchProductId = targetBatchProductId,
         ProductToPartId = productToPartId
     }
-    );
+);
 
 var activeParts =
     await Http.GetFromJsonAsync<List<int>>(
-    $"http://localhost:5270/api/tasks/active-parts?batchProductId={SelectedBatch!.BatchProductId}"
+    $"http://localhost:5270/api/tasks/active-parts?batchProductId={targetBatchProductId}"
 ) ?? new();
 
 ActivatedParts = activeParts.ToHashSet();
@@ -512,11 +546,11 @@ ActivatedParts = activeParts.ToHashSet();
 await InvokeAsync(StateHasChanged);
 
 // pārlādējam arī indikatorus šai rindai
-if (SelectedBatch?.BatchProductId is int batchProductId2 && batchProductId2 > 0)
+if (targetBatchProductId > 0)
 {
     var indicators =
         await Http.GetFromJsonAsync<List<DetailedIndicatorRow>>(
-            $"http://localhost:5270/api/tasks/detailed-indicators?batchProductId={batchProductId2}"
+            $"http://localhost:5270/api/tasks/detailed-indicators?batchProductId={targetBatchProductId}"
         ) ?? new();
 
     DetailedIndicators = indicators.ToDictionary(
@@ -592,6 +626,7 @@ private Dictionary<int, List<dynamic>> tasksGrouped = new();
 private sealed class DetailQtyRow
 {
     public int ProductToPartId { get; set; }
+    public int? BatchProductId { get; set; }
     public string TopPartName { get; set; } = "";
     public int ParentQty { get; set; }
     public int ChildQty { get; set; }
