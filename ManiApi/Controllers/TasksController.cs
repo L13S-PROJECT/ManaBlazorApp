@@ -3728,7 +3728,7 @@ public async Task<IActionResult> GetUnassignedTasksV2()
         FROM batches_products bp2
         WHERE bp2.Batch_Id = bp.Batch_Id
           AND bp2.Version_Id = bp.Version_Id
-          AND bp2.ParentBatchProduct_ID IS NULL
+          AND bp2.ProductToPart_ID IS NULL
           AND bp2.IsActive = 1
     )
     THEN (
@@ -3736,7 +3736,7 @@ public async Task<IActionResult> GetUnassignedTasksV2()
         FROM batches_products bp2
         WHERE bp2.Batch_Id = bp.Batch_Id
           AND bp2.Version_Id = bp.Version_Id
-          AND bp2.ParentBatchProduct_ID IS NULL
+          AND bp2.ProductToPart_ID IS NULL
           AND bp2.IsActive = 1
         LIMIT 1
     )
@@ -3843,8 +3843,8 @@ foreach (var g in groups)
 {
     var items = g.ToList();
 
-    var parents = items.Where(x => x.ParentBatchProductId == null).ToList();
-    var childs = items.Where(x => x.ParentBatchProductId != null).ToList();
+    var parents = items.Where(x => x.ProductToPartId == 0).ToList();
+    var childs = items.Where(x => x.ProductToPartId != 0).ToList();
 
     var hasParent = parents.Any();
     var hasChild = childs.Any();

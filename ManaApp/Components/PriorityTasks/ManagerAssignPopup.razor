@@ -30,7 +30,11 @@
     .Select(g =>
     {
         if (g.Count() == 1)
-            return g.First();
+{
+    var single = g.First();
+
+    return single;
+}
 
         var first = g.First();
 
@@ -45,21 +49,12 @@
 
 tasks = mergedTasks;
 
-    var groups2 = tasks.GroupBy(x => x.RootId);
-
-        foreach (var g in groups2)
-            {
-                var hasParent = g.Any(x => x.BatchProductId == x.RootId);
-                var hasChild = g.Any(x => x.BatchProductId != x.RootId);
-
-                foreach (var item in g)
-                {
-                    if (item.RowType != "ParentChildMerged" && item.BatchProductId != item.RootId)
-                    {
-                        item.RowType = "SingleChild";
-                    }
-                }
-            }
+foreach (var t in tasks)
+{
+    Console.WriteLine(
+        $"DEBUG: Batch={t.BatchCode} Root={t.RootId} BP={t.BatchProductId} RowType={t.RowType}"
+    );
+}
 
     var pushTasks = tasks.Where(t => t.Tasks_Push).ToList();
     var priorityTasks = tasks.Where(t => !t.Tasks_Push && t.BatchPriority).ToList();
