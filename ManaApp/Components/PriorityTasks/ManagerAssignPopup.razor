@@ -57,8 +57,22 @@ foreach (var t in tasks)
 }
 
     var pushTasks = tasks.Where(t => t.Tasks_Push).ToList();
-    var priorityTasks = tasks.Where(t => !t.Tasks_Push && t.BatchPriority).ToList();
-    var ordinaryTasks = tasks.Where(t => !t.Tasks_Push && !t.BatchPriority).ToList();  
+
+    var superPriorityTasks = tasks
+        .Where(t => !t.Tasks_Push && t.BatchPriority && t.Tasks_Priority)
+        .ToList();
+
+    var priorityTasks = tasks
+        .Where(t => !t.Tasks_Push && t.BatchPriority && !t.Tasks_Priority)
+        .ToList();
+
+    var superOrdinaryTasks = tasks
+        .Where(t => !t.Tasks_Push && !t.BatchPriority && t.Tasks_Priority)
+        .ToList();
+
+    var ordinaryTasks = tasks
+        .Where(t => !t.Tasks_Push && !t.BatchPriority && !t.Tasks_Priority)
+        .ToList(); 
 
 <div class="elp-section">
 
@@ -181,6 +195,90 @@ else
 </td>
 </tr>
 }
+
+@if (superPriorityTasks.Any())
+{
+<tr class="section-header">
+    <td colspan="11"><b>Super Priority</b></td>
+</tr>
+
+@foreach (var t in superPriorityTasks)
+{
+    <tr class="section-priority">
+        <td>@t.BatchCode</td>
+        <td>@t.ProductName</td>
+        <td>
+            @t.TopPartName
+            @if (t.RowType == "SingleChild")
+            {
+                <span style="margin-left:4px;">*</span>
+            }
+        </td>
+        <td>@t.StepName</td>
+        <td>
+            @if (!string.IsNullOrEmpty(t.QtyBreakdown))
+            {
+                <span>@t.QtyBreakdown</span>
+            }
+            else
+            {
+                <span>@t.Qty</span>
+            }
+        </td>
+        <td>@FormatTime(t.EstimatedMinutes)</td>
+        <td>
+            @if (t.Status == 1)
+            {
+                @(t.CanStart == true ? "Var sākt" : "Gaida...")
+            }
+        </td>
+
+        <td>
+            <select class="form-select form-select-sm"
+                value="@(t.Assigned_To?.ToString() ?? "0")"
+                @onchange="async e => {
+                    var val = e.Value?.ToString();
+                    int parsed = 0;
+
+                    if (!string.IsNullOrWhiteSpace(val))
+                        int.TryParse(val, out parsed);
+
+                    t.Assigned_To = parsed == 0 ? null : parsed;
+
+                    await OnAssigneeChanged(t, e);
+                }">
+
+                <option value="0">Nav piešķirts</option>
+
+                @foreach (var emp in employees)
+                {
+                    <option value="@emp.Id">@emp.Name</option>
+                }
+            </select>
+        </td>
+
+        <td>
+            <input type="checkbox"
+                checked="@t.Tasks_Priority"
+                @onchange="e => OnPriorityChanged(t, e)" />
+        </td>
+
+        <td>
+            <span class="push-btn"
+                @onclick="() => TogglePush(t)">
+                ↑
+            </span>
+        </td>
+
+        <td>
+            <span style="cursor:pointer"
+                @onclick="() => OpenTaskDetails(t)">
+                🔍
+            </span>
+        </td>
+    </tr>
+}
+}
           
 @if (priorityTasks.Any())
 {
@@ -267,6 +365,91 @@ else
     </tr>
 }
 }
+
+@if (superOrdinaryTasks.Any())
+{
+<tr class="section-header">
+    <td colspan="11"><b>Super Sequential</b></td>
+</tr>
+
+@foreach (var t in superOrdinaryTasks)
+{
+    <tr class="section-ordinary">
+        <td>@t.BatchCode</td>
+        <td>@t.ProductName</td>
+        <td>
+            @t.TopPartName
+            @if (t.RowType == "SingleChild")
+            {
+                <span style="margin-left:4px;">*</span>
+            }
+        </td>
+        <td>@t.StepName</td>
+        <td>
+            @if (!string.IsNullOrEmpty(t.QtyBreakdown))
+            {
+                <span>@t.QtyBreakdown</span>
+            }
+            else
+            {
+                <span>@t.Qty</span>
+            }
+        </td>
+        <td>@FormatTime(t.EstimatedMinutes)</td>
+        <td>
+            @if (t.Status == 1)
+            {
+                @(t.CanStart == true ? "Var sākt" : "Gaida...")
+            }
+        </td>
+
+        <td>
+            <select class="form-select form-select-sm"
+                value="@(t.Assigned_To?.ToString() ?? "0")"
+                @onchange="async e => {
+                    var val = e.Value?.ToString();
+                    int parsed = 0;
+
+                    if (!string.IsNullOrWhiteSpace(val))
+                        int.TryParse(val, out parsed);
+
+                    t.Assigned_To = parsed == 0 ? null : parsed;
+
+                    await OnAssigneeChanged(t, e);
+                }">
+
+                <option value="0">Nav piešķirts</option>
+
+                @foreach (var emp in employees)
+                {
+                    <option value="@emp.Id">@emp.Name</option>
+                }
+            </select>
+        </td>
+
+        <td>
+            <input type="checkbox"
+                checked="@t.Tasks_Priority"
+                @onchange="e => OnPriorityChanged(t, e)" />
+        </td>
+
+        <td>
+            <span class="push-btn"
+                @onclick="() => TogglePush(t)">
+                ↑
+            </span>
+        </td>
+
+        <td>
+            <span style="cursor:pointer"
+                @onclick="() => OpenTaskDetails(t)">
+                🔍
+            </span>
+        </td>
+    </tr>
+}
+}
+
 @if (ordinaryTasks.Any())
 {
 <tr class="section-header">
@@ -544,7 +727,7 @@ Console.WriteLine($"SEND -> BP:{t.BatchProductId} STEP:{t.TopPartStepId} PART:{t
 
 var response = await Http.PostAsJsonAsync("api/tasks/update-assignee-aggregated", new
 {
-    BatchProductId = t.BatchProductId,
+    BatchProductId = t.RootId,
     TopPartStepId = t.TopPartStepId,
     ProductToPartId = t.ProductToPartId,
     RowType = t.RowType,   
@@ -582,7 +765,7 @@ private async Task OnPriorityChanged(UnassignedTaskV2Dto t, ChangeEventArgs e)
 
     await Http.PostAsJsonAsync("api/tasks/set-part-priority", new
     {
-        BatchProductId = t.BatchProductId,
+        BatchProductId = t.RootId,
         ProductToPartId = t.ProductToPartId,
         Tasks_Priority = isChecked
     });
@@ -603,10 +786,11 @@ private async Task TogglePush(UnassignedTaskV2Dto t)
     var newValue = !t.Tasks_Push;
 
     await Http.PostAsJsonAsync("api/tasks/set-task-push", new
-    {
-        TaskId = t.TaskId,
-        Tasks_Push = newValue
-    });
+        {
+            BatchProductId = t.RootId,  
+            ProductToPartId = t.ProductToPartId,
+            Tasks_Push = newValue
+        });
 
     t.Tasks_Push = newValue;
 var data = await Http.GetFromJsonAsync<List<UnassignedTaskV2Dto>>("/api/tasks/unassigned-v2")
@@ -621,7 +805,7 @@ model = new EmployeeLoadModel
 
 private void OpenTaskDetails(UnassignedTaskV2Dto t)
 {
-    detailsBatchProductId = t.BatchProductId;
+    detailsBatchProductId = t.RootId;
     detailsProductToPartId = t.ProductToPartId;
     selectedTaskId = t.TaskId;
 }

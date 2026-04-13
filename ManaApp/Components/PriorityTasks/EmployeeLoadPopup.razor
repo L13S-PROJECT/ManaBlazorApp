@@ -768,7 +768,7 @@ showSavedPopup = true;
 
 private void OpenTaskDetails(TaskRow t)
 {
-    detailsBatchProductId = t.BatchProductId;
+    detailsBatchProductId = t.RootId;
     detailsProductToPartId = t.ProductToPartId;
     selectedTaskId = t.TaskId;
 }
@@ -894,16 +894,17 @@ private void CloseTaskDetails()
     selectedTaskId = null;
 }
 private IEnumerable<TaskRow> PushTasks =>
-    (model?.Priority ?? Enumerable.Empty<TaskRow>())
+    (model?.InProgress ?? Enumerable.Empty<TaskRow>())
+    .Concat(model?.Priority ?? Enumerable.Empty<TaskRow>())
     .Concat(model?.Normal ?? Enumerable.Empty<TaskRow>())
     .Where(t => t.Tasks_Push);
 private IEnumerable<TaskRow> PrioritySuper =>
-    model?.Priority?.Where(t => t.BatchPriority && !t.Tasks_Push)
-        .Where(t => t.Assigned_To == EmployeeId || t.Assigned_To == null || EmployeeId == 0)
+    model?.Priority?.Where(t => t.Tasks_Priority && !t.Tasks_Push)
+    .Where(t => t.Assigned_To == EmployeeId || t.Assigned_To == null || EmployeeId == 0)
     ?? Enumerable.Empty<TaskRow>();
 
 private IEnumerable<TaskRow> PriorityNormal =>
-    model?.Priority?.Where(t => !t.BatchPriority && !t.Tasks_Push)
+    model?.Priority?.Where(t => !t.Tasks_Priority && !t.Tasks_Push)
     .Where(t => t.Assigned_To == EmployeeId || t.Assigned_To == null || EmployeeId == 0)
     ?? Enumerable.Empty<TaskRow>();
 
@@ -924,7 +925,7 @@ private async Task OnPartPriorityChanged(TaskRow t, ChangeEventArgs e)
 
     await Http.PostAsJsonAsync("api/tasks/set-part-priority", new
     {
-        BatchProductId = t.BatchProductId,
+        BatchProductId = t.RootId,
         ProductToPartId = t.ProductToPartId,
         Tasks_Priority = isChecked
     });
@@ -962,10 +963,11 @@ private async Task TogglePush(TaskRow t)
     var newValue = !t.Tasks_Push;
 
     await Http.PostAsJsonAsync("api/tasks/set-task-push", new
-    {
-        TaskId = t.TaskId,
-        Tasks_Push = newValue
-    });
+        {
+            BatchProductId = t.RootId,   
+            ProductToPartId = t.ProductToPartId,
+            Tasks_Push = newValue
+        });
 
     t.Tasks_Push = newValue;
 
@@ -1017,7 +1019,7 @@ await JS.InvokeVoidAsync("console.log", new {
 
 var payload = new
 {
-    BatchProductId = t.BatchProductId,
+    BatchProductId = t.RootId,
     TopPartStepId = t.TopPartStepId,
     ProductToPartId = t.ProductToPartId,
     RowType = t.RowType, 

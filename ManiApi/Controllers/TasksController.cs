@@ -3229,7 +3229,7 @@ public async Task<IActionResult> UpdateAssigneeAggregated([FromBody] UpdateAssig
     await using var cmd = conn.CreateCommand();
 if (dto.RowType == "SingleChild")
 {
-    cmd.CommandText = @"
+cmd.CommandText = @"
 UPDATE tasks t
 JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
 SET t.Assigned_To = @emp
@@ -3245,8 +3245,9 @@ WHERE t.IsActive = 1
           SELECT bp0.Version_Id FROM batches_products bp0 WHERE bp0.ID = @bp LIMIT 1
       )
 )
-  AND ts.ProductToPart_ID = @productToPartId;
+AND ts.ProductToPart_ID = @productToPartId;
 ";
+
 }
 else
 {
@@ -3357,16 +3358,22 @@ WHERE t.IsActive = 1
     await using var cmd = conn.CreateCommand();
     cmd.CommandText = @"
 UPDATE tasks t
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
 SET t.Tasks_Priority = @prio
 WHERE t.IsActive = 1
   AND t.Tasks_Status = 1
-  AND t.BatchProduct_ID = @bp
-  AND t.TopPartStep_ID IN (
-      SELECT ts.ID
-      FROM toppartsteps ts
-      WHERE ts.IsActive = 1
-        AND ts.ProductToPart_ID = @ptp
-  );
+  AND t.BatchProduct_ID IN (
+      SELECT bp2.ID
+      FROM batches_products bp2
+      WHERE bp2.IsActive = 1
+        AND bp2.Batch_Id = (
+            SELECT bp0.Batch_Id FROM batches_products bp0 WHERE bp0.ID = @bp LIMIT 1
+        )
+        AND bp2.Version_Id = (
+            SELECT bp0.Version_Id FROM batches_products bp0 WHERE bp0.ID = @bp LIMIT 1
+        )
+  )
+  AND ts.ProductToPart_ID = @ptp;
 ";
     cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@prio", dto.Tasks_Priority ? 1 : 0));
     cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@bp", dto.BatchProductId));
@@ -3448,25 +3455,60 @@ public async Task<IActionResult> GetAssemblyAvailableUi([FromQuery] int batchPro
     return Ok(Math.Max(assemblyStock, 0));
 }
 
-public sealed class SetTaskPushDto
+public class SetTaskPushDto
 {
-    public int TaskId { get; set; }
+    public int BatchProductId { get; set; }
+    public int ProductToPartId { get; set; }
     public bool Tasks_Push { get; set; }
 }
 
 [HttpPost("set-task-push")]
 public async Task<IActionResult> SetTaskPush([FromBody] SetTaskPushDto dto)
 {
-    if (dto == null || dto.TaskId <= 0)
-        return BadRequest("TaskId required.");
+    if (dto == null || dto.BatchProductId <= 0 || dto.ProductToPartId <= 0)
+        return BadRequest("Invalid data.");
 
-    var t = await _db.Tasks.FirstOrDefaultAsync(x => x.ID == dto.TaskId && x.IsActive);
-    if (t == null)
-        return NotFound();
+    var conn = _db.Database.GetDbConnection();
+    if (conn.State != System.Data.ConnectionState.Open)
+    await conn.OpenAsync();
 
-    t.Tasks_Push = dto.Tasks_Push;
+    using var cmd = conn.CreateCommand();
 
-    await _db.SaveChangesAsync();
+    cmd.CommandText = @"
+    UPDATE tasks t
+    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+    SET t.Tasks_Push = @push
+    WHERE t.IsActive = 1
+      AND t.BatchProduct_ID IN (
+          SELECT bp2.ID
+          FROM batches_products bp2
+          WHERE bp2.IsActive = 1
+            AND bp2.Batch_Id = (
+                SELECT bp0.Batch_Id FROM batches_products bp0 WHERE bp0.ID = @bp LIMIT 1
+            )
+            AND bp2.Version_Id = (
+                SELECT bp0.Version_Id FROM batches_products bp0 WHERE bp0.ID = @bp LIMIT 1
+            )
+      )
+      AND ts.ProductToPart_ID = @ptp;
+    ";
+
+    var p1 = cmd.CreateParameter();
+    p1.ParameterName = "@push";
+    p1.Value = dto.Tasks_Push;
+    cmd.Parameters.Add(p1);
+
+    var p2 = cmd.CreateParameter();
+    p2.ParameterName = "@bp";
+    p2.Value = dto.BatchProductId;
+    cmd.Parameters.Add(p2);
+
+    var p3 = cmd.CreateParameter();
+    p3.ParameterName = "@ptp";
+    p3.Value = dto.ProductToPartId;
+    cmd.Parameters.Add(p3);
+
+    await cmd.ExecuteNonQueryAsync();
 
     return Ok(new { updated = true });
 }
@@ -3632,10 +3674,11 @@ continue;
 
     return Ok(new
 {
-InProgress = result.Where(x => x.Status == 2),
-Priority = result.Where(x => x.Status != 2 && x.BatchPriority && x.Tasks_Priority),
-Normal   = result.Where(x => x.Status != 2 && !(x.BatchPriority && x.Tasks_Priority))
+    InProgress = result.Where(x => x.Status == 2),
+    Priority = result.Where(x => x.Status != 2 && x.BatchPriority),
+    Normal = result.Where(x => x.Status != 2 && !x.BatchPriority)
 });
+
 }
 
 [HttpPost("update-assignee-bulk")]
