@@ -842,7 +842,7 @@ private void CloseDetails()
 private class TaskRow
 {
     public int TaskId { get; set; }
-
+    public bool BatchPriority { get; set; }
     public string? BatchCode { get; set; }
     public int BatchProductId { get; set; }
     public int ProductToPartId { get; set; }
@@ -898,12 +898,12 @@ private IEnumerable<TaskRow> PushTasks =>
     .Concat(model?.Normal ?? Enumerable.Empty<TaskRow>())
     .Where(t => t.Tasks_Push);
 private IEnumerable<TaskRow> PrioritySuper =>
-    model?.Priority?.Where(t => t.Tasks_Priority && !t.Tasks_Push)
+    model?.Priority?.Where(t => t.BatchPriority && !t.Tasks_Push)
         .Where(t => t.Assigned_To == EmployeeId || t.Assigned_To == null || EmployeeId == 0)
     ?? Enumerable.Empty<TaskRow>();
 
 private IEnumerable<TaskRow> PriorityNormal =>
-    model?.Priority?.Where(t => !t.Tasks_Priority && !t.Tasks_Push)
+    model?.Priority?.Where(t => !t.BatchPriority && !t.Tasks_Push)
     .Where(t => t.Assigned_To == EmployeeId || t.Assigned_To == null || EmployeeId == 0)
     ?? Enumerable.Empty<TaskRow>();
 

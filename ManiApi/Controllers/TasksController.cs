@@ -2392,6 +2392,7 @@ ORDER BY
     {
         list.Add(new
         {
+            BatchPriority = false,
             WorkCenter = r.IsDBNull(0) ? null : r.GetString(0),
             WorkCenterSort = r.IsDBNull(1) ? (int?)null : r.GetInt32(1),
             TaskId = r.GetInt32(2),
@@ -2535,6 +2536,7 @@ await using (var r2 = await cmd2.ExecuteReaderAsync())
     {
         priorityList.Add(new
         {
+            BatchPriority = true,
             WorkCenter = r2.IsDBNull(0) ? null : r2.GetString(0),
             WorkCenterSort = r2.IsDBNull(1) ? (int?)null : r2.GetInt32(1),
             TaskId = r2.GetInt32(2),
@@ -2680,6 +2682,7 @@ await using (var r3 = await cmd3.ExecuteReaderAsync())
     {
         normalList.Add(new
         {
+            BatchPriority = false,
             WorkCenter = r3.IsDBNull(0) ? null : r3.GetString(0),
             WorkCenterSort = r3.IsDBNull(1) ? (int?)null : r3.GetInt32(1),
             TaskId = r3.GetInt32(2),
@@ -3224,15 +3227,24 @@ public async Task<IActionResult> UpdateAssigneeAggregated([FromBody] UpdateAssig
     await conn.OpenAsync();
 
     await using var cmd = conn.CreateCommand();
-    if (dto.RowType == "SingleChild")
+if (dto.RowType == "SingleChild")
 {
     cmd.CommandText = @"
 UPDATE tasks t
 JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
 SET t.Assigned_To = @emp
 WHERE t.IsActive = 1
-  AND t.BatchProduct_ID = @bp
-  AND t.TopPartStep_ID = @step
+  AND t.BatchProduct_ID IN (
+    SELECT bp2.ID
+    FROM batches_products bp2
+    WHERE bp2.IsActive = 1
+      AND bp2.Batch_Id = (
+          SELECT bp0.Batch_Id FROM batches_products bp0 WHERE bp0.ID = @bp LIMIT 1
+      )
+      AND bp2.Version_Id = (
+          SELECT bp0.Version_Id FROM batches_products bp0 WHERE bp0.ID = @bp LIMIT 1
+      )
+)
   AND ts.ProductToPart_ID = @productToPartId;
 ";
 }
@@ -3498,6 +3510,7 @@ foreach (var g in groups)
                     {
                         RootId = (int)t.RootId,
                         BatchCode = t.BatchCode,
+                        BatchPriority = t.BatchPriority,
                         BatchProductId = (int)t.BatchProductId,
                         ProductToPartId = (int)t.ProductToPartId,
                         ProductName = t.ProductName,
@@ -3549,6 +3562,7 @@ foreach (var g in groups)
                         RootId = (int)first.RootId,
                         BatchCode = first.BatchCode,
                         BatchProductId = (int)first.BatchProductId,
+                        BatchPriority = first.BatchPriority,
                         ProductToPartId = (int)first.ProductToPartId,
                         ProductName = first.ProductName,
         
@@ -3590,6 +3604,7 @@ foreach (var sg in stepGroups)
         RootId = (int)first.RootId,
         BatchCode = first.BatchCode,
         BatchProductId = (int)first.BatchProductId,
+        BatchPriority = first.BatchPriority,
         ProductToPartId = (int)first.ProductToPartId,
         ProductName = first.ProductName,
         TopPartName = first.TopPartName,
@@ -3618,8 +3633,8 @@ continue;
     return Ok(new
 {
 InProgress = result.Where(x => x.Status == 2),
-Priority = result.Where(x => x.Status != 2 && x.Tasks_Priority),
-Normal = result.Where(x => x.Status != 2 && !x.Tasks_Priority)
+Priority = result.Where(x => x.Status != 2 && x.BatchPriority && x.Tasks_Priority),
+Normal   = result.Where(x => x.Status != 2 && !(x.BatchPriority && x.Tasks_Priority))
 });
 }
 
@@ -3654,6 +3669,7 @@ public class EmployeeTaskRowV2
 {
     public int RootId { get; set; }
     public int BatchProductId { get; set; }    
+    public bool BatchPriority { get; set; }
     public int ProductToPartId { get; set; }    
     public string? BatchCode { get; set; }
     public string? ProductName { get; set; }

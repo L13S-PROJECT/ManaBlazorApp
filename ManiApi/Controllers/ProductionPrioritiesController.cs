@@ -468,12 +468,54 @@ public async Task<IActionResult> GetPriorityImpact()
             cmd.CommandText = @"
 WITH task_flags AS (
     SELECT
-        t.ID,
+        t.BatchProduct_ID,
+        CASE
+    WHEN bp.ProductToPart_ID IS NULL 
+         AND EXISTS (
+             SELECT 1
+             FROM batches_products bp2
+             WHERE bp2.Batch_Id = bp.Batch_Id
+               AND bp2.Version_Id = bp.Version_Id
+               AND bp2.ProductToPart_ID IS NOT NULL
+               AND bp2.IsActive = 1
+         )
+    THEN CONCAT(bp.ID, '_MERGE')
+
+    WHEN bp.ProductToPart_ID IS NOT NULL
+         AND EXISTS (
+             SELECT 1
+             FROM batches_products bp2
+             WHERE bp2.Batch_Id = bp.Batch_Id
+               AND bp2.Version_Id = bp.Version_Id
+               AND bp2.ProductToPart_ID IS NULL
+               AND bp2.IsActive = 1
+         )
+    THEN CONCAT(bp_root.ID, '_MERGE')
+
+    ELSE CAST(bp.ID AS CHAR)
+END AS MergeKey,
+
+CASE
+    --  Parent + Child → MERGE kā 1 gab
+    WHEN bp_root.ID IS NOT NULL
+    THEN CONCAT(bp_root.ID, '_', COALESCE(ts.ProductToPart_ID, 0))
+
+    --  Child-only (nav parent) → katrs child savs key
+    WHEN bp.ProductToPart_ID IS NOT NULL
+    THEN CONCAT(bp.ID, '_', ts.ProductToPart_ID)
+
+    --  Parent-only
+    ELSE CONCAT(bp.ID, '_', COALESCE(ts.ProductToPart_ID, 0))
+END AS TaskGroupKey,
+
+        COALESCE(ts.ProductToPart_ID, 0) AS ProductToPart_ID,
+        MIN(ts.Step_Order) AS Step_Order,
+        bp.ProductToPart_ID AS BatchProductToPartId,
+        bp.Batch_Id AS BatchId,
         COALESCE(t.Assigned_To, 0) AS Assigned_To,
         wc2.ID AS WorkCentr_ID,
         wc2.WorkCentr_Name AS WorkCenterName,
         wc2.Step_Type_ID AS StepTypeId,
-        t.BatchProduct_ID,
         COALESCE(bp.is_priority,0) AS IsPriority,
         CASE 
             WHEN ts.Step_Type IN (1,2) THEN (bp.Planned_Qty * ptp.Qty_Per_product) * ts.Estimated_Minutes
@@ -497,11 +539,40 @@ END AS CanStart
 
     FROM tasks t
     JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+    JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+    LEFT JOIN batches_products bp_root 
+        ON bp_root.Batch_Id = bp.Batch_Id
+        AND bp_root.Version_Id = bp.Version_Id
+        AND bp_root.ProductToPart_ID IS NULL
+        AND bp_root.IsActive = 1
     JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
     LEFT JOIN workcentr_type wc2 ON wc2.ID = ts.WorkCentr_ID
-    JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
-    WHERE t.IsActive = 1
+
+    WHERE 
+    t.IsActive = 1
     AND t.Tasks_Status IN (1)
+
+    AND NOT (
+        bp.ProductToPart_ID IS NOT NULL
+        AND EXISTS (
+            SELECT 1
+            FROM batches_products bp_parent
+            WHERE bp_parent.Batch_Id = bp.Batch_Id
+              AND bp_parent.Version_Id = bp.Version_Id
+              AND bp_parent.ProductToPart_ID IS NULL
+              AND bp_parent.IsActive = 1
+        )
+    )
+
+GROUP BY
+    t.ID,
+    t.BatchProduct_ID,
+    COALESCE(ts.ProductToPart_ID, 0),
+    COALESCE(t.Assigned_To, 0),
+    wc2.ID,
+    wc2.WorkCentr_Name,
+    wc2.Step_Type_ID,
+    bp.is_priority
 )
 
 SELECT
@@ -522,25 +593,27 @@ SUM(CASE
     AND tf.Assigned_To <> 0
     THEN 1 ELSE 0 END) AS NormalCount,
 
-SUM(CASE 
+COUNT(DISTINCT CASE 
     WHEN tf.IsPriority = 1
     AND tf.Assigned_To IS NOT NULL 
     AND tf.Assigned_To <> 0
     AND tf.CanStart = 1
-    THEN 1 ELSE 0 END) AS PriorityCanStartCount,
+    THEN tf.TaskGroupKey
+END) AS PriorityCanStartCount,
 
-SUM(CASE 
+COUNT(DISTINCT CASE 
     WHEN tf.IsPriority = 0
     AND tf.Assigned_To IS NOT NULL 
     AND tf.Assigned_To <> 0
-     AND tf.CanStart = 1
-    THEN 1 ELSE 0 END) AS NormalCanStartCount,
+    AND tf.CanStart = 1
+    THEN tf.TaskGroupKey
+END) AS NormalCanStartCount,
 
-COUNT(CASE 
+COUNT(DISTINCT CASE 
     WHEN tf.CanStart = 1
     AND tf.Assigned_To IS NOT NULL 
     AND tf.Assigned_To <> 0
-    THEN tf.ID 
+    THEN tf.TaskGroupKey
 END) AS CanStartCount,
 
 SUM(CASE 
@@ -557,24 +630,20 @@ SUM(CASE
     WHEN tf.Assigned_To IS NULL OR tf.Assigned_To = 0
     THEN 1 ELSE 0 END) AS UnassignedTotalCount,
 
-SUM(
-    CASE 
-        WHEN tf.CanStart = 1
-        AND (tf.Assigned_To IS NULL OR tf.Assigned_To = 0)
-        THEN 1 ELSE 0 
-    END
-) AS UnassignedCanStartCount,
+COUNT(DISTINCT CASE 
+    WHEN tf.CanStart = 1
+    AND (tf.Assigned_To IS NULL OR tf.Assigned_To = 0)
+    THEN tf.TaskGroupKey
+END) AS UnassignedCanStartCount,
 
 -- 🔥 JAUNAIS – pilns sadalījums (NEAIZTIEC esošos laukus)
 
-SUM(
-    CASE 
-        WHEN tf.CanStart = 1
-        AND (tf.Assigned_To IS NULL OR tf.Assigned_To = 0)
-        AND tf.IsPriority = 1
-        THEN 1 ELSE 0 
-    END
-) AS UnassignedPriorityCanStartCount,
+COUNT(DISTINCT CASE 
+    WHEN tf.CanStart = 1
+    AND (tf.Assigned_To IS NULL OR tf.Assigned_To = 0)
+    AND tf.IsPriority = 1
+    THEN tf.TaskGroupKey
+END) AS UnassignedPriorityCanStartCount,
 
 SUM(
     CASE 
@@ -585,14 +654,12 @@ SUM(
     END
 ) AS UnassignedPriorityWaitingCount,
 
-SUM(
-    CASE 
-        WHEN tf.CanStart = 1
-        AND (tf.Assigned_To IS NULL OR tf.Assigned_To = 0)
+COUNT(DISTINCT CASE 
+    WHEN tf.CanStart = 1
+    AND (tf.Assigned_To IS NULL OR tf.Assigned_To = 0)
         AND tf.IsPriority = 0
-        THEN 1 ELSE 0 
-    END
-) AS UnassignedNormalCanStartCount,
+        THEN tf.TaskGroupKey
+END) AS UnassignedNormalCanStartCount,
 
 SUM(
     CASE 
