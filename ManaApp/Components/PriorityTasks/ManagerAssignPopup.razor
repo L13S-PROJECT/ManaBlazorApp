@@ -25,22 +25,52 @@
     .Where(t => (t.WorkCenter ?? "") == wc)
     .ToList();
 
+    var mergedTasks = tasks
+    .GroupBy(x => new { x.RootId, x.ProductToPartId, x.StepName })
+    .Select(g =>
+    {
+        if (g.Count() == 1)
+            return g.First();
+
+        var first = g.First();
+
+        first.QtyBreakdown = string.Join("+", g.Select(x => x.Qty));
+        first.Qty = g.Sum(x => x.Qty);
+        first.EstimatedMinutes = g.Sum(x => x.EstimatedMinutes);
+        first.RowType = "ParentChildMerged";
+
+        return first;
+    })
+    .ToList();
+
+tasks = mergedTasks;
+
+    var groups2 = tasks.GroupBy(x => x.RootId);
+
+        foreach (var g in groups2)
+            {
+                var hasParent = g.Any(x => x.BatchProductId == x.RootId);
+                var hasChild = g.Any(x => x.BatchProductId != x.RootId);
+
+                foreach (var item in g)
+                {
+                    if (item.RowType != "ParentChildMerged" && item.BatchProductId != item.RootId)
+                    {
+                        item.RowType = "SingleChild";
+                    }
+                }
+            }
+
     var pushTasks = tasks.Where(t => t.Tasks_Push).ToList();
-    var priorityTasks = tasks
-    .Where(t => !t.Tasks_Push && t.BatchPriority)
-    .ToList();   
-
-    var ordinaryTasks = tasks
-    .Where(t => !t.Tasks_Push && !t.BatchPriority)
-    .ToList();   
-
+    var priorityTasks = tasks.Where(t => !t.Tasks_Push && t.BatchPriority).ToList();
+    var ordinaryTasks = tasks.Where(t => !t.Tasks_Push && !t.BatchPriority).ToList();  
 
 <div class="elp-section">
 
 <div class="wc-header">
     @wc
     <span class="wc-time">
-        (@tasks.Count | @FormatTime(tasks.Sum(t => t.Qty * t.EstimatedMinutes)))
+        (@tasks.Count | @FormatTime(tasks.Sum(t => t.EstimatedMinutes)))
     </span>
 </div>
 
@@ -83,19 +113,27 @@ else
 <tr class="section-push">
     <td>@t.BatchCode</td>
     <td>@t.ProductName</td>
-    <td>@t.TopPartName</td>
-    <td>@t.StepName</td>
     <td>
-@if (t.RowType == "ParentChildMerged")
+@t.TopPartName
+@if (t.RowType == "SingleChild")
 {
-    <span>@t.QtyBreakdown</span>
-}
-else
-{
-    <span>@t.Qty</span>
+    <span style="margin-left:4px;">*</span>
 }
 </td>
-    <td>@FormatTime(t.Qty * t.EstimatedMinutes)</td>
+    <td>@t.StepName</td>
+<td>
+    @if (!string.IsNullOrEmpty(t.QtyBreakdown))
+    {
+        <span>@t.QtyBreakdown</span>
+    }
+    else
+    {
+        <span>@t.Qty</span>
+    }
+</td>
+    <td>
+@FormatTime(t.EstimatedMinutes)
+</td>
     <td>
         @if (t.Status == 1)
         {
@@ -105,10 +143,20 @@ else
 
     <td>
     <select class="form-select form-select-sm"
-        value="@t.Assigned_To"
-        @onchange="e => OnAssigneeChanged(t, e)">
+        value="@(t.Assigned_To?.ToString() ?? "0")"
+        @onchange="async e => {
+            var val = e.Value?.ToString();
+            int parsed = 0;
 
-            <option value="">Nav piešķirts</option>
+            if (!string.IsNullOrWhiteSpace(val))
+                int.TryParse(val, out parsed);
+
+            t.Assigned_To = parsed == 0 ? null : parsed;
+
+            await OnAssigneeChanged(t, e);
+        }">
+
+            <option value="0">Nav piešķirts</option>
 
             @foreach (var emp in employees)
             {
@@ -150,19 +198,27 @@ else
     <tr class="section-priority">
         <td>@t.BatchCode</td>
         <td>@t.ProductName</td>
-        <td>@t.TopPartName</td>
-        <td>@t.StepName</td>
         <td>
-@if (t.RowType == "ParentChildMerged")
+@t.TopPartName
+@if (t.RowType == "SingleChild")
 {
-    <span>@t.QtyBreakdown</span>
-}
-else
-{
-    <span>@t.Qty</span>
+    <span style="margin-left:4px;">*</span>
 }
 </td>
-        <td>@FormatTime(t.Qty * t.EstimatedMinutes)</td>
+        <td>@t.StepName</td>
+        <td>
+    @if (!string.IsNullOrEmpty(t.QtyBreakdown))
+    {
+        <span>@t.QtyBreakdown</span>
+    }
+    else
+    {
+        <span>@t.Qty</span>
+    }
+</td>
+        <td>
+@FormatTime(t.EstimatedMinutes)
+</td>
         <td>
             @if (t.Status == 1)
             {
@@ -172,10 +228,20 @@ else
 
         <td>
     <select class="form-select form-select-sm"
-        value="@t.Assigned_To"
-        @onchange="e => OnAssigneeChanged(t, e)">
+        value="@(t.Assigned_To?.ToString() ?? "0")"
+        @onchange="async e => {
+            var val = e.Value?.ToString();
+            int parsed = 0;
 
-                <option value="">Nav piešķirts</option>
+            if (!string.IsNullOrWhiteSpace(val))
+                int.TryParse(val, out parsed);
+
+            t.Assigned_To = parsed == 0 ? null : parsed;
+
+            await OnAssigneeChanged(t, e);
+        }">
+
+                <option value="0">Nav piešķirts</option>
 
                 @foreach (var emp in employees)
                 {
@@ -215,21 +281,31 @@ else
 @foreach (var t in ordinaryTasks)
 {
     <tr class="section-ordinary">
-        <td>@t.BatchCode</td>
-        <td>@t.ProductName</td>
-        <td>@t.TopPartName</td>
-        <td>@t.StepName</td>
         <td>
-@if (t.RowType == "ParentChildMerged")
+            @t.BatchCode
+        </td>
+        <td>@t.ProductName</td>
+        <td>
+@t.TopPartName
+@if (t.RowType == "SingleChild")
 {
-    <span>@t.QtyBreakdown</span>
-}
-else
-{
-    <span>@t.Qty</span>
+    <span style="margin-left:4px;">*</span>
 }
 </td>
-        <td>@FormatTime(t.Qty * t.EstimatedMinutes)</td>
+        <td>@t.StepName</td>
+        <td>
+    @if (!string.IsNullOrEmpty(t.QtyBreakdown))
+    {
+        <span>@t.QtyBreakdown</span>
+    }
+    else
+    {
+        <span>@t.Qty</span>
+    }
+</td>
+        <td>
+@FormatTime(t.EstimatedMinutes)
+</td>
         <td>
             @if (t.Status == 1)
             {
@@ -239,10 +315,20 @@ else
 
         <td>
     <select class="form-select form-select-sm"
-        value="@t.Assigned_To"
-        @onchange="e => OnAssigneeChanged(t, e)">
+        value="@(t.Assigned_To?.ToString() ?? "0")"
+        @onchange="async e => {
+            var val = e.Value?.ToString();
+            int parsed = 0;
 
-                <option value="">Nav piešķirts</option>
+            if (!string.IsNullOrWhiteSpace(val))
+                int.TryParse(val, out parsed);
+
+            t.Assigned_To = parsed == 0 ? null : parsed;
+
+            await OnAssigneeChanged(t, e);
+        }">
+
+                <option value="0">Nav piešķirts</option>
 
                 @foreach (var emp in employees)
                 {
@@ -325,14 +411,39 @@ else
                     ?? new List<EmployeeDto>();
     }
 
-var data = await Http.GetFromJsonAsync<List<TaskRow>>("/api/tasks/unassigned")
-           ?? new List<TaskRow>();
+var data = await Http.GetFromJsonAsync<List<UnassignedTaskV2Dto>>("/api/tasks/unassigned-v2")
+           ?? new List<UnassignedTaskV2Dto>();
 
 model = new EmployeeLoadModel
 {
     Priority = data,
-    Normal = new List<TaskRow>()
+    Normal = new List<UnassignedTaskV2Dto>()
 };
+
+var allTasks = (model?.Priority ?? new List<UnassignedTaskV2Dto>())
+    .Concat(model?.Normal ?? new List<UnassignedTaskV2Dto>())
+    .ToList();
+
+var groups = allTasks.GroupBy(x => x.RootId);
+
+foreach (var g in groups)
+{
+    var hasParent = g.Any(x => x.BatchProductId == x.RootId);
+    var hasChild = g.Any(x => x.BatchProductId != x.RootId);
+
+    foreach (var item in g)
+    {
+        var isSingleChildGroup = !hasParent && hasChild;
+
+        item.RowType = item.RowType ?? "";
+
+        // ✔ tikai UI marķējums
+        if (isSingleChildGroup)
+        {
+            item.RowType = "SingleChild";
+        }
+    }
+}
 
 if (allWorkCenters.Count == 0)
 {
@@ -346,9 +457,9 @@ private class EmployeeLoadModel
     public string? EmployeeName { get; set; }
     public string? WorkCenterName { get; set; }
 
-    public List<TaskRow>? InProgress { get; set; }
-    public List<TaskRow>? Priority { get; set; }
-    public List<TaskRow>? Normal { get; set; }
+    public List<UnassignedTaskV2Dto>? InProgress { get; set; }
+    public List<UnassignedTaskV2Dto>? Priority { get; set; }
+    public List<UnassignedTaskV2Dto>? Normal { get; set; }
 }
 
 private class TaskRow
@@ -359,7 +470,7 @@ private class TaskRow
     public string? BatchCode { get; set; }
     public int BatchProductId { get; set; }
     public int ProductToPartId { get; set; }
-
+    public int TopPartStepId { get; set; }
     public string? ProductName { get; set; }
     public string? TopPartName { get; set; }
     public string? StepName { get; set; }
@@ -369,14 +480,47 @@ private class TaskRow
     public int Status { get; set; }
     public bool? CanStart { get; set; }
     public string? RowType { get; set; }
-    public string? QtyBreakdown { get; set; }
-
     public int? Assigned_To { get; set; }
     public bool BatchPriority { get; set; }
     public bool Tasks_Priority { get; set; }
     public bool Tasks_Push { get; set; }
     public int StepOrder { get; set; }
+    public int RootId { get; set; }
     
+}
+
+private class UnassignedTaskV2Dto
+{
+    public string? WorkCenter { get; set; }
+    public int? WorkCenterSort { get; set; }
+    public int TopPartStepId { get; set; }
+    public int TaskId { get; set; }
+    public int RootId { get; set; }
+
+    public int BatchProductId { get; set; }
+    public int ProductToPartId { get; set; }
+
+    public string? BatchCode { get; set; }
+    public string? ProductName { get; set; }
+    public string? TopPartName { get; set; }
+    public string? StepName { get; set; }
+
+    public int Qty { get; set; }
+    public string? QtyBreakdown { get; set; }
+    public int EstimatedMinutes { get; set; }
+
+    public int Status { get; set; }
+    public bool CanStart { get; set; }
+
+    public int? Assigned_To { get; set; }
+
+    public bool BatchPriority { get; set; }
+    public bool Tasks_Priority { get; set; }
+    public bool Tasks_Push { get; set; }
+
+    public int StepOrder { get; set; }
+
+    public string RowType { get; set; } = "";
 }
 
 private class EmployeeDto
@@ -385,42 +529,57 @@ private class EmployeeDto
     public string? Name { get; set; }
 }
 
-private IEnumerable<TaskRow> AllTasks =>
-    (model?.Priority ?? Enumerable.Empty<TaskRow>())
-    .Concat(model?.Normal ?? Enumerable.Empty<TaskRow>());
+private IEnumerable<UnassignedTaskV2Dto> AllTasks =>
+    (model?.Priority ?? Enumerable.Empty<UnassignedTaskV2Dto>())
+    .Concat(model?.Normal ?? Enumerable.Empty<UnassignedTaskV2Dto>());
 
 private IEnumerable<string> WorkCenters => allWorkCenters;
 
-private async Task OnAssigneeChanged(TaskRow t, ChangeEventArgs e)
+private async Task OnAssigneeChanged(UnassignedTaskV2Dto t, ChangeEventArgs e)
 {
-    int? empId = null;
+    var val = e.Value?.ToString();
+int parsed = 0;
 
-    if (int.TryParse(e.Value?.ToString(), out var val))
-        empId = val;
+if (!string.IsNullOrWhiteSpace(val))
+    int.TryParse(val, out parsed);
 
-    t.Assigned_To = empId;
+int? empId = parsed == 0 ? null : parsed;
 
-    await Http.PostAsJsonAsync("api/tasks/update-assignee", new
+Console.WriteLine($"SEND -> BP:{t.BatchProductId} STEP:{t.TopPartStepId} PART:{t.ProductToPartId} EMP:{empId}");
+
+var response = await Http.PostAsJsonAsync("api/tasks/update-assignee-aggregated", new
 {
-    TaskId = t.TaskId,
+    BatchProductId = t.BatchProductId,
+    TopPartStepId = t.TopPartStepId,
+    ProductToPartId = t.ProductToPartId,
+    RowType = t.RowType,   
     Assigned_To = empId
 });
 
-// 🔽 pārlādē UNASSIGNED listu
-var data = await Http.GetFromJsonAsync<List<TaskRow>>("/api/tasks/unassigned")
-           ?? new List<TaskRow>();
+if (!response.IsSuccessStatusCode)
+{
+    var err = await response.Content.ReadAsStringAsync();
+    Console.WriteLine(err);
+    return;
+}
+
+var data = await Http.GetFromJsonAsync<List<UnassignedTaskV2Dto>>("/api/tasks/unassigned-v2")
+           ?? new List<UnassignedTaskV2Dto>();
 
 model = new EmployeeLoadModel
 {
     Priority = data,
-    Normal = new List<TaskRow>()
+    Normal = new List<UnassignedTaskV2Dto>()
 };
 
-StateHasChanged();
+model.Priority = model.Priority
+    ?.Where(x => x.Assigned_To == null)
+    .ToList();
 
+StateHasChanged();
 }
 
-private async Task OnPriorityChanged(TaskRow t, ChangeEventArgs e)
+private async Task OnPriorityChanged(UnassignedTaskV2Dto t, ChangeEventArgs e)
 {
     var isChecked = e?.Value is bool b && b;
 
@@ -433,23 +592,20 @@ private async Task OnPriorityChanged(TaskRow t, ChangeEventArgs e)
         Tasks_Priority = isChecked
     });
 
-var data = await Http.GetFromJsonAsync<List<TaskRow>>("/api/tasks/unassigned")
-           ?? new List<TaskRow>();
+var data = await Http.GetFromJsonAsync<List<UnassignedTaskV2Dto>>("/api/tasks/unassigned-v2")
+           ?? new List<UnassignedTaskV2Dto>();
 
 model = new EmployeeLoadModel
 {
     Priority = data,
-    Normal = new List<TaskRow>()
+    Normal = new List<UnassignedTaskV2Dto>()
 };
 
 }
 
-private async Task TogglePush(TaskRow t)
+private async Task TogglePush(UnassignedTaskV2Dto t)
 {
     var newValue = !t.Tasks_Push;
-
-    if (newValue)
-        t.Assigned_To = null;
 
     await Http.PostAsJsonAsync("api/tasks/set-task-push", new
     {
@@ -458,17 +614,17 @@ private async Task TogglePush(TaskRow t)
     });
 
     t.Tasks_Push = newValue;
-var data = await Http.GetFromJsonAsync<List<TaskRow>>("/api/tasks/unassigned")
-           ?? new List<TaskRow>();
+var data = await Http.GetFromJsonAsync<List<UnassignedTaskV2Dto>>("/api/tasks/unassigned-v2")
+           ?? new List<UnassignedTaskV2Dto>();
 
 model = new EmployeeLoadModel
 {
     Priority = data,
-    Normal = new List<TaskRow>()
+    Normal = new List<UnassignedTaskV2Dto>()
 };
 }
 
-private void OpenTaskDetails(TaskRow t)
+private void OpenTaskDetails(UnassignedTaskV2Dto t)
 {
     detailsBatchProductId = t.BatchProductId;
     detailsProductToPartId = t.ProductToPartId;

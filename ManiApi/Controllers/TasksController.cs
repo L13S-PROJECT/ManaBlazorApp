@@ -71,14 +71,7 @@ ts.Estimated_Minutes,
 (
     CASE 
         WHEN ts.Step_Type IN (1,2) THEN 
-            (
-                CASE 
-                    WHEN bp.ProductToPart_ID IS NOT NULL 
-                        AND bp.ParentBatchProduct_ID IS NULL
-                    THEN bp.Planned_Qty
-                    ELSE bp.Planned_Qty * ptp.Qty_Per_product
-                END
-            ) * ts.Estimated_Minutes
+    bp.Planned_Qty * ts.Estimated_Minutes
         WHEN ts.Step_Type = 3 THEN t.Qty_Done * ts.Estimated_Minutes
         ELSE bp.Planned_Qty * ts.Estimated_Minutes
     END
@@ -1212,14 +1205,22 @@ JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
 SET t.Tasks_Status = 1
 WHERE t.IsActive = 1
   AND t.Tasks_Status IN (5)
-  AND (
-    t.BatchProduct_ID = @bp
-    OR t.BatchProduct_ID = (
-        SELECT ParentBatchProduct_ID
-        FROM batches_products
-        WHERE ID = @bp
-        LIMIT 1
-    )
+ AND t.BatchProduct_ID IN (
+    SELECT bp2.ID
+    FROM batches_products bp2
+    WHERE bp2.IsActive = 1
+      AND bp2.Batch_Id = (
+          SELECT bp0.Batch_Id
+          FROM batches_products bp0
+          WHERE bp0.ID = @bp
+          LIMIT 1
+      )
+      AND bp2.Version_Id = (
+          SELECT bp0.Version_Id
+          FROM batches_products bp0
+          WHERE bp0.ID = @bp
+          LIMIT 1
+      )
 )
   AND ts.ProductToPart_ID = @ptp
 ";
@@ -2435,7 +2436,7 @@ CASE
             WHEN bp.ProductToPart_ID IS NOT NULL 
                  AND bp.ParentBatchProduct_ID IS NULL
             THEN bp.Planned_Qty
-            ELSE bp.Planned_Qty * COALESCE(ptpParent.Qty_Per_product, ptp.Qty_Per_product)
+            ELSE bp.Planned_Qty * ptp.Qty_Per_product
         END
     WHEN ts.Step_Type = 3 THEN t.Qty_Done
     ELSE bp.Planned_Qty
@@ -2578,7 +2579,7 @@ CASE
             WHEN bp.ProductToPart_ID IS NOT NULL 
                  AND bp.ParentBatchProduct_ID IS NULL
             THEN bp.Planned_Qty
-            ELSE bp.Planned_Qty * COALESCE(ptpParent.Qty_Per_product, ptp.Qty_Per_product)
+            ELSE bp.Planned_Qty * ptp.Qty_Per_product
         END
     WHEN ts.Step_Type = 3 THEN t.Qty_Done
     ELSE bp.Planned_Qty
@@ -2768,6 +2769,28 @@ public async Task<IActionResult> GetUnassignedTasks()
     cmd.CommandText = @"
 SELECT
     wc.Workcentr_Name AS WorkCenter,
+    (
+    CASE 
+        WHEN EXISTS (
+            SELECT 1
+            FROM batches_products bp2
+            WHERE bp2.Batch_Id = bp.Batch_Id
+              AND bp2.Version_Id = bp.Version_Id
+              AND bp2.ProductToPart_ID IS NULL
+              AND bp2.IsActive = 1
+        )
+        THEN (
+            SELECT bp2.ID
+            FROM batches_products bp2
+            WHERE bp2.Batch_Id = bp.Batch_Id
+              AND bp2.Version_Id = bp.Version_Id
+              AND bp2.ProductToPart_ID IS NULL
+              AND bp2.IsActive = 1
+            LIMIT 1
+        )
+        ELSE bp.ID
+    END
+) AS RootId,
     wc.ID AS WorkCenterSort,
     t.ID AS TaskId,
     t.BatchProduct_ID,
@@ -2776,6 +2799,7 @@ SELECT
     p.Product_Name AS ProductName,
     tp.TopPart_Name,
     ts.Step_Name,
+    t.TopPartStep_ID AS TopPartStepId,
 
 CASE 
     WHEN ts.Step_Type IN (1,2) THEN 
@@ -2783,7 +2807,7 @@ CASE
             WHEN bp.ProductToPart_ID IS NOT NULL 
                  AND bp.ParentBatchProduct_ID IS NULL
             THEN bp.Planned_Qty
-            ELSE bp.Planned_Qty * COALESCE(ptpParent.Qty_Per_product, ptp.Qty_Per_product)
+            ELSE bp.Planned_Qty * ptp.Qty_Per_product
         END
     WHEN ts.Step_Type = 3 THEN t.Qty_Done
     ELSE bp.Planned_Qty
@@ -2862,30 +2886,36 @@ WHERE t.IsActive = 1
         list.Add(new
         {
             WorkCenter = r.IsDBNull(0) ? null : r.GetString(0),
-            WorkCenterSort = r.IsDBNull(1) ? (int?)null : r.GetInt32(1),
-            TaskId = r.GetInt32(2),
-            BatchProductId = r.GetInt32(3),
-            ProductToPartId = r.GetInt32(4),
-            BatchCode = r.GetString(5),
-            ProductName = r.GetString(6),
-            TopPartName = r.GetString(7),
-            StepName = r.GetString(8),
-            Qty = r.IsDBNull(9) ? 0 : r.GetInt32(9),
-            Status = r.GetInt32(10),
-            CanStart = r.GetInt32(11) == 1,
-            StepOrder = r.GetInt32(12),
-            StepType = r.GetInt32(13),
-            EstimatedMinutes = r.IsDBNull(14) ? 0 : r.GetInt32(14),
-            Assigned_To = r.IsDBNull(15) ? (int?)null : r.GetInt32(15),
-            BatchPriority = !r.IsDBNull(16) && r.GetBoolean(16),
-            Tasks_Priority = !r.IsDBNull(17) && r.GetBoolean(17),
-            Tasks_Push = !r.IsDBNull(18) && r.GetBoolean(18)
+            RootId = r.GetInt32(1),
+            WorkCenterSort = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
+            TaskId = r.GetInt32(3),
+            BatchProductId = r.GetInt32(4),
+            ProductToPartId = r.GetInt32(5),
+            BatchCode = r.GetString(6),
+            ProductName = r.GetString(7),
+            TopPartName = r.GetString(8),
+            StepName = r.GetString(9),
+            TopPartStepId = r.GetInt32(10),
+            Qty = r.IsDBNull(11) ? 0 : r.GetInt32(11),
+            Status = r.GetInt32(12),
+            CanStart = r.GetInt32(13) == 1,
+            StepOrder = r.GetInt32(14),
+            StepType = r.GetInt32(15),
+            EstimatedMinutes = r.IsDBNull(16) ? 0 : r.GetInt32(16),
+            Assigned_To = r.IsDBNull(17) ? (int?)null : r.GetInt32(17),
+            BatchPriority = !r.IsDBNull(18) && r.GetBoolean(18),
+            Tasks_Priority = !r.IsDBNull(19) && r.GetBoolean(19),
+            Tasks_Push = !r.IsDBNull(20) && r.GetBoolean(20)
         });
     }
 
     var raw = list.Cast<dynamic>().ToList();
 
-var groups = raw.GroupBy(x => (int)x.BatchProductId);
+var groups = raw.GroupBy(x => new 
+{ 
+    RootId = (int)x.RootId,
+    StepOrder = (int)x.StepOrder
+});
 
 var result = new List<object>();
 
@@ -2893,59 +2923,82 @@ foreach (var g in groups)
 {
     var items = g.ToList();
 
-    var hasParent = items.Any(x => (int)x.ProductToPartId == (int)x.BatchProductId);
-    var hasChild = items.Any(x => (int)x.ProductToPartId != (int)x.BatchProductId);
+var hasParent = items.Any(x => (int)x.BatchProductId == (int)x.RootId);
+var hasChild = items.Any(x => (int)x.BatchProductId != (int)x.RootId);
 
     if (hasParent && hasChild)
     {
-        var stepGroups = items.GroupBy(x => x.StepOrder);
+        var first = items.First();
 
-        foreach (var sg in stepGroups)
-        {
-            var first = sg.First();
+        var parentQty = items
+            .Where(x => (int)x.BatchProductId == (int)x.RootId)
+            .Sum(x => (int)x.Qty);
 
-            var parentQty = sg
-                .Where(x => (int)x.ProductToPartId == (int)x.BatchProductId)
-                .Sum(x => (int)x.Qty);
-
-            var childQty = sg
-                .Where(x => (int)x.ProductToPartId != (int)x.BatchProductId)
-                .Sum(x => (int)x.Qty);
+        var childQty = items
+            .Where(x => (int)x.BatchProductId != (int)x.RootId)
+            .Sum(x => (int)x.Qty);
 
             var totalQty = parentQty + childQty;
 
             result.Add(new
-            {
-                first.WorkCenter,
-                first.WorkCenterSort,
-                first.TaskId,
-                first.BatchProductId,
-                first.ProductToPartId,
-                first.BatchCode,
-                first.ProductName,
-                first.TopPartName,
-                first.StepName,
-                Qty = totalQty,
-                QtyBreakdown = $"{parentQty}+{childQty}",
-                EstimatedMinutes = first.EstimatedMinutes,
-                first.Status,
-                first.CanStart,
-                first.Assigned_To,
-                first.BatchPriority,
-                first.Tasks_Priority,
-                first.Tasks_Push,
-                first.StepOrder,
-                RowType = "ParentChildMerged"
-            });
-        }
-    }
+                    {
+                        first.WorkCenter,
+                        first.WorkCenterSort,
+                        first.TaskId,
+                        first.BatchProductId,
+                        first.ProductToPartId,
+                        first.BatchCode,
+                        first.ProductName,
+                        first.TopPartName,
+                        first.StepName,
+                        first.TopPartStepId,
+                        Qty = totalQty,
+                        QtyBreakdown = $"{parentQty}+{childQty}",
+                        EstimatedMinutes = first.EstimatedMinutes,
+                        first.Status,
+                        first.CanStart,
+                        first.Assigned_To,
+                        first.BatchPriority,
+                        first.Tasks_Priority,
+                        first.Tasks_Push,
+                        first.StepOrder,
+                        RowType = "ParentChildMerged"
+                    });
+                }
     else
+{
+    foreach (var t in items)
     {
-        foreach (var t in items)
+        var isParent = hasParent
+            ? (int)t.BatchProductId == (int)t.RootId
+            : true;
+
+        result.Add(new
         {
-            result.Add(t);
-        }
+            t.WorkCenter,
+            t.WorkCenterSort,
+            t.TaskId,
+            t.BatchProductId,
+            t.ProductToPartId,
+            t.BatchCode,
+            t.ProductName,
+            t.TopPartName,
+            t.StepName,
+            t.TopPartStepId,
+            t.Qty,
+            t.EstimatedMinutes,
+            t.Status,
+            t.CanStart,
+            t.Assigned_To,
+            t.BatchPriority,
+            t.Tasks_Priority,
+            t.Tasks_Push,
+            t.StepOrder,
+
+            RowType = isParent ? "Parent" : "ChildOnly"
+        });
     }
+}
 }
 
 return Ok(result);
@@ -3164,13 +3217,28 @@ var result = grouped
 [HttpPost("update-assignee-aggregated")]
 public async Task<IActionResult> UpdateAssigneeAggregated([FromBody] UpdateAssigneeAggregatedDto dto)
 {
-    if (dto is null || dto.BatchProductId <= 0 || dto.TopPartStepId <= 0 || dto.ProductToPartId <= 0)
+    if (dto is null || dto.BatchProductId <= 0 || dto.ProductToPartId <= 0)
         return BadRequest();
 
     var conn = _db.Database.GetDbConnection();
     await conn.OpenAsync();
 
     await using var cmd = conn.CreateCommand();
+    if (dto.RowType == "SingleChild")
+{
+    cmd.CommandText = @"
+UPDATE tasks t
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+SET t.Assigned_To = @emp
+WHERE t.IsActive = 1
+  AND t.BatchProduct_ID = @bp
+  AND t.TopPartStep_ID = @step
+  AND ts.ProductToPart_ID = @productToPartId;
+";
+}
+else
+{
+    // Parent vai Parent+ChildMerged
     cmd.CommandText = @"
 UPDATE tasks t
 JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
@@ -3187,9 +3255,9 @@ WHERE t.IsActive = 1
           SELECT bp0.Version_Id FROM batches_products bp0 WHERE bp0.ID = @bp LIMIT 1
       )
 )
-AND t.TopPartStep_ID = @step
-AND ts.ProductToPart_ID = @productToPartId
+AND ts.ProductToPart_ID = @productToPartId;
 ";
+}
 
     cmd.Parameters.Add(new MySqlParameter("@emp", (object?)dto.Assigned_To ?? DBNull.Value));
     cmd.Parameters.Add(new MySqlParameter("@bp", dto.BatchProductId));
@@ -3198,13 +3266,17 @@ AND ts.ProductToPart_ID = @productToPartId
 
     var affected = await cmd.ExecuteNonQueryAsync();
 
+    
+
     return Ok(new { updated = affected });
+    
 }
 
 public sealed class UpdateAssigneeAggregatedDto
 {
     public int BatchProductId { get; set; }
     public int TopPartStepId { get; set; }
+    public string? RowType { get; set; }
     public int ProductToPartId { get; set; }
     public int? Assigned_To { get; set; }
 }
@@ -3639,6 +3711,293 @@ private sealed class TaskRowDto
     public int BatchId { get; set; }
     public int VersionId { get; set; }
     public int BatchProductId { get; set; }
+}
+
+[HttpGet("unassigned-v2")]
+public async Task<IActionResult> GetUnassignedTasksV2()
+{
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"SELECT
+    wc.Workcentr_Name AS WorkCenter,
+    CASE 
+    WHEN EXISTS (
+        SELECT 1
+        FROM batches_products bp2
+        WHERE bp2.Batch_Id = bp.Batch_Id
+          AND bp2.Version_Id = bp.Version_Id
+          AND bp2.ParentBatchProduct_ID IS NULL
+          AND bp2.IsActive = 1
+    )
+    THEN (
+        SELECT bp2.ID
+        FROM batches_products bp2
+        WHERE bp2.Batch_Id = bp.Batch_Id
+          AND bp2.Version_Id = bp.Version_Id
+          AND bp2.ParentBatchProduct_ID IS NULL
+          AND bp2.IsActive = 1
+        LIMIT 1
+    )
+    ELSE bp.ID
+END AS RootId,
+    wc.ID AS WorkCenterSort,
+    t.ID AS TaskId,
+    t.BatchProduct_ID,
+    ts.ProductToPart_ID,
+    b.Batches_Code,
+    p.Product_Name,
+    tp.TopPart_Name,
+    ts.Step_Name,
+    t.TopPartStep_ID,
+    CASE 
+        WHEN ts.Step_Type IN (1,2) THEN 
+            bp.Planned_Qty
+        WHEN ts.Step_Type = 3 THEN t.Qty_Done
+        ELSE bp.Planned_Qty
+    END AS Qty,
+    CASE 
+WHEN ts.Step_Type IN (1,2) THEN 
+    bp.Planned_Qty * ts.Estimated_Minutes
+WHEN ts.Step_Type = 3 THEN 
+    t.Qty_Done * ts.Estimated_Minutes
+ELSE 
+    bp.Planned_Qty * ts.Estimated_Minutes
+END AS Estimated_Minutes,
+    t.Tasks_Status,
+    CASE
+        WHEN t.Tasks_Status = 1 AND NOT EXISTS (
+            SELECT 1
+            FROM tasks t2
+            JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+            WHERE t2.BatchProduct_ID = t.BatchProduct_ID
+              AND ts2.ProductToPart_ID = ts.ProductToPart_ID
+              AND ts2.Step_Order < ts.Step_Order
+              AND t2.Tasks_Status <> 3
+              AND t2.IsActive = 1
+        )
+        THEN 1 ELSE 0
+    END AS CanStart,
+    t.Assigned_To,
+    bp.is_priority,
+    COALESCE(t.Tasks_Priority, 0),
+    t.Tasks_Push,
+    ts.Step_Order,
+    bp.ParentBatchProduct_ID
+FROM tasks t
+JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+JOIN batches b ON b.ID = bp.Batch_Id
+JOIN versions v ON v.ID = bp.Version_Id
+JOIN products p ON p.ID = v.Product_ID
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+LEFT JOIN workcentr_type wc ON wc.ID = ts.WorkCentr_ID AND wc.IsActive = 1
+JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
+JOIN toppart tp ON tp.ID = ptp.TopPart_ID
+WHERE t.IsActive = 1
+  AND t.Tasks_Status = 1
+  AND t.Assigned_To IS NULL;
+";
+
+    var raw = new List<dynamic>();
+
+    await using var r = await cmd.ExecuteReaderAsync();
+    while (await r.ReadAsync())
+    {
+        raw.Add(new
+        {
+            WorkCenter = r.IsDBNull(0) ? null : r.GetString(0),
+            RootId = r.IsDBNull(1) ? 0 : r.GetInt32(1),
+            WorkCenterSort = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
+            TaskId = r.GetInt32(3),
+            BatchProductId = r.GetInt32(4),
+            ProductToPartId = r.GetInt32(5),
+            BatchCode = r.IsDBNull(6) ? null : r.GetString(6),
+            ProductName = r.IsDBNull(7) ? null : r.GetString(7),
+            TopPartName = r.IsDBNull(8) ? null : r.GetString(8),
+            StepName = r.IsDBNull(9) ? null : r.GetString(9),
+            TopPartStepId = r.IsDBNull(10) ? 0 : r.GetInt32(10),
+            Qty = r.IsDBNull(11) ? 0 : r.GetInt32(11),
+            EstimatedMinutes = r.IsDBNull(12) ? 0 : r.GetInt32(12),
+            Status = r.IsDBNull(13) ? 0 : r.GetInt32(13),
+            CanStart = !r.IsDBNull(14) && r.GetInt32(14) == 1,
+            Assigned_To = r.IsDBNull(15) ? null : (int?)r.GetInt32(15),
+            BatchPriority = !r.IsDBNull(16) && r.GetBoolean(16),
+            Tasks_Priority = !r.IsDBNull(17) && r.GetBoolean(17),
+            Tasks_Push = !r.IsDBNull(18) && r.GetBoolean(18),
+            StepOrder = r.IsDBNull(19) ? 0 : r.GetInt32(19),
+            ParentBatchProductId = r.IsDBNull(20) ? (int?)null : r.GetInt32(20),
+        });
+    }
+
+    var result = new List<UnassignedTaskV2Dto>();
+
+var groups = raw.GroupBy(x => new 
+{ 
+    x.WorkCenter,
+    x.RootId,
+    x.StepOrder
+});
+
+foreach (var g in groups)
+{
+    var items = g.ToList();
+
+    var parents = items.Where(x => x.ParentBatchProductId == null).ToList();
+    var childs = items.Where(x => x.ParentBatchProductId != null).ToList();
+
+    var hasParent = parents.Any();
+    var hasChild = childs.Any();
+
+    // 🔹 Parent only
+    if (hasParent && !hasChild)
+    {
+        foreach (var t in items)
+        {
+            result.Add(new UnassignedTaskV2Dto
+            {
+                WorkCenter = t.WorkCenter,
+                WorkCenterSort = t.WorkCenterSort,
+                TaskId = t.TaskId,
+                RootId = t.RootId,
+                BatchProductId = t.BatchProductId,
+                ProductToPartId = t.ProductToPartId,
+                BatchCode = t.BatchCode,
+                ProductName = t.ProductName,
+                TopPartName = t.TopPartName,
+                StepName = t.StepName,
+
+                Qty = t.Qty,
+                EstimatedMinutes = t.EstimatedMinutes,
+
+                Status = t.Status,
+                CanStart = t.CanStart,
+
+                Assigned_To = t.Assigned_To,
+                BatchPriority = t.BatchPriority,
+                Tasks_Priority = t.Tasks_Priority,
+                Tasks_Push = t.Tasks_Push,
+
+                StepOrder = t.StepOrder,
+                RowType = "Parent"
+            });
+        }
+
+        continue;
+    }
+
+    // 🔹 Parent + Child
+    if (hasParent && hasChild)
+    {
+        var parentQty = parents.Sum(x => (int)x.Qty);
+        var childQty = childs.Sum(x => (int)x.Qty);
+
+        var first = items.First();
+        var totalQty = parentQty + childQty;
+
+        result.Add(new UnassignedTaskV2Dto
+        {
+            WorkCenter = first.WorkCenter,
+            WorkCenterSort = first.WorkCenterSort,
+            TaskId = first.TaskId,
+            RootId = first.RootId,
+            BatchProductId = first.BatchProductId,
+            ProductToPartId = first.ProductToPartId,
+            BatchCode = first.BatchCode,
+            ProductName = first.ProductName,
+            TopPartName = first.TopPartName,
+            StepName = first.StepName,
+
+            Qty = totalQty,
+            QtyBreakdown = childQty > 0 ? $"{parentQty}+{childQty}" : parentQty.ToString(),
+            EstimatedMinutes = first.EstimatedMinutes,
+
+            Status = first.Status,
+            CanStart = first.CanStart,
+
+            Assigned_To = first.Assigned_To,
+            BatchPriority = first.BatchPriority,
+            Tasks_Priority = first.Tasks_Priority,
+            Tasks_Push = first.Tasks_Push,
+
+            StepOrder = first.StepOrder,
+            RowType = "ParentChildMerged"
+        });
+
+        continue;
+    }
+
+    // 🔹 Single Child
+    if (!hasParent && hasChild)
+    {
+        foreach (var t in items)
+        {
+            result.Add(new UnassignedTaskV2Dto
+            {
+                WorkCenter = t.WorkCenter,
+                WorkCenterSort = t.WorkCenterSort,
+                TaskId = t.TaskId,
+                RootId = t.RootId,
+                BatchProductId = t.BatchProductId,
+                ProductToPartId = t.ProductToPartId,
+                BatchCode = t.BatchCode,
+                ProductName = t.ProductName,
+                TopPartName = t.TopPartName,
+                StepName = t.StepName,
+
+                Qty = t.Qty,
+                EstimatedMinutes = t.EstimatedMinutes,
+
+                Status = t.Status,
+                CanStart = t.CanStart,
+
+                Assigned_To = t.Assigned_To,
+                BatchPriority = t.BatchPriority,
+                Tasks_Priority = t.Tasks_Priority,
+                Tasks_Push = t.Tasks_Push,
+
+                StepOrder = t.StepOrder,
+                RowType = "SingleChild"
+            });
+        }
+    }
+}
+
+return Ok(result);
+}
+
+public sealed class UnassignedTaskV2Dto
+{
+    public string? WorkCenter { get; set; }
+    public int? WorkCenterSort { get; set; }
+
+    public int TaskId { get; set; }
+    public int RootId { get; set; }
+
+    public int BatchProductId { get; set; }
+    public int ProductToPartId { get; set; }
+
+    public string? BatchCode { get; set; }
+    public string? ProductName { get; set; }
+    public string? TopPartName { get; set; }
+    public string? StepName { get; set; }
+
+    public int Qty { get; set; }
+    public string? QtyBreakdown { get; set; } // "x+y"
+    public int EstimatedMinutes { get; set; }
+
+    public int Status { get; set; }
+    public bool CanStart { get; set; }
+
+    public int? Assigned_To { get; set; }
+
+    public bool BatchPriority { get; set; }
+    public bool Tasks_Priority { get; set; }
+    public bool Tasks_Push { get; set; }
+
+    public int StepOrder { get; set; }
+
+    public string RowType { get; set; } = ""; // Parent / ParentChildMerged / SingleChild
 }
 
     }

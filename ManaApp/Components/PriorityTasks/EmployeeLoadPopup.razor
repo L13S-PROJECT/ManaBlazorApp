@@ -566,7 +566,7 @@ else
                                     {
                                         <span class="unassigned-mark" title="Nav piešķirts darbiniekam">❗</span>
                                     }
-                                    @t.ProductName (@t.RowType)
+                                    @t.ProductName 
                                         @if (t.ShowChildMark)
                                             {
                                                 <span style="margin-left:4px;">*</span>
@@ -1020,6 +1020,7 @@ var payload = new
     BatchProductId = t.BatchProductId,
     TopPartStepId = t.TopPartStepId,
     ProductToPartId = t.ProductToPartId,
+    RowType = t.RowType, 
     Assigned_To = t.Assigned_To
 };
 
