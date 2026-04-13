@@ -479,29 +479,31 @@ if (step.AssignedTo.HasValue)
 
 if (step.IsFinal)
 {
-    if (!result.ContainsKey(step.BatchProductId))
-        result[step.BatchProductId] = new SimulationResult();
+    var resultBatchId = step.ParentBatchId ?? step.BatchProductId;
+
+    if (!result.ContainsKey(resultBatchId))
+        result[resultBatchId] = new SimulationResult();
 
     if (step.StepType == 1)
-        {
-            var current = result[step.BatchProductId].DetailFinish;
-            if (!current.HasValue || stepEnd > current.Value)
-                result[step.BatchProductId].DetailFinish = stepEnd;
-        }
+    {
+        var current = result[resultBatchId].DetailFinish;
+        if (!current.HasValue || stepEnd > current.Value)
+            result[resultBatchId].DetailFinish = stepEnd;
+    }
 
     if (step.StepType == 2)
-        {
-            var current = result[step.BatchProductId].AssemblyFinish;
-            if (!current.HasValue || stepEnd > current.Value)
-                result[step.BatchProductId].AssemblyFinish = stepEnd;
-        }
+    {
+        var current = result[resultBatchId].AssemblyFinish;
+        if (!current.HasValue || stepEnd > current.Value)
+            result[resultBatchId].AssemblyFinish = stepEnd;
+    }
 
     if (step.StepType == 3)
-        {
-            var current = result[step.BatchProductId].FinishingFinish;
-            if (!current.HasValue || stepEnd > current.Value)
-                result[step.BatchProductId].FinishingFinish = stepEnd;
-        }
+    {
+        var current = result[resultBatchId].FinishingFinish;
+        if (!current.HasValue || stepEnd > current.Value)
+            result[resultBatchId].FinishingFinish = stepEnd;
+    }
 }
 
 var nextStep = allStepsQueue
@@ -521,6 +523,8 @@ var nextStep = allStepsQueue
 
     return result;
 }
+
+
 
 private void CalculateAssembly(
     DetailResult result,
@@ -833,7 +837,17 @@ public async Task<Dictionary<int, DetailResult>> CalculateDetailGlobal(
     var result = new Dictionary<int, DetailResult>();
     var sharedEmployeeBusy = new Dictionary<int, DateTime>();
     var sharedWorkCenterBusy = new Dictionary<int, List<DateTime>>();
-        var allStepsQueue = allTasksOrdered
+    
+      //  Parent+Child → jāizmet child no Assembly/Finishing GLOBĀLI
+        allTasksOrdered = allTasksOrdered
+            .Where(t =>
+                t.StepType == 1 ||            // DETAIL → visi
+                t.ParentBatchId == null       // Assembly + Finishing → tikai parent
+            )
+            .ToList();
+
+    var allStepsQueue = allTasksOrdered
+        
         .OrderByDescending(t => t.IsPriority)
         .ThenBy(t => t.Priority)
         .ThenByDescending(t => t.TasksPush)
@@ -842,26 +856,29 @@ public async Task<Dictionary<int, DetailResult>> CalculateDetailGlobal(
         .ThenBy(t => t.BatchProductId)
         .ThenBy(t => t.StepOrder)
         .ToList();
+
     var calendar = _calendarCache ??= await GetCompanyCalendar();
     var calendarDict = calendar.ToDictionary(c => c.WorkDate.Date);
 
-var batchStartMap = orderedBatches
-    .ToDictionary(
-        x => x.BatchProductId,
-        x =>
-        {
-            var batchTasks = allTasksOrdered
-                .Where(t => t.BatchProductId == x.BatchProductId && t.StepType == 1);
+    var batchStartMap = allTasksOrdered
+        .Select(t => t.ParentBatchId ?? t.BatchProductId)
+        .Distinct()
+        .ToDictionary(
+            id => id,
+            id =>
+            {
+                var batchTasks = allTasksOrdered
+                    .Where(t => (t.ParentBatchId ?? t.BatchProductId) == id && t.StepType == 1);
 
-            var lastFinished = batchTasks
-                .Where(t => t.FinishedAt != null)
-                .Select(t => t.FinishedAt!.Value)
-                .DefaultIfEmpty(DateTime.Today)
-                .Max();
+                var lastFinished = batchTasks
+                    .Where(t => t.FinishedAt != null)
+                    .Select(t => t.FinishedAt!.Value)
+                    .DefaultIfEmpty(DateTime.Today)
+                    .Max();
 
-            return lastFinished;
-        }
-    );
+                return lastFinished;
+            }
+        );
 
     var simulatedBatchFinish = SimulateAllSteps(
         allStepsQueue,
@@ -870,37 +887,127 @@ var batchStartMap = orderedBatches
         calendarDict,
         batchStartMap
     );
+
     var grouped = allTasksOrdered
-        .GroupBy(t => t.BatchProductId)
+        .GroupBy(t => t.ParentBatchId ?? t.BatchProductId)
         .ToDictionary(g => g.Key, g => g.ToList());
-    // 🔥 VISI STEP vienā rindā (Detail + Assembly + Finishing)
 
+    var detailGroups = allTasksOrdered
+        .Where(t => t.StepType == 1)
+        .GroupBy(t => t.ParentBatchId ?? t.BatchProductId)
+        .ToDictionary(g => g.Key, g => g.ToList());
+    
+    var allBatchIds = allTasksOrdered
+        .Select(t => t.ParentBatchId ?? t.BatchProductId)
+        .Distinct()
+        .ToList();
+    
+    var summaryCache = new Dictionary<int, FinishingSummaryVm>();
 
-    foreach (var batch in orderedBatches)
+    
+    foreach (var batchId in allBatchIds)
     {
-        var batchTasks = grouped.ContainsKey(batch.BatchProductId)
-            ? grouped[batch.BatchProductId]
+        var batch = orderedBatches.FirstOrDefault(x => x.BatchProductId == batchId);
+
+                if (batch == null)
+                {
+                    batch = new BatchSimulationRow
+                    {
+                        BatchProductId = batchId,
+                        Planned = 0
+                    };
+                }
+
+        var key = batch.BatchProductId;
+
+        var batchTasks = grouped.ContainsKey(key)
+            ? grouped[key]
             : new List<TaskDto>();
+        
+        var scenario = GetScenario(batchTasks);
+        
+        //  Parent+Child → Assembly + Finishing jāņem tikai no parent
+            if (scenario == BatchScenario.ParentChild)
+            {
+                batchTasks = batchTasks
+                    .Where(t =>
+                        t.StepType == 1 ||                 // DETAIL → parent + child
+                        (t.ParentBatchId == null)          // Assembly + Finishing → tikai parent
+                    )
+                    .ToList();
+            }
+        
+        
 
         var queueIndex = orderedBatches.FindIndex(x => x.BatchProductId == batch.BatchProductId);
 
         // ✔ prioritāte dod reālu nobīdi (nevis 30min)
         var queueStart = DateTime.Today.AddHours(queueIndex * 4);
 
+List<TaskDto> detailTasks;
+
+if (scenario == BatchScenario.ParentChild)
+{
+    // 🔥 Parent + Child → merge DETAIL no visiem (gan parent, gan child)
+    detailTasks = batchTasks
+        .Where(t => t.StepType == 1)
+        .ToList();
+}
+else
+{
+    // Parent vai ChildOnly → kā bija
+    detailTasks = batchTasks
+        .Where(t => t.StepType == 1)
+        .ToList();
+}
+
+// 🔥 JA tikai child → ignorējam visus pārējos step (drošībai)
+// ✅ scenārija vadīta loģika (nevis hasParent/hasChild pa tiešo)
+if (scenario == BatchScenario.ChildOnly)
+{
+    // tikai DETAIL step
+    batchTasks = detailTasks;
+}
+
 var detail = await CalculateDetail(
-    batchTasks,
-    batch.Planned,
+    detailTasks,
+    scenario == BatchScenario.ChildOnly
+        ? detailTasks.Count   //  child-only → katrs top part = 1 vienība
+        : batch.Planned,
     queueStart
 );
 
 detail.FinishingAvailableQty = await GetAssemblyAvailable(batch.BatchProductId);
 
-// 🔥 paņemam reālo Planned no DB (tāpat kā UI)
-var summary = await _http.GetFromJsonAsync<List<FinishingSummaryVm>>(
-    $"api/stockmovements/finishing-summary-by-batch?batchId={batch.BatchId}"
-);
+//  Parent+Child → apjoms vienmēr no parent
+var hasParent2 = batchTasks.Any(t => t.ParentBatchId == null);
+var hasChild2 = batchTasks.Any(t => t.ParentBatchId != null);
 
-var s = summary?.FirstOrDefault(x => x.BatchProductId == batch.BatchProductId);
+if (hasParent2 && hasChild2)
+{
+    // neko nemainām – paliek parent apjoms
+}
+else if (!hasParent2 && hasChild2)
+{
+    // tikai child
+}
+
+if (!summaryCache.ContainsKey(batch.BatchProductId))
+{
+    var summary = await _http.GetFromJsonAsync<List<FinishingSummaryVm>>(
+        $"api/stockmovements/finishing-summary-by-batch?batchId={batch.BatchProductId}"
+    );
+
+    var sLocal = summary?.FirstOrDefault(x => x.BatchProductId == batch.BatchProductId);
+
+    if (sLocal != null)
+        summaryCache[batch.BatchProductId] = sLocal;
+}
+
+//  paņemam reālo Planned no DB (tāpat kā UI)
+var s = summaryCache.ContainsKey(batch.BatchProductId)
+    ? summaryCache[batch.BatchProductId]
+    : null;
 
 if (s != null)
 {
@@ -974,20 +1081,34 @@ if (simulatedBatchFinish.ContainsKey(batch.BatchProductId))
     }
 }
 
-CalculateAssembly(
-    detail,
-    batchTasks,
-    batchTasks.Where(t => t.StepType == 1).ToList(),
-    calendarDict,
-    queueStart
-);
+var groupKey = batch.BatchProductId;
 
-await CalculateFinishing(
-    detail,
-    batchTasks,
-    calendarDict,
-    queueStart
-);
+var parentOnlyTasks = new List<TaskDto>();
+
+if (scenario == BatchScenario.Parent || scenario == BatchScenario.ParentChild)
+{
+    parentOnlyTasks = grouped.ContainsKey(groupKey)
+        ? grouped[groupKey].Where(t => t.ParentBatchId == null).ToList()
+        : new List<TaskDto>();
+}
+
+if (scenario != BatchScenario.ChildOnly)
+{
+    CalculateAssembly(
+        detail,
+        parentOnlyTasks,
+        parentOnlyTasks.Where(t => t.StepType == 1).ToList(),
+        calendarDict,
+        queueStart
+    );
+
+    await CalculateFinishing(
+        detail,
+        parentOnlyTasks,
+        calendarDict,
+        queueStart
+    );
+}
 
 result[batch.BatchProductId] = detail;
 
@@ -1045,6 +1166,27 @@ private class FinishingSummaryVm
 {
     public int BatchProductId { get; set; }
     public int Planned { get; set; }
+}
+
+private enum BatchScenario
+{
+    Parent,
+    ParentChild,
+    ChildOnly
+}
+
+private BatchScenario GetScenario(List<TaskDto> tasks)
+{
+    var hasParent = tasks.Any(t => t.ParentBatchId == null);
+    var hasChild = tasks.Any(t => t.ParentBatchId != null);
+
+    if (hasParent && hasChild)
+        return BatchScenario.ParentChild;
+
+    if (!hasParent && hasChild)
+        return BatchScenario.ChildOnly;
+
+    return BatchScenario.Parent;
 }
 
     }

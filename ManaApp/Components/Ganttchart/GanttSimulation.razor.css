@@ -363,3 +363,41 @@
 .row-active {
     background-color: #e6f4ff;
 }
+
+.detail-part {
+    font-size: 9px;
+    color: #888;
+    margin-left: 6px;
+    text-transform: uppercase;
+
+    display: inline-block;
+    max-width: 120px;
+
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.product-cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
+}
+
+.product-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.detail-part {
+    font-size: 9px;
+    color: #888;
+    text-transform: uppercase;
+
+    max-width: 100px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

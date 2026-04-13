@@ -90,62 +90,98 @@
         </div>
 
         <div class="simulation-body">
-        
-@foreach (var row in ordered.Where(r =>
-    detailResults.ContainsKey(r.BatchProductId)
-    &&
-    // 🟦 ARHĪVS
+
+@{
+    var filteredRows = mergedOrdered.Where(r =>
+    {
+        var resultKey = allTasks
+            .Where(t => t.BatchProductId == r.BatchProductId)
+            .Select(t => t.ParentBatchId ?? t.BatchProductId)
+            .FirstOrDefault();
+
+        return detailResults.ContainsKey(resultKey)
+
+        &&
         (
             showArchive
                 ? true
-                : !(detailResults[r.BatchProductId].FinishingStatus == "Pabeigts"
-                    && (detailResults[r.BatchProductId].FinishingAvailableQty ?? 0) == 0)
+                : !(detailResults[resultKey].FinishingStatus == "Pabeigts"
+                    && (detailResults[resultKey].FinishingAvailableQty ?? 0) == 0)
         )
-    &&
-    (
-        string.IsNullOrWhiteSpace(searchText) ||
-        (r.ProductName != null && r.ProductName.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
-        (r.ProductCode != null && r.ProductCode.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
-        (r.BatchCode != null && r.BatchCode.Contains(searchText, StringComparison.OrdinalIgnoreCase))
-    )
-    &&
-    // 🔵 Detail filtrs
-    (
-        string.IsNullOrWhiteSpace(selectedDetailStatus) ||
-        detailResults[r.BatchProductId].Status == selectedDetailStatus
-    )
-    &&
-    // 🟣 Assembly filtrs
-    (
-        string.IsNullOrWhiteSpace(selectedAssemblyStatus) ||
-        detailResults[r.BatchProductId].AssemblyStatus == selectedAssemblyStatus
-    )
-    &&
-    // 🟢 Finishing filtrs
-    (
-        string.IsNullOrWhiteSpace(selectedFinishingStatus) ||
-        detailResults[r.BatchProductId].FinishingStatus == selectedFinishingStatus
-    )
-))
-    {
-        <div class="data-row 
-            @(IsFinished(detailResults[row.BatchProductId]) ? "text-gray" : "")
+        &&
+        (
+            string.IsNullOrWhiteSpace(searchText) ||
+            (r.ProductName != null && r.ProductName.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
+            (r.ProductCode != null && r.ProductCode.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
+            (r.BatchCode != null && r.BatchCode.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+        )
+        &&
+        (
+            string.IsNullOrWhiteSpace(selectedDetailStatus) ||
+            detailResults[resultKey].Status == selectedDetailStatus
+        )
+        &&
+        (
+            string.IsNullOrWhiteSpace(selectedAssemblyStatus) ||
+            detailResults[resultKey].AssemblyStatus == selectedAssemblyStatus
+        )
+        &&
+        (
+            string.IsNullOrWhiteSpace(selectedFinishingStatus) ||
+            detailResults[resultKey].FinishingStatus == selectedFinishingStatus
+        );
+    }).ToList();
+}
+
+@foreach (var row in filteredRows)
+{
+    
+        var resultKey = allTasks
+            .Where(t => t.BatchProductId == row.BatchProductId)
+            .Select(t => t.ParentBatchId ?? t.BatchProductId)
+            .FirstOrDefault();
+
+        var detail = detailResults.ContainsKey(resultKey)
+            ? detailResults[resultKey]
+            : new GanttSimulationService.DetailResult();
+    
+
+    <div class="data-row 
+        @(IsFinished(detail) ? "text-gray" : "")
             @(openedBatchId == row.BatchProductId ? "row-active" : "")">
 
             <div class="cell">@Highlight(row.BatchCode)</div>
-            <div class="cell">@Highlight(row.ProductName)</div>
+            <div class="cell product-cell">
+                @{
+                    var key = $"{row.BatchId}_{row.VersionId}";
+                    var flag = batchFlags.ContainsKey(key) ? batchFlags[key] : "";
+                }
+
+                <span class="product-name">
+                    @Highlight(row.ProductName)
+                </span>
+
+                @if (flag == "+")
+                {
+                    <span class="text-blue">+</span>
+                }
+                else if (flag == "!")
+                {
+                    var partName = allTasks
+                        .Where(t => t.BatchProductId == row.BatchProductId && t.StepType == 1)
+                        .Select(t => t.PartName)
+                        .FirstOrDefault() ?? "-";
+
+                    <span class="detail-part" title="@partName">
+                        @partName
+                    </span>
+                }
+            </div>
             <div class="cell">@Highlight(row.ProductCode)</div>
             <div class="cell">@row.VersionName</div>
             <div class="cell">@row.Planned</div>
 
-<!-- detail lauku -->
-           @{
-                var tasks = tasksByBatch.ContainsKey(row.BatchProductId)
-                    ? tasksByBatch[row.BatchProductId]
-                    : new List<TaskDto>();
 
-                var detail = detailResults[row.BatchProductId];
-            }
 
         <div class="cell">@detail.Status</div>
     
@@ -158,8 +194,12 @@
         </div>
 
 <!-- Assembly posms -->
-        <div class="cell">@detail.AssemblyStatus</div>
-        <div class="cell @GetAssemblyClass(detail)">@detail.AssemblyTimeText</div>
+        <div class="cell">
+            @(detail.AssemblyStatus ?? "-")
+        </div>
+        <div class="cell @GetAssemblyClass(detail)">
+            @(detail.AssemblyTimeText ?? "-")
+        </div>
 
 <!-- Finishing posms -->
 
@@ -221,13 +261,17 @@
             </div>
         </div>
     }
+    
 
 </div>
             </div>
             <div class="cell text-gray">
                 @(detail.FinishingRemainingTimeText ?? "-")
             </div>
-            <div class="cell">@detail.FinishingStatus</div>
+
+            <div class="cell">
+                @(detail.FinishingStatus ?? "-")
+            </div>
 
             <div class="cell">
                 @(detail.FinishingInProgressQty > 0 
@@ -259,28 +303,78 @@
     Dictionary<int, List<TaskDto>> tasksByBatch = new();
     Dictionary<int, GanttSimulationService.DetailResult> detailResults = new();
     List<BatchSimulationRow> ordered = new();
+    Dictionary<int, bool> parentHasChildMap = new();
+    List<BatchSimulationRow> mergedOrdered = new();
+    private Dictionary<string, string> batchFlags = new();
     List<TaskDto> allTasks = new();
     protected override async Task OnInitializedAsync()
     {
-        
+        var flags = await Http.GetFromJsonAsync<Dictionary<string, string>>("api/batches/batch-flags");
+
+            if (flags != null)
+                batchFlags = flags;
+
         data = await Http.GetFromJsonAsync<List<BatchSimulationRow>>("api/batches/list-production") ?? new();
         
-    foreach (var row in data)
-    {
-        var tasks = await Http.GetFromJsonAsync<List<TaskDto>>(
-            $"api/production/gantt?batchProductId={row.BatchProductId}"
-        );
+    var allTasksFromApi = await Http.GetFromJsonAsync<List<TaskDto>>("api/production/gantt");
 
-        tasksByBatch[row.BatchProductId] = tasks ?? new();
+        allTasks = allTasksFromApi ?? new List<TaskDto>();
 
-        if (tasks != null)
-            allTasks.AddRange(tasks);
-    }
+        tasksByBatch = allTasks
+            .GroupBy(t => t.BatchProductId)
+            .ToDictionary(g => g.Key, g => g.ToList());
 
         ordered = data
+            .Where(x =>
+                    {
+                        var key = $"{x.BatchId}_{x.VersionId}";
+                        var flag = batchFlags.ContainsKey(key) ? batchFlags[key] : "";
+
+                        
+                        var hasParent = allTasks.Any(t =>
+                            t.BatchProductId == x.BatchProductId &&
+                            t.ParentBatchId.HasValue);
+
+                        if (flag == "!" && hasParent)
+                            return false;
+
+                        return true;
+                    })
             .OrderByDescending(x => x.IsPriority)
             .ThenBy(x => x.Priority)
             .ToList();
+
+mergedOrdered = ordered
+    .GroupBy(r => new { r.BatchId, r.VersionId })
+    .Select(g =>
+            {
+                var parent = g.FirstOrDefault(x =>
+                {
+                    var key = $"{x.BatchId}_{x.VersionId}";
+                    return batchFlags.ContainsKey(key) && batchFlags[key] == "+";
+                });
+
+        var children = g.Where(x =>
+            {
+                var key = $"{x.BatchId}_{x.VersionId}";
+                return batchFlags.ContainsKey(key) && batchFlags[key] == "!";
+            }).ToList();
+
+        //  tikai child (nav parent)
+        if (parent == null)
+            return g.First();
+
+        //  parent + child → MERGE
+        if (children.Any())
+        {
+            parent.Planned = children.Sum(x => x.Planned);
+            return parent;
+        }
+
+        //  tikai parent
+        return parent;
+    })
+    .ToList();
         
 var allTasksOrdered = allTasks
     .OrderByDescending(t => t.IsPriority)
@@ -289,12 +383,75 @@ var allTasksOrdered = allTasks
     .ThenBy(t => t.StepOrder)
     .ToList();
 
-var allDetails = await Service.CalculateDetailGlobal(allTasksOrdered, ordered);
+var tasksByParent = allTasksOrdered
+    .GroupBy(t => t.ParentBatchId ?? t.BatchProductId)
+    .ToDictionary(g => g.Key, g => g.ToList());
+
+var mergedTasks = new List<TaskDto>();
+
+foreach (var group in tasksByParent.Values)
+{
+    var hasParent = group.Any(t => t.ParentBatchId == null);
+    var hasChild = group.Any(t => t.ParentBatchId != null);
+
+    // 1) tikai Parent
+    if (hasParent && !hasChild)
+    {
+        mergedTasks.AddRange(group);
+        continue;
+    }
+
+    // 2) tikai Child
+    if (!hasParent && hasChild)
+    {
+        mergedTasks.AddRange(group.Where(t => t.StepType == 1));
+        continue;
+    }
+
+    // 3) Parent + Child
+    foreach (var t in group)
+    {
+        // DETAIL → parent + child
+        if (t.StepType == 1)
+        {
+            mergedTasks.Add(t);
+            continue;
+        }
+
+        // Assembly + Finishing → tikai parent
+        if ((t.StepType == 2 || t.StepType == 3) && t.ParentBatchId == null)
+        {
+            mergedTasks.Add(t);
+        }
+    }
+}
+
+mergedTasks = mergedTasks
+    .Where(t => t.BatchProductId > 0)
+    .ToList();
+
+var filteredOrdered = ordered
+    .Where(o => o.BatchProductId > 0) // 🚨 aizsardzība pret 0
+    .Where(o =>
+        mergedTasks.Any(t => t.BatchProductId == o.BatchProductId)
+    )
+    .ToList();
+
+filteredOrdered = filteredOrdered
+    .Where(x => x.BatchProductId > 0)
+    .ToList();
+
+var allDetails = await Service.CalculateDetailGlobal(mergedTasks, filteredOrdered);
 
 foreach (var kvp in allDetails)
 {
     detailResults[kvp.Key] = kvp.Value;
 }
+
+parentHasChildMap = allTasks
+    .Where(t => t.ParentBatchId.HasValue)
+    .GroupBy(t => t.ParentBatchId!.Value)
+    .ToDictionary(g => g.Key, g => true);
 
 // TESTS — globālā secība (tikai pārbaudei)
 var debugOrder = allTasksOrdered

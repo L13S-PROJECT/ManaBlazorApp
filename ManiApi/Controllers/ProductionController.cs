@@ -109,7 +109,7 @@ WHERE ts2.ProductToPart_ID = ts.ProductToPart_ID
     SELECT COALESCE(SUM(s.DurationMinutes),0)
     FROM tasks_work_sessions s
     WHERE s.Task_ID = t.ID
-) AS ActualMinutes 
+) AS ActualMinutes
 
         FROM tasks t
         JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
@@ -131,6 +131,7 @@ WHERE ts2.ProductToPart_ID = ts.ProductToPart_ID
         ";
     cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@bp", batchProductId));
 
+    
     var list = new List<object>();
 
     await using var r = await cmd.ExecuteReaderAsync();
@@ -167,8 +168,19 @@ WHERE ts2.ProductToPart_ID = ts.ProductToPart_ID
         });
     }
 
+    
+
     return Ok(list);
 }
+
+
+[HttpGet("gantt-full")]
+public async Task<IActionResult> GetGanttFull()
+{
+    return await GetGantt(null);
+}
+
+
 
 [HttpGet("finishing-minutes-per-unit")]
 public async Task<IActionResult> GetFinishingMinutesPerUnit([FromQuery] int batchProductId)

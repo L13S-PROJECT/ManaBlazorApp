@@ -26,6 +26,8 @@ namespace ManaApp.Models
         public int QtyDone { get; set; }
         public int? RalColorId { get; set; }
     public string? RalColorName { get; set; }
+    public int? ParentBatchId { get; set; }
+    public string? PartName { get; set; }
 
     }
 }
