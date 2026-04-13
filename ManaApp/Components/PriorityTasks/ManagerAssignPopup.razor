@@ -43,6 +43,8 @@
         first.EstimatedMinutes = g.Sum(x => x.EstimatedMinutes);
         first.RowType = "ParentChildMerged";
 
+        first.CanStart = g.All(x => x.CanStart == true);
+
         return first;
     })
     .ToList();
@@ -146,7 +148,7 @@ else
     <td>
         @if (t.Status == 1)
         {
-            @(t.CanStart == true ? "Var sākt" : "Gaida...")
+            @(t.Status == 1 && t.CanStart == true ? "Var sākt" : "Gaida...")
         }
     </td>
 
@@ -229,7 +231,7 @@ else
         <td>
             @if (t.Status == 1)
             {
-                @(t.CanStart == true ? "Var sākt" : "Gaida...")
+                @(t.Status == 1 && t.CanStart == true ? "Var sākt" : "Gaida...")
             }
         </td>
 
@@ -315,7 +317,7 @@ else
         <td>
             @if (t.Status == 1)
             {
-                @(t.CanStart == true ? "Var sākt" : "Gaida...")
+                @(t.Status == 1 && t.CanStart == true ? "Var sākt" : "Gaida...")
             }
         </td>
 
@@ -399,7 +401,7 @@ else
         <td>
             @if (t.Status == 1)
             {
-                @(t.CanStart == true ? "Var sākt" : "Gaida...")
+                @(t.Status == 1 && t.CanStart == true ? "Var sākt" : "Gaida...")
             }
         </td>
 
@@ -487,7 +489,7 @@ else
         <td>
             @if (t.Status == 1)
             {
-                @(t.CanStart == true ? "Var sākt" : "Gaida...")
+                @(t.Status == 1 && t.CanStart == true ? "Var sākt" : "Gaida...")
             }
         </td>
 
