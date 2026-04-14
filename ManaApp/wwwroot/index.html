@@ -39,6 +39,14 @@
 
   <script src="_framework/blazor.webassembly.js"></script>
 
+  
+
+  <script>
+    window.openDatePicker = (element) => {
+        element.showPicker ? element.showPicker() : element.click();
+    }
+</script>
+
   <script>
     window.createPlanDialogEsc = function (dotnetRef) {
 
@@ -62,7 +70,21 @@
     };
 </script>
 
+<script>
+    window.initScrollSync = () => {
+        const left = document.getElementById('leftPanel');
+        const right = document.getElementById('rightPanel');
+
+        if (!left || !right) return;
+
+        right.addEventListener('scroll', () => {
+            left.scrollTop = right.scrollTop;
+        });
+    };
+</script>
+
 </body>
+
 </html>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>

@@ -4,6 +4,10 @@
 @inject HttpClient Http
 @using ManaApp.Models
 @using ManaApp.Components.Ganttchart
+@using ManaApp.Services
+@inject GanttChartService GanttService
+@using System.Globalization;
+@inject IJSRuntime JS
 
 <div class="main-layout">
 
@@ -14,33 +18,98 @@
 
     <!-- BOTTOM BOX -->
     <div class="bottom-box">
-<div class="gantt-header">
+<div class="gantt-page">
 
-    <div class="gantt-left">
-        Detail
+    <!-- TOP -->
+    <div class="gantt-toolbar">
+
+    <!-- LEFT -->
+    <div class="gantt-toolbar-left">
     </div>
 
-<GanttTimeline Days="@daysInMonth" />
+    <!-- RIGHT -->
+    <div class="gantt-toolbar-right">
 
-</div>
+                <!-- 1. rinda (week + arrows) -->
+                <div class="toolbar-row toolbar-top">
 
-@if (data.Count == 0)
-{
-    <p>Loading...</p>
-}
+                    <span @onclick="PrevWeek" style="cursor:pointer">◀</span>
 
-@if (grouped != null)
-{
-<div class="gantt-scroll">
-    <div class="gantt-body">
+                    <span>Nedēļa @WeekNumber, @startOfWeek.Year</span>
 
-        <GanttDetail Groups="grouped" />
-        <GanttAssembly Groups="grouped" />
-        <GanttFinishing Groups="grouped" />
+                    <span @onclick="NextWeek" style="cursor:pointer">▶</span>
+
+                    <button @onclick="GoToday">Šodiena</button>
+
+                    <span class="calendar-icon" @onclick="OpenCalendar">
+                        📅
+                    </span>
+
+                    <input type="date" @ref="dateInput"
+                        style="position:absolute; opacity:0; pointer-events:none;"
+                        @onchange="OnDateChanged" />
+
+                </div>
+
+                <!-- 2. rinda (dienu nosaukumi) -->
+               <div class="toolbar-row toolbar-days">
+                    
+                    @foreach (var d in weekDays)
+                    {
+                        <div>@d.ToString("dddd")</div>
+                    }
+                </div>
+
+                <!-- 3. rinda (datumi) -->
+                <div class="toolbar-row toolbar-dates">
+                    
+                    @foreach (var d in weekDays)
+                    {
+                        <div>@d.ToString("dd.MM")</div>
+                    }
+                </div>
+
+            </div>
 
     </div>
+
+    <!-- BODY -->
+<div class="gantt-body">
+    <table class="gantt-table">
+        <colgroup>
+            <col style="width:250px" />
+            @for (int i = 0; i < 7; i++)
+            {
+                <col style="width: calc((100% - 250px)/7)" />
+            }
+        </colgroup>
+        <tbody>
+            @foreach (var group in grouped ?? new())
+            {
+                <tr class="wc-row">
+                    <td class="name-cell">@group.WorkCenterName</td>
+                    @for (int i = 0; i < 7; i++)
+                    {
+                        <td></td>
+                    }
+                </tr>
+
+                @foreach (var emp in group.Employees ?? new())
+                {
+                    <tr class="emp-row">
+                        <td class="name-cell">@emp.EmployeeName</td>
+                        @foreach (var day in weekDays)
+                        {
+                            <td></td>
+                        }
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
 </div>
-}
+
+</div>
 
    </div>
 
@@ -50,49 +119,79 @@
 List<GanttRow> data = new();
 List<WorkCenterGroup> grouped = new();
 List<EmployeeDto> employees = new();
+List<WorkCenterDto> workCenters = new();
+DateTime startOfWeek =>
+    DateTime.Today
+        .AddDays(-(int)DateTime.Today.DayOfWeek + 1)
+        .AddDays(weekOffset * 7);
+List<DateTime> weekDays = new();
 int daysInMonth = DateTime.DaysInMonth(DateTime.Today.Year, DateTime.Today.Month);
-
+int weekOffset = 0;
   protected override async Task OnInitializedAsync()
 {
     data = await Http.GetFromJsonAsync<List<GanttRow>>("api/production/gantt") ?? new();
+
     employees = await Http.GetFromJsonAsync<List<EmployeeDto>>("api/employees") ?? new();
-    grouped = data
-    .GroupBy(x => x.WorkCenterId)
-    .Select(wc => new WorkCenterGroup
-    {
-        WorkCenterId = wc.Key,
-        WorkCenterName = wc.First().WorkCenterName,
 
-                Employees = employees
-    .Where(e => e.WorkCentrTypeID == wc.Key)
-    .Select(e =>
-    {
-        var tasks = wc
-            .Where(t => t.AssignedTo == e.Id || t.AssignedTo == 0 || t.AssignedTo == null)
-            .OrderByDescending(t => t.IsPriority)
-            .ThenBy(t => t.Priority)
-            .ThenBy(t => t.BatchProductId)
-            .ThenBy(t => t.StepOrder)
-            .ToList();
+    workCenters = await Http.GetFromJsonAsync<List<WorkCenterDto>>("api/workcenters") ?? new(); // ⬅️ PĀRVIETO ŠEIT
 
-        int current = 0;
+    var simulated = GanttService.BuildSimulatedTasks(data);
 
-        foreach (var t in tasks)
-        {
-            t.EstimatedStartMinutes = current;
-            current += t.EstimatedTotalMinutes;
-        }
+    grouped = GanttService.BuildGroups(simulated, employees, workCenters); // ⬅️ TAGAD OK await Http.GetFromJsonAsync<List<WorkCenterDto>>("api/workcenters") ?? new();
 
-        return new EmployeeGroup
-        {
-            EmployeeId = e.Id,
-            EmployeeName = e.Name,
-            Tasks = tasks
-        };
-    })
-    .ToList()
-    })
-    .ToList();
+GenerateWeek();
+
 }
+
+void PrevWeek() 
+{
+    weekOffset--;
+    GenerateWeek();
+}
+
+void NextWeek()
+{
+    weekOffset++;
+    GenerateWeek();
+}
+
+void GenerateWeek()
+{
+    weekDays = Enumerable.Range(0, 7)
+        .Select(i => startOfWeek.AddDays(i))
+        .ToList();
+}
+
+int WeekNumber =>
+    CultureInfo.CurrentCulture.Calendar.GetWeekOfYear(
+        startOfWeek,
+        CalendarWeekRule.FirstFourDayWeek,
+        DayOfWeek.Monday);
+
+void GoToday()
+{
+    weekOffset = 0;
+    GenerateWeek();
+}
+
+void OnDateChanged(ChangeEventArgs e)
+{
+    if (DateTime.TryParse(e.Value?.ToString(), out var selected))
+    {
+        var monday = selected.AddDays(-(int)selected.DayOfWeek + 1);
+        weekOffset = (int)((monday - DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek + 1)).TotalDays / 7);
+        GenerateWeek();
+    }
+}
+
+ElementReference dateInput;
+
+async Task OpenCalendar()
+{
+    await JS.InvokeVoidAsync("openDatePicker", dateInput);
+}
+
+ElementReference leftPanel;
+
 
 }

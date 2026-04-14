@@ -25,6 +25,8 @@ builder.Services.AddSyncfusionBlazor();
 
 builder.Services.AddScoped<ManaApp.Services.AppState>();
 
+builder.Services.AddScoped<GanttChartService>();
+
 var culture = new System.Globalization.CultureInfo("lv-LV");
 System.Globalization.CultureInfo.DefaultThreadCurrentCulture = culture;
 System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = culture;

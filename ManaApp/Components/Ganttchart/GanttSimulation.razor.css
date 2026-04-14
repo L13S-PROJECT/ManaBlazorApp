@@ -387,8 +387,11 @@
 
 .product-name {
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+}
+
+.product-cell.child-only .product-name {
+    overflow: visible;
+    text-overflow: unset;
 }
 
 .detail-part {

@@ -1,3 +1,5 @@
+
+
 .main-layout {
     display: flex;
     flex-direction: column;
@@ -12,8 +14,14 @@
 }
 
 .bottom-box {
-    flex: 1;
-    overflow: auto;
+    height: 50vh;
+    overflow: hidden; 
+}
+
+.gantt-page {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
 .simulation-placeholder {
@@ -23,4 +31,195 @@
     justify-content: center;
     font-weight: bold;
     color: #888;
+}
+
+.gantt-body {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    min-width: 0;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    scrollbar-gutter: stable;
+    scrollbar-width: none;
+}
+
+.gantt-body::-webkit-scrollbar {
+    display: none; /* Chrome, Edge */
+}
+
+.gantt-left-panel {
+    width: 250px;
+    border-right: 1px solid #ccc;
+}
+
+.gantt-right-panel {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+}
+
+.gantt-toolbar {
+    height: 60px;
+    border-bottom: 1px solid #ccc;
+    flex-shrink: 0;
+    display: flex;
+    min-width: 0;
+}
+
+.gantt-toolbar-left {
+    width: 250px;
+    border-right: 1px solid #ccc;
+}
+
+.gantt-toolbar-right {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+}
+
+
+.toolbar-row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr); 
+    text-align: center;
+    border-bottom: 1px solid #ccc;
+    height: 20px;
+}
+
+.toolbar-top {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    font-weight: bold;
+    font-size: 13px;
+    padding: 0px;   /* samazina augstumu */
+}
+
+.toolbar-days div,
+.toolbar-dates div {
+    border-right: 1px solid #ccc;
+    padding: 1px 1px;   /* mazāks vertikālais "gaiss" */
+    font-size: 11px;    /* mazāks teksts */
+    line-height: 1;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.gantt-grid-body {
+    flex: 1;
+    width: 100%;
+}
+
+.calendar-icon {
+    position: relative;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.calendar-icon input {
+    position: absolute;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+}
+
+.wc-row {
+    font-weight: bold;
+    padding: 2px;
+    background: #f3f3f3;
+    border-bottom: 1px solid #ccc;
+    height: 24px;
+    
+}
+
+.emp-row {
+    padding: 2px 2px 2px 11px;
+    border-bottom: 1px solid #eee;
+    height: 24px;
+    
+}
+
+.gantt-grid-body {
+    display: flex;
+    flex-direction: column;
+}
+
+.grid-row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr); 
+    width: 100%;
+}
+
+.gantt-toolbar-right,
+.gantt-grid-body {
+    width: 100%;
+    min-width: 0;   
+}
+
+.grid-cell {
+    border-right: 1px solid #ccc;
+    border-bottom: 1px solid #eee;
+    height: 100%;
+    min-height: 24px;
+}
+
+.week-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    width: 100%;
+    border-right: 1px solid #ccc;
+}
+
+.week-grid > div {
+    box-sizing: border-box;   /*  svarīgākais */
+}
+
+.gantt-grid-8 {
+    display: grid;
+    grid-template-columns: 2fr repeat(7, 1fr);
+}
+
+.cell {
+    display: flex;
+    align-items: center;
+    padding: 2px;
+    box-sizing: border-box;
+
+    border-right: 1px solid #ccc;
+    border-bottom: 1px solid #eee;
+}
+
+.gantt-left-panel,
+.gantt-toolbar-left {
+    width: 250px; /* ⬅️ vienāds */
+    flex-shrink: 0;
+}
+
+.gantt-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse; /* ⬅️ KRITISKI */
+}
+
+.gantt-table td {
+    border-bottom: 1px solid #ccc; /* ⬅️ horizontālās līnijas */
+    border-right: 1px solid #ccc;
+    height: 24px;
+}
+
+.gantt-table .wc-row td {
+    font-weight: bold;
+    background: #f3f3f3;
+}
+
+.gantt-table td:first-child {
+    border-left: 1px solid #ccc;
 }
