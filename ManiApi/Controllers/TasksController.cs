@@ -115,8 +115,15 @@ JOIN toppart          tp   ON tp.ID  = ptp.TopPart_ID
 WHERE t.IsActive = 1
   AND t.Tasks_Status IN (1,2)
 AND (
-    (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To IS NULL))
- OR (@empId = 0 AND t.Assigned_To IS NULL)
+    t.Assigned_To = @empId
+    OR (
+        t.Assigned_To IS NULL
+        AND ts.WorkCentr_ID = (
+            SELECT WorkCentrTypeID 
+            FROM employees 
+            WHERE ID = @empId
+        )
+    )
 )
 
 ORDER BY
@@ -2259,14 +2266,14 @@ if (empId < 0)
     await using var cmd = conn.CreateCommand();
 
     string? employeeName = null;
-string? workCenterName = null;
+    string? workCenterName = null;
+    int? employeeWorkCenterId = null;
 
 
 await using (var cmdHeader = conn.CreateCommand())
 {
     cmdHeader.CommandText = @"
-SELECT 
-    Employee_Name
+SELECT ID, Employee_Name, WorkCentrTypeID
 FROM employees
 WHERE ID = @empId;
 ";
@@ -2275,14 +2282,16 @@ WHERE ID = @empId;
 
     await using var rHeader = await cmdHeader.ExecuteReaderAsync();
     if (await rHeader.ReadAsync())
-    {
-        employeeName = rHeader.IsDBNull(0) ? null : rHeader.GetString(0);
-    }
+        {
+            employeeName = rHeader.IsDBNull(1) ? null : rHeader.GetString(1);
+            employeeWorkCenterId = rHeader.IsDBNull(2) ? (int?)null : rHeader.GetInt32(2);
+        }
 }
 
     cmd.CommandText = @"
 SELECT
     wc.Workcentr_Name AS WorkCenter,
+    ts.WorkCentr_ID AS WorkCentrTypeID,
     wc.ID AS WorkCenterSort,
     t.ID AS TaskId,
     t.BatchProduct_ID,
@@ -2371,9 +2380,12 @@ LEFT JOIN producttopparts ptpParent
     AND ptpParent.IsActive = 1
 WHERE t.IsActive = 1
   AND t.Tasks_Status = 2
-  AND (
-    (@empId > 0 AND (t.Claimed_By = @empId OR t.Assigned_To IS NULL))
- OR (@empId = 0 AND t.Assigned_To IS NULL)
+AND (
+    (t.Assigned_To = @empId OR t.Claimed_By = @empId)
+    OR (
+        t.Assigned_To IS NULL
+        AND ts.WorkCentr_ID = @wc
+    )
 )
 ORDER BY
   bp.is_priority DESC,
@@ -2382,7 +2394,7 @@ ORDER BY
   ts.Step_Order ASC;
 ";
 
-    cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@empId", empId));
+    cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@wc", (object?)employeeWorkCenterId ?? DBNull.Value));
 
     var list = new List<object>();
 
@@ -2394,28 +2406,30 @@ ORDER BY
         {
             BatchPriority = false,
             WorkCenter = r.IsDBNull(0) ? null : r.GetString(0),
-            WorkCenterSort = r.IsDBNull(1) ? (int?)null : r.GetInt32(1),
-            TaskId = r.GetInt32(2),
-            BatchProductId = r.GetInt32(3),
-            BatchCode = r.GetString(4),
-            ProductName = r.GetString(5),
-            Qty = r.IsDBNull(6) ? 0 : r.GetInt32(6),
-            Status = r.GetInt32(7),
-            CanStart = r.IsDBNull(8) ? (bool?)null : r.GetInt32(8) == 1,
-            StepOrder = r.IsDBNull(9) ? 0 : r.GetInt32(9),
-            StepType = r.GetInt32(10),
-            StepName = r.IsDBNull(11) ? null : r.GetString(11),
-            EstimatedMinutes = r.IsDBNull(12) ? 0 : r.GetInt32(12),
-            ProductToPartId = r.GetInt32(13),
-            TopPartName = r.IsDBNull(14) ? null : r.GetString(14),
-            IsFinal = !r.IsDBNull(15) && r.GetBoolean(15),
-            Assigned_To = r.IsDBNull(16) ? (int?)null : r.GetInt32(16),
-            Tasks_Priority = !r.IsDBNull(17) && r.GetBoolean(17),
-            Tasks_Push = !r.IsDBNull(18) && r.GetBoolean(18),
-            Claimed_By = r.IsDBNull(19) ? (int?)null : r.GetInt32(19),
-            RootId = r.GetInt32(20),
-            TopPartStepId = r.GetInt32(21),
-            RowType = r.IsDBNull(22) ? null : r.GetString(22),
+            workCenterTypeId = r.IsDBNull(1) ? (int?)null : r.GetInt32(1),
+            WorkCenterSort = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
+            TaskId = r.GetInt32(3),
+            BatchProductId = r.GetInt32(4),
+            BatchCode = r.GetString(5),
+            ProductName = r.GetString(6),
+            Qty = r.IsDBNull(7) ? 0 : r.GetInt32(7),
+            Status = r.GetInt32(8),
+            CanStart = r.IsDBNull(9) ? (bool?)null : r.GetInt32(9) == 1,
+            StepOrder = r.IsDBNull(10) ? 0 : r.GetInt32(10),
+            StepType = r.GetInt32(11),
+            StepName = r.IsDBNull(12) ? null : r.GetString(12),
+            EstimatedMinutes = r.IsDBNull(13) ? 0 : r.GetInt32(13),
+            ProductToPartId = r.GetInt32(14),
+            TopPartName = r.IsDBNull(15) ? null : r.GetString(15),
+            IsFinal = !r.IsDBNull(16) && r.GetBoolean(16),
+            Assigned_To = r.IsDBNull(17) ? (int?)null : r.GetInt32(17),
+            Tasks_Priority = !r.IsDBNull(18) && r.GetBoolean(18),
+            Tasks_Push = !r.IsDBNull(19) && r.GetBoolean(19),
+            Claimed_By = r.IsDBNull(20) ? (int?)null : r.GetInt32(20),
+            RootId = r.GetInt32(21),
+            TopPartStepId = r.GetInt32(22),
+            RowType = r.IsDBNull(23) ? null : r.GetString(23),
+
         });
     }
 }
@@ -2516,8 +2530,11 @@ WHERE t.IsActive = 1
   AND t.Tasks_Status = 1
   AND bp.is_priority = 1
 AND (
-    (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To IS NULL))
- OR (@empId = 0 AND t.Assigned_To IS NULL)
+    (t.Assigned_To = @empId OR t.Claimed_By = @empId)
+    OR (
+        t.Assigned_To IS NULL
+        AND ts.WorkCentr_ID = @wc
+    )
 )
 ORDER BY
   CASE WHEN t.Tasks_Push = 1 THEN 0 ELSE 1 END,
@@ -2526,7 +2543,7 @@ ORDER BY
   ts.Step_Order ASC;
 ";
 
-cmd2.Parameters.Add(new MySqlConnector.MySqlParameter("@empId", empId));
+cmd2.Parameters.Add(new MySqlConnector.MySqlParameter("@wc", (object?)employeeWorkCenterId ?? DBNull.Value));
 
 var priorityList = new List<object>();
 
@@ -2661,8 +2678,11 @@ WHERE t.IsActive = 1
   AND t.Tasks_Status = 1
   AND bp.is_priority = 0
 AND (
-    (@empId > 0 AND (t.Assigned_To = @empId OR t.Assigned_To IS NULL))
- OR (@empId = 0 AND t.Assigned_To IS NULL)
+    (t.Assigned_To = @empId OR t.Claimed_By = @empId)
+    OR (
+        t.Assigned_To IS NULL
+        AND ts.WorkCentr_ID = @wc
+    )
 )
 ORDER BY
   CASE WHEN t.Tasks_Push = 1 THEN 0 ELSE 1 END,
@@ -2672,7 +2692,7 @@ ORDER BY
   ts.Step_Order ASC;
 ";
 
-cmd3.Parameters.Add(new MySqlConnector.MySqlParameter("@empId", empId));
+cmd3.Parameters.Add(new MySqlConnector.MySqlParameter("@wc", (object?)employeeWorkCenterId ?? DBNull.Value));
 
 var normalList = new List<object>();
 
@@ -2709,14 +2729,16 @@ await using (var r3 = await cmd3.ExecuteReaderAsync())
         });
     }
 }
-    return Ok(new
-{
-    EmployeeName = employeeName,
-    WorkCenterName = workCenterName,
-    InProgress = list,
-    Priority = priorityList,
-    Normal = normalList
-});
+
+return Ok(new
+    {
+        EmployeeName = employeeName,
+        WorkCenterName = workCenterName,
+        WorkCentrTypeID = employeeWorkCenterId,
+        InProgress = list,
+        Priority = priorityList,
+        Normal = normalList
+    });
 
 }
 

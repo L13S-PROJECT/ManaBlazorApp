@@ -717,6 +717,12 @@ var allTasks = (model?.InProgress ?? new List<TaskRow>())
 
 foreach (var t in allTasks)
 {
+    await JS.InvokeVoidAsync("console.log", new {
+            t.TaskId,
+            t.Assigned_To,
+            t.WorkCentrTypeID
+        });
+    
     if (t.BatchProductId == 0 || t.ProductToPartId == 0)
     {
         await JS.InvokeVoidAsync("console.warn", t);
@@ -738,6 +744,12 @@ foreach (var g in groups)
         item.ShowChildMark = item.RowType == "SingleChild";  
     }
 }
+
+await JS.InvokeVoidAsync("console.log", new {
+    EmployeeId,
+    EmployeeWC = model?.WorkCentrTypeID
+});
+
 }
 
 private async Task ReloadData()
@@ -833,7 +845,7 @@ private void CloseDetails()
 {
     public string? EmployeeName { get; set; }
     public string? WorkCenterName { get; set; }
-
+    public int? WorkCentrTypeID { get; set; }
     public List<TaskRow>? InProgress { get; set; }
     public List<TaskRow>? Priority { get; set; }
     public List<TaskRow>? Normal { get; set; }
@@ -857,7 +869,7 @@ private class TaskRow
     public int StepType { get; set; }
     public string? QtyBreakdown { get; set; }   
     public bool IsFinal { get; set; }
-
+    public int? WorkCentrTypeID { get; set; }
     public int? Assigned_To { get; set; }
     public bool Tasks_Priority { get; set; }
     public bool Tasks_Push { get; set; }
@@ -897,10 +909,11 @@ private IEnumerable<TaskRow> PushTasks =>
     (model?.InProgress ?? Enumerable.Empty<TaskRow>())
     .Concat(model?.Priority ?? Enumerable.Empty<TaskRow>())
     .Concat(model?.Normal ?? Enumerable.Empty<TaskRow>())
-    .Where(t => t.Tasks_Push);
+    .Where(t => t.Tasks_Push)
+    .Where(CanSee);
 private IEnumerable<TaskRow> PrioritySuper =>
     model?.Priority?.Where(t => t.Tasks_Priority && !t.Tasks_Push)
-    .Where(t => t.Assigned_To == EmployeeId || t.Assigned_To == null || EmployeeId == 0)
+    .Where(CanSee)
     ?? Enumerable.Empty<TaskRow>();
 
 private IEnumerable<TaskRow> PriorityNormal =>
@@ -1038,6 +1051,13 @@ var response = await Http.PostAsJsonAsync("api/tasks/update-assignee-aggregated"
 }
 
     StateHasChanged();
+}
+
+private bool CanSee(TaskRow t)
+{
+    return t.Assigned_To == EmployeeId
+        || (t.Assigned_To == null 
+            && t.WorkCentrTypeID == model?.WorkCentrTypeID);
 }
 
 

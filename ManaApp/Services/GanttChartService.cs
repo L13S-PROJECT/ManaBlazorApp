@@ -23,50 +23,175 @@ namespace ManaApp.Services
                         var wcTasks = data
                             .Where(t => t.WorkCenterId == wc.ID)
                             .ToList();
+                        var workCenterBusy = new Dictionary<int, int>();
+                        var wcEmployees = employeesByWorkCenter.ContainsKey(wc.ID)
+                            ? employeesByWorkCenter[wc.ID]
+                            : new List<EmployeeDto>();
 
                         return new WorkCenterGroup
                 {
                     WorkCenterId = wc.ID,
                     WorkCenterName = wc.WorkCentr_Name,             
 
-                Employees = employees
-                    .Where(e => e.WorkCentrTypeID == wc.ID)
-                    .ToList()
-                        
+                Employees = wcEmployees
                     .Select(e =>
                         {
                             var tasks = (wcTasks ?? new List<GanttRow>())
-                                .Where(t => t.AssignedTo == e.Id)
-                                .OrderByDescending(t => t.IsPriority)
-                                .ThenBy(t => t.Priority)
+                                    .Where(t =>
+                                        t.Status != 5 &&
+                                        (
+                                            t.ClaimedBy == e.Id
+                                            || t.AssignedTo == e.Id
+                                            || (t.AssignedTo == null && t.ClaimedBy == null)
+                                        )
+                                    )
+                                .OrderBy(t => t.AssignedTo == null ? 1 : 0)
+                                .ThenBy(t => t.CanStart ? 0 : 1)
+                                .ThenByDescending(t => t.TasksPush)
+                                .ThenByDescending(t => t.BatchPriority)
+                                .ThenByDescending(t => t.TasksPriority)
+                                .ThenBy(t => t.IsPriority ? t.Priority : int.MaxValue)
+                                .ThenBy(t => !t.IsPriority ? t.NormalOrder : int.MaxValue)
                                 .ThenBy(t => t.BatchProductId)
                                 .ThenBy(t => t.StepOrder)
                                 .ToList();
 
-                            var employeeBusy = new Dictionary<int, int>();
 
-                       foreach (var t in tasks)
+                       var employeeBusy = new Dictionary<int, int>();
+                        
+                        var scheduled = new List<GanttRow>();
+
+                        var available = tasks
+                            .Select(t => new GanttRow
                             {
-                                var empId = e.Id;
+                                BatchProductId = t.BatchProductId,
+                                StepOrder = t.StepOrder,
+                                EstimatedTotalMinutes = t.EstimatedTotalMinutes,
+                                ActualMinutes = t.ActualMinutes,
+                                AssignedTo = t.AssignedTo,
+                                Status = t.Status,
+                                TasksPush = t.TasksPush,
+                                BatchPriority = t.BatchPriority,
+                                TasksPriority = t.TasksPriority,
+                                Priority = t.Priority,
+                                IsPriority = t.IsPriority,
+                                NormalOrder = t.NormalOrder,
+                                WorkCenterId = t.WorkCenterId,
+                                CanStart = t.CanStart,
+                                DisplayColor = t.DisplayColor
+                            })
+                            .ToList();
 
-                                    if (!employeeBusy.ContainsKey(empId))
-                                        employeeBusy[empId] = 0;
+                        var lastStepEnd = new Dictionary<(int batchId, int stepOrder), int>();
 
-                                    var start = employeeBusy[empId];
+while (available.Any())
+{
+    var next = available
+        .Where(t => t.CanStart)
+        .DefaultIfEmpty(available.First())
+        .OrderBy(t => t.AssignedTo == null ? 1 : 0)
+        .ThenByDescending(t => t.TasksPush)
+        .ThenByDescending(t => t.BatchPriority)
+        .ThenByDescending(t => t.TasksPriority)
+        .ThenBy(t => t.Priority)
+        .First();
 
-                                    t.EstimatedStartMinutes = start;
+    available.Remove(next);
 
-                                    var duration = Math.Max(0, t.EstimatedTotalMinutes - t.ActualMinutes);
+    var empId = next.AssignedTo ?? e.Id;
 
-                                    employeeBusy[empId] = start + duration;
-                            }
+    if (!employeeBusy.ContainsKey(empId))
+        employeeBusy[empId] = 0;
 
-                            return new EmployeeGroup
-                            {
-                                EmployeeId = e.Id,
-                                EmployeeName = e.Name,
-                                Tasks = tasks
-                            };
+    var prevKey = ((int)next.BatchProductId!, (int)next.StepOrder! - 1);
+
+    var previousStepEnd = lastStepEnd.ContainsKey(prevKey)
+        ? lastStepEnd[prevKey]
+        : 0;
+
+    if (!workCenterBusy.ContainsKey(wc.ID))
+    workCenterBusy[wc.ID] = 0;
+
+int start;
+
+if (next.AssignedTo != null)
+{
+    start = Math.Max(
+        Math.Max(employeeBusy[empId], previousStepEnd),
+        workCenterBusy[wc.ID]
+    );
+}
+else
+{
+    // pelēkie = tikai employee + dependency
+    start = Math.Max(employeeBusy[empId], previousStepEnd);
+}
+
+    // ⚠️ klonējam tasku, lai katram darbiniekam būtu savs laiks
+        var taskInstance = new GanttRow
+        {
+            BatchProductId = next.BatchProductId,
+            StepOrder = next.StepOrder,
+            EstimatedTotalMinutes = next.EstimatedTotalMinutes,
+            ActualMinutes = next.ActualMinutes,
+            AssignedTo = next.AssignedTo,
+            ClaimedBy = next.ClaimedBy,
+            Status = next.Status,
+            TasksPush = next.TasksPush,
+            BatchPriority = next.BatchPriority,
+            TasksPriority = next.TasksPriority,
+            Priority = next.Priority,
+            IsPriority = next.IsPriority,
+            NormalOrder = next.NormalOrder,
+            WorkCenterId = next.WorkCenterId,
+            CanStart = next.CanStart,
+            DisplayColor = next.DisplayColor
+        };
+    
+    taskInstance.EstimatedStartMinutes = start;
+
+    var duration = Math.Max(0, next.EstimatedTotalMinutes - next.ActualMinutes);
+    // pelēkie taski neietekmē employee noslodzi (what-if simulācija)
+    var affectsEmployee = next.AssignedTo != null;
+    var currentEnd = start + duration;
+    var currentKey = ((int)next.BatchProductId!, (int)next.StepOrder!);
+    lastStepEnd[currentKey] = currentEnd;
+
+    
+    // ❗ tikai ja assigned → bloķē darbinieku
+    if (affectsEmployee)
+        {
+            employeeBusy[empId] = start + duration;
+        }
+
+    if (next.AssignedTo != null)
+        {
+            workCenterBusy[wc.ID] = start + duration;
+        }
+
+    scheduled.Add(taskInstance);
+
+    // 👉 pievienojam nākamos stepus
+    var nextSteps = data
+        .Where(x =>
+            x.BatchProductId == next.BatchProductId &&
+            x.StepOrder == next.StepOrder + 1)
+        .ToList();
+
+    foreach (var step in nextSteps)
+    {
+        if (!available.Contains(step) && !scheduled.Contains(step))
+        {
+            available.Add(step);
+        }
+    }
+}
+        return new EmployeeGroup
+        {
+            EmployeeId = e.Id,
+            EmployeeName = e.Name,
+            Tasks = scheduled
+        };
                         })
                         .ToList()
                 };

@@ -17,9 +17,17 @@ public class GanttRow
     public string? WorkCenterName { get; set; }
 
     public int? AssignedTo { get; set; }
+    public int? ClaimedBy { get; set; }
     public string? EmployeeName { get; set; }
-
+    public DateTime? StartedAt { get; set; }
+    public DateTime? FinishedAt { get; set; }
     public int EstimatedStartMinutes { get; set; }
     public int EstimatedTotalMinutes { get; set; }
     public int ActualMinutes { get; set; }
-}
+    public bool TasksPush { get; set; }
+    public bool TasksPriority { get; set; }
+    public bool BatchPriority { get; set; }
+    public int NormalOrder { get; set; }
+    public bool CanStart { get; set; }
+    public string? DisplayColor { get; set; }
+    }

@@ -98,9 +98,19 @@
                 {
                     <tr class="emp-row">
                         <td class="name-cell">@emp.EmployeeName</td>
-                        @foreach (var day in weekDays)
+
+                        @for (int d = 0; d < 7; d++)
                         {
-                            <td></td>
+                            <td>
+                                <div class="day-cell">
+                                    @for (int h = 0; h < 8; h++)
+                                    {
+                                        <div class="hour-cell"
+                                            style="background-color:@GetColorByHour(emp.Tasks, d, h)">
+                                        </div>
+                                    }
+                                </div>
+                            </td>
                         }
                     </tr>
                 }
@@ -137,7 +147,7 @@ int weekOffset = 0;
 
     var simulated = GanttService.BuildSimulatedTasks(data);
 
-    grouped = GanttService.BuildGroups(simulated, employees, workCenters); // ⬅️ TAGAD OK await Http.GetFromJsonAsync<List<WorkCenterDto>>("api/workcenters") ?? new();
+    grouped = GanttService.BuildGroups(data, employees, workCenters);
 
 GenerateWeek();
 
@@ -193,5 +203,82 @@ async Task OpenCalendar()
 
 ElementReference leftPanel;
 
+string GetColor(List<GanttRow>? tasks, int dayIndex)
+{
+    if (tasks == null) return "";
+
+    var dayStart = startOfWeek.AddDays(dayIndex);
+    var dayEnd = dayStart.AddDays(1);
+
+    var task = tasks.FirstOrDefault(t =>
+    {
+        var taskStart = DateTime.Today.AddMinutes(t.EstimatedStartMinutes);
+        var taskEnd = taskStart.AddMinutes(t.EstimatedTotalMinutes);
+
+        return taskStart < dayEnd && taskEnd > dayStart;
+    });
+
+    return task?.DisplayColor ?? "";
+}
+
+string GetColorByHour(List<GanttRow>? tasks, int dayIndex, int hour)
+{
+    if (tasks == null) return "";
+
+    var minutesPerHour = 60;
+
+    var dayStart = startOfWeek.AddDays(dayIndex);
+    var hourStart = dayStart.AddMinutes(hour * minutesPerHour);
+    var hourEnd = hourStart.AddMinutes(minutesPerHour);
+
+var task = tasks.FirstOrDefault(t =>
+{
+    DateTime taskStart;
+    DateTime taskEnd;
+
+    if (t.StartedAt != null)
+    {
+        taskStart = t.StartedAt.Value;
+        taskEnd = t.FinishedAt ?? DateTime.Now;
+    }
+    else
+    {
+        taskStart = DateTime.Today.AddMinutes(t.EstimatedStartMinutes);
+        taskEnd = taskStart.AddMinutes(t.EstimatedTotalMinutes);
+    }
+
+    var overlapStart = taskStart > hourStart ? taskStart : hourStart;
+    var overlapEnd = taskEnd < hourEnd ? taskEnd : hourEnd;
+
+    return overlapEnd > overlapStart;
+});
+
+    if (task == null)
+    return "";
+
+// 🔴 kavēts > 24h
+// var taskStart = DateTime.Today.AddMinutes(task.EstimatedStartMinutes);
+// var now = DateTime.Today;
+// if (task.Status != 3 && now > taskStart.AddHours(24))
+//     return "red";
+
+// 🟢 pabeigts
+if (task.Status == 3)
+    return "green";
+
+// 🟡 procesā
+if (task.Status == 2)
+    return "yellow";
+
+// 🟠 neiesākts (assigned)
+if (task.Status == 1 && task.AssignedTo != null)
+    return "orange";
+
+// ⚪ nav piešķirts
+if (task.AssignedTo == null)
+    return "lightgray";
+
+return "";
+}
 
 }
