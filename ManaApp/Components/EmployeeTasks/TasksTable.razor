@@ -22,14 +22,15 @@ else
 
         <tbody>
             @foreach (var t in Tasks
+            
                 .OrderByDescending(t => t.Tasks_Push)
                 .ThenBy(t => t.Status == 2 ? 0 : 1)
                 .ThenBy(t => t.StepOrder)
                 .ThenBy(t => t.TaskId))
             {
 <tr class="@GetRowClass(t)"
-    style="cursor: @(CanStart(t) ? "pointer" : "default")"
-    @onclick="() => { if (CanStart(t)) OnSelect.InvokeAsync(t); }">
+    style="cursor: @(t.CanStart ? "pointer" : "default")"
+@onclick="() => { if (t.CanStart) OnSelect.InvokeAsync(t); }">
                     <td>@t.BatchCode</td>
                     <td>
                             @if (t.Assigned_To == null || t.Assigned_To == 0)
@@ -63,29 +64,28 @@ else
 @code {
     [Parameter] public IEnumerable<TaskRow> Tasks { get; set; } = Enumerable.Empty<TaskRow>();
     [Parameter] public Func<int, TaskRow, string> StatusText { get; set; } = default!;
-    [Parameter] public Func<TaskRow, bool> CanStart { get; set; } = default!;
     [Parameter] public EventCallback<TaskRow> OnOpen { get; set; }
     [Parameter] public EventCallback<TaskRow> OnSelect { get; set; }
-    [Parameter] public TaskRow? AvailableTask { get; set; }
+    [Parameter] public int? AvailableTaskId { get; set; }
     private string GetRowClass(TaskRow t)
-    {
-        if (t.Tasks_Push && t.Status == 1)
-            return "task-push";
+{
+    if (t.Tasks_Push && t.Status == 1)
+        return "task-push";
 
-        if (t.Status == 2)
-            return "table-warning";
+    if (t.Status == 2)
+        return "table-warning";
 
-        if (t.Status == 3)
-            return "table-success";
+    if (t.Status == 3)
+        return "table-success";
 
-        if (AvailableTask != null && t.TaskId == AvailableTask.TaskId)
-            return "task-available";
+    if (AvailableTaskId.HasValue && t.TaskId == AvailableTaskId.Value)
+        return "task-available"; // 🔥 vienīgais aktīvais
 
-        return "task-disabled";
-    }
+    if (t.CanStart)
+        return "task-canstart"; // 👈 pievieno šo
 
-private TaskRow? FirstStartable =>
-    Tasks.FirstOrDefault(t => t.Status == 1);
+    return "task-disabled";
+}
 
 }
 

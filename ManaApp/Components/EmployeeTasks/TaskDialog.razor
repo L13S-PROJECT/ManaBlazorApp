@@ -2,7 +2,7 @@
 
 @if (IsOpen 
       && SelectedTask is not null 
-      && (IsFinish || CanStart(SelectedTask)))
+      && (IsFinish || SelectedTask.CanStart))
 {
     <div class="dialog-backdrop">
         <div class="dialog">
@@ -42,8 +42,6 @@
     [Parameter] public TaskRow? SelectedTask { get; set; }
 
     [Parameter] public Func<int, string> StatusText { get; set; } = default!;
-    [Parameter] public Func<TaskRow, bool> CanStart { get; set; } = default!;
-
     [Parameter] public EventCallback<TaskRow> OnStart { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
     [Parameter] public bool IsFinish { get; set; }

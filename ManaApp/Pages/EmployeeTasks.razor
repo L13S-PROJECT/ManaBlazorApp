@@ -44,11 +44,9 @@
                     <div class="elp-section">
                     <h5>Darbs procesā</h5>
                     <TasksTable Tasks="InProgress"
-                                StatusText="StatusText"
-                                CanStart="CanStart"
-                                OnSelect="SelectTask"
-                                OnOpen="OpenTaskDialog"
-                                AvailableTask="FirstAvailableTask" />
+                                StatusText="StatusText"            
+                                OnSelect="OpenTaskDialog"                                
+                                AvailableTaskId="FirstAvailableTask?.TaskId" />
                     </div>
                 }
 
@@ -57,11 +55,9 @@
                         <div class="elp-section push">
                             <h5>Push darbi</h5>
                             <TasksTable Tasks="PushTasks"
-                                        StatusText="StatusText"
-                                        CanStart="CanStart"
-                                        OnSelect="SelectTask"
-                                        OnOpen="OpenTaskDialog"
-                                        AvailableTask="FirstAvailableTask" />
+                                        StatusText="StatusText"                                        
+                                        OnSelect="OpenTaskDialog"                                        
+                                        AvailableTaskId="FirstAvailableTask?.TaskId" />
                         </div>
                     }
 
@@ -70,11 +66,9 @@
                     <div class="elp-section">
                     <h5>Prioritārie – var sākt</h5>
                     <TasksTable Tasks="SuperPriorityCanStart"
-                                StatusText="StatusText"
-                                CanStart="CanStart"
-                                OnSelect="SelectTask"
-                                OnOpen="OpenTaskDialog"
-                                AvailableTask="FirstAvailableTask" />
+                                StatusText="StatusText"                                
+                                OnSelect="OpenTaskDialog"                                
+                                AvailableTaskId="FirstAvailableTask?.TaskId" />
                     </div>
                 }
 
@@ -83,11 +77,9 @@
                         <div class="elp-section">
                             <h5>Prioritārie</h5>
                             <TasksTable Tasks="BatchPriorityCanStart"
-                                        StatusText="StatusText"
-                                        CanStart="CanStart"
-                                        OnSelect="SelectTask"
-                                        OnOpen="OpenTaskDialog"
-                                        AvailableTask="FirstAvailableTask" />
+                                        StatusText="StatusText"                                        
+                                        OnSelect="OpenTaskDialog"                                        
+                                        AvailableTaskId="FirstAvailableTask?.TaskId" />
                         </div>
                     }
 
@@ -96,11 +88,9 @@
                         <div class="elp-section waiting">
                             <h5>Prioritārie – gaida</h5>
                             <TasksTable Tasks="BatchPriorityWaiting"
-                                        StatusText="StatusText"
-                                        CanStart="CanStart"
-                                        OnSelect="SelectTask"
-                                        OnOpen="OpenTaskDialog"
-                                        AvailableTask="FirstAvailableTask" />
+                                        StatusText="StatusText"                                        
+                                        OnSelect="OpenTaskDialog"                                        
+                                        AvailableTaskId="FirstAvailableTask?.TaskId" />
                         </div>
                     }
 
@@ -109,11 +99,9 @@
                     <div class="elp-section waiting">
                     <h5>Prioritārie – gaida</h5>
                     <TasksTable Tasks="SuperPriorityWaiting"
-                                StatusText="StatusText"
-                                CanStart="CanStart"
-                                OnSelect="SelectTask"
-                                OnOpen="OpenTaskDialog"
-                                AvailableTask="FirstAvailableTask" />
+                                StatusText="StatusText"                                
+                                OnSelect="OpenTaskDialog"                                
+                                AvailableTaskId="FirstAvailableTask?.TaskId" />
                     </div>
                 }
 
@@ -122,11 +110,9 @@
                     <div class="elp-section">
                     <h5>Pārējie – var sākt</h5>
                     <TasksTable Tasks="NormalSuperCanStart"
-                                StatusText="StatusText"
-                                CanStart="CanStart"
-                                OnSelect="SelectTask"
-                                OnOpen="OpenTaskDialog"
-                                AvailableTask="FirstAvailableTask" />
+                                StatusText="StatusText"                                
+                                OnSelect="OpenTaskDialog"                                
+                                AvailableTaskId="FirstAvailableTask?.TaskId" />
                     </div>
                 }
 
@@ -135,11 +121,9 @@
                     <div class="elp-section waiting">
                     <h5>Pārējie – gaida</h5>
                     <TasksTable Tasks="NormalSuperWaiting"
-                                StatusText="StatusText"
-                                CanStart="CanStart"
-                                OnSelect="SelectTask"
-                                OnOpen="OpenTaskDialog"
-                                AvailableTask="FirstAvailableTask" />
+                                StatusText="StatusText"                                
+                                OnSelect="OpenTaskDialog"                                
+                                AvailableTaskId="FirstAvailableTask?.TaskId" />
                     </div>
                 }
 
@@ -148,11 +132,9 @@
     <div class="elp-section">
         <h5>Pārējie</h5>
         <TasksTable Tasks="NormalCanStart"
-                    StatusText="StatusText"
-                    CanStart="CanStart"
-                    OnSelect="SelectTask"
-                    OnOpen="OpenTaskDialog"
-                    AvailableTask="FirstAvailableTask" />
+                    StatusText="StatusText"                    
+                    OnSelect="OpenTaskDialog"                    
+                    AvailableTaskId="FirstAvailableTask?.TaskId" />
     </div>
 }
 
@@ -161,11 +143,9 @@
    <div class="elp-section waiting">
         <h5>Pārējie – gaida</h5>
         <TasksTable Tasks="NormalWaiting"
-                    StatusText="StatusText"
-                    CanStart="CanStart"
-                    OnSelect="SelectTask"
-                    OnOpen="OpenTaskDialog"
-                    AvailableTask="FirstAvailableTask" />
+                    StatusText="StatusText"                    
+                    OnSelect="OpenTaskDialog"                    
+                    AvailableTaskId="FirstAvailableTask?.TaskId" />
     </div>
 }
 
@@ -176,12 +156,12 @@
 
     <div class="right-panel">
         <ActiveTaskPanel ActiveTask="_activeTask"
-                OnFinish="FinishTask"
-                StatusText="StatusText"
-                OnStart="OpenTaskDialog"
-                OnFinishConfirm="OpenFinishDialog"
-                AvailableTask="FirstAvailableTask"
-                HasActiveTask="tasks.Any(t => t.Status == 2)" />
+            OnFinish="FinishTask"
+            StatusText="StatusText"
+            OnStart="OpenTaskDialog"
+            OnFinishConfirm="OpenFinishDialog"
+            AvailableTaskId="FirstAvailableTask?.TaskId"
+            HasActiveTask="tasks.Any(t => t.Status == 2)" />
     </div>
 </div>
     </div>
@@ -190,7 +170,7 @@
             IsFinish="@(_dialogMode == TaskDialogMode.Finish)"
             SelectedTask="_selectedTask"
             StatusText="StatusText"
-            CanStart="CanStart"
+            
             OnConfirm="@(async t => {
        if (_dialogMode == TaskDialogMode.Finish)
             await FinishTask(t);
@@ -216,31 +196,31 @@ private IEnumerable<TaskRow> InProgress =>
 
 // 1) Super prioritārie (BatchPriority + Tasks_Priority)
 private IEnumerable<TaskRow> SuperPriorityCanStart =>
-    tasks.Where(t => t.BatchPriority && t.Priority == 1 && t.Status == 1 && CanStart(t));
+    tasks.Where(t => t.BatchPriority && t.Priority == 1 && t.Status == 1 && t.CanStart);
 
 private IEnumerable<TaskRow> SuperPriorityWaiting =>
-    tasks.Where(t => t.BatchPriority && t.Priority == 1 && t.Status == 1 && !CanStart(t));
+    tasks.Where(t => t.BatchPriority && t.Priority == 1 && t.Status == 1 && !t.CanStart);
 
 // 2) Prioritārie (BatchPriority tikai)
 private IEnumerable<TaskRow> BatchPriorityCanStart =>
-    tasks.Where(t => t.BatchPriority && t.Priority == 0 && t.Status == 1 && CanStart(t));
+    tasks.Where(t => t.BatchPriority && t.Priority == 0 && t.Status == 1 && t.CanStart);
 
 private IEnumerable<TaskRow> BatchPriorityWaiting =>
-    tasks.Where(t => t.BatchPriority && t.Priority == 0 && t.Status == 1 && !CanStart(t));
+    tasks.Where(t => t.BatchPriority && t.Priority == 0 && t.Status == 1 && !t.CanStart);
 
 // 3) Secīgie ar part prioritāti
 private IEnumerable<TaskRow> NormalSuperCanStart =>
-    tasks.Where(t => !t.BatchPriority && t.Priority == 1 && t.Status == 1 && CanStart(t));
+    tasks.Where(t => !t.BatchPriority && t.Priority == 1 && t.Status == 1 && t.CanStart);
 
 private IEnumerable<TaskRow> NormalSuperWaiting =>
-    tasks.Where(t => !t.BatchPriority && t.Priority == 1 && t.Status == 1 && !CanStart(t));
+    tasks.Where(t => !t.BatchPriority && t.Priority == 1 && t.Status == 1 && !t.CanStart);
 
 // 4) Parastie
 private IEnumerable<TaskRow> NormalCanStart =>
-    tasks.Where(t => !t.BatchPriority && t.Priority == 0 && t.Status == 1 && CanStart(t));
+    tasks.Where(t => !t.BatchPriority && t.Priority == 0 && t.Status == 1 && t.CanStart);
 
 private IEnumerable<TaskRow> NormalWaiting =>
-    tasks.Where(t => !t.BatchPriority && t.Priority == 0 && t.Status == 1 && !CanStart(t));
+    tasks.Where(t => !t.BatchPriority && t.Priority == 0 && t.Status == 1 && !t.CanStart);
 
 private string StatusText(int s, TaskRow t) => s switch
 {
@@ -264,38 +244,56 @@ private async Task ClaimTask(int taskId)
 
     var resp = await Http.PostAsJsonAsync("api/tasks/claim", body);
 
-    if (resp.IsSuccessStatusCode)
-    {
-        await LoadTasks();
-        StateHasChanged();
-        CloseTaskDialog();
-    }
+if (resp.IsSuccessStatusCode)
+{
+    await LoadTasks();
+
+    _activeTask = tasks
+        .FirstOrDefault(t => t.Status == 2);
+
+    CloseTaskDialog();
+}
+else
+{
+    var error = await resp.Content.ReadAsStringAsync();
+    Console.WriteLine($"CLAIM ERROR: {error}");
+}
 }
 
-private List<TaskRow> _allTasks = new();
 private async Task LoadTasks()
 {
     tasks = await Http.GetFromJsonAsync<List<TaskRow>>(
         $"api/tasks/for-employee?empId={selectedEmployeeId}"
     ) ?? new();
 
-    _allTasks = await Http.GetFromJsonAsync<List<TaskRow>>(
-    "api/tasks/all-active"
-) ?? new();
+    tasks = tasks
+        .OrderBy(t => t.Tasks_Push ? 0 : 1)
+        .ThenBy(t => t.BatchPriority ? 0 : 1)
+        .ThenByDescending(t => t.Priority)
+        .ThenBy(t => t.StepOrder)
+        .ThenBy(t => t.TaskId)
+        .ToList();
 
-    Console.WriteLine("---- ALL TASKS ----");
-foreach (var t in _allTasks)
-{
-    Console.WriteLine($"{t.BatchProductId} | {t.StepOrder} | {t.Status}");
-}
+    _activeTask = tasks
+    .Where(t => t.Status == 2)
+    .OrderBy(t => t.StepOrder)
+    .ThenBy(t => t.TaskId)
+    .FirstOrDefault();
 
-    _activeTask = tasks.FirstOrDefault(t => t.Status == 2);
+    
 
     StateHasChanged();
 }
 
 private TaskRow? FirstAvailableTask =>
-    tasks.FirstOrDefault(t => t.Status == 1 && CanStart(t));
+    tasks
+        .Where(t => t.Status == 1 && t.CanStart)
+        .OrderBy(t => t.Tasks_Push ? 0 : 1)
+        .ThenBy(t => t.BatchPriority ? 0 : 1)
+        .ThenByDescending(t => t.Priority)
+        .ThenBy(t => t.StepOrder)
+        .ThenBy(t => t.TaskId)
+        .FirstOrDefault();
 
 private async Task FinishTask(TaskRow task)
 {
@@ -362,33 +360,7 @@ private TaskRow? _activeTask;
     // kas joprojām ir sarakstā (t.i., nav pabeigts).
 private bool CanStart(TaskRow t)
 {
-       // 1️⃣ Vai šai partijai + detaļai ir iepriekšējais solis, kas nav pabeigts
-    var hasPrevNotFinished = _allTasks.Any(other =>
-        other.RootId == t.RootId &&
-        other.StepOrder < t.StepOrder &&
-        other.Status != 3);
-
-   // 2️⃣ Vai ir augstākas prioritātes darbs, ko var sākt
-            var hasHigherPriority = _allTasks.Any(other =>
-                other.Status == 1 &&
-                CanStartInternal(other) &&
-
-                (
-                    // 🔥 PUSH vienmēr augstāk
-                    (other.Tasks_Push && !t.Tasks_Push)
-
-                    // batch priority virs parastajiem
-                    || (other.BatchPriority && !t.BatchPriority)
-
-                    // vienā līmenī – Tasks_Priority
-                    || (other.BatchPriority == t.BatchPriority &&
-                        other.Priority > t.Priority)
-                )
-            );
-    
-     Console.WriteLine($"{t.TaskId} | {t.BatchProductId} | {t.RootId} | {t.StepOrder} | {t.Status} | {t.Assigned_To}");
-
-    return !hasPrevNotFinished && !hasHigherPriority;
+    return t.CanStart;
 }
 
 private void SelectTask(TaskRow task)
@@ -397,17 +369,9 @@ private void SelectTask(TaskRow task)
     _dialogMode = TaskDialogMode.None;
 }
 
-private bool CanStartInternal(TaskRow t)
-{
-    return !_allTasks.Any(prev =>
-        prev.RootId == t.RootId &&
-        prev.StepOrder < t.StepOrder &&
-        prev.Status != 3);
-}
-
 private int GetRootId(TaskRow t)
 {
-    return t.BatchProductId; // 🔥 pagaidām vienkāršā versija
+    return t.RootId != 0 ? t.RootId : t.BatchProductId;
 }
 
 enum TaskDialogMode
