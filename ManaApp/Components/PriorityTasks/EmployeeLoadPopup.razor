@@ -31,9 +31,8 @@ else
             </div>
 <div class="elp-content">
 
-@if (EmployeeId > 0 || EmployeeId == 0)
+@if (VisibleInProgress.Any())
 {
-    @if (model.InProgress != null && model.InProgress.Any())
         {
         <div class="elp-section">
             <h6>Darbs procesā</h6>
@@ -51,7 +50,7 @@ else
                         </tr>
                     </thead>
                     <tbody>
-                    @foreach (var t in model.InProgress ?? Enumerable.Empty<TaskRow>())
+                    @foreach (var t in VisibleInProgress)
                     {
                         <tr @key="t">
                             <td>@t.BatchCode</td>
@@ -717,12 +716,6 @@ var allTasks = (model?.InProgress ?? new List<TaskRow>())
 
 foreach (var t in allTasks)
 {
-    await JS.InvokeVoidAsync("console.log", new {
-            t.TaskId,
-            t.Assigned_To,
-            t.WorkCentrTypeID
-        });
-    
     if (t.BatchProductId == 0 || t.ProductToPartId == 0)
     {
         await JS.InvokeVoidAsync("console.warn", t);
@@ -744,11 +737,6 @@ foreach (var g in groups)
         item.ShowChildMark = item.RowType == "SingleChild";  
     }
 }
-
-await JS.InvokeVoidAsync("console.log", new {
-    EmployeeId,
-    EmployeeWC = model?.WorkCentrTypeID
-});
 
 }
 
@@ -905,30 +893,30 @@ private void CloseTaskDetails()
 {
     selectedTaskId = null;
 }
+
+private IEnumerable<TaskRow> VisibleInProgress =>
+    (model?.InProgress ?? Enumerable.Empty<TaskRow>());
+
 private IEnumerable<TaskRow> PushTasks =>
     (model?.InProgress ?? Enumerable.Empty<TaskRow>())
     .Concat(model?.Priority ?? Enumerable.Empty<TaskRow>())
     .Concat(model?.Normal ?? Enumerable.Empty<TaskRow>())
-    .Where(t => t.Tasks_Push)
-    .Where(CanSee);
+    .Where(t => t.Tasks_Push);
+
 private IEnumerable<TaskRow> PrioritySuper =>
     model?.Priority?.Where(t => t.Tasks_Priority && !t.Tasks_Push)
-    .Where(CanSee)
     ?? Enumerable.Empty<TaskRow>();
 
 private IEnumerable<TaskRow> PriorityNormal =>
     model?.Priority?.Where(t => !t.Tasks_Priority && !t.Tasks_Push)
-    .Where(t => t.Assigned_To == EmployeeId || t.Assigned_To == null || EmployeeId == 0)
     ?? Enumerable.Empty<TaskRow>();
 
 private IEnumerable<TaskRow> NormalSuper =>
     model?.Normal?.Where(t => t.Tasks_Priority && !t.Tasks_Push)
-    .Where(t => t.Assigned_To == EmployeeId || t.Assigned_To == null || EmployeeId == 0)
     ?? Enumerable.Empty<TaskRow>();
 
 private IEnumerable<TaskRow> NormalNormal =>
     model?.Normal?.Where(t => !t.Tasks_Priority && !t.Tasks_Push)
-    .Where(t => t.Assigned_To == EmployeeId || t.Assigned_To == null || EmployeeId == 0)
     ?? Enumerable.Empty<TaskRow>();
 
 
@@ -1055,10 +1043,7 @@ var response = await Http.PostAsJsonAsync("api/tasks/update-assignee-aggregated"
 
 private bool CanSee(TaskRow t)
 {
-    return t.Assigned_To == EmployeeId
-        || (t.Assigned_To == null 
-            && t.WorkCentrTypeID == model?.WorkCentrTypeID);
+    return true;
 }
-
 
 }

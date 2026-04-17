@@ -2,7 +2,7 @@ using ManiApi.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Text.Json.Serialization; // <- pie using augšā
-
+using ManiApi.Services;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -25,6 +25,8 @@ builder.Services.AddDbContextPool<AppDbContext>(options =>
     ));
 
 builder.Services.AddHttpClient();
+
+builder.Services.AddScoped<TaskService>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();

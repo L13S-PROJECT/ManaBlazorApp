@@ -2131,14 +2131,15 @@ JOIN producttopparts ptp
     ON ptp.Version_ID = bp.Version_Id
     AND ptp.IsActive = 1
 
-JOIN toppartsteps ts 
-    ON ts.ProductToPart_ID = ptp.ID
-    AND ts.IsActive = 1
-
-JOIN stage_step_type_map m
-    ON m.Step_Type_ID = ts.Step_Type
-    AND m.Stage = 1
-    AND m.IsActive = 1
+JOIN (
+    SELECT DISTINCT ts.ProductToPart_ID
+    FROM toppartsteps ts
+    JOIN stage_step_type_map m
+        ON m.Step_Type_ID = ts.Step_Type
+        AND m.Stage = 1
+        AND m.IsActive = 1
+    WHERE ts.IsActive = 1
+) ts ON ts.ProductToPart_ID = ptp.ID
 
 JOIN toppart tp 
     ON tp.ID = ptp.TopPart_ID

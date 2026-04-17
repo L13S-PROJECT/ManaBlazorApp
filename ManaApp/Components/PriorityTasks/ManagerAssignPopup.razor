@@ -36,16 +36,41 @@
     return single;
 }
 
-        var first = g.First();
+var first = g.First();
 
-        first.QtyBreakdown = string.Join("+", g.Select(x => x.Qty));
-        first.Qty = g.Sum(x => x.Qty);
-        first.EstimatedMinutes = g.Sum(x => x.EstimatedMinutes);
-        first.RowType = "ParentChildMerged";
+return new UnassignedTaskV2Dto
+{
+    WorkCenter = first.WorkCenter,
+    WorkCenterSort = first.WorkCenterSort,
+    TopPartStepId = first.TopPartStepId,
+    TaskId = first.TaskId,
+    RootId = first.RootId,
 
-        first.CanStart = g.All(x => x.CanStart == true);
+    BatchProductId = first.BatchProductId,
+    ProductToPartId = first.ProductToPartId,
 
-        return first;
+    BatchCode = first.BatchCode,
+    ProductName = first.ProductName,
+    TopPartName = first.TopPartName,
+    StepName = first.StepName,
+
+    Qty = g.Sum(x => x.Qty),
+    QtyBreakdown = string.Join("+", g.Select(x => x.Qty)),
+    EstimatedMinutes = g.Sum(x => x.EstimatedMinutes),
+
+    Status = first.Status,
+    CanStart = g.All(x => x.CanStart == true),
+
+    Assigned_To = first.Assigned_To,
+
+    BatchPriority = first.BatchPriority,
+    Tasks_Priority = first.Tasks_Priority,
+    Tasks_Push = first.Tasks_Push,
+
+    StepOrder = first.StepOrder,
+
+    RowType = "ParentChildMerged"
+};
     })
     .ToList();
 
@@ -154,18 +179,18 @@ else
 
     <td>
     <select class="form-select form-select-sm"
-        value="@(t.Assigned_To?.ToString() ?? "0")"
-        @onchange="async e => {
-            var val = e.Value?.ToString();
-            int parsed = 0;
+    value="@(t.Assigned_To?.ToString() ?? "0")"
+    @onchange="async e => {
+        var val = e.Value?.ToString();
+        int parsed = 0;
 
-            if (!string.IsNullOrWhiteSpace(val))
-                int.TryParse(val, out parsed);
+        if (!string.IsNullOrWhiteSpace(val))
+            int.TryParse(val, out parsed);
 
-            t.Assigned_To = parsed == 0 ? null : parsed;
+        t.Assigned_To = parsed == 0 ? null : parsed;
 
-            await OnAssigneeChanged(t, e);
-        }">
+        await OnAssigneeChanged(t, e);
+    }">
 
             <option value="0">Nav piešķirts</option>
 
@@ -495,18 +520,18 @@ else
 
         <td>
     <select class="form-select form-select-sm"
-        value="@(t.Assigned_To?.ToString() ?? "0")"
-        @onchange="async e => {
-            var val = e.Value?.ToString();
-            int parsed = 0;
+    value="@(t.Assigned_To?.ToString() ?? "0")"
+    @onchange="async e => {
+        var val = e.Value?.ToString();
+        int parsed = 0;
 
-            if (!string.IsNullOrWhiteSpace(val))
-                int.TryParse(val, out parsed);
+        if (!string.IsNullOrWhiteSpace(val))
+            int.TryParse(val, out parsed);
 
-            t.Assigned_To = parsed == 0 ? null : parsed;
+        t.Assigned_To = parsed == 0 ? null : parsed;
 
-            await OnAssigneeChanged(t, e);
-        }">
+        await OnAssigneeChanged(t, e);
+    }">
 
                 <option value="0">Nav piešķirts</option>
 
@@ -612,17 +637,17 @@ foreach (var g in groups)
     var hasChild = g.Any(x => x.BatchProductId != x.RootId);
 
     foreach (var item in g)
-    {
-        var isSingleChildGroup = !hasParent && hasChild;
-
-        item.RowType = item.RowType ?? "";
-
-        // ✔ tikai UI marķējums
-        if (isSingleChildGroup)
         {
-            item.RowType = "SingleChild";
+            var isSingleChildGroup = !hasParent && hasChild;
+
+            item.RowType ??= "";
+
+            // tikai ja API nav jau iedevis RowType
+            if (isSingleChildGroup && string.IsNullOrWhiteSpace(item.RowType))
+            {
+                item.RowType = "SingleChild";
+            }
         }
-    }
 }
 
 if (allWorkCenters.Count == 0)
@@ -725,14 +750,14 @@ if (!string.IsNullOrWhiteSpace(val))
 
 int? empId = parsed == 0 ? null : parsed;
 
-Console.WriteLine($"SEND -> BP:{t.BatchProductId} STEP:{t.TopPartStepId} PART:{t.ProductToPartId} EMP:{empId}");
-
 var response = await Http.PostAsJsonAsync("api/tasks/update-assignee-aggregated", new
 {
-    BatchProductId = t.RootId,
+    BatchProductId = t.RowType == "ParentChildMerged"
+    ? t.RootId
+    : t.BatchProductId,
     TopPartStepId = t.TopPartStepId,
     ProductToPartId = t.ProductToPartId,
-    RowType = t.RowType,   
+    RowType = string.IsNullOrWhiteSpace(t.RowType) ? "Single" : t.RowType,
     Assigned_To = empId
 });
 
@@ -743,18 +768,7 @@ if (!response.IsSuccessStatusCode)
     return;
 }
 
-var data = await Http.GetFromJsonAsync<List<UnassignedTaskV2Dto>>("/api/tasks/unassigned-v2")
-           ?? new List<UnassignedTaskV2Dto>();
-
-model = new EmployeeLoadModel
-{
-    Priority = data,
-    Normal = new List<UnassignedTaskV2Dto>()
-};
-
-model.Priority = model.Priority
-    ?.Where(x => x.Assigned_To == null)
-    .ToList();
+t.Assigned_To = empId;
 
 StateHasChanged();
 }
@@ -772,14 +786,9 @@ private async Task OnPriorityChanged(UnassignedTaskV2Dto t, ChangeEventArgs e)
         Tasks_Priority = isChecked
     });
 
-var data = await Http.GetFromJsonAsync<List<UnassignedTaskV2Dto>>("/api/tasks/unassigned-v2")
-           ?? new List<UnassignedTaskV2Dto>();
+t.Tasks_Priority = isChecked;
 
-model = new EmployeeLoadModel
-{
-    Priority = data,
-    Normal = new List<UnassignedTaskV2Dto>()
-};
+StateHasChanged();
 
 }
 
@@ -795,14 +804,9 @@ private async Task TogglePush(UnassignedTaskV2Dto t)
         });
 
     t.Tasks_Push = newValue;
-var data = await Http.GetFromJsonAsync<List<UnassignedTaskV2Dto>>("/api/tasks/unassigned-v2")
-           ?? new List<UnassignedTaskV2Dto>();
+t.Tasks_Push = newValue;
 
-model = new EmployeeLoadModel
-{
-    Priority = data,
-    Normal = new List<UnassignedTaskV2Dto>()
-};
+StateHasChanged();
 }
 
 private void OpenTaskDetails(UnassignedTaskV2Dto t)

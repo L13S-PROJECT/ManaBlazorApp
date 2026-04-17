@@ -52,6 +52,19 @@
                     </div>
                 }
 
+                @if (PushTasks.Any())
+                    {
+                        <div class="elp-section push">
+                            <h5>Push darbi</h5>
+                            <TasksTable Tasks="PushTasks"
+                                        StatusText="StatusText"
+                                        CanStart="CanStart"
+                                        OnSelect="SelectTask"
+                                        OnOpen="OpenTaskDialog"
+                                        AvailableTask="FirstAvailableTask" />
+                        </div>
+                    }
+
                 @if (SuperPriorityCanStart.Any())
                 {
                     <div class="elp-section">
@@ -195,6 +208,9 @@
 @code {
     private List<TaskRow> tasks = new();
     
+// PUSH (augstāk par visiem)
+private IEnumerable<TaskRow> PushTasks =>
+    tasks.Where(t => t.Tasks_Push && t.Status == 1);
 private IEnumerable<TaskRow> InProgress =>
     tasks.Where(t => t.Status == 2);
 
@@ -256,11 +272,22 @@ private async Task ClaimTask(int taskId)
     }
 }
 
+private List<TaskRow> _allTasks = new();
 private async Task LoadTasks()
 {
     tasks = await Http.GetFromJsonAsync<List<TaskRow>>(
         $"api/tasks/for-employee?empId={selectedEmployeeId}"
     ) ?? new();
+
+    _allTasks = await Http.GetFromJsonAsync<List<TaskRow>>(
+    "api/tasks/all-active"
+) ?? new();
+
+    Console.WriteLine("---- ALL TASKS ----");
+foreach (var t in _allTasks)
+{
+    Console.WriteLine($"{t.BatchProductId} | {t.StepOrder} | {t.Status}");
+}
 
     _activeTask = tasks.FirstOrDefault(t => t.Status == 2);
 
@@ -335,23 +362,31 @@ private TaskRow? _activeTask;
     // kas joprojām ir sarakstā (t.i., nav pabeigts).
 private bool CanStart(TaskRow t)
 {
-    // 1️⃣ Vai šai partijai + detaļai ir iepriekšējais solis, kas nav pabeigts
-    var hasPrevNotFinished = tasks.Any(other =>
-        other.BatchProductId == t.BatchProductId &&
-        other.PartName == t.PartName &&
+       // 1️⃣ Vai šai partijai + detaļai ir iepriekšējais solis, kas nav pabeigts
+    var hasPrevNotFinished = _allTasks.Any(other =>
+        other.RootId == t.RootId &&
         other.StepOrder < t.StepOrder &&
         other.Status != 3);
 
-    // 2️⃣ Vai ir augstākas prioritātes darbs, ko var sākt
-    var hasHigherPriority = tasks.Any(other =>
-        other.Status == 1 &&
-        other.BatchPriority &&
-        !t.BatchPriority &&
-        !tasks.Any(prev =>
-            prev.BatchProductId == other.BatchProductId &&
-            prev.PartName == other.PartName &&
-            prev.StepOrder < other.StepOrder &&
-            prev.Status != 3));
+   // 2️⃣ Vai ir augstākas prioritātes darbs, ko var sākt
+            var hasHigherPriority = _allTasks.Any(other =>
+                other.Status == 1 &&
+                CanStartInternal(other) &&
+
+                (
+                    // 🔥 PUSH vienmēr augstāk
+                    (other.Tasks_Push && !t.Tasks_Push)
+
+                    // batch priority virs parastajiem
+                    || (other.BatchPriority && !t.BatchPriority)
+
+                    // vienā līmenī – Tasks_Priority
+                    || (other.BatchPriority == t.BatchPriority &&
+                        other.Priority > t.Priority)
+                )
+            );
+    
+     Console.WriteLine($"{t.TaskId} | {t.BatchProductId} | {t.RootId} | {t.StepOrder} | {t.Status} | {t.Assigned_To}");
 
     return !hasPrevNotFinished && !hasHigherPriority;
 }
@@ -360,6 +395,19 @@ private void SelectTask(TaskRow task)
 {
     _activeTask = task;
     _dialogMode = TaskDialogMode.None;
+}
+
+private bool CanStartInternal(TaskRow t)
+{
+    return !_allTasks.Any(prev =>
+        prev.RootId == t.RootId &&
+        prev.StepOrder < t.StepOrder &&
+        prev.Status != 3);
+}
+
+private int GetRootId(TaskRow t)
+{
+    return t.BatchProductId; // 🔥 pagaidām vienkāršā versija
 }
 
 enum TaskDialogMode

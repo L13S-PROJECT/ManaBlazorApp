@@ -41,10 +41,14 @@
     <!-- 3. Apjoms -->
     <div>
 @{
-    var qty = qtyList.FirstOrDefault(x => x.ProductToPartId == p.ProductToPartId);
+    var parentQty = qtyList
+    .Where(x => x.ProductToPartId == p.ProductToPartId)
+    .Sum(x => x.ParentQty);
 
-    var parentQty = qty?.ParentQty ?? 0;
-    var childQty  = qty?.ChildQty ?? 0;
+    var childQty = qtyList
+        .Where(x => x.ProductToPartId == p.ProductToPartId)
+        .Sum(x => x.ChildQty);
+        
     var baseQty   = p.Quantity;
 }
 
