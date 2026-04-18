@@ -16,10 +16,16 @@ namespace ManiApi.Controllers
     public class TasksController : ControllerBase
     {
         private readonly AppDbContext _db;
-        public TasksController(AppDbContext db, TaskService taskService)
+private readonly DetailTasksService _detailService;
+
+public TasksController(
+    AppDbContext db,
+    TaskService taskService,
+    DetailTasksService detailService)
 {
     _db = db;
     _taskService = taskService;
+    _detailService = detailService;
 }
 
         private readonly TaskService _taskService;
@@ -663,21 +669,14 @@ JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
 SET t.Tasks_Status = 1
 WHERE t.IsActive = 1
   AND t.Tasks_Status IN (5)
- AND t.BatchProduct_ID IN (
-    SELECT bp2.ID
-    FROM batches_products bp2
-    WHERE bp2.IsActive = 1
-      AND bp2.Batch_Id = (
-          SELECT bp0.Batch_Id
-          FROM batches_products bp0
-          WHERE bp0.ID = @bp
-          LIMIT 1
+  AND t.BatchProduct_ID IN (
+    SELECT ID FROM batches_products
+    WHERE IsActive = 1
+      AND Batch_Id = (
+          SELECT Batch_Id FROM batches_products WHERE ID = @bp
       )
-      AND bp2.Version_Id = (
-          SELECT bp0.Version_Id
-          FROM batches_products bp0
-          WHERE bp0.ID = @bp
-          LIMIT 1
+      AND Version_Id = (
+          SELECT Version_Id FROM batches_products WHERE ID = @bp
       )
 )
   AND ts.ProductToPart_ID = @ptp
@@ -1468,17 +1467,46 @@ public async Task<IActionResult> UpdateComment([FromBody] UpdateCommentDto dto)
     if (dto is null || dto.TaskId <= 0)
         return BadRequest("TaskId is required.");
 
-    var t = await _db.Tasks.FirstOrDefaultAsync(x => x.ID == dto.TaskId && x.IsActive);
-    if (t is null)
-        return NotFound();
+    var baseTask = await _db.Tasks
+    .Where(x => x.ID == dto.TaskId && x.IsActive)
+    .Select(x => new { x.TopPartStep_ID, x.BatchProduct_ID })
+    .FirstOrDefaultAsync();
 
+if (baseTask is null)
+    return NotFound();
+
+var relatedBatchProducts = await _db.Set<BatchProduct>()
+    .Where(x =>
+        x.IsActive &&
+        x.Batch_Id == _db.Set<BatchProduct>()
+            .Where(b => b.ID == baseTask.BatchProduct_ID)
+            .Select(b => b.Batch_Id)
+            .FirstOrDefault() &&
+        x.Version_Id == _db.Set<BatchProduct>()
+            .Where(b => b.ID == baseTask.BatchProduct_ID)
+            .Select(b => b.Version_Id)
+            .FirstOrDefault()
+    )
+    .Select(x => x.ID)
+    .ToListAsync();
+
+var tasks = await _db.Tasks
+    .Where(x =>
+        x.IsActive &&
+        x.TopPartStep_ID == baseTask.TopPartStep_ID &&
+        relatedBatchProducts.Contains(x.BatchProduct_ID))
+    .ToListAsync();
+
+foreach (var t in tasks)
+{
     t.Tasks_Comment = string.IsNullOrWhiteSpace(dto.Comment)
         ? null
         : dto.Comment;
+}
 
-    await _db.SaveChangesAsync();
+await _db.SaveChangesAsync();
 
-    return Ok(new { updated = true, taskId = t.ID });
+    return Ok(new { updated = true, taskId = dto.TaskId });
 }
 
 
@@ -2530,6 +2558,8 @@ var conn = _db.Database.GetDbConnection();
                 t.Claimed_By,
                 t.Started_At,
                 t.Finished_At,
+                t.Tasks_Comment,                 
+                t.Is_Comment_For_Employee,       
                 1 AS QtyDone,
                 ts.Step_Name,
                 tp.TopPart_Name,
@@ -2624,10 +2654,13 @@ while (await r.ReadAsync())
             Claimed_By = r.IsDBNull(5) ? (int?)null : r.GetInt32(5),
             StartedAt = r.IsDBNull(6) ? (DateTime?)null : r.GetDateTime(6),
             FinishedAt = r.IsDBNull(7) ? (DateTime?)null : r.GetDateTime(7),
-            Qty = r.GetInt32(8),
-            StepName = r.IsDBNull(9) ? null : r.GetString(9),
-            TopPartName = r.IsDBNull(10) ? null : r.GetString(10),
-            ProductToPartId = r.GetInt32(11),
+            Comment = r.IsDBNull(8) ? null : r.GetString(8),
+            IsCommentForEmployee = !r.IsDBNull(9) && r.GetBoolean(9),
+
+            Qty = r.GetInt32(10),
+            StepName = r.IsDBNull(11) ? null : r.GetString(11),
+            TopPartName = r.IsDBNull(12) ? null : r.GetString(12),
+            ProductToPartId = r.GetInt32(13),
         });
 }
 
@@ -2691,6 +2724,10 @@ var result = grouped
         g.All(x => x.FinishedAt != null)
             ? g.Max(x => x.FinishedAt)
             : null,
+    Comment = g.Select(x => x.Comment)
+    .FirstOrDefault(c => !string.IsNullOrWhiteSpace(c)),
+
+    IsCommentForEmployee = g.Any(x => x.IsCommentForEmployee),
 
     Status =
     g.Any(x => x.Status == 2) ? 2 :
@@ -2759,7 +2796,18 @@ AND t.BatchProduct_ID IN (
 )
 AND ts.ProductToPart_ID = @productToPartId
 AND (
-    (@rowType = 'ParentChildMerged' AND ts.ProductToPart_ID = @productToPartId)
+    (@rowType = 'ParentChildMerged' AND ts.ProductToPart_ID IN (
+        SELECT ProductToPart_ID
+        FROM batches_products
+        WHERE IsActive = 1
+          AND Batch_Id = (
+              SELECT Batch_Id FROM batches_products WHERE ID = @bp LIMIT 1
+          )
+          AND Version_Id = (
+              SELECT Version_Id FROM batches_products WHERE ID = @bp LIMIT 1
+          )
+          AND ProductToPart_ID IS NOT NULL
+    ))
     OR
     (@rowType <> 'ParentChildMerged' AND ts.ProductToPart_ID = @productToPartId AND ts.ID = @step)
 )
@@ -2802,6 +2850,8 @@ private sealed class RawTaskRow
     public string? StepName { get; set; }
     public string? TopPartName { get; set; }
     public int ProductToPartId { get; set; }
+    public string? Comment { get; set; }
+    public bool IsCommentForEmployee { get; set; }
 }
 
 private sealed class DetailQtyRow
@@ -3564,6 +3614,19 @@ public sealed class UnassignedTaskV2Dto
     public int StepOrder { get; set; }
 
     public string RowType { get; set; } = ""; // Parent / ParentChildMerged / SingleChild
+}
+
+
+// GET: /api/tasks/detail-tasks?batchProductId=123
+[HttpGet("detail-tasks")]
+public async Task<IActionResult> GetDetailTasks([FromQuery] int batchProductId)
+{
+    if (batchProductId <= 0)
+        return BadRequest("batchProductId is required.");
+
+    var result = await _detailService.GetDetailTasks(batchProductId);
+
+    return Ok(result);
 }
 
     }

@@ -8,7 +8,8 @@ public sealed class DetailPartRow
 
     public int TopPartId { get; set; }  
     public string? WorkCenterName { get; set; }
-
+    public int Qty { get; set; }
+    public string QtyDisplay { get; set; } = "";
     public bool IsDone { get; set; } = false;
     public int? AssignedEmployeeId { get; set; }
     public int TopPartIdRaw { get; set; }   // tikai priekš sasaistes ar Taskiem, nav no DB 

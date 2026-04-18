@@ -37,7 +37,7 @@ builder.Services.AddSwaggerGen(c =>
     c.MapType<TimeOnly>(() => new OpenApiSchema { Type = "string", Format = "time" });
 });
 
-
+builder.Services.AddScoped<DetailTasksService>();
 
 builder.Services.AddControllers()
     .AddJsonOptions(o =>
