@@ -107,6 +107,7 @@ else
     [Parameter] public EventCallback<TaskRow> OnFinishConfirm { get; set; }
     [Parameter] public TaskRow? AvailableTask { get; set; }
     [Parameter] public int? AvailableTaskId { get; set; }
+    [Parameter] public long? DisplayGroupId { get; set; }
 string GetPanelClass()
 {
     if (ActiveTask == null)

@@ -43,6 +43,7 @@ public async Task<int> GetWorkCenterId(int empId)
     cmd.CommandText = @"
 SELECT
   t.ID,                      -- 0 TaskId
+  t.TopPartStep_ID,
   t.Tasks_Priority,          -- 1 Priority
   t.Tasks_Push,
   bp.is_priority AS BatchPriority,
@@ -109,7 +110,8 @@ END AS PlannedQty,
   ts.Step_Type              AS StepType,       -- 12 (Detailed/Assembly/Finishing)
   b.ID                      AS BatchId,       -- 13 (batches.ID)
   bp.Version_Id             AS VersionId,     -- 14 (versions.ID)
-  bp.ID                     AS BatchProductId -- 15  (batches_products.ID)
+  bp.ID                     AS BatchProductId, -- 15  (batches_products.ID)
+  COALESCE(bp.ParentBatchProduct_ID, bp.ID) AS RootId -- 16 RootId
 
 FROM tasks t
 JOIN batches_products bp   ON bp.ID  = t.BatchProduct_ID AND bp.IsActive = 1
@@ -172,32 +174,34 @@ ORDER BY
         rawTasks.Add(new TaskRowDto
         {
             TaskId = r.GetInt32(0),
-            Priority = r.IsDBNull(1) ? (byte)0 : r.GetByte(1),
-            Tasks_Push = !r.IsDBNull(2) && r.GetBoolean(2),
-            BatchPriority = r.GetBoolean(3),
-            Status = r.GetInt32(5),
-            PriorityLevel = r.IsDBNull(6) ? 0 : r.GetInt32(6),
-            StartedAt = r.IsDBNull(7) ? (DateTime?)null : r.GetDateTime(7),
-            FinishedAt = r.IsDBNull(8) ? (DateTime?)null : r.GetDateTime(8),
-            IsCommentForEmployee = !r.IsDBNull(9) && r.GetBoolean(9),
-            Comment = r.IsDBNull(10) ? null : r.GetString(10),
-            ProductName = r.IsDBNull(11) ? null : r.GetString(11),
-            PartName = r.IsDBNull(12) ? null : r.GetString(12),
-            ProductToPartId = r.IsDBNull(13) ? 0 : r.GetInt32(13),
-            StepName = r.IsDBNull(14) ? null : r.GetString(14),
-            EstimatedMinutes = r.IsDBNull(15) ? 0 : r.GetInt32(15),
-            ActualMinutes = r.IsDBNull(16) ? 0 : r.GetInt32(16),
-            EstimatedTotalMinutes = r.IsDBNull(17) ? 0 : r.GetInt32(17),
-            EstimatedStartMinutes = r.IsDBNull(18) ? 0 : r.GetInt32(18),
-            BatchCode = r.IsDBNull(19) ? null : r.GetString(19),
-            Done = r.IsDBNull(20) ? 0 : r.GetInt32(20),
-            Assigned_To = r.IsDBNull(21) ? (int?)null : r.GetInt32(21),
-            Planned = r.IsDBNull(22) ? 0 : r.GetInt32(22),
-            StepOrder = r.IsDBNull(23) ? 0 : r.GetInt32(23),
-            StepType = r.IsDBNull(24) ? 0 : r.GetInt32(24),
-            BatchId = r.IsDBNull(25) ? 0 : r.GetInt32(25),
-            VersionId = r.IsDBNull(26) ? 0 : r.GetInt32(26),
-            BatchProductId = r.IsDBNull(27) ? 0 : r.GetInt32(27),
+            TopPartStepId = r.GetInt32(1),
+            Priority = r.IsDBNull(2) ? (byte)0 : r.GetByte(2),
+            Tasks_Push = !r.IsDBNull(3) && r.GetBoolean(3),
+            BatchPriority = r.GetBoolean(4),
+            Status = r.GetInt32(6),
+            PriorityLevel = r.IsDBNull(7) ? 0 : r.GetInt32(7),
+            StartedAt = r.IsDBNull(8) ? (DateTime?)null : r.GetDateTime(8),
+            FinishedAt = r.IsDBNull(9) ? (DateTime?)null : r.GetDateTime(9),
+            IsCommentForEmployee = !r.IsDBNull(10) && r.GetBoolean(10),
+            Comment = r.IsDBNull(11) ? null : r.GetString(11),
+            ProductName = r.IsDBNull(12) ? null : r.GetString(12),
+            PartName = r.IsDBNull(13) ? null : r.GetString(13),
+            ProductToPartId = r.IsDBNull(14) ? 0 : r.GetInt32(14),
+            StepName = r.IsDBNull(15) ? null : r.GetString(15),
+            EstimatedMinutes = r.IsDBNull(16) ? 0 : r.GetInt32(16),
+            ActualMinutes = r.IsDBNull(17) ? 0 : r.GetInt32(17),
+            EstimatedTotalMinutes = r.IsDBNull(18) ? 0 : r.GetInt32(18),
+            EstimatedStartMinutes = r.IsDBNull(19) ? 0 : r.GetInt32(19),
+            BatchCode = r.IsDBNull(20) ? null : r.GetString(20),
+            Done = r.IsDBNull(21) ? 0 : r.GetInt32(21),
+            Assigned_To = r.IsDBNull(22) ? (int?)null : r.GetInt32(22),
+            Planned = r.IsDBNull(23) ? 0 : r.GetInt32(23),
+            StepOrder = r.IsDBNull(24) ? 0 : r.GetInt32(24),
+            StepType = r.IsDBNull(25) ? 0 : r.GetInt32(25),
+            BatchId = r.IsDBNull(26) ? 0 : r.GetInt32(26),
+            VersionId = r.IsDBNull(27) ? 0 : r.GetInt32(27),
+            BatchProductId = r.IsDBNull(28) ? 0 : r.GetInt32(28),
+            RootId = r.IsDBNull(29) ? 0 : r.GetInt32(29),
         });
     }
 
@@ -211,63 +215,50 @@ Console.WriteLine($"Final tasks count for empId={empId}: {result.Count}");
 
 foreach (var t in result)
 {
-    var rootId = allTasks
-        .FirstOrDefault(x => x.BatchProductId == t.BatchProductId)?.RootId
-        ?? t.BatchProductId;
+        t.DisplayGroupId = t.RootId;
 
-    t.RootId = rootId;
-
-        var sameStepRows = result
-            .Where(x => x.RootId == rootId 
-                    && x.StepOrder == t.StepOrder
-                    && x.ProductToPartId == t.ProductToPartId)
-            .ToList();
-
-        var hasRootRow = sameStepRows.Any(x => x.BatchProductId == rootId);
-        var hasChildRows = sameStepRows.Any(x => x.BatchProductId != rootId);
-
-        if (hasRootRow && hasChildRows)
-        {
-            t.Planned = sameStepRows.Sum(x => x.Planned);
-        }
-
+        Console.WriteLine($"DBG -> Task:{t.TaskId} Root:{t.RootId} BP:{t.BatchProductId} Step:{t.TopPartStepId} DG:{t.DisplayGroupId}");
+        
+        var rootId = t.RootId;
+       
     var hasPrevNotFinished = allTasks.Any(prev =>
-        prev.RootId == rootId &&
+        prev.DisplayGroupId == t.DisplayGroupId &&
         prev.StepOrder < t.StepOrder &&
         prev.Status != 3);
 
     var hasHigherPriority = allTasks.Any(other =>
-            other.TaskId != t.TaskId &&
-            other.Status == 1 &&
-            !allTasks.Any(prev =>
-                prev.RootId == other.RootId &&
-                prev.StepOrder < other.StepOrder &&
-                prev.Status != 3) &&
+        other.TaskId != t.TaskId &&
+        other.Status == 1 &&
+        other.DisplayGroupId == t.DisplayGroupId &&
 
-            (
-                (other.Tasks_Push && !t.Tasks_Push)
-                || (other.BatchPriority && !t.BatchPriority)
-                || (other.BatchPriority == t.BatchPriority && other.Priority > t.Priority)
-            )
-        );
+    !allTasks.Any(prev =>
+        prev.DisplayGroupId == other.DisplayGroupId &&
+        prev.StepOrder < other.StepOrder &&
+        prev.Status != 3) &&
+
+    (
+        (other.Tasks_Push && !t.Tasks_Push)
+        || (other.BatchPriority && !t.BatchPriority)
+        || (other.BatchPriority == t.BatchPriority && other.Priority > t.Priority)
+    )
+);
 
 t.CanStart = !hasPrevNotFinished && !hasHigherPriority;
 }
 
-result = result
-    .GroupBy(t => new { t.RootId, t.StepOrder, t.ProductToPartId })
+    result = result
+    .GroupBy(t => t.DisplayGroupId)
     .Select(g =>
     {
-        // ja ir root scenārijs (vairāk nekā 1 rinda)
-        if (g.Count() > 1)
-        {
-            return g
-                .OrderByDescending(x => x.Assigned_To == empId)
-                .ThenByDescending(x => x.Status == 2)
-                .First(); // tikai 1 rinda
-        }
+        var selected = g
+            .OrderByDescending(x => x.Status == 2)
+            .ThenByDescending(x => x.Assigned_To == empId)
+            .ThenByDescending(x => x.BatchProductId == x.RootId)
+            .First();
 
-        return g.First();
+        selected.Planned = g.Sum(x => x.Planned);
+
+        return selected;
     })
     .ToList();
 
@@ -281,7 +272,7 @@ return result
     .ToList();
 }
 
-public async Task<List<TaskRowDto>> GetAllActiveTasks(DbConnection conn, DbTransaction tx)
+public async Task<List<TaskRowDto>> GetAllActiveTasks()
 {
     await using var conn = new MySqlConnector.MySqlConnection(_db.Database.GetConnectionString());
        if (conn.State != ConnectionState.Open)
@@ -294,6 +285,7 @@ public async Task<List<TaskRowDto>> GetAllActiveTasks(DbConnection conn, DbTrans
         cmd.CommandText = @"
     SELECT 
         t.ID,
+        t.TopPartStep_ID,
         t.BatchProduct_ID,
         ts.Step_Order,
         t.Tasks_Status,
@@ -301,26 +293,7 @@ public async Task<List<TaskRowDto>> GetAllActiveTasks(DbConnection conn, DbTrans
         t.Assigned_To,
         t.Tasks_Priority,
         t.Tasks_Push,
-        CASE 
-            WHEN EXISTS (
-                SELECT 1
-                FROM batches_products bp2
-                WHERE bp2.Batch_Id = bp.Batch_Id
-                  AND bp2.Version_Id = bp.Version_Id
-                  AND bp2.ProductToPart_ID IS NULL
-                  AND bp2.IsActive = 1
-            )
-            THEN (
-                SELECT bp2.ID
-                FROM batches_products bp2
-                WHERE bp2.Batch_Id = bp.Batch_Id
-                  AND bp2.Version_Id = bp.Version_Id
-                  AND bp2.ProductToPart_ID IS NULL
-                  AND bp2.IsActive = 1
-                LIMIT 1
-            )
-            ELSE bp.ID
-        END AS RootId
+        COALESCE(bp.ParentBatchProduct_ID, bp.ID) AS RootId
     FROM tasks t
     JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
     JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
@@ -336,15 +309,19 @@ public async Task<List<TaskRowDto>> GetAllActiveTasks(DbConnection conn, DbTrans
         list.Add(new TaskRowDto
             {
                 TaskId = r.GetInt32(0),
-                BatchProductId = r.GetInt32(1),
-                StepOrder = r.GetInt32(2),
-                Status = r.GetInt32(3),
-                BatchPriority = r.GetBoolean(4),
-                Assigned_To = r.IsDBNull(5) ? (int?)null : r.GetInt32(5),
-                Priority = !r.IsDBNull(6) && r.GetBoolean(6) ? (byte)1 : (byte)0,
-                Tasks_Push = !r.IsDBNull(7) && r.GetBoolean(7),
-                RootId = r.GetInt32(8),
-                CanStart = true
+                TopPartStepId = r.GetInt32(1),
+                BatchProductId = r.GetInt32(2),
+                StepOrder = r.GetInt32(3),
+                Status = r.GetInt32(4),
+                BatchPriority = r.GetBoolean(5),
+                Assigned_To = r.IsDBNull(6) ? (int?)null : r.GetInt32(6),
+                Priority = !r.IsDBNull(7) && r.GetBoolean(7) ? (byte)1 : (byte)0,
+                Tasks_Push = !r.IsDBNull(8) && r.GetBoolean(8),
+                RootId = r.GetInt32(9),
+                CanStart = true,
+                DisplayGroupId = r.GetInt32(9) != r.GetInt32(2)
+                    ? r.GetInt32(1)
+                    : r.GetInt32(2)
             });
     }
     await r.DisposeAsync();
@@ -356,6 +333,8 @@ public async Task<(bool Success, string? Error)> ClaimTask(int taskId, int empId
     if (taskId <= 0 || empId <= 0)
         return (false, "Bad request");
 
+    Console.WriteLine($"CLAIM CALLED: taskId={taskId}, empId={empId}");
+
     var conn = _db.Database.GetDbConnection();
     if (conn.State != ConnectionState.Open)
         {
@@ -363,6 +342,43 @@ public async Task<(bool Success, string? Error)> ClaimTask(int taskId, int empId
         }
 
     await using var tx = await conn.BeginTransactionAsync();
+
+   /* // Vienmēr pārejam uz root "master" tasku
+await using (var rootFix = conn.CreateCommand())
+{
+    rootFix.Transaction = tx;
+    rootFix.CommandText = @"
+SELECT t2.ID
+FROM tasks t
+JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+JOIN batches_products bp2 ON (
+    bp2.ID = bp.ID 
+    OR bp2.ParentBatchProduct_ID = bp.ID
+    OR bp.ParentBatchProduct_ID = bp2.ID
+)
+JOIN tasks t2 ON t2.BatchProduct_ID = bp2.ID
+JOIN toppartsteps ts ON ts.ID = t2.TopPartStep_ID
+WHERE t.ID = @taskId
+AND ts.Step_Order = (
+    SELECT ts2.Step_Order
+    FROM tasks t3
+    JOIN toppartsteps ts2 ON ts2.ID = t3.TopPartStep_ID
+    WHERE t3.ID = @taskId
+)
+ORDER BY 
+    (t2.Tasks_Status = 2) DESC,
+    (t2.Assigned_To = @emp) DESC,
+    (bp.ParentBatchProduct_ID IS NULL) DESC
+LIMIT 1;";
+
+    rootFix.Parameters.Add(new MySqlParameter("@taskId", taskId));
+    rootFix.Parameters.Add(new MySqlParameter("@emp", empId));
+
+    var newId = await rootFix.ExecuteScalarAsync();
+
+    if (newId != null)
+        taskId = Convert.ToInt32(newId);
+} */
 
     // 1) Vai šim darbiniekam jau nav cita aktīva darba (status 2)?
     await using (var chk = conn.CreateCommand())
@@ -382,10 +398,11 @@ WHERE Claimed_By = @emp
 
         var cnt = Convert.ToInt32(await chk.ExecuteScalarAsync());
         if (cnt > 0)
-        {
-            await tx.RollbackAsync();
-            return (false, "Jau ir iesākts cits darbs.");
-        }
+            {
+                Console.WriteLine("BLOCK: already has active task");
+                await tx.RollbackAsync();
+                return (false, "Jau ir iesākts cits darbs.");
+            }
     }
 
  
@@ -476,12 +493,10 @@ LIMIT 1;";
 
     var higherExists = await checkOrder.ExecuteScalarAsync() != null;
 
-    if (higherExists)
+if (higherExists)
 {
-    Console.WriteLine("BLOCKED BY PRIORITY RULE");
+    Console.WriteLine("BLOCK: higher priority");
     await tx.RollbackAsync();
-    Console.WriteLine($"DEBUG CLAIM: taskId={taskId}, emp={empId}");
-    Console.WriteLine($"curIsPriority={currentIsPriority}, curBatchOrder={currentBatchOrder}, curStepOrder={currentStepOrder}");
     return (false, "Ir augstākas prioritātes darbs.");
 }
 
@@ -500,33 +515,14 @@ SELECT
         WHEN EXISTS (
             SELECT 1
             FROM batches_products bp2
-            WHERE bp2.Batch_Id = bp.Batch_Id
-              AND bp2.Version_Id = bp.Version_Id
-              AND bp2.ProductToPart_ID IS NULL
-              AND bp2.IsActive = 1
+            WHERE bp2.ID = bp.ID
+            OR bp2.ParentBatchProduct_ID = bp.ID
+            OR bp.ParentBatchProduct_ID = bp2.ID
         )
-        THEN 1 ELSE 0
+        THEN 1
+        ELSE 0
     END,
-    CASE 
-        WHEN EXISTS (
-            SELECT 1
-            FROM batches_products bp2
-            WHERE bp2.Batch_Id = bp.Batch_Id
-              AND bp2.Version_Id = bp.Version_Id
-              AND bp2.ProductToPart_ID IS NULL
-              AND bp2.IsActive = 1
-        )
-        THEN (
-            SELECT bp2.ID
-            FROM batches_products bp2
-            WHERE bp2.Batch_Id = bp.Batch_Id
-              AND bp2.Version_Id = bp.Version_Id
-              AND bp2.ProductToPart_ID IS NULL
-              AND bp2.IsActive = 1
-            LIMIT 1
-        )
-        ELSE bp.ID
-    END
+COALESCE(bp.ParentBatchProduct_ID, bp.ID)
 FROM tasks t
 JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
 WHERE t.ID = @taskId;";
@@ -556,8 +552,14 @@ await using (var chk2 = conn.CreateCommand())
             WHERE t.IsActive = 1
             AND t.Tasks_Status = 2
             AND ts.Step_Order = @curStepOrder
+            AND ts.ProductToPart_ID = (
+                SELECT ts2.ProductToPart_ID
+                FROM tasks t2
+                JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+                WHERE t2.ID = @taskId
+            )
             AND (
-                    bp.ID = @rootId
+                bp.ID = @rootId
                 OR bp.ParentBatchProduct_ID = @rootId
             );";
 
@@ -566,10 +568,11 @@ await using (var chk2 = conn.CreateCommand())
 
     var cnt2 = Convert.ToInt32(await chk2.ExecuteScalarAsync());
     if (cnt2 > 0)
-    {
-        await tx.RollbackAsync();
-        return (false, "Šis darbs jau ir procesā citam darbiniekam.");
-    }
+{
+    Console.WriteLine("BLOCK: already in progress by someone else");
+    await tx.RollbackAsync();
+    return (false, "Šis darbs jau ir procesā citam darbiniekam.");
+}
 }
 
 // 🔒 STEP secības validācija (server-side)
@@ -585,54 +588,13 @@ JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
 WHERE t.IsActive = 1
   AND t.Tasks_Status <> 3
   AND ts.Step_Order < @curStepOrder
-  AND (
-        CASE 
-            WHEN EXISTS (
-                SELECT 1
-                FROM batches_products bp2
-                WHERE bp2.Batch_Id = bp.Batch_Id
-                  AND bp2.Version_Id = bp.Version_Id
-                  AND bp2.ProductToPart_ID IS NULL
-                  AND bp2.IsActive = 1
-            )
-            THEN (
-                SELECT bp2.ID
-                FROM batches_products bp2
-                WHERE bp2.Batch_Id = bp.Batch_Id
-                  AND bp2.Version_Id = bp.Version_Id
-                  AND bp2.ProductToPart_ID IS NULL
-                  AND bp2.IsActive = 1
-                LIMIT 1
-            )
-            ELSE bp.ID
-        END
-    ) = (
-        SELECT 
-            CASE 
-                WHEN EXISTS (
-                    SELECT 1
-                    FROM batches_products bp2
-                    WHERE bp2.Batch_Id = bp3.Batch_Id
-                      AND bp2.Version_Id = bp3.Version_Id
-                      AND bp2.ProductToPart_ID IS NULL
-                      AND bp2.IsActive = 1
-                )
-                THEN (
-                    SELECT bp2.ID
-                    FROM batches_products bp2
-                    WHERE bp2.Batch_Id = bp3.Batch_Id
-                      AND bp2.Version_Id = bp3.Version_Id
-                      AND bp2.ProductToPart_ID IS NULL
-                      AND bp2.IsActive = 1
-                    LIMIT 1
-                )
-                ELSE bp3.ID
-            END
-        FROM batches_products bp3
-        WHERE bp3.ID = (
-            SELECT BatchProduct_ID FROM tasks WHERE ID = @taskId
-        )
+  AND COALESCE(bp.ParentBatchProduct_ID, bp.ID) = (
+    SELECT COALESCE(bp3.ParentBatchProduct_ID, bp3.ID)
+    FROM batches_products bp3
+    WHERE bp3.ID = (
+        SELECT BatchProduct_ID FROM tasks WHERE ID = @taskId
     )
+)
 LIMIT 1;";
 
     checkPrev.Parameters.Add(new MySqlParameter("@taskId", taskId));
@@ -641,15 +603,42 @@ LIMIT 1;";
     var hasPrev = await checkPrev.ExecuteScalarAsync() != null;
     
     if (hasPrev)
-    {
-        await tx.RollbackAsync();
-        return (false, "Iepriekšējais solis nav pabeigts.");
-    }
+{
+    Console.WriteLine("BLOCK: previous step not finished");
+    await tx.RollbackAsync();
+    return (false, "Iepriekšējais solis nav pabeigts.");
+}
 }
 
-var scenario = DetectScenario(hasRoot, currentStepOrder);
+int stepTypeForScenario = 0;
+
+await using (var stepCmd = conn.CreateCommand())
+{
+    stepCmd.Transaction = tx;
+    stepCmd.CommandText = @"
+SELECT ts.Step_Type
+FROM tasks t
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+WHERE t.ID = @taskId;";
+
+    stepCmd.Parameters.Add(new MySqlParameter("@taskId", taskId));
+
+    var obj = await stepCmd.ExecuteScalarAsync();
+    if (obj != null)
+        stepTypeForScenario = Convert.ToInt32(obj);
+}
+
+var scenario = DetectScenario(hasRoot, stepTypeForScenario);
+
 // 🔒 Atļauts sākt tikai pašu pirmo pieejamo tasku (server-side)
-var allTasks = await GetAllActiveTasks(conn, tx);
+var allTasks = await GetAllActiveTasks();
+
+Console.WriteLine($"CLICKED TASK ID: {taskId}");
+
+foreach (var t in allTasks)
+{
+    Console.WriteLine($"ALL TASK: {t.TaskId}");
+}
 
 var currentTask = allTasks.FirstOrDefault(t => t.TaskId == taskId);
 
@@ -659,25 +648,31 @@ if (currentTask == null)
     return (false, "Task not found.");
 }
 
-// tas pats loģikas princips kā UI
+/* // tas pats loģikas princips kā UI
 var firstAvailable = allTasks
     .Where(t => t.Status == 1)
+    .Where(t => t.Assigned_To == empId || t.Assigned_To == null)
     .Where(t => !allTasks.Any(prev =>
         prev.RootId == t.RootId &&
         prev.StepOrder < t.StepOrder &&
         prev.Status != 3))
     .OrderBy(t => t.Tasks_Push ? 0 : 1)
-    .ThenBy(t => t.BatchPriority ? 0 : 1)
+    .ThenByDescending(t => t.BatchPriority ? 1 : 0)
     .ThenByDescending(t => t.Priority)
     .ThenBy(t => t.StepOrder)
     .ThenBy(t => t.TaskId)
     .FirstOrDefault();
 
+Console.WriteLine($"FIRST AVAILABLE: {firstAvailable?.TaskId}");
+Console.WriteLine($"CLICKED: {taskId}");
+
 if (firstAvailable == null || firstAvailable.TaskId != taskId)
 {
+    Console.WriteLine($"BLOCK: firstAvailable={firstAvailable?.TaskId}, current={taskId}");
+    Console.WriteLine($"DEBUG -> firstAvailable: {firstAvailable?.TaskId}, clicked: {taskId}");
     await tx.RollbackAsync();
     return (false, "Drīkst sākt tikai pirmo pieejamo darbu.");
-}
+}*/
 
 // 🔒 Root gadījumā pārbaudām VISUS step taskus
 if (scenario == TaskScenario.B_Root)
@@ -693,10 +688,7 @@ JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
 WHERE t.IsActive = 1
   AND t.Tasks_Status <> 3
   AND ts.Step_Order < @curStepOrder
-  AND (
-        bp.ID = @rootId
-     OR bp.ParentBatchProduct_ID = @rootId
-  )
+  AND COALESCE(bp.ParentBatchProduct_ID, bp.ID) = @rootId
 LIMIT 1;";
 
     checkRootPrev.Parameters.Add(new MySqlParameter("@curStepOrder", currentStepOrder));
@@ -715,7 +707,7 @@ LIMIT 1;";
     await using (var upd = conn.CreateCommand())
     {
         upd.Transaction = tx;
-        if (scenario == TaskScenario.B_Root || scenario == TaskScenario.C_Child)
+        if (scenario == TaskScenario.B_Root)
 {
     upd.CommandText = @"
         UPDATE tasks t
@@ -726,34 +718,19 @@ LIMIT 1;";
             t.Started_At   = CURRENT_TIMESTAMP
         WHERE t.IsActive = 1
         AND t.Tasks_Status = 1
-        AND ts.Step_Order = @curStepOrder
+        AND t.TopPartStep_ID = (
+            SELECT TopPartStep_ID
+            FROM tasks
+            WHERE ID = @taskId
+        )
         AND (
                 bp.ID = @rootId
             OR bp.ParentBatchProduct_ID = @rootId
         )
         AND (
-    t.ID = @taskId
-    OR (
-        @scenario = 1
-        AND (t.Assigned_To = @emp OR t.Assigned_To IS NULL)
-        AND NOT EXISTS (
-            SELECT 1
-            FROM tasks tprev
-            JOIN toppartsteps tsprev ON tsprev.ID = tprev.TopPartStep_ID
-            WHERE tprev.IsActive = 1
-              AND tprev.Tasks_Status <> 3
-              AND tsprev.Step_Order < ts.Step_Order
-              AND (
-                    tprev.BatchProduct_ID = bp.ID
-                 OR tprev.BatchProduct_ID IN (
-                        SELECT bp2.ID
-                        FROM batches_products bp2
-                        WHERE bp2.ParentBatchProduct_ID = @rootId
-                    )
-              )
-        )
-    )
-);";
+                (@scenario = 1)
+                OR t.ID = @taskId
+            )";
 }
 else
 {
@@ -841,11 +818,10 @@ JOIN batches_products bp2 ON bp2.ID = t2.BatchProduct_ID
 JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
 WHERE t2.IsActive = 1
   AND t2.Tasks_Status = 2
-  AND ts2.ProductToPart_ID = (
-    SELECT ts.ProductToPart_ID
-    FROM tasks t
-    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-    WHERE t.ID = @taskId
+  AND ts2.ID = (
+    SELECT TopPartStep_ID
+    FROM tasks
+    WHERE ID = @taskId
 )
 AND t2.BatchProduct_ID IN (
     SELECT bp3.ID
@@ -877,12 +853,42 @@ VALUES
 
 public async Task<(bool Success, string? Error)> FinishTask(int taskId, int? qtyDoneAdd)
 {
+    Console.WriteLine($"FINISH CALLED: taskId={taskId}");
+
     var conn = _db.Database.GetDbConnection();
 if (conn.State != ConnectionState.Open)
     {
         await conn.OpenAsync();
     }
 await using var tx = await conn.BeginTransactionAsync();
+
+// 🔥 pārejam uz root tasku
+await using (var rootFix = conn.CreateCommand())
+{
+    rootFix.Transaction = tx;
+    rootFix.CommandText = @"
+SELECT t2.ID
+FROM tasks t
+JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+JOIN tasks t2 ON (
+        t2.BatchProduct_ID = bp.ID
+     OR t2.BatchProduct_ID IN (
+            SELECT bp2.ID
+            FROM batches_products bp2
+            WHERE bp2.ParentBatchProduct_ID = bp.ID
+        )
+)
+WHERE t.ID = @taskId
+ORDER BY (t2.Tasks_Status = 2) DESC
+LIMIT 1;";
+
+    rootFix.Parameters.Add(new MySqlParameter("@taskId", taskId));
+
+    var newId = await rootFix.ExecuteScalarAsync();
+
+    if (newId != null)
+        taskId = Convert.ToInt32(newId);
+}
 
 int currentStatus;
 
@@ -919,6 +925,7 @@ if (currentStatus != 2)
 }
 
 int stepType;
+int currentStepOrder;
 int qtyPerProduct;
 int plannedQty;
 int currentDone;
@@ -932,6 +939,7 @@ await using (var info = conn.CreateCommand())
     info.CommandText = @"
 SELECT 
     ts.Step_Type,
+    ts.Step_Order,
     ptp.Qty_Per_product,
     COALESCE(SUM(bp.Planned_Qty), 0) AS PlannedQty,
     COALESCE(t.Qty_Done, 0)          AS CurrentDone,
@@ -965,14 +973,15 @@ GROUP BY
         return (false, "Uzdevuma dati nav atrasti.");
     }
 
-    stepType       = rr.GetInt32(0);
-    qtyPerProduct  = rr.GetInt32(1);
-    plannedQty     = rr.GetInt32(2);
-    currentDone    = rr.GetInt32(3);
-    batchProductId = rr.GetInt32(4);
-    versionId      = rr.IsDBNull(5) ? 0 : rr.GetInt32(5);
-    var finishingPlannedQty = rr.IsDBNull(6) ? 0 : rr.GetInt32(6);
-    ralColorId = rr.IsDBNull(7) ? null : rr.GetInt32(7);
+    stepType         = rr.GetInt32(0);
+    currentStepOrder = rr.GetInt32(1);
+    qtyPerProduct    = rr.GetInt32(2);
+    plannedQty       = rr.GetInt32(3);
+    currentDone      = rr.GetInt32(4);
+    batchProductId   = rr.GetInt32(5);
+    versionId        = rr.IsDBNull(6) ? 0 : rr.GetInt32(6);
+    var finishingPlannedQty = rr.IsDBNull(7) ? 0 : rr.GetInt32(7);
+    ralColorId       = rr.IsDBNull(8) ? null : rr.GetInt32(8);
 
     if (stepType == 3 && finishingPlannedQty > 0)
     {
@@ -1044,21 +1053,16 @@ if (scenario == TaskScenario.B_Root)
     {
         upd.Transaction = tx;
         upd.CommandText = @"
-UPDATE tasks t
-JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-SET t.Tasks_Status = 3,
-    t.Finished_At  = CURRENT_TIMESTAMP,
-    t.Qty_Done     = @qtyDone
-WHERE t.IsActive = 1
-  AND t.Tasks_Status = 2
-AND t.BatchProduct_ID IN (
-    SELECT bp3.ID
-    FROM batches_products bp3
-    JOIN batches_products root ON root.ID = @rootId
-    WHERE bp3.IsActive = 1
-      AND bp3.Batch_Id = root.Batch_Id
-      AND bp3.Version_Id = root.Version_Id
-);";
+            UPDATE tasks t
+            JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+            JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+            SET t.Tasks_Status = 3,
+                t.Finished_At  = CURRENT_TIMESTAMP,
+                t.Qty_Done     = @qtyDone
+            WHERE t.IsActive = 1
+            AND t.Tasks_Status = 2
+            AND ts.Step_Order = @curStepOrder
+            AND COALESCE(bp.ParentBatchProduct_ID, bp.ID) = @rootId;";
 
         var p1 = upd.CreateParameter();
         p1.ParameterName = "@qtyDone";
@@ -1070,7 +1074,8 @@ AND t.BatchProduct_ID IN (
         p2.Value = taskId;
         upd.Parameters.Add(p2);
         upd.Parameters.Add(new MySqlParameter("@rootId", rootId));
-        
+        upd.Parameters.Add(new MySqlParameter("@curStepOrder", currentStepOrder));
+
         await upd.ExecuteNonQueryAsync();
     }
 
@@ -1191,10 +1196,22 @@ else if (scenario == TaskScenario.A_Parent)
     {
         upd.Transaction = tx;
         upd.CommandText = @"
-UPDATE tasks
-   SET Tasks_Status = 3,
-       Finished_At  = CURRENT_TIMESTAMP
- WHERE ID = @id;";
+                UPDATE tasks t
+                JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+                JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+                SET t.Tasks_Status = 3,
+                    t.Finished_At  = CURRENT_TIMESTAMP
+                WHERE t.IsActive = 1
+                AND t.Tasks_Status = 2
+                AND ts.Step_Order = (
+                        SELECT ts2.Step_Order
+                        FROM tasks t2
+                        JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+                        WHERE t2.ID = @id
+                    )
+                AND (
+                        COALESCE(bp.ParentBatchProduct_ID, bp.ID) = @rootId
+                );";
 
         var p = upd.CreateParameter();
         p.ParameterName = "@id";
@@ -1297,6 +1314,65 @@ private TaskScenario DetectScenario(bool hasRoot, int stepType)
 
     // A → Parasts Parent
     return TaskScenario.A_Parent;
+}
+
+private async Task<TaskScenario> DetectScenarioV2(int batchProductId, int rootId)
+{
+    await using var conn = new MySqlConnection(_db.Database.GetConnectionString());
+    if (conn.State != ConnectionState.Open)
+        await conn.OpenAsync();
+
+    // cik batch_products ir zem šī root
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+SELECT COUNT(*)
+FROM batches_products
+WHERE IsActive = 1
+AND (
+        ID = @rootId
+     OR ParentBatchProduct_ID = @rootId
+);";
+
+    cmd.Parameters.Add(new MySqlParameter("@rootId", rootId));
+
+    var count = Convert.ToInt32(await cmd.ExecuteScalarAsync());
+
+    // vai šis ir parent
+    bool isParent = batchProductId == rootId;
+
+    if (count > 1)
+        return TaskScenario.B_Root;
+
+    if (!isParent)
+        return TaskScenario.C_Child;
+
+    return TaskScenario.A_Parent;
+}
+
+
+public async Task<(bool Success, string? Error)> StartByGroup(int empId, long displayGroupId)
+{
+    var tasks = await GetForEmployee(empId);
+
+    var groupTasks = tasks
+        .Where(t => t.DisplayGroupId == displayGroupId)
+        .ToList();
+
+    if (!groupTasks.Any())
+        return (false, "Nav pieejamu uzdevumu šajā grupā.");
+
+    var targetTask = groupTasks
+        .Where(t => t.Status == 1 && t.CanStart)
+        .OrderBy(t => t.Tasks_Push ? 0 : 1)
+        .ThenByDescending(t => t.PriorityLevel)
+        .ThenBy(t => t.StepOrder)
+        .ThenBy(t => t.TaskId)
+        .FirstOrDefault();
+
+    if (targetTask == null)
+        return (false, "Nav startējamu uzdevumu.");
+
+    return await ClaimTask(targetTask.TaskId, empId);
 }
 
 }

@@ -31,6 +31,7 @@ public sealed class TaskRow
     public bool CanStart { get; set; }
     public bool BatchPriority { get; set; }
     public int? Assigned_To { get; set; }
+    public int? DisplayGroupId { get; set; }
 
     public int? Claimed_By { get; set; }
 }

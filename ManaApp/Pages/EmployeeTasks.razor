@@ -15,13 +15,16 @@
     <button @onclick="PrevEmployee">◀</button>
 
     <select @bind="selectedEmployeeId" @bind:after="OnEmployeeChangedAfter">
-        @foreach (var emp in employees)
-        {
-            <option value="@emp.Id">
-                @emp.Name
-            </option>
-        }
-    </select>
+
+            <option value="0">-- Izvēlies darbinieku --</option>
+
+            @foreach (var emp in employees)
+            {
+                <option value="@emp.Id">
+                    @emp.Name
+                </option>
+            }
+        </select>
 
     <button @onclick="NextEmployee">▶</button>
 </div>
@@ -157,12 +160,13 @@
 
     <div class="right-panel">
         <ActiveTaskPanel ActiveTask="_activeTask"
-            OnFinish="FinishTask"
-            StatusText="StatusText"
-            OnStart="OpenTaskDialog"
-            OnFinishConfirm="OpenFinishDialog"
-            AvailableTaskId="FirstAvailableTask?.TaskId"
-            HasActiveTask="_activeTask?.Status == 2" />
+                 OnFinish="FinishTask"
+                 StatusText="StatusText"
+                 OnStart="OpenTaskDialog"
+                 OnFinishConfirm="OpenFinishDialog"
+                 AvailableTaskId="FirstAvailableTask?.TaskId"
+                 HasActiveTask="_activeTask?.Status == 2"
+                 DisplayGroupId="_activeTask?.DisplayGroupId" />
     </div>
 </div>
     </div>
@@ -174,9 +178,14 @@
             
             OnConfirm="@(async t => {
        if (_dialogMode == TaskDialogMode.Finish)
-            await FinishTask(t);
-        else
-            await ClaimTask(t.TaskId);
+            {
+                Console.WriteLine($"UI FINISH CLICK: taskId={t.TaskId}");
+                await FinishTask(t);
+            }
+            else
+            {
+                await StartTask(t.DisplayGroupId);
+            }
 
         _isDialogOpen = false;
         _dialogMode = TaskDialogMode.None;
@@ -191,37 +200,37 @@
     
 // PUSH (augstāk par visiem)
 private IEnumerable<TaskRow> PushTasks =>
-    tasks.Where(t => t.PriorityLevel >= 0 && t.Tasks_Push && t.Status == 1);
+    tasks.Where(t => t.Tasks_Push && t.Status == 1);
 private IEnumerable<TaskRow> InProgress =>
     tasks.Where(t => t.Status == 2);
 
 // 1) Super prioritārie (BatchPriority + Tasks_Priority)
 private IEnumerable<TaskRow> SuperPriorityCanStart =>
-    tasks.Where(t => t.PriorityLevel == 3 && t.Status == 1 && t.CanStart);
+    tasks.Where(t => !t.Tasks_Push && t.PriorityLevel == 3 && t.Status == 1 && t.CanStart);
 
 private IEnumerable<TaskRow> SuperPriorityWaiting =>
-    tasks.Where(t => t.PriorityLevel == 3 && t.Status == 1 && !t.CanStart);
+    tasks.Where(t => !t.Tasks_Push && t.PriorityLevel == 3 && t.Status == 1 && !t.CanStart);
 
 // 2) Prioritārie (BatchPriority tikai)
 private IEnumerable<TaskRow> BatchPriorityCanStart =>
-    tasks.Where(t => t.PriorityLevel == 2 && t.Status == 1 && t.CanStart);
+    tasks.Where(t => !t.Tasks_Push && t.PriorityLevel == 2 && t.Status == 1 && t.CanStart);
 
 private IEnumerable<TaskRow> BatchPriorityWaiting =>
-    tasks.Where(t => t.PriorityLevel == 2 && t.Status == 1 && !t.CanStart);
+    tasks.Where(t => !t.Tasks_Push && t.PriorityLevel == 2 && t.Status == 1 && !t.CanStart);
 
 // 3) Secīgie ar part prioritāti
 private IEnumerable<TaskRow> NormalSuperCanStart =>
-    tasks.Where(t => t.PriorityLevel == 1 && t.Status == 1 && t.CanStart);
+    tasks.Where(t => !t.Tasks_Push && t.PriorityLevel == 1 && t.Status == 1 && t.CanStart);
 
 private IEnumerable<TaskRow> NormalSuperWaiting =>
-    tasks.Where(t => t.PriorityLevel == 1 && t.Status == 1 && !t.CanStart);
+    tasks.Where(t => !t.Tasks_Push && t.PriorityLevel == 1 && t.Status == 1 && !t.CanStart);
 
 // 4) Parastie
 private IEnumerable<TaskRow> NormalCanStart =>
-    tasks.Where(t => t.PriorityLevel == 0 && t.Status == 1 && t.CanStart);
+    tasks.Where(t => !t.Tasks_Push && t.PriorityLevel == 0 && t.Status == 1 && t.CanStart);
 
 private IEnumerable<TaskRow> NormalWaiting =>
-    tasks.Where(t => t.PriorityLevel == 0 && t.Status == 1 && !t.CanStart);
+    tasks.Where(t => !t.Tasks_Push && t.PriorityLevel == 0 && t.Status == 1 && !t.CanStart);
 
 private string StatusText(int s, TaskRow t) => s switch
 {
@@ -237,6 +246,21 @@ private string StatusText(int s) => StatusText(s, null!);
 
 private async Task ClaimTask(int taskId)
 {
+    var groupTasks = tasks
+        .Where(t => t.DisplayGroupId == _activeTask?.DisplayGroupId)
+        .ToList();
+
+    var targetTask = groupTasks
+        .Where(t => t.Status == 1)
+        .OrderByDescending(t => t.CanStart)
+        .ThenByDescending(t => t.Tasks_Push)
+        .ThenByDescending(t => t.PriorityLevel)
+        .ThenBy(t => t.StepOrder)
+        .ThenBy(t => t.TaskId)
+        .First();
+
+    taskId = targetTask.TaskId;
+
     var body = new
     {
         taskId,
@@ -263,6 +287,12 @@ else
 
 private async Task LoadTasks()
 {
+    if (selectedEmployeeId == 0)
+            {
+                tasks.Clear();
+                return;
+            }
+
     tasks = await Http.GetFromJsonAsync<List<TaskRow>>(
         $"api/tasks/for-employee?empId={selectedEmployeeId}"
     ) ?? new();
@@ -277,7 +307,13 @@ private async Task LoadTasks()
 }
 
 private TaskRow? FirstAvailableTask =>
-    tasks.FirstOrDefault(t => t.Status == 1 && t.CanStart);
+    tasks
+        .Where(t => t.Status == 1 && t.CanStart)
+        .OrderBy(t => t.Tasks_Push ? 0 : 1)
+        .ThenByDescending(t => t.PriorityLevel)
+        .ThenBy(t => t.StepOrder)
+        .ThenBy(t => t.TaskId)
+        .FirstOrDefault();
 
 private async Task FinishTask(TaskRow task)
 {
@@ -310,14 +346,13 @@ private async Task FinishTask(TaskRow task)
 private bool _isDialogOpen = false;
 private TaskRow? _selectedTask;
 
-private Task OpenTaskDialog(TaskRow t)
+private async Task OpenTaskDialog(TaskRow t)
 {
     _selectedTask = t;
     _dialogMode = TaskDialogMode.Start;
     _isDialogOpen = true;
-    return Task.CompletedTask;
 
-
+    await InvokeAsync(StateHasChanged);
 }
 
 private async Task LoadEmployees()
@@ -326,11 +361,7 @@ private async Task LoadEmployees()
         "api/employees"
     ) ?? new();
 
-    if (employees.Any() && selectedEmployeeId == 0)
-        {
-            selectedEmployeeId = employees.First().Id;
-        }
-}
+    }
 
 private void CloseTaskDialog()
 {
@@ -342,7 +373,13 @@ private TaskRow? _activeTask;
 
 private void SelectTask(TaskRow task)
 {
-    _activeTask = task;
+    _activeTask = tasks
+        .Where(t => t.DisplayGroupId == task.DisplayGroupId)
+        .OrderByDescending(t => t.Status == 2)
+        .ThenByDescending(t => t.Assigned_To == selectedEmployeeId)
+        .ThenByDescending(t => t.BatchProductId == t.RootId)
+        .First();
+
     _dialogMode = TaskDialogMode.None;
 }
 
@@ -368,7 +405,7 @@ private void OpenFinishDialog(TaskRow t)
     _isDialogOpen = true;
 }
 
-private int selectedEmployeeId = 1;
+private int selectedEmployeeId = 0;
 private List<EmployeeDto> employees = new();
 
 private class EmployeeDto
@@ -380,7 +417,11 @@ private class EmployeeDto
 protected override async Task OnInitializedAsync()
 {
     await LoadEmployees();
-    await LoadTasks();
+
+        if (selectedEmployeeId != 0)
+        {
+            await LoadTasks();
+        }
 }
 
 
@@ -414,6 +455,35 @@ private async Task NextEmployee()
 private async Task OnEmployeeChangedAfter()
 {
     await LoadTasks();
+}
+
+private async Task StartTask(int? displayGroupId)
+{
+    if (!displayGroupId.HasValue || displayGroupId.Value <= 0)
+        return;
+
+    var body = new
+    {
+        employeeId = selectedEmployeeId,
+        displayGroupId = displayGroupId.Value
+    };
+
+    var resp = await Http.PostAsJsonAsync("api/tasks/start", body);
+
+    if (resp.IsSuccessStatusCode)
+    {
+        await LoadTasks();
+
+        _activeTask = tasks
+            .FirstOrDefault(t => t.Status == 2);
+
+        CloseTaskDialog();
+    }
+    else
+    {
+        var error = await resp.Content.ReadAsStringAsync();
+        Console.WriteLine($"START ERROR: {error}");
+    }
 }
 
 }

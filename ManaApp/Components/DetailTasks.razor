@@ -97,7 +97,7 @@ if (AggregatedByStep.TryGetValue((step.Id, p.ProductToPartId), out var aggList))
 
                         <!-- 4. Piešķirts -->
                         <div>
-                            @if (t.Status == 2 || t.Status == 3)
+                            @if (t.Status == 2 || t.Status == 3 || t.Claimed_By != null || t.StartedAt != null)
                                 {
                                     <div class="assigned-readonly">
                                         @Employees.FirstOrDefault(e => e.Id == t.Assigned_To)?.Name
@@ -364,14 +364,15 @@ async Task OnAssignedChanged(int stepId, int partId, ChangeEventArgs e)
             }
 
     await Http.PostAsJsonAsync(
-        "http://localhost:5270/api/tasks/update-assignee-aggregated",
-        new
-        {
-            BatchProductId = SelectedBatch!.BatchProductId,
-            TopPartStepId = stepId,
-            ProductToPartId = partId,
-            Assigned_To = empId
-        });
+            "http://localhost:5270/api/tasks/update-assignee-root",
+            new
+            {
+                BatchProductId = SelectedBatch!.BatchProductId,
+                TopPartStepId = stepId,
+                ProductToPartId = partId,
+                Assigned_To = empId,
+                IsRoot = true 
+            });
 }
 
 private sealed class DetailTaskRow

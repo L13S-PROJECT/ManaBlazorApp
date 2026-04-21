@@ -60,17 +60,21 @@ namespace ManiApi.Services
                         )
                     )
                 .Select(x => new DetailPartDto
-                {
-                    ProductToPartId = x.Id,
-                    TopPartName = null,
-                    Qty = 0,
-                    QtyDisplay = "",
-                    Indicator = "gray",
-                    IsActivated = false,
-                    StartDate = null,
-                    EndDate = null,
-                    Steps = new List<DetailStepDto>()
-                })
+                        {
+                            ProductToPartId = x.Id,
+                            TopPartName = _db.TopParts
+                                .Where(tp => tp.Id == x.TopPartId)
+                                .Select(tp => tp.TopPartName)
+                                .FirstOrDefault(),
+
+                            Qty = 0,
+                            QtyDisplay = "",
+                            Indicator = "gray",
+                            IsActivated = false,
+                            StartDate = null,
+                            EndDate = null,
+                            Steps = new List<DetailStepDto>()
+                        })
                 .ToListAsync();
 
             var stepRows = await _db.Set<TopPartStep>()
@@ -180,10 +184,10 @@ var relatedBatchProducts = await _db.Set<BatchProduct>()
         x.Version_Id == bp.Version_Id)
     .ToListAsync();
 
-var childPartId = relatedBatchProducts
+var childPartIds = relatedBatchProducts
     .Where(x => x.ProductToPart_ID != null)
-    .Select(x => x.ProductToPart_ID)
-    .FirstOrDefault();
+    .Select(x => x.ProductToPart_ID!.Value)
+    .ToList();
 
 foreach (var part in parts)
 {
@@ -197,11 +201,9 @@ foreach (var part in parts)
             .Where(x => x.ProductToPart_ID == null)
             .Sum(x => x.Planned_Qty);
 
-        var childQty = part.ProductToPartId == childPartId
-            ? relatedBatchProducts
-                .Where(x => x.ProductToPart_ID == childPartId)
-                .Sum(x => x.Planned_Qty)
-            : 0;
+        var childQty = relatedBatchProducts
+            .Where(x => x.ProductToPart_ID == part.ProductToPartId)
+            .Sum(x => x.Planned_Qty);
 
         // tikai display (UI izmantos)
         if (scenario == "C")

@@ -39,6 +39,8 @@ if (dto.Items is null || dto.Items.Count == 0)
 
 await using var tx = await conn.BeginTransactionAsync();
 
+int? parentId = null;
+
 // 🔒 VALIDĀCIJA (tā pati kā CreateDraft)
 if (dto.Items is not null)
 {
@@ -140,9 +142,10 @@ row.Transaction = tx;
 
 row.CommandText = @"
 INSERT INTO batches_products
-    (Batch_Id, Version_Id, ProductToPart_ID, Planned_Qty, Done_Qty, Priority, BatchProduct_Comments, IsActive)
+    (Batch_Id, Version_Id, ProductToPart_ID, Planned_Qty, Done_Qty, Priority, BatchProduct_Comments, IsActive, ParentBatchProduct_ID)
 VALUES
-    (@bid, @vid, @ptpId, @qty, 0, 0, @comment, 1);";
+    (@bid, @vid, @ptpId, @qty, 0, 0, @comment, 1, @parentId);
+SELECT LAST_INSERT_ID();";
 
 var pb = row.CreateParameter();
 pb.ParameterName = "@bid";
@@ -169,7 +172,26 @@ p3.ParameterName = "@ptpId";
 p3.Value = (object?)it.ProductToPartId ?? DBNull.Value;
 row.Parameters.Add(p3);
 
-await row.ExecuteNonQueryAsync();
+row.CommandText = @"
+INSERT INTO batches_products
+    (Batch_Id, Version_Id, ProductToPart_ID, Planned_Qty, Done_Qty, Priority, BatchProduct_Comments, IsActive, ParentBatchProduct_ID)
+VALUES
+    (@bid, @vid, @ptpId, @qty, 0, 0, @comment, 1, @parentId);
+SELECT LAST_INSERT_ID();";
+
+var pParent = row.CreateParameter();
+pParent.ParameterName = "@parentId";
+pParent.Value = (object?)parentId ?? DBNull.Value;
+row.Parameters.Add(pParent);
+
+var newIdObj = await row.ExecuteScalarAsync();
+var newId = Convert.ToInt32(newIdObj);
+
+// JA vēl nav parent → šis kļūst par root
+if (parentId == null)
+{
+    parentId = newId;
+}
         }
 }
 
@@ -340,7 +362,8 @@ WHERE Batch_Id = @bid;";
     await clear.ExecuteNonQueryAsync();
 }
 
-    
+    int? parentId = null;
+
     foreach (var it in dto.Items)
     {
         // ✅ Backend aizsardzība: nedrīkst mainīt produktu (VersionId)
@@ -369,11 +392,11 @@ WHERE Batch_Id = @bid;";
         await using var row = conn.CreateCommand();
         row.Transaction = tx;
    row.CommandText = @"
-INSERT INTO batches_products 
-    (Batch_Id, Version_Id, ProductToPart_ID, Planned_Qty, Done_Qty, Priority, BatchProduct_Comments, IsActive)
-VALUES 
-    (@bid, @vid, @ptpId, @qty, 0, 0, @comment, 1);
-    ";
+        INSERT INTO batches_products
+            (Batch_Id, Version_Id, ProductToPart_ID, Planned_Qty, Done_Qty, Priority, BatchProduct_Comments, IsActive, ParentBatchProduct_ID)
+        VALUES
+            (@bid, @vid, @ptpId, @qty, 0, 0, @comment, 1, @parentId);
+        SELECT LAST_INSERT_ID();";
 
         var pb = row.CreateParameter();
         pb.ParameterName = "@bid";
@@ -400,7 +423,26 @@ VALUES
         p3.Value = (object?)it.ProductToPartId ?? DBNull.Value;
         row.Parameters.Add(p3);
 
-        await row.ExecuteNonQueryAsync();
+        row.CommandText = @"
+INSERT INTO batches_products
+    (Batch_Id, Version_Id, ProductToPart_ID, Planned_Qty, Done_Qty, Priority, BatchProduct_Comments, IsActive, ParentBatchProduct_ID)
+VALUES
+    (@bid, @vid, @ptpId, @qty, 0, 0, @comment, 1, @parentId);
+SELECT LAST_INSERT_ID();";
+
+var pParent = row.CreateParameter();
+pParent.ParameterName = "@parentId";
+pParent.Value = (object?)parentId ?? DBNull.Value;
+row.Parameters.Add(pParent);
+
+var newIdObj = await row.ExecuteScalarAsync();
+var newId = Convert.ToInt32(newIdObj);
+
+// JA vēl nav parent → šis kļūst par root
+if (parentId == null)
+{
+    parentId = newId;
+}
     }
 }
 

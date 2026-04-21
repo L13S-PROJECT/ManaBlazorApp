@@ -25,11 +25,11 @@ public sealed class TaskRowDto
     public int EstimatedStartMinutes { get; set; }
     public bool CanStart { get; set; }
     public string? BatchCode { get; set; }
-
+    public long DisplayGroupId { get; set; }
     public int Done { get; set; }
     public int? Assigned_To { get; set; }
     public int Planned { get; set; }
-
+    public int TopPartStepId { get; set; }
     public int StepOrder { get; set; }
 
     public int StepType { get; set; }

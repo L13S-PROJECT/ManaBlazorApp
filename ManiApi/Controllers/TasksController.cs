@@ -2827,6 +2827,72 @@ AND (
     
 }
 
+[HttpPost("update-assignee-root")]
+public async Task<IActionResult> UpdateAssigneeRoot([FromBody] UpdateAssigneeDto dto)
+{
+    if (dto.BatchProductId <= 0)
+        return BadRequest();
+
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+
+    cmd.CommandText = @"
+UPDATE tasks t
+JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+
+SET t.Assigned_To = @empId
+
+WHERE bp.Batch_Id = (
+        SELECT Batch_Id FROM batches_products WHERE ID = @bpId
+    )
+AND bp.Version_Id = (
+        SELECT Version_Id FROM batches_products WHERE ID = @bpId
+    )
+AND t.TopPartStep_ID = @stepId
+AND EXISTS (
+    SELECT 1
+    FROM toppartsteps ts
+    WHERE ts.ID = t.TopPartStep_ID
+      AND ts.ProductToPart_ID = @partId
+)
+AND t.IsActive = 1;
+";
+
+    var p1 = cmd.CreateParameter();
+    p1.ParameterName = "@empId";
+    p1.Value = (object?)dto.Assigned_To ?? DBNull.Value;
+    cmd.Parameters.Add(p1);
+
+    var p2 = cmd.CreateParameter();
+    p2.ParameterName = "@bpId";
+    p2.Value = dto.BatchProductId;
+    cmd.Parameters.Add(p2);
+
+    var p3 = cmd.CreateParameter();
+    p3.ParameterName = "@stepId";
+    p3.Value = dto.TopPartStepId;
+    cmd.Parameters.Add(p3);
+
+    var p4 = cmd.CreateParameter();
+    p4.ParameterName = "@partId";
+    p4.Value = dto.ProductToPartId;
+    cmd.Parameters.Add(p4);
+
+    await cmd.ExecuteNonQueryAsync();
+
+    return Ok();
+}
+
+public sealed class UpdateAssigneeDto
+{
+    public int BatchProductId { get; set; }
+    public int TopPartStepId { get; set; }
+    public int ProductToPartId { get; set; }
+    public int? Assigned_To { get; set; }
+}
+
 public sealed class UpdateAssigneeAggregatedDto
 {
     public int BatchProductId { get; set; }
@@ -3627,6 +3693,23 @@ public async Task<IActionResult> GetDetailTasks([FromQuery] int batchProductId)
     var result = await _detailService.GetDetailTasks(batchProductId);
 
     return Ok(result);
+}
+
+[HttpPost("start")]
+public async Task<IActionResult> StartTask([FromBody] StartTaskRequest req)
+{
+    var result = await _taskService.StartByGroup(req.EmployeeId, req.DisplayGroupId);
+
+    if (!result.Success)
+        return BadRequest(result.Error);
+
+    return Ok(result);
+}
+
+public class StartTaskRequest
+{
+    public int EmployeeId { get; set; }
+    public long DisplayGroupId { get; set; }
 }
 
     }
