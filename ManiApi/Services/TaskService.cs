@@ -222,19 +222,20 @@ foreach (var t in result)
         var rootId = t.RootId;
        
     var hasPrevNotFinished = allTasks.Any(prev =>
-        prev.DisplayGroupId == t.DisplayGroupId &&
+        prev.RootId == t.RootId &&
+        prev.ProductToPartId == t.ProductToPartId &&
         prev.StepOrder < t.StepOrder &&
         prev.Status != 3);
 
     var hasHigherPriority = allTasks.Any(other =>
-        other.TaskId != t.TaskId &&
-        other.Status == 1 &&
-        other.DisplayGroupId == t.DisplayGroupId &&
+            other.TaskId != t.TaskId &&
+            other.Status == 1 &&
+            other.RootId == t.RootId &&
 
     !allTasks.Any(prev =>
-        prev.DisplayGroupId == other.DisplayGroupId &&
-        prev.StepOrder < other.StepOrder &&
-        prev.Status != 3) &&
+            prev.RootId == other.RootId &&
+            prev.StepOrder < other.StepOrder &&
+            prev.Status != 3) &&
 
     (
         (other.Tasks_Push && !t.Tasks_Push)
@@ -293,7 +294,8 @@ public async Task<List<TaskRowDto>> GetAllActiveTasks()
         t.Assigned_To,
         t.Tasks_Priority,
         t.Tasks_Push,
-        COALESCE(bp.ParentBatchProduct_ID, bp.ID) AS RootId
+        COALESCE(bp.ParentBatchProduct_ID, bp.ID) AS RootId,
+        ts.ProductToPart_ID
     FROM tasks t
     JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
     JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
@@ -318,6 +320,7 @@ public async Task<List<TaskRowDto>> GetAllActiveTasks()
                 Priority = !r.IsDBNull(7) && r.GetBoolean(7) ? (byte)1 : (byte)0,
                 Tasks_Push = !r.IsDBNull(8) && r.GetBoolean(8),
                 RootId = r.GetInt32(9),
+                ProductToPartId = r.GetInt32(10),
                 CanStart = true,
                 DisplayGroupId = r.GetInt32(9) != r.GetInt32(2)
                     ? r.GetInt32(1)
@@ -588,15 +591,16 @@ JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
 WHERE t.IsActive = 1
   AND t.Tasks_Status <> 3
   AND ts.Step_Order < @curStepOrder
-  AND COALESCE(bp.ParentBatchProduct_ID, bp.ID) = (
-    SELECT COALESCE(bp3.ParentBatchProduct_ID, bp3.ID)
-    FROM batches_products bp3
-    WHERE bp3.ID = (
-        SELECT BatchProduct_ID FROM tasks WHERE ID = @taskId
+  AND ts.ProductToPart_ID = (
+        SELECT ts2.ProductToPart_ID
+        FROM tasks t2
+        JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+        WHERE t2.ID = @taskId
     )
-)
+  AND COALESCE(bp.ParentBatchProduct_ID, bp.ID) = @rootId
 LIMIT 1;";
 
+    checkPrev.Parameters.Add(new MySqlParameter("@rootId", rootId));
     checkPrev.Parameters.Add(new MySqlParameter("@taskId", taskId));
     checkPrev.Parameters.Add(new MySqlParameter("@curStepOrder", currentStepOrder));
 
@@ -688,7 +692,13 @@ JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
 WHERE t.IsActive = 1
   AND t.Tasks_Status <> 3
   AND ts.Step_Order < @curStepOrder
-  AND COALESCE(bp.ParentBatchProduct_ID, bp.ID) = @rootId
+    AND ts.ProductToPart_ID = (
+        SELECT ts2.ProductToPart_ID
+        FROM tasks t2
+        JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+        WHERE t2.ID = @taskId
+    )
+AND COALESCE(bp.ParentBatchProduct_ID, bp.ID) = @rootId
 LIMIT 1;";
 
     checkRootPrev.Parameters.Add(new MySqlParameter("@curStepOrder", currentStepOrder));

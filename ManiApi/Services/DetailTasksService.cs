@@ -98,6 +98,7 @@ var activePartIds = await _db.Tasks
         (t, ts) => new { t, ts })
     .Where(x =>
             x.t.IsActive &&
+            x.ts.IsActive &&
             x.t.Tasks_Status != 5 &&
             x.ts.StepType == 1 &&
             (
@@ -118,6 +119,7 @@ var indicatorRows = await _db.Tasks
         (t, ts) => new { t, ts })
     .Where(x =>
             x.t.IsActive &&
+            x.ts.IsActive &&
             x.ts.StepType == 1 &&
             (
                 scenario == "C"
@@ -154,6 +156,7 @@ var taskRows = await _db.Tasks
         (t, ts) => new { t, ts })
     .Where(x =>
             x.t.IsActive &&
+            x.ts.IsActive &&
             x.ts.StepType == 1 &&
             (
                 scenario == "C"
