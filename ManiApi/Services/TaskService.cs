@@ -121,20 +121,20 @@ JOIN producttopparts  ptp  ON ptp.ID = ts.ProductToPart_ID
 JOIN toppart          tp   ON tp.ID  = ptp.TopPart_ID
 WHERE t.IsActive = 1
 AND (
-    -- 1) Mani taski (vienmēr redzu)
-    t.Assigned_To = @empId
-
-    OR
-
-    -- 2) Taski, ko es jau daru
+    -- 1) Procesā (vienmēr augstākā prioritāte)
     (t.Tasks_Status = 2 AND t.Claimed_By = @empId)
 
     OR
 
-    -- 3) Brīvie taski manā workcentrā
+    -- 2) Assigned uz mani
+    (t.Assigned_To = @empId)
+
+    OR
+
+    -- 3) Brīvie workcenter uzdevumi
     (
-        t.Tasks_Status = 1
-        AND t.Assigned_To IS NULL
+        t.Assigned_To IS NULL
+        AND t.Tasks_Status = 1
         AND ts.WorkCentr_ID = @workCenterId
     )
 )
@@ -202,20 +202,10 @@ ORDER BY
     }
 
     var result = rawTasks.ToList();
+
     var allTasks = await GetAllActiveTasks();
 
     // apvienojam Parent+Child uz root līmeni (tikai display/loģikai)
-result = result
-    .GroupBy(t =>
-        allTasks.FirstOrDefault(x => x.BatchProductId == t.BatchProductId)?.RootId
-        ?? t.BatchProductId)
-    .Select(g => g
-        .OrderBy(t => t.StepOrder)
-        .ThenBy(t => t.TaskId)
-        .First())
-    .ToList();
-
-
 
 Console.WriteLine($"Final tasks count for empId={empId}: {result.Count}");
 
@@ -224,6 +214,22 @@ foreach (var t in result)
     var rootId = allTasks
         .FirstOrDefault(x => x.BatchProductId == t.BatchProductId)?.RootId
         ?? t.BatchProductId;
+
+    t.RootId = rootId;
+
+        var sameStepRows = result
+            .Where(x => x.RootId == rootId 
+                    && x.StepOrder == t.StepOrder
+                    && x.ProductToPartId == t.ProductToPartId)
+            .ToList();
+
+        var hasRootRow = sameStepRows.Any(x => x.BatchProductId == rootId);
+        var hasChildRows = sameStepRows.Any(x => x.BatchProductId != rootId);
+
+        if (hasRootRow && hasChildRows)
+        {
+            t.Planned = sameStepRows.Sum(x => x.Planned);
+        }
 
     var hasPrevNotFinished = allTasks.Any(prev =>
         prev.RootId == rootId &&
@@ -234,7 +240,7 @@ foreach (var t in result)
             other.TaskId != t.TaskId &&
             other.Status == 1 &&
             !allTasks.Any(prev =>
-                prev.RootId == rootId &&
+                prev.RootId == other.RootId &&
                 prev.StepOrder < other.StepOrder &&
                 prev.Status != 3) &&
 
@@ -248,15 +254,34 @@ foreach (var t in result)
 t.CanStart = !hasPrevNotFinished && !hasHigherPriority;
 }
 
-return result.OrderBy(t => t.Tasks_Push ? 0 : 1)
-             .ThenBy(t => t.BatchPriority ? 0 : 1)
-             .ThenByDescending(t => t.Priority)
-             .ThenBy(t => t.StepOrder)
-             .ThenBy(t => t.TaskId)
-             .ToList();
+result = result
+    .GroupBy(t => new { t.RootId, t.StepOrder, t.ProductToPartId })
+    .Select(g =>
+    {
+        // ja ir root scenārijs (vairāk nekā 1 rinda)
+        if (g.Count() > 1)
+        {
+            return g
+                .OrderByDescending(x => x.Assigned_To == empId)
+                .ThenByDescending(x => x.Status == 2)
+                .First(); // tikai 1 rinda
+        }
+
+        return g.First();
+    })
+    .ToList();
+
+return result
+    .OrderBy(t => t.Status == 2 ? 0 : 1) // procesā vienmēr pirmais
+    .ThenBy(t => t.Tasks_Push ? 0 : 1)
+    .ThenByDescending(t => t.Assigned_To == empId) //  Assigned uz mani = augstāk
+    .ThenBy(t => t.PriorityLevel * -1) // augstāks PriorityLevel = augstāk
+    .ThenBy(t => t.StepOrder)
+    .ThenBy(t => t.TaskId)
+    .ToList();
 }
 
-public async Task<List<TaskRowDto>> GetAllActiveTasks()
+public async Task<List<TaskRowDto>> GetAllActiveTasks(DbConnection conn, DbTransaction tx)
 {
     await using var conn = new MySqlConnector.MySqlConnection(_db.Database.GetConnectionString());
        if (conn.State != ConnectionState.Open)
@@ -274,6 +299,8 @@ public async Task<List<TaskRowDto>> GetAllActiveTasks()
         t.Tasks_Status,
         bp.is_priority AS BatchPriority,
         t.Assigned_To,
+        t.Tasks_Priority,
+        t.Tasks_Push,
         CASE 
             WHEN EXISTS (
                 SELECT 1
@@ -314,7 +341,9 @@ public async Task<List<TaskRowDto>> GetAllActiveTasks()
                 Status = r.GetInt32(3),
                 BatchPriority = r.GetBoolean(4),
                 Assigned_To = r.IsDBNull(5) ? (int?)null : r.GetInt32(5),
-                RootId = r.GetInt32(6),
+                Priority = !r.IsDBNull(6) && r.GetBoolean(6) ? (byte)1 : (byte)0,
+                Tasks_Push = !r.IsDBNull(7) && r.GetBoolean(7),
+                RootId = r.GetInt32(8),
                 CanStart = true
             });
     }
@@ -358,6 +387,8 @@ WHERE Claimed_By = @emp
             return (false, "Jau ir iesākts cits darbs.");
         }
     }
+
+ 
 
     int currentIsPriority = 0;
 int currentBatchOrder = 0;
@@ -513,6 +544,34 @@ WHERE t.ID = @taskId;";
         
 }
 
+   // 🔒 Vai kāds cits jau nav paņēmis šo tasku
+await using (var chk2 = conn.CreateCommand())
+{
+    chk2.Transaction = tx;
+    chk2.CommandText = @"
+            SELECT COUNT(*)
+            FROM tasks t
+            JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+            JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+            WHERE t.IsActive = 1
+            AND t.Tasks_Status = 2
+            AND ts.Step_Order = @curStepOrder
+            AND (
+                    bp.ID = @rootId
+                OR bp.ParentBatchProduct_ID = @rootId
+            );";
+
+    chk2.Parameters.Add(new MySqlParameter("@curStepOrder", currentStepOrder));
+    chk2.Parameters.Add(new MySqlParameter("@rootId", rootId));
+
+    var cnt2 = Convert.ToInt32(await chk2.ExecuteScalarAsync());
+    if (cnt2 > 0)
+    {
+        await tx.RollbackAsync();
+        return (false, "Šis darbs jau ir procesā citam darbiniekam.");
+    }
+}
+
 // 🔒 STEP secības validācija (server-side)
 await using (var checkPrev = conn.CreateCommand())
 {
@@ -589,6 +648,68 @@ LIMIT 1;";
 }
 
 var scenario = DetectScenario(hasRoot, currentStepOrder);
+// 🔒 Atļauts sākt tikai pašu pirmo pieejamo tasku (server-side)
+var allTasks = await GetAllActiveTasks(conn, tx);
+
+var currentTask = allTasks.FirstOrDefault(t => t.TaskId == taskId);
+
+if (currentTask == null)
+{
+    await tx.RollbackAsync();
+    return (false, "Task not found.");
+}
+
+// tas pats loģikas princips kā UI
+var firstAvailable = allTasks
+    .Where(t => t.Status == 1)
+    .Where(t => !allTasks.Any(prev =>
+        prev.RootId == t.RootId &&
+        prev.StepOrder < t.StepOrder &&
+        prev.Status != 3))
+    .OrderBy(t => t.Tasks_Push ? 0 : 1)
+    .ThenBy(t => t.BatchPriority ? 0 : 1)
+    .ThenByDescending(t => t.Priority)
+    .ThenBy(t => t.StepOrder)
+    .ThenBy(t => t.TaskId)
+    .FirstOrDefault();
+
+if (firstAvailable == null || firstAvailable.TaskId != taskId)
+{
+    await tx.RollbackAsync();
+    return (false, "Drīkst sākt tikai pirmo pieejamo darbu.");
+}
+
+// 🔒 Root gadījumā pārbaudām VISUS step taskus
+if (scenario == TaskScenario.B_Root)
+{
+    await using var checkRootPrev = conn.CreateCommand();
+    checkRootPrev.Transaction = tx;
+
+    checkRootPrev.CommandText = @"
+SELECT 1
+FROM tasks t
+JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+WHERE t.IsActive = 1
+  AND t.Tasks_Status <> 3
+  AND ts.Step_Order < @curStepOrder
+  AND (
+        bp.ID = @rootId
+     OR bp.ParentBatchProduct_ID = @rootId
+  )
+LIMIT 1;";
+
+    checkRootPrev.Parameters.Add(new MySqlParameter("@curStepOrder", currentStepOrder));
+    checkRootPrev.Parameters.Add(new MySqlParameter("@rootId", rootId));
+
+    var hasPrevRoot = await checkRootPrev.ExecuteScalarAsync() != null;
+
+    if (hasPrevRoot)
+    {
+        await tx.RollbackAsync();
+        return (false, "Root: iepriekšējais solis nav pabeigts.");
+    }
+}
 
     // 2) Pārejam uz statusu 2 šim taskam
     await using (var upd = conn.CreateCommand())
@@ -596,31 +717,43 @@ var scenario = DetectScenario(hasRoot, currentStepOrder);
         upd.Transaction = tx;
         if (scenario == TaskScenario.B_Root || scenario == TaskScenario.C_Child)
 {
-    upd.CommandText = @"UPDATE tasks 
-   SET Tasks_Status = 2, 
-       Claimed_By   = @emp,
-       Started_At   = CURRENT_TIMESTAMP
- WHERE ID IN (
-    SELECT t2.ID
-    FROM tasks t2
-    JOIN batches_products bp2 ON bp2.ID = t2.BatchProduct_ID
-    JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
-    WHERE t2.IsActive = 1
-      AND t2.Tasks_Status IN (1)
-AND t2.BatchProduct_ID IN (
-    SELECT bp3.ID
-    FROM batches_products bp3
-    WHERE bp3.IsActive = 1
-      AND (
-            bp3.ID = @rootId
-         OR bp3.ParentBatchProduct_ID = @rootId
-      )
-)
-AND ts2.Step_Order = @curStepOrder
-
-)
-   AND Tasks_Status = 1 
-   AND IsActive = 1;";
+    upd.CommandText = @"
+        UPDATE tasks t
+        JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+        JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+        SET t.Tasks_Status = 2,
+            t.Claimed_By   = @emp,
+            t.Started_At   = CURRENT_TIMESTAMP
+        WHERE t.IsActive = 1
+        AND t.Tasks_Status = 1
+        AND ts.Step_Order = @curStepOrder
+        AND (
+                bp.ID = @rootId
+            OR bp.ParentBatchProduct_ID = @rootId
+        )
+        AND (
+    t.ID = @taskId
+    OR (
+        @scenario = 1
+        AND (t.Assigned_To = @emp OR t.Assigned_To IS NULL)
+        AND NOT EXISTS (
+            SELECT 1
+            FROM tasks tprev
+            JOIN toppartsteps tsprev ON tsprev.ID = tprev.TopPartStep_ID
+            WHERE tprev.IsActive = 1
+              AND tprev.Tasks_Status <> 3
+              AND tsprev.Step_Order < ts.Step_Order
+              AND (
+                    tprev.BatchProduct_ID = bp.ID
+                 OR tprev.BatchProduct_ID IN (
+                        SELECT bp2.ID
+                        FROM batches_products bp2
+                        WHERE bp2.ParentBatchProduct_ID = @rootId
+                    )
+              )
+        )
+    )
+);";
 }
 else
 {
@@ -644,6 +777,7 @@ else
         upd.Parameters.Add(pId);
         upd.Parameters.Add(new MySqlParameter("@rootId", rootId));
         upd.Parameters.Add(new MySqlParameter("@curStepOrder", currentStepOrder));
+        upd.Parameters.Add(new MySqlParameter("@scenario", scenario == TaskScenario.B_Root ? 1 : 0));
 
         var affected = await upd.ExecuteNonQueryAsync();
         if (affected == 0)

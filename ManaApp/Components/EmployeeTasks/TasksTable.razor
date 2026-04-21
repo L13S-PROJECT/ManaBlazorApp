@@ -21,12 +21,7 @@ else
         </thead>
 
         <tbody>
-            @foreach (var t in Tasks
-            
-                .OrderByDescending(t => t.Tasks_Push)
-                .ThenBy(t => t.Status == 2 ? 0 : 1)
-                .ThenBy(t => t.StepOrder)
-                .ThenBy(t => t.TaskId))
+            @foreach (var t in Tasks)
             {
 <tr class="@GetRowClass(t)"
     style="cursor: @(t.CanStart ? "pointer" : "default")"
@@ -79,10 +74,13 @@ else
         return "table-success";
 
     if (AvailableTaskId.HasValue && t.TaskId == AvailableTaskId.Value)
-        return "task-available"; // 🔥 vienīgais aktīvais
+        return "task-available"; // vienīgais aktīvais
 
     if (t.CanStart)
-        return "task-canstart"; // 👈 pievieno šo
+    return "task-canstart";
+
+    if (!t.CanStart && t.Status == 1)
+        return "task-waiting";
 
     return "task-disabled";
 }
