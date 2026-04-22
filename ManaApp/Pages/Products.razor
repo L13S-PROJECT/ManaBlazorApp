@@ -684,8 +684,27 @@ if (row.VersionId == null || row.VersionId == 0)
         if (detail is null) return;
 
         currentStepsPartId = detail.ProductToPartId;
+
         var steps = await LoadStepsAsync(detail.ProductToPartId);
-        editingSteps = new List<PartStepDto>(steps);
+        Console.WriteLine("STEPS COUNT: " + steps.Count);
+
+// force fresh instance (nevis reference copy)
+editingSteps = steps
+    .Select(s => new PartStepDto
+    {
+        Id = s.Id,
+        ProductToPartId = s.ProductToPartId,
+        StepOrder = s.StepOrder,
+        StepName = s.StepName,
+        StepType = s.StepType,
+        WorkCentrId = s.WorkCentrId,
+        EstimatedMinutes = s.EstimatedMinutes,
+        ParallelGroup = s.ParallelGroup,
+        IsMandatory = s.IsMandatory,
+        IsFinal = s.IsFinal,
+        Comments = s.Comments
+    })
+    .ToList();
 
 // ielādē dropdown avotus katru reizi atverot
 await LoadActiveWorkCentersAsync();
@@ -863,7 +882,7 @@ if (!ValidateFinalRule())
 }
 
         // 2️⃣ PUT all (pareizais order)
-        foreach (var step in editingSteps.Where(s => s.Id > 0))
+        foreach (var step in editingSteps.Where(s => s.Id > 0 && editingSteps.Contains(s)))
         {
             var payload = new
             {
@@ -924,7 +943,15 @@ if (result.TryGetProperty("Id", out var idProp))
 }
         }
             SetMainDialog(null);
-            await OnRowClicked(selected!);
+
+            // pārlādē soļus tieši no DB
+            selectedPartDetails = await Http.GetFromJsonAsync<List<ProductDetailDto>>(
+                $"http://localhost:5270/api/products/details-by-version?versionId={selected!.VersionId}");
+
+            worksByParts = await Http.GetFromJsonAsync<List<WorksByPartDto>>(
+                $"http://localhost:5270/api/products/works-by-version?versionId={selected!.VersionId}");
+
+            StateHasChanged();
     }
 
 catch (Exception ex)
@@ -1351,25 +1378,14 @@ if (existing is not null)
         return;
     }
 
-if (!dto.IsActive)
-{
-    selectedPartDetails.Remove(existing);
-}
-else
-{
-    // ON → jāieliek atpakaļ UI
-    selectedPartDetails.Add(new ProductDetailDto
-    {
-        ProductToPartId = existing.ProductToPartId,
-        TopPartId = part.Id,
-        TopPartName = part.TopPartName,
-        TopPartCode = part.TopPartCode,
-        Quantity = existing.Quantity
-    });
-}
+selectedPartDetails = await Http.GetFromJsonAsync<List<ProductDetailDto>>(
+    $"http://localhost:5270/api/products/details-by-version?versionId={selected!.VersionId}");
 
-    StateHasChanged();
-    return;
+worksByParts = await Http.GetFromJsonAsync<List<WorksByPartDto>>(
+    $"http://localhost:5270/api/products/works-by-version?versionId={selected!.VersionId}");
+
+StateHasChanged();
+return;
 }
 
 // ===== JA NAV → ADD =====
@@ -1393,14 +1409,11 @@ if (dto.IsActive)
 
     var result = await resp.Content.ReadFromJsonAsync<AddPartResponse>();
 
-    selectedPartDetails.Add(new ProductDetailDto
-    {
-        ProductToPartId = result!.Id,
-        TopPartId = part.Id,
-        TopPartName = part.TopPartName,
-        TopPartCode = part.TopPartCode,
-        Quantity = 1
-    });
+    selectedPartDetails = await Http.GetFromJsonAsync<List<ProductDetailDto>>(
+    $"http://localhost:5270/api/products/details-by-version?versionId={selected!.VersionId}");
+
+    worksByParts = await Http.GetFromJsonAsync<List<WorksByPartDto>>(
+        $"http://localhost:5270/api/products/works-by-version?versionId={selected!.VersionId}");
 }
 
     StateHasChanged();

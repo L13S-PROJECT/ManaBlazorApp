@@ -17,5 +17,6 @@ namespace ManaApp.Models
         public bool IsFinal { get; set; }
         public bool IsMandatory { get; set; }
         public string? Comments { get; set; }
+        public bool IsActive { get; set; }
     }
 }

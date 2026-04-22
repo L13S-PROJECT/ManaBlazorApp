@@ -448,11 +448,11 @@ public async Task<IActionResult> GetWorksByVersion([FromQuery] int versionId)
             Steps = _db.TopPartSteps
                 .Where(s => s.ProductToPartId == x.pt.Id && s.IsActive)
                 .OrderBy(s => s.StepOrder)
-                .Join(_db.StepTypes.Where(st => st.IsActive),
+                .Join(_db.StepTypes,
                     s => s.StepType,
                     st => st.Id,
                     (s, st) => new { s, StepTypeName = st.StepTypeName })
-                .Join(_db.WorkCentrs.Where(wc => wc.IsActive),
+                .Join(_db.WorkCentrs,
                     temp => temp.s.WorkCentrId,
                     wc => wc.Id,
                     (temp, wc) => new
@@ -463,7 +463,8 @@ public async Task<IActionResult> GetWorksByVersion([FromQuery] int versionId)
                         WorkCenter = wc.WorkCentr_Name,
                         temp.s.IsFinal,
                         temp.s.IsMandatory,
-                        temp.s.Comments
+                        temp.s.Comments,
+                        temp.s.IsActive
                     })
                 .ToList()
                 
@@ -728,11 +729,11 @@ var map = oldParts
                 .Where(s => s.ProductToPartId == productToPartId && s.IsActive)
                 .OrderBy(s => s.StepOrder)
                 
-                .Join(_db.StepTypes.Where(st => st.IsActive),
+                .Join(_db.StepTypes,
                     s => s.StepType,
                     st => st.Id,
                     (s, st) => new { s, StepTypeName = st.StepTypeName })
-.Join(_db.WorkCentrs.Where(wc => wc.IsActive),
+.Join(_db.WorkCentrs,
       t => t.s.WorkCentrId,
       wc => wc.Id,
    (t, wc) => new
@@ -849,6 +850,17 @@ dto.StepType = (int)await _db.StageStepTypeMaps
             };
 
             _db.TopPartSteps.Add(step);
+
+            var steps = await _db.TopPartSteps
+                .Where(s => s.ProductToPartId == step.ProductToPartId && s.IsActive)
+                .OrderBy(s => s.StepOrder)
+                .ToListAsync();
+
+            for (int i = 0; i < steps.Count; i++)
+            {
+                steps[i].StepOrder = (i + 1) * 10;
+            }
+
             await _db.SaveChangesAsync();
 
             return Ok(new { step.Id });
@@ -902,7 +914,7 @@ dto.StepType = (int)await _db.StageStepTypeMaps
                     o.IsFinal = false;
             }
 
-            step.StepOrder = dto.StepOrder;
+            step.StepOrder = dto.StepOrder <= 0 ? step.StepOrder : dto.StepOrder;
             step.StepName = dto.StepName;
             step.StepType = dto.StepType;
             step.WorkCentrId = dto.WorkCentrId;
@@ -911,8 +923,20 @@ dto.StepType = (int)await _db.StageStepTypeMaps
             step.IsMandatory = dto.IsMandatory;
             step.IsFinal = dto.IsFinal;
             step.Comments = dto.Comments ?? "";
+            step.IsActive = true;
 
-            await _db.SaveChangesAsync();
+                var steps = await _db.TopPartSteps
+                    .Where(s => s.ProductToPartId == step.ProductToPartId && s.IsActive)
+                    .OrderBy(s => s.StepOrder)
+                    .ToListAsync();
+
+                for (int i = 0; i < steps.Count; i++)
+                {
+                    steps[i].StepOrder = (i + 1) * 10;
+                }
+
+                await _db.SaveChangesAsync();
+
             return Ok(new { step.Id });
         }
 
@@ -1325,6 +1349,8 @@ public async Task<IActionResult> SetPriority([FromBody] SetPriorityRequest dto)
 [HttpPut("toggle-part")]
 public async Task<IActionResult> TogglePart([FromBody] TogglePartRequest dto)
 {
+    Console.WriteLine($"TOGGLE PART: Id={dto.ProductToPartId}, IsActive={dto.IsActive}");
+
     var entity = await _db.ProductTopParts
         .FirstOrDefaultAsync(x => x.Id == dto.ProductToPartId);
 
