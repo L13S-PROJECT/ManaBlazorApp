@@ -794,6 +794,7 @@ var map = oldParts
             if (!versionActive)
                 return BadRequest("Steps can be edited only for active version.");
         // ja UI nav atsūtījis StepType (vai 0) -> piešķiram pēc TopPart.Stage
+// tikai ja StepType NAV padots no UI → piešķiram pēc Stage
 if (dto.StepType <= 0)
 {
     var stage = await _db.TopParts
@@ -801,13 +802,15 @@ if (dto.StepType <= 0)
         .Select(tp => tp.Stage)
         .FirstOrDefaultAsync();
 
-dto.StepType = (int)await _db.StageStepTypeMaps
-    .Where(m => m.IsActive && m.Stage == stage)
-    .Select(m => m.Step_Type_ID)
-    .FirstOrDefaultAsync();
+    var mapped = await _db.StageStepTypeMaps
+        .Where(m => m.IsActive && m.Stage == stage)
+        .Select(m => m.Step_Type_ID)
+        .FirstOrDefaultAsync();
 
-    if (dto.StepType <= 0)
+    if (mapped <= 0)
         return BadRequest($"Nav konfigurēts StepType priekš Stage={stage}.");
+
+    dto.StepType = mapped;
 }
 
             // 2) StepOrder: ja 0, piešķiram max+10
@@ -883,6 +886,7 @@ dto.StepType = (int)await _db.StageStepTypeMaps
             var versionActive = await _db.ProductVersions.AnyAsync(v => v.Id == ptp.VersionId && v.IsActive);
             if (!versionActive) return BadRequest("Steps can be edited only for active version.");
 
+// tikai ja StepType NAV padots no UI → izmanto mapping
 if (dto.StepType <= 0)
 {
     var stage = await _db.TopParts
@@ -890,14 +894,17 @@ if (dto.StepType <= 0)
         .Select(tp => tp.Stage)
         .FirstOrDefaultAsync();
 
-dto.StepType = (int)await _db.StageStepTypeMaps
-    .Where(m => m.IsActive && m.Stage == stage)
-    .Select(m => m.Step_Type_ID)
-    .FirstOrDefaultAsync();
+    var mappedStepType = await _db.StageStepTypeMaps
+        .Where(m => m.IsActive && m.Stage == stage)
+        .Select(m => m.Step_Type_ID)
+        .FirstOrDefaultAsync();
 
-    if (dto.StepType <= 0)
+    if (mappedStepType <= 0)
         return BadRequest($"Nav konfigurēts StepType priekš Stage={stage}.");
+
+    dto.StepType = mappedStepType;
 }
+
             // StepOrder
             if (dto.StepOrder <= 0) dto.StepOrder = step.StepOrder;
 
@@ -925,16 +932,7 @@ dto.StepType = (int)await _db.StageStepTypeMaps
             step.Comments = dto.Comments ?? "";
             step.IsActive = true;
 
-                var steps = await _db.TopPartSteps
-                    .Where(s => s.ProductToPartId == step.ProductToPartId && s.IsActive)
-                    .OrderBy(s => s.StepOrder)
-                    .ToListAsync();
-
-                for (int i = 0; i < steps.Count; i++)
-                {
-                    steps[i].StepOrder = (i + 1) * 10;
-                }
-
+                
                 await _db.SaveChangesAsync();
 
             return Ok(new { step.Id });
@@ -1079,6 +1077,63 @@ return Ok(new { id = row.Id });
             await db.SaveChangesAsync();
             return Ok();
         }
+
+        [HttpPut("steps-bulk")]
+public async Task<IActionResult> UpdateStepsBulk([FromBody] List<UpdateStepRequest> stepsDto)
+{
+    if (stepsDto == null || stepsDto.Count == 0)
+        return BadRequest("Nav soļu.");
+
+    var ids = stepsDto.Select(x => x.Id).ToList();
+
+    var steps = await _db.TopPartSteps
+        .Where(s => ids.Contains(s.Id) && s.IsActive)
+        .ToListAsync();
+
+    foreach (var step in steps)
+    {
+        var dto = stepsDto.First(x => x.Id == step.Id);
+
+        step.StepOrder = dto.StepOrder;
+        step.StepName = dto.StepName;
+
+// tikai ja StepType NAV padots → izmanto mapping
+if (dto.StepType <= 0)
+{
+    var ptp = await _db.ProductTopParts
+        .FirstOrDefaultAsync(p => p.Id == step.ProductToPartId && p.IsActive);
+
+    if (ptp != null)
+    {
+        var stage = await _db.TopParts
+            .Where(tp => tp.Id == ptp.TopPartId && tp.IsActive)
+            .Select(tp => tp.Stage)
+            .FirstOrDefaultAsync();
+
+        var mapped = await _db.StageStepTypeMaps
+            .Where(m => m.IsActive && m.Stage == stage)
+            .Select(m => m.Step_Type_ID)
+            .FirstOrDefaultAsync();
+
+        if (mapped > 0)
+            dto.StepType = mapped;
+    }
+}
+
+step.StepType = dto.StepType;
+
+        step.WorkCentrId = dto.WorkCentrId;
+        step.EstimatedMinutes = dto.EstimatedMinutes;
+        step.ParallelGroup = dto.ParallelGroup;
+        step.IsMandatory = dto.IsMandatory;
+        step.IsFinal = dto.IsFinal;
+        step.Comments = dto.Comments ?? "";
+    }
+
+    await _db.SaveChangesAsync();
+
+    return Ok();
+}
 
         // === DTO pievienošanai ===
         public class AddPartDto

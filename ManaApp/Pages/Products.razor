@@ -875,39 +875,28 @@ private async Task SaveStepsAsync()
         return;
     }
 
-if (!ValidateFinalRule())
+var finals = editingSteps.Where(s => s.IsFinal).ToList();
+
+if (finals.Count == 0)
 {
-    await JS.InvokeVoidAsync("alert", "Pēdējam solim jābūt atzīmētam kā Final.");
+    await JS.InvokeVoidAsync("alert", "Atzīmē pēdējo soli kā Final.");
     return;
 }
 
-        // 2️⃣ PUT all (pareizais order)
-        foreach (var step in editingSteps.Where(s => s.Id > 0 && editingSteps.Contains(s)))
-        {
-            var payload = new
-            {
-                Id = step.Id,
-                StepOrder = step.StepOrder,
-                StepName = step.StepName,
-                StepType = step.StepType,
-                WorkCentrId = step.WorkCentrId,
-                EstimatedMinutes = step.EstimatedMinutes,
-                ParallelGroup = step.IsParallel ? 1 : 0,
-                IsMandatory = step.IsMandatory,
-                IsFinal = step.IsFinal,
-                Comments = step.Comments
-            };
+if (finals.Count > 1)
+{
+    await JS.InvokeVoidAsync("alert", "Drīkst būt tikai viens Final solis.");
+    return;
+}
 
+var maxOrder = editingSteps.Max(s => s.StepOrder);
 
-            var resp = await Http.PutAsJsonAsync("http://localhost:5270/api/products/step", payload);
+if (finals[0].StepOrder != maxOrder)
+{
+    await JS.InvokeVoidAsync("alert", "Final solim jābūt pēdējam.");
+    return;
+}
 
-                if (!resp.IsSuccessStatusCode)
-                {
-                    stepsError = await resp.Content.ReadAsStringAsync();
-                    await InvokeAsync(StateHasChanged);
-                    return;
-                }
-        }
     // 1️⃣ POST new
         foreach (var step in editingSteps.Where(s => s.Id == 0))
         {
@@ -942,15 +931,47 @@ if (result.TryGetProperty("Id", out var idProp))
     step.Id = idProp.GetInt32();
 }
         }
+
+        // 2️⃣ PUT all (pareizais order)
+    var updatePayload = editingSteps
+        .Where(s => s.Id > 0)
+        .Select(step => new
+        {
+            Id = step.Id,
+            StepOrder = step.StepOrder,
+            StepName = step.StepName,
+            StepType = step.StepType,
+            WorkCentrId = step.WorkCentrId,
+            EstimatedMinutes = step.EstimatedMinutes,
+            ParallelGroup = step.IsParallel ? 1 : 0,
+            IsMandatory = step.IsMandatory,
+            IsFinal = step.IsFinal,
+            Comments = step.Comments
+        })
+        .ToList();
+
+    if (updatePayload.Count > 0)
+        {
+            var respBulk = await Http.PutAsJsonAsync(
+                "http://localhost:5270/api/products/steps-bulk",
+                updatePayload);
+
+            if (!respBulk.IsSuccessStatusCode)
+            {
+                stepsError = await respBulk.Content.ReadAsStringAsync();
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+        }
+
             SetMainDialog(null);
 
-            // pārlādē soļus tieši no DB
             selectedPartDetails = await Http.GetFromJsonAsync<List<ProductDetailDto>>(
                 $"http://localhost:5270/api/products/details-by-version?versionId={selected!.VersionId}");
 
             worksByParts = await Http.GetFromJsonAsync<List<WorksByPartDto>>(
                 $"http://localhost:5270/api/products/works-by-version?versionId={selected!.VersionId}");
-
+            
             StateHasChanged();
     }
 
