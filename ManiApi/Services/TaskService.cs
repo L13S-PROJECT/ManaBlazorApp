@@ -129,7 +129,7 @@ AND (
     OR
 
     -- 2) Assigned uz mani
-    (t.Assigned_To = @empId)
+    (t.Assigned_To = @empId AND t.Tasks_Status = 1)
 
     OR
 
@@ -203,6 +203,8 @@ ORDER BY
             BatchProductId = r.IsDBNull(28) ? 0 : r.GetInt32(28),
             RootId = r.IsDBNull(29) ? 0 : r.GetInt32(29),
         });
+
+        Console.WriteLine($"SQL TASK -> ID:{r.GetInt32(0)} Assigned:{(r.IsDBNull(22) ? "NULL" : r.GetInt32(22))}");
     }
 
     var result = rawTasks.ToList();
@@ -218,9 +220,7 @@ foreach (var t in result)
         t.DisplayGroupId = t.RootId;
 
         Console.WriteLine($"DBG -> Task:{t.TaskId} Root:{t.RootId} BP:{t.BatchProductId} Step:{t.TopPartStepId} DG:{t.DisplayGroupId}");
-        
-        var rootId = t.RootId;
-       
+               
     var hasPrevNotFinished = allTasks.Any(prev =>
         prev.RootId == t.RootId &&
         prev.ProductToPartId == t.ProductToPartId &&
@@ -247,22 +247,92 @@ foreach (var t in result)
 t.CanStart = !hasPrevNotFinished && !hasHigherPriority;
 }
 
-    result = result
-    .GroupBy(t => t.DisplayGroupId)
+result = result
+    .GroupBy(t => new { t.DisplayGroupId, t.TopPartStepId })
     .Select(g =>
+{
+    var totalPlanned = g.Sum(x => x.Planned);
+    var totalDone = g.Sum(x => x.Done);
+
+    TaskRowDto row;
+
+    // 1. Procesā
+    var inProgress = g.FirstOrDefault(x => x.Status == 2);
+    if (inProgress != null)
     {
-        var selected = g
-            .OrderByDescending(x => x.Status == 2)
-            .ThenByDescending(x => x.Assigned_To == empId)
-            .ThenByDescending(x => x.BatchProductId == x.RootId)
-            .First();
+        row = inProgress;
+    }
+    else
+    {
+        // 2. Assigned
+        var assigned = g
+            .Where(x => x.Assigned_To == empId)
+            .OrderBy(x => x.StepOrder)
+            .FirstOrDefault();
 
-        selected.Planned = g.Sum(x => x.Planned);
+        if (assigned != null)
+        {
+            row = assigned;
+        }
+        else
+        {
+            // 3. CanStart
+            var canStart = g
+                .Where(x => x.CanStart == true)
+                .OrderBy(x => x.StepOrder)
+                .FirstOrDefault();
 
-        return selected;
-    })
+            if (canStart != null)
+            {
+                row = canStart;
+            }
+            else
+            {
+                // 4. fallback
+                row = g
+                    .OrderBy(x => x.StepOrder)
+                    .First();
+            }
+        }
+    }
+
+return new TaskRowDto
+{
+    TaskId = row.TaskId,
+    TopPartStepId = row.TopPartStepId,
+    Priority = row.Priority,
+    Tasks_Push = row.Tasks_Push,
+    BatchPriority = row.BatchPriority,
+    Status = row.Status,
+    PriorityLevel = row.PriorityLevel,
+    StartedAt = row.StartedAt,
+    FinishedAt = row.FinishedAt,
+    IsCommentForEmployee = row.IsCommentForEmployee,
+    Comment = row.Comment,
+    ProductName = row.ProductName,
+    PartName = row.PartName,
+    ProductToPartId = row.ProductToPartId,
+    StepName = row.StepName,
+    EstimatedMinutes = row.EstimatedMinutes,
+    ActualMinutes = row.ActualMinutes,
+    EstimatedTotalMinutes = row.EstimatedTotalMinutes,
+    EstimatedStartMinutes = row.EstimatedStartMinutes,
+    BatchCode = row.BatchCode,
+    Done = totalDone,              
+    Assigned_To = row.Assigned_To,
+    Planned = totalPlanned,        
+    StepOrder = row.StepOrder,
+    StepType = row.StepType,
+    BatchId = row.BatchId,
+    VersionId = row.VersionId,
+    BatchProductId = row.BatchProductId,
+    RootId = row.RootId,
+    DisplayGroupId = row.DisplayGroupId,
+    CanStart = row.CanStart
+};
+})
     .ToList();
-
+    
 return result
     .OrderBy(t => t.Status == 2 ? 0 : 1) // procesā vienmēr pirmais
     .ThenBy(t => t.Tasks_Push ? 0 : 1)

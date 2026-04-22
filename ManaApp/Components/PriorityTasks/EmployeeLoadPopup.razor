@@ -819,9 +819,19 @@ private async Task UpdateData()
 
     await JS.InvokeVoidAsync("console.log", list);
 
+    if (!list.Any())
+        {
+            return;
+        }
+
     var response = await Http.PostAsJsonAsync("api/tasks/update-steps", list);
 
-    response.EnsureSuccessStatusCode();
+    if (!response.IsSuccessStatusCode)
+{
+    var err = await response.Content.ReadAsStringAsync();
+    await JS.InvokeVoidAsync("console.error", err);
+    return;
+}
 }
 
 private void CloseDetails()

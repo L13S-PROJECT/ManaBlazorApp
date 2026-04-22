@@ -2748,6 +2748,11 @@ public async Task<IActionResult> UpdateAssigneeAggregated([FromBody] UpdateAssig
     var conn = _db.Database.GetDbConnection();
     await conn.OpenAsync();
 
+    var batchInfo = await _db.BatchProducts
+        .Where(x => x.ID == dto.BatchProductId)
+        .Select(x => new { x.Batch_Id, x.Version_Id })
+        .FirstAsync();
+
     await using var cmd = conn.CreateCommand();
 if (dto.RowType == "SingleChild")
 {
@@ -2762,13 +2767,12 @@ AND t.BatchProduct_ID IN (
     FROM batches_products bp2
     WHERE bp2.IsActive = 1
       AND bp2.Batch_Id = (
-          SELECT bp0.Batch_Id FROM batches_products bp0 WHERE bp0.ID = @bp LIMIT 1
+          @batchId
       )
       AND bp2.Version_Id = (
-          SELECT bp0.Version_Id FROM batches_products bp0 WHERE bp0.ID = @bp LIMIT 1
+          @versionId
       )
 )
-AND ts.ProductToPart_ID = @productToPartId
 AND ts.ID = @step;
 ";
 }
@@ -2788,36 +2792,21 @@ AND t.BatchProduct_ID IN (
     FROM batches_products bp2
     WHERE bp2.IsActive = 1
       AND bp2.Batch_Id = (
-          SELECT bp0.Batch_Id FROM batches_products bp0 WHERE bp0.ID = @bp LIMIT 1
+          @batchId
       )
       AND bp2.Version_Id = (
-          SELECT bp0.Version_Id FROM batches_products bp0 WHERE bp0.ID = @bp LIMIT 1
+          @versionId
       )
 )
-AND ts.ProductToPart_ID = @productToPartId
-AND (
-    (@rowType = 'ParentChildMerged' AND ts.ProductToPart_ID IN (
-        SELECT ProductToPart_ID
-        FROM batches_products
-        WHERE IsActive = 1
-          AND Batch_Id = (
-              SELECT Batch_Id FROM batches_products WHERE ID = @bp LIMIT 1
-          )
-          AND Version_Id = (
-              SELECT Version_Id FROM batches_products WHERE ID = @bp LIMIT 1
-          )
-          AND ProductToPart_ID IS NOT NULL
-    ))
-    OR
-    (@rowType <> 'ParentChildMerged' AND ts.ProductToPart_ID = @productToPartId AND ts.ID = @step)
-)
+AND ts.ID = @step
 ";
 }
 
     cmd.Parameters.Add(new MySqlParameter("@emp", (object?)dto.Assigned_To ?? DBNull.Value));
     cmd.Parameters.Add(new MySqlParameter("@bp", dto.BatchProductId));
+    cmd.Parameters.Add(new MySqlParameter("@batchId", batchInfo.Batch_Id));
+    cmd.Parameters.Add(new MySqlParameter("@versionId", batchInfo.Version_Id));
     cmd.Parameters.Add(new MySqlParameter("@step", dto.TopPartStepId));
-    cmd.Parameters.Add(new MySqlParameter("@productToPartId", dto.ProductToPartId));
     cmd.Parameters.Add(new MySqlParameter("@rowType", dto.RowType ?? ""));
     var affected = await cmd.ExecuteNonQueryAsync();
 
