@@ -405,6 +405,25 @@ public async Task<(bool Success, string? Error)> ClaimTask(int taskId, int empId
 {
     if (taskId <= 0 || empId <= 0)
         return (false, "Bad request");
+    
+    // 🔒 pārbaudām vai task vispār drīkst sākt (UI loģika serverī)
+            var availableTasks = await GetForEmployee(empId);
+
+            var target = availableTasks.FirstOrDefault(t => t.TaskId == taskId);
+
+                var firstAvailable = availableTasks
+                    .Where(t => t.Status == 1 && t.CanStart)
+                    .OrderBy(t => t.Tasks_Push ? 0 : 1)
+                    .ThenByDescending(t => t.PriorityLevel)
+                    .ThenBy(t => t.StepOrder)
+                    .ThenBy(t => t.TaskId)
+                    .FirstOrDefault();
+
+                if (target == null || firstAvailable == null || target.TaskId != firstAvailable.TaskId)
+                        {
+                            Console.WriteLine($"BLOCK: not first available. clicked={taskId}, first={firstAvailable?.TaskId}");
+                            return (false, "Drīkst sākt tikai nākamo prioritāro darbu.");
+                        }
 
     Console.WriteLine($"CLAIM CALLED: taskId={taskId}, empId={empId}");
 
@@ -1159,6 +1178,27 @@ if (scenario == TaskScenario.B_Root)
         await upd.ExecuteNonQueryAsync();
     }
 
+    //  pārbaudām vai visi DETAIL step pabeigti šim BatchProduct
+int notFinished = 0;
+
+await using (var cmdCheck = conn.CreateCommand())
+{
+    cmdCheck.Transaction = tx;
+    cmdCheck.CommandText = @"
+SELECT COUNT(*)
+FROM tasks t
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+WHERE t.BatchProduct_ID = @bpId
+  AND t.IsActive = 1
+  AND ts.Step_Type = 1
+  AND t.Tasks_Status <> 3;";
+
+    cmdCheck.Parameters.Add(new MySqlParameter("@bpId", batchProductId));
+
+    var obj = await cmdCheck.ExecuteScalarAsync();
+    notFinished = obj == null ? 0 : Convert.ToInt32(obj);
+}
+
   }
 
 else if (scenario == TaskScenario.A_Parent && stepType == 2 && batchProductId > 0 && versionId > 0)
@@ -1266,7 +1306,108 @@ VALUES
         }
     }
 
-   
+}
+
+else if (scenario == TaskScenario.C_Child)
+{
+    // 1) Task -> Finished
+    await using (var upd = conn.CreateCommand())
+    {
+        upd.Transaction = tx;
+        upd.CommandText = @"
+        UPDATE tasks
+        SET Tasks_Status = 3,
+            Finished_At  = CURRENT_TIMESTAMP
+        WHERE ID = @id;";
+
+        upd.Parameters.Add(new MySqlParameter("@id", taskId));
+
+        await upd.ExecuteNonQueryAsync();
+    }
+
+    // 🔵 pārbaudām vai visi DETAIL step pabeigti šim BatchProduct
+    int notFinished = 0;
+
+    await using (var cmdCheck = conn.CreateCommand())
+    {
+        cmdCheck.Transaction = tx;
+        cmdCheck.CommandText = @"
+SELECT COUNT(*)
+FROM tasks t
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+WHERE t.BatchProduct_ID = @bpId
+  AND t.IsActive = 1
+  AND ts.Step_Type = 1
+  AND t.Tasks_Status <> 3;";
+
+        cmdCheck.Parameters.Add(new MySqlParameter("@bpId", batchProductId));
+
+        var obj = await cmdCheck.ExecuteScalarAsync();
+        notFinished = obj == null ? 0 : Convert.ToInt32(obj);
+    }
+
+    if (notFinished == 0 && versionId > 0)
+    {
+        int alreadyDone = 0;
+
+        await using (var chk = conn.CreateCommand())
+        {
+            chk.Transaction = tx;
+            chk.CommandText = @"
+SELECT COUNT(*)
+FROM stock_movements
+WHERE BatchProduct_ID = @bpId
+  AND Move_Type = 'DETAILED'
+  AND IsActive = 1;";
+
+            chk.Parameters.Add(new MySqlParameter("@bpId", batchProductId));
+
+            alreadyDone = Convert.ToInt32(await chk.ExecuteScalarAsync());
+        }
+
+        if (alreadyDone == 0)
+        {
+            var totalQty = plannedQty;
+
+            await using (var m2 = conn.CreateCommand())
+            {
+                m2.Transaction = tx;
+                m2.CommandText = @"
+INSERT INTO stock_movements
+    (Version_ID, BatchProduct_ID, Move_Type, Stock_Qty, Created_At, Task_ID, IsActive)
+VALUES
+    (@ver, @bpId, 'DETAILED', @qty, CURRENT_TIMESTAMP, @taskId, 1);";
+
+                m2.Parameters.Add(new MySqlParameter("@ver", versionId));
+                m2.Parameters.Add(new MySqlParameter("@bpId", batchProductId));
+                m2.Parameters.Add(new MySqlParameter("@qty", totalQty));
+                m2.Parameters.Add(new MySqlParameter("@taskId", taskId));
+
+                await m2.ExecuteNonQueryAsync();
+            }
+        }
+
+        await using (var openFinishing = conn.CreateCommand())
+                {
+                    openFinishing.Transaction = tx;
+                    openFinishing.CommandText = @"
+                UPDATE tasks t
+                JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+                SET t.Tasks_Status = 1
+                WHERE t.BatchProduct_ID = @bpId
+                AND t.IsActive = 1
+                AND ts.Step_Type = 3
+                AND t.Tasks_Status = 5;";
+
+                    openFinishing.Parameters.Add(new MySqlParameter("@bpId", batchProductId));
+
+                    await openFinishing.ExecuteNonQueryAsync();
+                }
+
+    }
+
+
+
 }
 
 else if (scenario == TaskScenario.A_Parent)

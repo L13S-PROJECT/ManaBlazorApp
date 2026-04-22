@@ -208,16 +208,25 @@ FinishingState = indicators.FirstOrDefault()?.State ?? "gray";
 
 var productToPartId = FinishingIndicators.FirstOrDefault()?.ProductToPartId ?? 0;
 
-var waves =
-    await Http.GetFromJsonAsync<List<FinishingTaskRow>>(
-        $"api/tasks/finishing-waves?batchProductId={bpId}&productToPartId={productToPartId}"
-    ) ?? new();
-Waves = waves;
+if (productToPartId > 0)
+{
+    var waves =
+        await Http.GetFromJsonAsync<List<FinishingTaskRow>>(
+            $"api/tasks/finishing-waves?batchProductId={bpId}&productToPartId={productToPartId}"
+        ) ?? new();
+
+    Waves = waves;
+}
+else
+{
+    Waves = new List<FinishingTaskRow>();
+}
+
 
     Parts.Add(new FinishingPartVm
         {
             PartName = "FINISHING",
-            Tasks = waves
+            Tasks = Waves
         });
 
     var summary =
