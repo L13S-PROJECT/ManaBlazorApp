@@ -84,14 +84,12 @@
                 <div class="steps-flag-cell">
                     <input type="checkbox"
                         checked="@s.IsFinal"
-                        disabled="@( !IsLastStep(s) )"
-                        @onclick="() => OnSetFinal.InvokeAsync(s)" />
+                        @onchange="e => ToggleFinal(s, e.Value)" />
                 </div>
 
                 <div class="steps-flag-cell">
                     <input type="checkbox"
                         checked="@s.IsPainting"
-                        disabled="@( !HasFinalBefore(s) )"
                         @onchange="e => TogglePainting(s, e.Value)" />
                 </div>
 
@@ -244,6 +242,13 @@ private void OnDragEnter(int index)
         return;
 
     var item = Steps[_selectedIndex.Value];
+
+            // ❗ ja kustina Final → noņemam
+            if (item.IsFinal)
+            {
+                item.IsFinal = false;
+            }
+    
     Steps.RemoveAt(_selectedIndex.Value);
     Steps.Insert(index, item);
 
@@ -306,6 +311,23 @@ private void TogglePainting(PartStepDto step, object? value)
         s.IsPainting = false;
 
     step.IsPainting = true;
+}
+
+private void ToggleFinal(PartStepDto step, object? value)
+{
+    var isChecked = value is bool b && b;
+
+    if (!isChecked)
+    {
+        step.IsFinal = false;
+        return;
+    }
+
+    // tikai viens Final
+    foreach (var s in Steps!)
+        s.IsFinal = false;
+
+    step.IsFinal = true;
 }
 
 }

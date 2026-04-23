@@ -905,7 +905,16 @@ if (finalStep != null)
 
 if (finals.Count == 0)
 {
-    await JS.InvokeVoidAsync("alert", "Atzīmē pēdējo soli kā Final.");
+    if (editingSteps.Any(s => s.IsPainting))
+    {
+        await JS.InvokeVoidAsync("alert",
+            "Ir atzīmēts 'Krāsošana', bet nav norādīts 'Final' solis. Vispirms izvēlies Final.");
+    }
+    else
+    {
+        await JS.InvokeVoidAsync("alert",
+            "Jābūt vismaz vienam 'Final' solim.");
+    }
     return;
 }
 
@@ -913,6 +922,32 @@ if (finals.Count > 1)
 {
     await JS.InvokeVoidAsync("alert", "Drīkst būt tikai viens Final solis.");
     return;
+}
+
+// ❗ rinda aiz Final
+var finalIndex = editingSteps.IndexOf(finalStep!);
+
+if (finalIndex != -1 && finalIndex < editingSteps.Count - 1)
+{
+    var nextStep = editingSteps[finalIndex + 1];
+
+    // jābūt Painting
+    if (!nextStep.IsPainting)
+    {
+        await JS.InvokeVoidAsync("alert",
+            "Solis aiz Final ir jāatzīmē kā 'Krāsošana'.");
+        return;
+    }
+
+    // jābūt konkrētam WorkCenter (piemēram: 'Krāsošana')
+    const int PAINT_WC_ID = 4;
+
+    if (nextStep.WorkCentrId != PAINT_WC_ID)
+        {
+            await JS.InvokeVoidAsync("alert",
+                "Solis aiz Final jābūt ar darba centru 'Krāsošana'.");
+            return;
+        }
 }
 
 var maxOrder = editingSteps.Max(s => s.StepOrder);

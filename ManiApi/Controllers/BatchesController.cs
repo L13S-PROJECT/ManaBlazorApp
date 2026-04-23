@@ -893,8 +893,12 @@ SELECT
     1
 FROM batches_products bp
 JOIN producttopparts ptp
-     ON ptp.Version_ID = bp.Version_Id
-    AND ptp.IsActive = 1
+     ON ptp.IsActive = 1
+    AND (
+        (bp.ProductToPart_ID IS NULL AND ptp.Version_ID = bp.Version_Id)
+        OR
+        (bp.ProductToPart_ID IS NOT NULL AND ptp.ID = bp.ProductToPart_ID)
+    )
 JOIN toppartsteps ts
      ON ts.ProductToPart_ID = ptp.ID
     AND ts.IsActive = 1
@@ -903,6 +907,17 @@ JOIN toppartsteps ts
         OR
         (bp.ProductToPart_ID IS NOT NULL AND ts.Step_Type = 1)
     )
+    AND (
+    ts.Step_Type <> 1
+    OR ts.Step_Order <= COALESCE((
+        SELECT MIN(ts2.Step_Order)
+        FROM toppartsteps ts2
+        WHERE ts2.ProductToPart_ID = ptp.ID
+        AND ts2.IsActive = 1
+        AND ts2.IsFinal = 1
+    ), ts.Step_Order)
+)
+
 LEFT JOIN tasks t
      ON t.BatchProduct_ID = bp.ID
     AND t.TopPartStep_ID = ts.ID
@@ -910,10 +925,6 @@ LEFT JOIN tasks t
 WHERE bp.Batch_Id = @bid
   AND bp.IsActive = 1
   AND ts.IsActive = 1
-  AND (
-    bp.ProductToPart_ID IS NULL
-    OR ptp.ID = bp.ProductToPart_ID
-        )
   AND t.ID IS NULL;";
 
         var pbid = tcmd.CreateParameter();
