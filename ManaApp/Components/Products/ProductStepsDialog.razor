@@ -30,7 +30,8 @@
         <div class="steps-th steps-th-order">Secība</div>
         <div class="steps-th">Nosaukums</div>
         <div class="steps-th steps-th-workcenter">Darba centrs</div>
-        <div class="steps-th steps-th-flags">Statuss</div>
+        <div class="steps-th steps-th-flags">Pēdējais</div>
+        <div class="steps-th steps-th-flags">Krāsošana</div>
         <div class="steps-th steps-th-time">Min</div>
         <div class="steps-th">Komentārs</div>
         <div class="steps-th steps-th-actions"></div>
@@ -80,19 +81,18 @@
                     </SfDropDownList>
                 </div>
 
-                <div class="steps-flags-cell">
-                    <label class="steps-flag" title="Paralēls solis">
-                        <input type="checkbox" @bind="s.IsParallel" />
-                        <span class="flag-icon parallel"></span>
-                    </label>
+                <div class="steps-flag-cell">
+                    <input type="checkbox"
+                        checked="@s.IsFinal"
+                        disabled="@( !IsLastStep(s) )"
+                        @onclick="() => OnSetFinal.InvokeAsync(s)" />
+                </div>
 
-                    <label class="steps-flag" title="Pēdējais (Final) solis">
-                        <input type="checkbox"
-                            checked="@s.IsFinal"
-                            disabled="@( !IsLastStep(s) )"
-                            @onclick="() => OnSetFinal.InvokeAsync(s)" />
-                        <span class="flag-icon final"></span>
-                    </label>
+                <div class="steps-flag-cell">
+                    <input type="checkbox"
+                        checked="@s.IsPainting"
+                        disabled="@( !HasFinalBefore(s) )"
+                        @onchange="e => TogglePainting(s, e.Value)" />
                 </div>
 
                 <div>
@@ -280,6 +280,32 @@ private async Task HandleSave()
 {
     await OnSave.InvokeAsync();
     StateHasChanged();
+}
+
+private bool HasFinalBefore(PartStepDto step)
+{
+    if (Steps is null) return false;
+
+    var currentOrder = step.StepOrder;
+
+    return Steps.Any(s => s.IsFinal && s.StepOrder < currentOrder);
+}
+
+private void TogglePainting(PartStepDto step, object? value)
+{
+    var isChecked = value is bool b && b;
+
+    if (!isChecked)
+    {
+        step.IsPainting = false;
+        return;
+    }
+
+    // noņem visiem pārējiem (ja gribi tikai vienu Painting)
+    foreach (var s in Steps!)
+        s.IsPainting = false;
+
+    step.IsPainting = true;
 }
 
 }

@@ -109,8 +109,19 @@ else
                         .FirstOrDefault(w => w.TopPartCode == part.TopPartCode);
 
                     var steps = workItem?.Steps?
-                        .OrderBy(s => s.StepOrder)
-                        .ToList();
+                            .OrderBy(s => s.StepOrder)
+                            .ToList();
+
+                        if (steps != null)
+                        {
+                            var final = steps.FirstOrDefault(s => s.IsFinal);
+                            if (final != null)
+                            {
+                                steps = steps
+                                    .Where(s => s.StepOrder <= final.StepOrder)
+                                    .ToList();
+                            }
+                        }
 
                     @if (IsPartSelected(part) || (steps?.Any() == true))
                     {

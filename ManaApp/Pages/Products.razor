@@ -702,6 +702,7 @@ editingSteps = steps
         ParallelGroup = s.ParallelGroup,
         IsMandatory = s.IsMandatory,
         IsFinal = s.IsFinal,
+        IsPainting = s.IsPainting,
         Comments = s.Comments
     })
     .ToList();
@@ -797,8 +798,17 @@ private void RecalcOrders()
         editingSteps[i].StepOrder = (i + 1) * 10;
     }
 
-    // ❗ NEUZSPIEŽAM Final automātiski
-    // Final ir lietotāja atbildība
+    // nodrošina, ka Painting ir tikai pēc Final
+var final = editingSteps.FirstOrDefault(s => s.IsFinal);
+
+if (final != null)
+{
+    foreach (var s in editingSteps)
+    {
+        if (s.StepOrder <= final.StepOrder)
+            s.IsPainting = false;
+    }
+}
 
     StateHasChanged();
 }
@@ -877,6 +887,22 @@ private async Task SaveStepsAsync()
 
 var finals = editingSteps.Where(s => s.IsFinal).ToList();
 
+// Painting drīkst būt tikai pēc Final
+var finalStep = finals.FirstOrDefault();
+
+if (finalStep != null)
+{
+    var invalidPainting = editingSteps
+        .Where(s => s.IsPainting && s.StepOrder <= finalStep.StepOrder)
+        .ToList();
+
+    if (invalidPainting.Any())
+    {
+        await JS.InvokeVoidAsync("alert", "Krāsošanas solis drīkst būt tikai pēc Final.");
+        return;
+    }
+}
+
 if (finals.Count == 0)
 {
     await JS.InvokeVoidAsync("alert", "Atzīmē pēdējo soli kā Final.");
@@ -891,10 +917,25 @@ if (finals.Count > 1)
 
 var maxOrder = editingSteps.Max(s => s.StepOrder);
 
-if (finals[0].StepOrder != maxOrder)
+var paintingSteps = editingSteps.Where(s => s.IsPainting).ToList();
+
+if (paintingSteps.Any())
 {
-    await JS.InvokeVoidAsync("alert", "Final solim jābūt pēdējam.");
-    return;
+    var minPaintingOrder = paintingSteps.Min(s => s.StepOrder);
+
+    if (finals[0].StepOrder >= minPaintingOrder)
+    {
+        await JS.InvokeVoidAsync("alert", "Final solim jābūt pirms Krāsošanas.");
+        return;
+    }
+}
+else
+{
+    if (finals[0].StepOrder != maxOrder)
+    {
+        await JS.InvokeVoidAsync("alert", "Final solim jābūt pēdējam.");
+        return;
+    }
 }
 
     // 1️⃣ POST new
@@ -911,6 +952,7 @@ if (finals[0].StepOrder != maxOrder)
                 ParallelGroup = step.IsParallel ? 1 : 0,
                 IsMandatory = step.IsMandatory,
                 IsFinal = step.IsFinal,
+                IsPainting = step.IsPainting,
                 Comments = step.Comments
             };
 
@@ -946,6 +988,7 @@ if (result.TryGetProperty("Id", out var idProp))
             ParallelGroup = step.IsParallel ? 1 : 0,
             IsMandatory = step.IsMandatory,
             IsFinal = step.IsFinal,
+            IsPainting = step.IsPainting,
             Comments = step.Comments
         })
         .ToList();
@@ -1316,6 +1359,10 @@ private void SetFinalStep(PartStepDto step)
 
     foreach (var s in editingSteps)
         s.IsFinal = false;
+    
+    // ja mainām Final, noņemam visiem Painting
+    foreach (var s in editingSteps)
+        s.IsPainting = false;
 
     step.IsFinal = true;
 

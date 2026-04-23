@@ -22,6 +22,7 @@ namespace ManaApp.Models
         public int ParallelGroup { get; set; }
         public bool IsMandatory { get; set; }
         public bool IsFinal { get; set; }
+        public bool IsPainting { get; set; }
         public string? Comments { get; set; }
 
         public bool IsParallel

@@ -52,6 +52,7 @@ public class CreateStepRequest
     public int ParallelGroup { get; set; } = 0;
     public bool IsMandatory { get; set; }
     public bool IsFinal { get; set; }
+    public bool IsPainting { get; set; }
     public string? Comments { get; set; }
 }
 
@@ -66,6 +67,7 @@ public class UpdateStepRequest
     public int ParallelGroup { get; set; } = 0;
     public bool IsMandatory { get; set; }
     public bool IsFinal { get; set; }
+    public bool IsPainting { get; set; }
     public string? Comments { get; set; }
 }
 
@@ -462,6 +464,7 @@ public async Task<IActionResult> GetWorksByVersion([FromQuery] int versionId)
                         StepType = temp.StepTypeName,
                         WorkCenter = wc.WorkCentr_Name,
                         temp.s.IsFinal,
+                        temp.s.IsPainting,
                         temp.s.IsMandatory,
                         temp.s.Comments,
                         temp.s.IsActive
@@ -752,6 +755,7 @@ var map = oldParts
     t.s.ParallelGroup,
     t.s.IsMandatory,
     t.s.IsFinal,
+    t.s.IsPainting,
     t.s.Comments
 })
 
@@ -848,6 +852,7 @@ if (dto.StepType <= 0)
                 ParallelGroup = dto.ParallelGroup,
                 IsMandatory = dto.IsMandatory,
                 IsFinal = dto.IsFinal,
+                IsPainting = dto.IsPainting,
                 Comments = dto.Comments ?? "",
                 IsActive = true
             };
@@ -929,6 +934,7 @@ if (dto.StepType <= 0)
             step.ParallelGroup = dto.ParallelGroup;
             step.IsMandatory = dto.IsMandatory;
             step.IsFinal = dto.IsFinal;
+            step.IsPainting = dto.IsPainting;
             step.Comments = dto.Comments ?? "";
             step.IsActive = true;
 
@@ -1127,6 +1133,7 @@ step.StepType = dto.StepType;
         step.ParallelGroup = dto.ParallelGroup;
         step.IsMandatory = dto.IsMandatory;
         step.IsFinal = dto.IsFinal;
+        step.IsPainting = dto.IsPainting;
         step.Comments = dto.Comments ?? "";
     }
 

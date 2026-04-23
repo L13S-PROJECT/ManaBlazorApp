@@ -39,7 +39,7 @@
 /* GRID layout soļu rindām */
 .steps-dialog .steps-grid{
   display:grid;
-  grid-template-columns: 44px 2fr 1.2fr 120px 90px 2.2fr 50px;
+ grid-template-columns: 44px 2fr 1.2fr 70px 90px 90px 2.2fr 50px;
   align-items:center;
   gap:10px;
 }
@@ -138,11 +138,14 @@
   padding:4px 8px !important;
 }
 
-.steps-dialog .steps-flags-cell{
+.steps-dialog .steps-flag-cell{
   display:flex;
-  align-items:center;     /* vertikāli pa vidu */
-  justify-content:center; /* horizontāli pa vidu */
-  gap:10px;
+  justify-content:center;
+  align-items:center;
+}
+
+.steps-dialog input[type="checkbox"]{
+  margin:0;
 }
 
 /* Dzēšanas poga – elegants icon only */
@@ -296,4 +299,17 @@
 
   display:flex;
   justify-content:flex-end;
+}
+
+.steps-dialog .steps-th-flags{
+  display:flex;
+  justify-content:center;
+  gap:12px;
+  text-align:center;
+}
+
+.steps-dialog .steps-th-flags div{
+  width:20px;
+  font-size:11px;
+  line-height:1.1;
 }

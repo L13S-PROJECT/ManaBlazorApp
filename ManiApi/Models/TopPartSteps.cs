@@ -29,6 +29,8 @@ public int? DependsOnStepId { get; set; }
     
         [Column("IsFinal")]
         public bool IsFinal { get; set; }
+        [Column("IsPainting")]
+        public bool IsPainting { get; set; }
 
         [Column("IsMandatory")]
         public bool IsMandatory { get; set; }
