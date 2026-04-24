@@ -59,7 +59,7 @@
     .ToList())
 {
 <tr class="@(SelectedBatch?.BatchProductId == b.BatchProductId ? "ptv3-active" : "")"
-    @onclick="() => SelectRow(b.BatchProductId)">
+    @onclick="() => OnRowClick(b)">
 
     <td class="ptv3-batch-main">@b.BatchCode</td>
     <td class="ptv3-batch-flag">
@@ -86,14 +86,14 @@
                 : b.DetailStart != null ? "ptv3-detail-start" 
                 : "")">
 
-            @if (b.DetailFinish != null)
-            {
-                @b.DetailFinish?.ToString("dd.MM.yyyy")
-            }
-            else if (b.DetailStart != null)
-            {
-                @b.DetailStart?.ToString("dd.MM.yyyy")
-            }
+            @if (b.DetailFinish.HasValue)
+                {
+                    @b.DetailFinish.Value.ToString("dd.MM.yyyy")
+                }
+                else if (b.DetailStart.HasValue)
+                {
+                    @b.DetailStart.Value.ToString("dd.MM.yyyy")
+                }
 
     </td>
     <td class="ptv3-col-small @(b.AssemblyFinishDate != null ? "ptv3-detail-finish" 
@@ -149,6 +149,47 @@ else
 </td>
 
 </tr>
+
+var childList = ParseChildFinish(b);
+
+@if (b.DetailsChildTotal > 0 && childList.Any())
+{
+    @foreach (var ch in childList)
+    {
+    <tr class="ptv3-child-ready @(IsChildRowSelected 
+    && SelectedChildPartId == ch.partId 
+    && SelectedChildParentBatchProductId == b.BatchProductId 
+        ? "ptv3-active" : "")"
+    @onclick:stopPropagation="true"
+    @onclick="() => SelectChildRow(b.BatchProductId, ch.partId)">
+
+        <td class="ptv3-batch-main">@b.BatchCode</td>
+        <td class="ptv3-batch-flag">✔</td>
+        <td>@b.CategoryName</td>
+        <td>@AllProducts.FirstOrDefault(x => x.productCode == b.ProductCode)?.productName</td>
+        <td>@b.ProductCode</td>
+        <td>@b.VersionName</td>
+
+        <td>@ch.qty</td>
+        <td>-</td>
+        <td>0</td>
+
+        <!-- DETAIL -->
+        <td class="ptv3-batch-flag">✔</td>
+
+        <td></td>
+        <td class="ptv3-col-small ptv3-detail-finish">
+            @ch.Item2.ToString("dd.MM.yyyy")
+        </td>
+
+        <td class="ptv3-col-small ptv3-assembly-disabled">-</td>
+        <td>0/0</td>
+        <td></td>
+
+        <td></td>
+    </tr>
+}
+}
 }
 
 </tbody>
@@ -161,8 +202,10 @@ else
 <div class="ptv3-detail">
 
 <ProductionTasksDetailPanel
-        SelectedBatch="SelectedBatch"
-        OnDataChanged="HandleDetailChanged" />
+    SelectedBatch="SelectedBatch"
+    IsReadOnly="false"
+    IsChildRowSelected="IsChildRowSelected"
+    OnDataChanged="HandleDetailChanged" />
 
 </div>
 
@@ -173,13 +216,16 @@ else
 [Parameter]
 [SupplyParameterFromQuery]
 public int? BatchProductId { get; set; }
-
+[Parameter] public bool IsReadOnly { get; set; }
     private ProductBatchRow? SelectedBatch;
     private string SearchText = "";
 private void SelectRow(int batchProductId)
 {
     SelectedBatch = ProductBatches
         .FirstOrDefault(x => x.BatchProductId == batchProductId);
+
+    if (SelectedBatch != null)
+        SelectedBatch.IsReadOnlyChild = false;
 }
 
 private List<ProductBatchRow> ProductBatches = new();
@@ -371,5 +417,67 @@ private async Task HandleDetailChanged()
 }
 
 private Dictionary<string, string> BatchFlags = new();
+
+private List<(int partId, DateTime date, int qty)> ParseChildFinish(ProductBatchRow b)
+{
+    var result = new List<(int partId, DateTime date, int qty)>();
+
+    if (string.IsNullOrWhiteSpace(b.DetailFinishChildList))
+        return result;
+
+    var items = b.DetailFinishChildList.Split(',');
+
+    foreach (var item in items)
+    {
+        var parts = item.Split(':');
+        if (parts.Length != 3)
+            continue;
+
+        if (int.TryParse(parts[0], out var id)
+            && DateTime.TryParse(parts[1], out var dt)
+            && int.TryParse(parts[2], out var qty))
+                {
+                    result.Add((id, dt, qty));
+                }
+    }
+
+    return result;
+}
+
+private ProductBatchRow? GetEffectiveBatch()
+{
+    return SelectedBatch;
+}
+
+private void SelectChildRow(int parentBatchProductId, int partId)
+{
+    var parent = ProductBatches
+        .FirstOrDefault(x => x.BatchProductId == parentBatchProductId);
+
+    if (parent is null)
+        return;
+
+    //  saglabājam, ka izvēlēta child rinda
+    SelectedChildPartId = partId;
+    SelectedChildParentBatchProductId = parentBatchProductId;
+    IsChildRowSelected = true;
+
+    //  panelim joprojām dodam parent (datu avots)
+    SelectedBatch = parent;
+}
+
+private void OnRowClick(ProductBatchRow b)
+{
+    // noņemam child selection režīmu
+    IsChildRowSelected = false;
+    SelectedChildPartId = null;
+    SelectedChildParentBatchProductId = null;
+
+    SelectRow(b.BatchProductId);
+}
+
+private int? SelectedChildPartId;
+private int? SelectedChildParentBatchProductId;
+private bool IsChildRowSelected = false;
 
 }

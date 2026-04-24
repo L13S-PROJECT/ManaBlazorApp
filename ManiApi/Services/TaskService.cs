@@ -108,6 +108,8 @@ CASE
 END AS PlannedQty,
   COALESCE(ts.Step_Order, 0) AS StepOrder, -- 11 soļa secība    
   ts.Step_Type              AS StepType,       -- 12 (Detailed/Assembly/Finishing)
+  ts.IsFinal,
+  ts.IsPainting,
   b.ID                      AS BatchId,       -- 13 (batches.ID)
   bp.Version_Id             AS VersionId,     -- 14 (versions.ID)
   bp.ID                     AS BatchProductId, -- 15  (batches_products.ID)
@@ -198,10 +200,12 @@ ORDER BY
             Planned = r.IsDBNull(23) ? 0 : r.GetInt32(23),
             StepOrder = r.IsDBNull(24) ? 0 : r.GetInt32(24),
             StepType = r.IsDBNull(25) ? 0 : r.GetInt32(25),
-            BatchId = r.IsDBNull(26) ? 0 : r.GetInt32(26),
-            VersionId = r.IsDBNull(27) ? 0 : r.GetInt32(27),
-            BatchProductId = r.IsDBNull(28) ? 0 : r.GetInt32(28),
-            RootId = r.IsDBNull(29) ? 0 : r.GetInt32(29),
+            IsFinal = !r.IsDBNull(26) && r.GetBoolean(26),
+            IsPainting = !r.IsDBNull(27) && r.GetBoolean(27),
+            BatchId = r.IsDBNull(28) ? 0 : r.GetInt32(28),
+            VersionId = r.IsDBNull(29) ? 0 : r.GetInt32(29),
+            BatchProductId = r.IsDBNull(30) ? 0 : r.GetInt32(30),
+            RootId = r.IsDBNull(31) ? 0 : r.GetInt32(31),
         });
 
         Console.WriteLine($"SQL TASK -> ID:{r.GetInt32(0)} Assigned:{(r.IsDBNull(22) ? "NULL" : r.GetInt32(22))}");
@@ -222,10 +226,12 @@ foreach (var t in result)
         Console.WriteLine($"DBG -> Task:{t.TaskId} Root:{t.RootId} BP:{t.BatchProductId} Step:{t.TopPartStepId} DG:{t.DisplayGroupId}");
                
     var hasPrevNotFinished = allTasks.Any(prev =>
-        prev.RootId == t.RootId &&
-        prev.ProductToPartId == t.ProductToPartId &&
-        prev.StepOrder < t.StepOrder &&
-        prev.Status != 3);
+            prev.RootId == t.RootId &&
+            prev.ProductToPartId == t.ProductToPartId &&
+            prev.StepOrder < t.StepOrder &&
+            prev.Status != 3 &&
+            !prev.IsPainting   
+        );
 
     var hasHigherPriority = allTasks.Any(other =>
             other.TaskId != t.TaskId &&
@@ -233,9 +239,11 @@ foreach (var t in result)
             other.RootId == t.RootId &&
 
     !allTasks.Any(prev =>
-            prev.RootId == other.RootId &&
-            prev.StepOrder < other.StepOrder &&
-            prev.Status != 3) &&
+    prev.RootId == other.RootId &&
+    prev.StepOrder < other.StepOrder &&
+    prev.Status != 3 &&
+    !prev.IsPainting
+) &&
 
     (
         (other.Tasks_Push && !t.Tasks_Push)
@@ -365,7 +373,8 @@ public async Task<List<TaskRowDto>> GetAllActiveTasks()
         t.Tasks_Priority,
         t.Tasks_Push,
         COALESCE(bp.ParentBatchProduct_ID, bp.ID) AS RootId,
-        ts.ProductToPart_ID
+        ts.ProductToPart_ID,
+        ts.IsPainting
     FROM tasks t
     JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
     JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
@@ -391,6 +400,7 @@ public async Task<List<TaskRowDto>> GetAllActiveTasks()
                 Tasks_Push = !r.IsDBNull(8) && r.GetBoolean(8),
                 RootId = r.GetInt32(9),
                 ProductToPartId = r.GetInt32(10),
+                IsPainting = !r.IsDBNull(11) && r.GetBoolean(11),
                 CanStart = true,
                 DisplayGroupId = r.GetInt32(9) != r.GetInt32(2)
                     ? r.GetInt32(1)
@@ -680,6 +690,7 @@ JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
 WHERE t.IsActive = 1
   AND t.Tasks_Status <> 3
   AND ts.Step_Order < @curStepOrder
+  AND (ts.IsPainting = 0 OR ts.IsPainting IS NULL)
   AND ts.ProductToPart_ID = (
         SELECT ts2.ProductToPart_ID
         FROM tasks t2
@@ -781,6 +792,7 @@ JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
 WHERE t.IsActive = 1
   AND t.Tasks_Status <> 3
   AND ts.Step_Order < @curStepOrder
+  AND (ts.IsPainting = 0 OR ts.IsPainting IS NULL)
     AND ts.ProductToPart_ID = (
         SELECT ts2.ProductToPart_ID
         FROM tasks t2

@@ -226,3 +226,8 @@
 .ptv3-col-wide {
     min-width: 140px;
 }
+
+.ptv3-assembly-disabled {
+    background: #e5e7eb;   /* pelēks */
+    color: #9ca3af;
+}

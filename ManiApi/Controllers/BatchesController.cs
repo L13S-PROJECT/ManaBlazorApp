@@ -1841,7 +1841,7 @@ SELECT
     b.Batches_Code AS BatchCode,    
     bp.RootId,
 
-    MIN(bp.RootId) AS BatchProductId,
+    MIN(bp.ID) AS BatchProductId,
 
     bp.Version_Id AS VersionId,
     p.Product_Name AS ProductName,
@@ -1893,6 +1893,13 @@ END AS DetailsDone
 , COALESCE(dstat.DetailsChildDone,0) AS DetailsChildDone
 , dtask.DetailStart
 , dtask.DetailFinish
+, dtask.DetailFinishChildList
+
+, CASE 
+    WHEN MAX(CASE WHEN bp.ProductToPart_ID IS NULL THEN 1 ELSE 0 END) = 0
+         AND MAX(COALESCE(ch.ChildCount, 0)) > 0
+    THEN 1 ELSE 0
+END AS IsReadOnlyChild
 
 FROM (
     SELECT
@@ -1980,11 +1987,94 @@ LEFT JOIN (
             THEN t.Started_At 
         END) AS DetailStart,
 
+CASE
+    WHEN NOT EXISTS (
+        SELECT 1
+        FROM tasks t2
+        JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+        WHERE t2.BatchProduct_ID IN (
+            SELECT bp2.ID
+            FROM batches_products bp2
+            WHERE bp2.Batch_Id = bp.Batch_Id
+              AND bp2.Version_Id = bp.Version_Id
+              AND bp2.IsActive = 1
+        )
+          AND t2.IsActive = 1
+          AND ts2.Step_Type = 1
+          AND t2.Tasks_Status <> 3
+    )
+    THEN MAX(
         CASE
-            WHEN COALESCE(SUM(CASE WHEN t.Tasks_Status IN (1,2,5) THEN 1 ELSE 0 END),0) = 0
-            THEN MAX(t.Finished_At)
-            ELSE NULL
-        END AS DetailFinish
+            WHEN EXISTS (
+                SELECT 1
+                FROM toppartsteps ts
+                WHERE ts.ID = t.TopPartStep_ID
+                  AND ts.Step_Type = 1
+            )
+            THEN t.Finished_At
+        END
+    )
+    ELSE NULL
+END AS DetailFinish,
+
+ GROUP_CONCAT(
+    DISTINCT CASE
+        WHEN bp.ProductToPart_ID IS NOT NULL
+            AND EXISTS (
+                SELECT 1
+                FROM batches_products bp2
+                WHERE bp2.Batch_Id = bp.Batch_Id
+                AND bp2.Version_Id = bp.Version_Id
+                AND bp2.ProductToPart_ID IS NULL
+                AND bp2.IsActive = 1
+            )
+            AND NOT EXISTS (
+                SELECT 1
+                FROM tasks t2
+                WHERE t2.BatchProduct_ID = bp.ID
+                AND t2.IsActive = 1
+                AND t2.Tasks_Status <> 3
+            )
+        THEN CONCAT(
+                    bp.ProductToPart_ID, ':',
+                    DATE_FORMAT((
+                        SELECT MAX(t3.Finished_At)
+                        FROM tasks t3
+                        JOIN toppartsteps ts3 ON ts3.ID = t3.TopPartStep_ID
+                        WHERE t3.BatchProduct_ID = bp.ID
+                        AND t3.IsActive = 1
+                        AND ts3.Step_Type = 1
+                        AND ts3.IsFinal = 1
+                    ), '%Y-%m-%d'),
+                    ':',
+                    bp.Planned_Qty
+                )
+        ELSE NULL
+    END
+) AS DetailFinishChildList,
+
+MAX(
+    CASE
+        WHEN bp.ProductToPart_ID IS NOT NULL
+         AND NOT EXISTS (
+            SELECT 1
+            FROM tasks t2
+            WHERE t2.BatchProduct_ID = bp.ID
+              AND t2.IsActive = 1
+              AND t2.Tasks_Status <> 3
+         )
+        THEN (
+            SELECT MAX(t3.Finished_At)
+            FROM tasks t3
+            JOIN toppartsteps ts3 ON ts3.ID = t3.TopPartStep_ID
+            WHERE t3.BatchProduct_ID = bp.ID
+              AND t3.IsActive = 1
+              AND ts3.Step_Type = 1
+              AND ts3.IsFinal = 1
+        )
+        ELSE NULL
+    END
+) AS DetailFinishChild
 
     FROM (
         SELECT
@@ -2128,6 +2218,8 @@ while (await r.ReadAsync())
         DetailsChildDone = r.GetInt32(18),
         DetailStart  = r.IsDBNull(19) ? (DateTime?)null : r.GetDateTime(19),
         DetailFinish = r.IsDBNull(20) ? (DateTime?)null : r.GetDateTime(20),
+        DetailFinishChildList = r.IsDBNull(21) ? null : r.GetString(21),
+        IsReadOnlyChild = r.GetInt32(22) == 1
     });
 }
 

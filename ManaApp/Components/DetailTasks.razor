@@ -15,9 +15,11 @@
     return;
 }
 
+<div class="@(IsReadOnly ? "ptv2-readonly" : "")">
+
 @foreach (var p in Parts)
 {
-<div class="ptv2-tasks-row">
+<div class="ptv2-tasks-row @(IsReadOnly ? "ptv2-row-disabled" : "")">
     <!-- 1. Nosaukums -->
             <div class="ptv2-part-name" title="@p.TopPartName">
                 <span class="ptv2-part-indicator
@@ -33,7 +35,7 @@
 <input type="checkbox"
        class="ptv2-switch"
        checked="@ActivatedParts.Contains(p.ProductToPartId)"
-       disabled="@ActivatedParts.Contains(p.ProductToPartId)"
+       disabled="@(IsReadOnly || ActivatedParts.Contains(p.ProductToPartId))"
        @onclick:preventDefault="true"
        @onclick="() => OnActivatePart(p.ProductToPartId)" />
         </div>
@@ -83,7 +85,7 @@ if (AggregatedByStep.TryGetValue((step.Id, p.ProductToPartId), out var aggList))
         };
     var agg = aggList.FirstOrDefault();
 
-    <div class="ptv2-tasks-row sub task">
+    <div class="ptv2-tasks-row sub task @(IsReadOnly ? "ptv2-row-disabled" : "")">
                 <!-- 1. Nosaukums (tukšs – step jau ir augstāk) -->
                     <div title="@step.StepName">
                         @step.StepName
@@ -106,6 +108,7 @@ if (AggregatedByStep.TryGetValue((step.Id, p.ProductToPartId), out var aggList))
                                 else
                                 {
                                     <select value="@(agg?.Assigned_To)"
+                                        disabled="@(IsReadOnly || t.Status == 2 || t.Status == 3)"
                                             @onchange="async e => {
                                                 var val = int.TryParse(e.Value?.ToString(), out var v) ? v : (int?)null;
                                                 agg!.Assigned_To = val;
@@ -162,6 +165,7 @@ if (AggregatedByStep.TryGetValue((step.Id, p.ProductToPartId), out var aggList))
                 <div class="ptv2-done-cell">
                 <div class="ptv2-done-cell" style="position:relative; z-index:5;">
                     <input type="checkbox"
+                        disabled="@IsReadOnly"
                         class="ptv2-done-checkbox"
                         style="position:relative; z-index:6;"
                         title="Redzams darbiniekam"
@@ -196,6 +200,7 @@ if (AggregatedByStep.TryGetValue((step.Id, p.ProductToPartId), out var aggList))
         </div>
     </div>
 }
+</div>
 
 @code {
 
@@ -215,7 +220,7 @@ private sealed class DetailedIndicatorRow
     public int ProductToPartId { get; set; }
     public string State { get; set; } = "";
 }
-
+    [Parameter] public bool IsReadOnly { get; set; }
 
 Dictionary<(int TopPartStepId, int ProductToPartId), List<DetailTaskRow>> TasksByStep
     = new();

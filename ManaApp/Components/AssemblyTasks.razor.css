@@ -1,4 +1,4 @@
-/* DETAILTASKS.RAZOR.CSS */
+/* AssemblyTasks.RAZOR.CSS */
 
 .ptv2-tasks-row {
     display: grid;
@@ -398,3 +398,11 @@
     padding: 4px 6px;
 }
 
+.ptv2-detail-item.inactive {
+    color: #9ca3af;   /* pelēks */
+}
+
+.ptv2-detail-item.active {
+    color: #111827;   /* melns */
+    font-weight: 500;
+}

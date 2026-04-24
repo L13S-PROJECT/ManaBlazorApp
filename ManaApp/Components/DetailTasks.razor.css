@@ -376,3 +376,22 @@
     color: #555;
     padding: 4px 6px;
 }
+
+.ptv2-readonly .ptv2-tasks-row,
+.ptv2-readonly .ptv2-tasks-row.sub.task {
+    background: #f3f4f6 !important;
+    color: #9ca3af !important;
+}
+
+.ptv2-readonly input,
+.ptv2-readonly select,
+.ptv2-readonly button,
+.ptv2-readonly textarea {
+    pointer-events: none;
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.ptv2-readonly .ptv2-comment-edit {
+    display: none;
+}

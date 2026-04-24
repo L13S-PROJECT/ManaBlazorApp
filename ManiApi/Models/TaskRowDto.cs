@@ -31,7 +31,8 @@ public sealed class TaskRowDto
     public int Planned { get; set; }
     public int TopPartStepId { get; set; }
     public int StepOrder { get; set; }
-
+    public bool IsFinal { get; set; }
+    public bool IsPainting { get; set; }
     public int StepType { get; set; }
     public int BatchId { get; set; }
     public int VersionId { get; set; }

@@ -2,7 +2,7 @@
 @using ManaApp.Models
 @using ManaApp.Components
 
-<div class="ptv2-tasks-grid">
+<div class="ptv2-tasks-grid @(IsReadOnly ? "ptv2-readonly" : "")">
     <div class="ptv2-tasks-section">
     <div class="ptv2-tabs">
         <button class="@(ActiveTab == 1 ? "active" : "")" @onclick="() => ActiveTab = 1">DETAIL</button>
@@ -29,6 +29,7 @@
 <DetailTasks 
     @key="SelectedBatch"
     SelectedBatch="SelectedBatch"
+    IsReadOnly="IsChildRowSelected"
     OnDataChanged="HandleDataChanged" />
 </div>
 }
@@ -60,9 +61,9 @@
 
 @code {
     [Parameter] public ProductBatchRow? SelectedBatch { get; set; }
-
+    [Parameter] public bool IsReadOnly { get; set; }
     [Parameter] public EventCallback OnDataChanged { get; set; }
-
+    [Parameter] public bool IsChildRowSelected { get; set; }
     private void HandleDataChanged()
     {
         OnDataChanged.InvokeAsync(null);

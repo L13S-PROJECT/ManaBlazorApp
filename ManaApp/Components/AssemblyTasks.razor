@@ -11,6 +11,29 @@
     return;
 }
 
+@if (isChildOnly)
+{
+    <div class="ptv2-detail-placeholder">
+        Assembly posms nav nepieciešams (Child scenārijs)
+    </div>
+    return;
+}
+
+@if (DetailIndicatorsFromApi.Any())
+{
+    <div class="ptv2-detail-block" style="margin-bottom:8px;">
+
+        @foreach (var d in DetailIndicatorsFromApi)
+        {
+            <div class="ptv2-detail-item @(d.Value == "green" ? "active" : "inactive")"
+     style="font-size:11px; padding:2px 6px;">
+                @DetailParts.FirstOrDefault(p => p.ProductToPartId == d.Key)?.TopPartName
+            </div>
+        }
+
+    </div>
+}
+
 @foreach (var p in Parts)
 {
     <div class="ptv2-tasks-row assembly">
@@ -82,23 +105,29 @@
 
 <!-- 4. Piešķirts -->
 <div>
-    @if (t.Status == 2 || t.Status == 3)
-    {
-        <div class="assigned-readonly">
-            @Employees.FirstOrDefault(e => e.Id == t.Assigned_To)?.Name
-        </div>
-    }
-    else
-    {
-        <select value="@t.Assigned_To"
-                @onchange="e => OnAssignedChanged(t.TaskId, e)">
-            <option value="">—</option>
-            @foreach (var emp in Employees)
-            {
-                <option value="@emp.Id">@emp.Name</option>
-            }
-        </select>
-    }
+    @if (!AssemblyIndicators.TryGetValue(p.ProductToPartId, out var st2) || st2 != "green")
+{
+    <div class="assigned-readonly">
+        @Employees.FirstOrDefault(e => e.Id == t.Assigned_To)?.Name
+    </div>
+}
+else if (t.Status == 2 || t.Status == 3)
+{
+    <div class="assigned-readonly">
+        @Employees.FirstOrDefault(e => e.Id == t.Assigned_To)?.Name
+    </div>
+}
+else
+{
+    <select value="@t.Assigned_To"
+            @onchange="e => OnAssignedChanged(t.TaskId, e)">
+        <option value="">—</option>
+        @foreach (var emp in Employees)
+        {
+            <option value="@emp.Id">@emp.Name</option>
+        }
+    </select>
+}
 </div>
 
 
@@ -182,10 +211,10 @@
 [Parameter] public ProductBatchRow? SelectedBatch { get; set; }
 [Parameter] public EventCallback OnDataChanged { get; set; }
 private List<DetailPartRow> Parts = new();
-
+private Dictionary<int, string> DetailIndicatorsFromApi = new();
 private Dictionary<int, List<DetailTaskRow>> TasksByStep = new();
 // key = TopPartStepId
-
+private List<DetailPartRow> DetailParts = new();
 protected override async Task OnParametersSetAsync()
 {
     Parts.Clear();
@@ -201,6 +230,11 @@ protected override async Task OnParametersSetAsync()
     // 1) Parts (Assembly)
     var partsUrl =
         $"http://localhost:5270/api/products/details?versionId={vid}&stepType=2";
+
+    DetailParts =
+    await Http.GetFromJsonAsync<List<DetailPartRow>>(
+        $"http://localhost:5270/api/products/details?versionId={vid}&stepType=1"
+    ) ?? new();
 
     Parts =
         await Http.GetFromJsonAsync<List<DetailPartRow>>(partsUrl)
@@ -231,7 +265,40 @@ protected override async Task OnParametersSetAsync()
     TasksByStep = tasks
         .GroupBy(t => t.TopPartStepId)
         .ToDictionary(g => g.Key, g => g.ToList());
+    
+    var qtyList = await Http.GetFromJsonAsync<List<DetailQtyRow>>(
+    $"http://localhost:5270/api/batches/detail-qty?batchProductId={bpId}"
+) ?? new();
+
+        hasParent = qtyList.Any(x => x.ParentQty > 0);
+        hasChild  = qtyList.Any(x => x.ChildQty > 0);
+        isChildOnly = !hasParent && hasChild;
+        
+    var detailIndicatorsApi =
+    await Http.GetFromJsonAsync<List<AssemblyIndicatorRow>>(
+        $"http://localhost:5270/api/tasks/detailed-indicators?batchProductId={bpId}"
+    ) ?? new();
+
+    DetailIndicatorsFromApi = DetailParts.ToDictionary(
+    p => p.ProductToPartId,
+    p => detailIndicatorsApi
+            .FirstOrDefault(x => x.ProductToPartId == p.ProductToPartId)?.State
+         ?? "gray"
+);
+
 }
+
+private sealed class DetailQtyRow
+{
+    public int ProductToPartId { get; set; }
+    public int? BatchProductId { get; set; }
+    public int ParentQty { get; set; }
+    public int ChildQty { get; set; }
+}
+
+private bool hasParent;
+private bool hasChild;
+private bool isChildOnly;
 
 
 private sealed class DetailTaskRow
