@@ -45,6 +45,19 @@ namespace ManiApi.Services
                     isParent && hasChild  ? "B" :
                                             "C";
 
+                var relatedBatchProducts = await _db.Set<BatchProduct>()
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.IsActive &&
+                        x.Batch_Id == bp.Batch_Id &&
+                        x.Version_Id == bp.Version_Id)
+                    .ToListAsync();
+
+                var childPartIds = relatedBatchProducts
+                    .Where(x => x.ProductToPart_ID != null)
+                    .Select(x => x.ProductToPart_ID!.Value)
+                    .ToList();
+
             if (batchProduct == null || batchProduct.Version_Id <= 0)
                 return new DetailTasksDto();
 
@@ -56,7 +69,7 @@ namespace ManiApi.Services
                         (
                             scenario == "A" || scenario == "B"
                                 ? true
-                                : x.Id == bp.ProductToPart_ID
+                                : childPartIds.Contains(x.Id)
                         )
                     )
                 .Select(x => new DetailPartDto
@@ -101,11 +114,7 @@ var activePartIds = await _db.Tasks
             x.ts.IsActive &&
             x.t.Tasks_Status != 5 &&
             x.ts.StepType == 1 &&
-            (
-                scenario == "C"
-                    ? x.t.BatchProduct_ID == batchProductId
-                    : relatedBatchProductIds.Contains(x.t.BatchProduct_ID)
-            )
+            relatedBatchProductIds.Contains(x.t.BatchProduct_ID)
         )
     .Select(x => x.ts.ProductToPartId)
     .Distinct()
@@ -121,11 +130,7 @@ var indicatorRows = await _db.Tasks
             x.t.IsActive &&
             x.ts.IsActive &&
             x.ts.StepType == 1 &&
-            (
-                scenario == "C"
-                    ? x.t.BatchProduct_ID == batchProductId
-                    : relatedBatchProductIds.Contains(x.t.BatchProduct_ID)
-            )
+            relatedBatchProductIds.Contains(x.t.BatchProduct_ID)
         )
     .GroupBy(x => x.ts.ProductToPartId)
     .Select(g => new
@@ -141,11 +146,11 @@ var indicatorRows = await _db.Tasks
 
 var indicators = indicatorRows.ToDictionary(
     x => x.ProductToPartId,
-    x => x.Cnt5 == x.Total ? "gray"
-        : x.Cnt3 == x.Total ? "green"
-        : x.Cnt2 > 0 ? "yellow"
+    x =>
+        x.Cnt5 == x.Total ? "gray"
         : x.Cnt1 == x.Total ? "blue"
-        : "gray"
+        : x.Cnt3 == x.Total ? "green"
+        : "yellow"
 );
 
 var taskRows = await _db.Tasks
@@ -158,11 +163,7 @@ var taskRows = await _db.Tasks
             x.t.IsActive &&
             x.ts.IsActive &&
             x.ts.StepType == 1 &&
-            (
-                scenario == "C"
-                    ? x.t.BatchProduct_ID == batchProductId
-                    : relatedBatchProductIds.Contains(x.t.BatchProduct_ID)
-            )
+            relatedBatchProductIds.Contains(x.t.BatchProduct_ID)
         )
     .Select(x => new
     {
@@ -179,18 +180,7 @@ var taskRows = await _db.Tasks
     })
     .ToListAsync();
 
-var relatedBatchProducts = await _db.Set<BatchProduct>()
-    .AsNoTracking()
-    .Where(x =>
-        x.IsActive &&
-        x.Batch_Id == bp.Batch_Id &&
-        x.Version_Id == bp.Version_Id)
-    .ToListAsync();
 
-var childPartIds = relatedBatchProducts
-    .Where(x => x.ProductToPart_ID != null)
-    .Select(x => x.ProductToPart_ID!.Value)
-    .ToList();
 
 foreach (var part in parts)
 {

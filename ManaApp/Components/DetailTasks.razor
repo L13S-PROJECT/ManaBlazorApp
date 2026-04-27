@@ -17,6 +17,36 @@
 
 <div class="@(IsReadOnly ? "ptv2-readonly" : "")">
 
+@if (IsReadOnly && SelectedBatch is not null)
+{
+    var selectedPart = Parts.FirstOrDefault(p => p.ProductToPartId == SelectedChildPartId);
+
+    <div class="ptv2-info-banner">
+
+        @if (selectedPart is not null)
+        {
+            <span class="info-part">
+    @selectedPart.TopPartName.ToUpper()
+    @{
+        var qty = qtyList
+            .FirstOrDefault(x => x.ProductToPartId == SelectedChildPartId)?
+            .ChildQty ?? 0;
+    }
+    <span class="info-qty">(@qty gb)</span>
+</span>
+        }
+
+        <span class="info-meta">
+            <strong>@SelectedBatch.BatchCode</strong>
+            <span class="info-sep"> </span>
+            @SelectedBatch.CategoryName
+            <span class="info-sep"> </span>
+            @SelectedBatch.ProductCode
+        </span>
+
+    </div>
+}
+
 @foreach (var p in Parts)
 {
 <div class="ptv2-tasks-row @(IsReadOnly ? "ptv2-row-disabled" : "")">
@@ -34,8 +64,8 @@
         <div>
 <input type="checkbox"
        class="ptv2-switch"
-       checked="@ActivatedParts.Contains(p.ProductToPartId)"
-       disabled="@(IsReadOnly || ActivatedParts.Contains(p.ProductToPartId))"
+       checked="@IsPartActivated(p.ProductToPartId)"
+       disabled="@(IsReadOnly || IsPartActivated(p.ProductToPartId))"
        @onclick:preventDefault="true"
        @onclick="() => OnActivatePart(p.ProductToPartId)" />
         </div>
@@ -70,20 +100,40 @@
 
 if (AggregatedByStep.TryGetValue((step.Id, p.ProductToPartId), out var aggList))
 {
-    var t = new DetailTaskRow
-        {
-            TaskId = aggList.First().TaskId,
-            TopPartStepId = aggList.First().TopPartStepId,
-            ProductToPartId = aggList.First().ProductToPartId,
-            Assigned_To = aggList.First().Assigned_To,
-            Claimed_By = aggList.First().Claimed_By,
-            StartedAt = aggList.First().StartedAt,
-            FinishedAt = aggList.First().FinishedAt,
-            Status = aggList.First().Status,
-            Comment = aggList.First().Comment,
-            IsCommentForEmployee = aggList.First().IsCommentForEmployee
-        };
     var agg = aggList.FirstOrDefault();
+
+    var t = new DetailTaskRow
+{
+    TaskId = aggList.First().TaskId,
+    TopPartStepId = aggList.First().TopPartStepId,
+    ProductToPartId = aggList.First().ProductToPartId,
+
+    Assigned_To = aggList.Select(x => x.Assigned_To).Distinct().Count() == 1
+        ? aggList.First().Assigned_To
+        : null,
+
+    Claimed_By = aggList.Select(x => x.Claimed_By).Distinct().Count() == 1
+        ? aggList.First().Claimed_By
+        : null,
+
+    StartedAt = aggList.Where(x => x.StartedAt.HasValue).Any()
+        ? aggList.Min(x => x.StartedAt)
+        : null,
+
+    FinishedAt = aggList.All(x => x.FinishedAt.HasValue)
+        ? aggList.Max(x => x.FinishedAt)
+        : null,
+
+    Comment = aggList.Select(x => x.Comment).FirstOrDefault(c => !string.IsNullOrWhiteSpace(c)),
+
+    IsCommentForEmployee = aggList.Any(x => x.IsCommentForEmployee),
+
+    Status =
+        aggList.Any(x => x.Status == 2) ? 2 :
+        aggList.All(x => x.Status == 3) ? 3 :
+        aggList.All(x => x.Status == 1) ? 1 :
+        5
+};
 
     <div class="ptv2-tasks-row sub task @(IsReadOnly ? "ptv2-row-disabled" : "")">
                 <!-- 1. Nosaukums (tukšs – step jau ir augstāk) -->
@@ -206,15 +256,17 @@ if (AggregatedByStep.TryGetValue((step.Id, p.ProductToPartId), out var aggList))
 
     // glabās ProductToPartId, kuri jau ir aktivizēti šai partijai
     private HashSet<int> ActivatedParts = new();
+    private HashSet<(int BatchProductId, int ProductToPartId)> ActivatedChildParts = new();
     
     // DETAILED indikatori pa detaļām
     private Dictionary<int, string> DetailedIndicators = new();
+    private Dictionary<(int BatchProductId, int ProductToPartId), string> DetailedIndicatorsChild = new();
     private List<DetailQtyRow> qtyList = new();
     [Parameter] public ProductBatchRow? SelectedBatch { get; set; }
     [Parameter] public EventCallback OnDataChanged { get; set; }
 // Parts ir ProductTopParts konkrētajai VersionId (no SelectedBatch) 26.01.2026
     private List<DetailPartRow> Parts = new();
-
+    [Parameter] public int? SelectedChildPartId { get; set; }
 private sealed class DetailedIndicatorRow
 {
     public int ProductToPartId { get; set; }
@@ -324,6 +376,44 @@ if (dto is not null)
         {
             // neko nedaram – Parts paliek pilns saraksts
         }
+    
+    // child-only: ielādējam aktivētās detaļas konkrētajam batch
+if (isChildOnly)
+{
+    ActivatedChildParts.Clear();
+    DetailedIndicatorsChild.Clear();
+
+    var childBatchIds = qtyList
+        .Where(x => x.BatchProductId.HasValue)
+        .Select(x => x.BatchProductId!.Value)
+        .Distinct()
+        .ToList();
+
+   foreach (var childBatchProductId in childBatchIds)
+{
+    var activeParts =
+        await Http.GetFromJsonAsync<List<int>>(
+            $"http://localhost:5270/api/tasks/active-parts?batchProductId={childBatchProductId}"
+        ) ?? new();
+    
+    var indicators =
+    await Http.GetFromJsonAsync<List<DetailedIndicatorRow>>(
+        $"http://localhost:5270/api/tasks/detailed-indicators?batchProductId={childBatchProductId}"
+    ) ?? new();
+
+foreach (var ind in indicators)
+{
+    DetailedIndicatorsChild[(childBatchProductId, ind.ProductToPartId)] = ind.State;
+}
+
+    foreach (var id in activeParts)
+    {
+        ActivatedChildParts.Add((childBatchProductId, id));
+    
+    }
+
+}
+}
 }
 
 private List<EmployeeRow> Employees = new();
@@ -485,24 +575,29 @@ var activeParts =
     $"http://localhost:5270/api/tasks/active-parts?batchProductId={targetBatchProductId}"
 ) ?? new();
 
-ActivatedParts = activeParts.ToHashSet();
+// ❗ FIX: child-only → NEPĀRRAKSTĀM visu setu
+if (isChildOnly)
+{
+    // iztīram tikai konkrētā child batch ierakstus
+    ActivatedChildParts.RemoveWhere(x => x.BatchProductId == targetBatchProductId);
+
+    // ieliekam aktuālos no DB
+    foreach (var id in activeParts)
+    {
+        ActivatedChildParts.Add((targetBatchProductId, id));
+    }
+}
+else
+{
+    ActivatedParts = activeParts.ToHashSet();
+}
 
 await InvokeAsync(StateHasChanged);
 
-// pārlādējam arī indikatorus šai rindai
-if (targetBatchProductId > 0)
+if (!isChildOnly)
 {
-    var indicators =
-        await Http.GetFromJsonAsync<List<DetailedIndicatorRow>>(
-            $"http://localhost:5270/api/tasks/detailed-indicators?batchProductId={targetBatchProductId}"
-        ) ?? new();
-
-    DetailedIndicators = indicators.ToDictionary(
-        x => x.ProductToPartId,
-        x => x.State
-    );
+    await OnParametersSetAsync();
 }
-
 await InvokeAsync(StateHasChanged);
 await OnDataChanged.InvokeAsync();
 }
@@ -564,6 +659,14 @@ async Task OnCommentVisibilityChanged(DetailTaskRow task, ChangeEventArgs e)
         });
 
     task.IsCommentForEmployee = isChecked; // UI sync
+
+    if (AggregatedByStep.TryGetValue((task.TopPartStepId, task.ProductToPartId), out var list))
+{
+    foreach (var x in list)
+    {
+        x.IsCommentForEmployee = isChecked;
+    }
+}
 }
 
 private Dictionary<int, List<dynamic>> tasksGrouped = new();
@@ -585,6 +688,45 @@ int? GetAggregatedAssigned(int stepId, int partId)
     }
 
     return null;
+}
+
+private bool IsPartActivated(int productToPartId)
+{
+    if (isChildOnly)
+    {
+        var match = qtyList
+    .FirstOrDefault(x =>
+        x.ProductToPartId == productToPartId &&
+        ActivatedChildParts.Any(a =>
+            a.ProductToPartId == productToPartId &&
+            a.BatchProductId == x.BatchProductId));
+
+        if (match?.BatchProductId is int childBpId && childBpId > 0)
+        {
+            return ActivatedChildParts.Contains((childBpId, productToPartId));
+        }
+
+        return false;
+    }
+
+    // Parent vai Parent+Child
+    return ActivatedParts.Contains(productToPartId);
+}
+
+private string GetIndicatorState(int productToPartId)
+{
+    if (!isChildOnly)
+    {
+        return DetailedIndicators.TryGetValue(productToPartId, out var st)
+            ? st
+            : "gray";
+    }
+
+    // C scenārijs – skatāmies vai ir aktīvs jebkurš child
+    var hasActive = ActivatedChildParts
+        .Any(x => x.ProductToPartId == productToPartId);
+
+    return hasActive ? "blue" : "gray";
 }
 
 }

@@ -377,10 +377,12 @@
     padding: 4px 6px;
 }
 
-.ptv2-readonly .ptv2-tasks-row,
+.ptv2-readonly .ptv2-tasks-row {
+    opacity: 0.65;
+}
+
 .ptv2-readonly .ptv2-tasks-row.sub.task {
-    background: #f3f4f6 !important;
-    color: #9ca3af !important;
+    opacity: 0.55;
 }
 
 .ptv2-readonly input,
@@ -388,10 +390,49 @@
 .ptv2-readonly button,
 .ptv2-readonly textarea {
     pointer-events: none;
-    opacity: 0.55;
     cursor: not-allowed;
 }
 
 .ptv2-readonly .ptv2-comment-edit {
-    display: none;
+    opacity: 0.3;
+}
+
+.ptv2-info-banner {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    padding: 6px 8px;
+    margin-bottom: 4px;
+
+    background: #f3f4f6;
+    border-left: 3px solid #0f5ce3;
+
+    font-size: 11px;
+}
+
+/* TopPart – galvenais */
+.info-part {
+    font-weight: 700;
+    font-size: 12px;
+    color: #111827;
+    letter-spacing: 0.3px;
+}
+
+/* pārējais info */
+.info-meta {
+    color: #6b7280;
+    font-size: 10.5px;
+}
+
+.info-sep {
+    margin: 0 4px;
+    color: #9ca3af;
+}
+
+.info-qty {
+    font-weight: 500;
+    font-size: 10px;
+    color: #6b7280;
+    margin-left: 6px;
 }

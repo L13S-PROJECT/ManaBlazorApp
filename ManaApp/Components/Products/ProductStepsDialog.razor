@@ -50,7 +50,7 @@
                 var index = i;
 
 <div 
-     @key="s.Id"
+     @key="(s.Id > 0 ? s.Id : index)"
      class="steps-tr steps-grid @( _selectedIndex == index ? "dragging" : "" )"
      @onmouseenter="() => OnDragEnter(index)">
               

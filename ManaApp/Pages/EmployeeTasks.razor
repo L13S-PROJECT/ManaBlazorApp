@@ -374,11 +374,11 @@ private TaskRow? _activeTask;
 private void SelectTask(TaskRow task)
 {
     _activeTask = tasks
-        .Where(t => t.DisplayGroupId == task.DisplayGroupId)
-        .OrderByDescending(t => t.Status == 2)
-        .ThenByDescending(t => t.Assigned_To == selectedEmployeeId)
-        .ThenByDescending(t => t.BatchProductId == t.RootId)
-        .First();
+    .Where(t => t.DisplayGroupId == task.DisplayGroupId)
+    .OrderByDescending(t => t.Status == 2)
+    .ThenByDescending(t => t.TaskId == FirstAvailableTask?.TaskId) 
+    .ThenByDescending(t => t.Assigned_To == selectedEmployeeId)
+    .First();
 
     _dialogMode = TaskDialogMode.None;
 }

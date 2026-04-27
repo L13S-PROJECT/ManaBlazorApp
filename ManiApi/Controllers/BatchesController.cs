@@ -172,13 +172,6 @@ p3.ParameterName = "@ptpId";
 p3.Value = (object?)it.ProductToPartId ?? DBNull.Value;
 row.Parameters.Add(p3);
 
-row.CommandText = @"
-INSERT INTO batches_products
-    (Batch_Id, Version_Id, ProductToPart_ID, Planned_Qty, Done_Qty, Priority, BatchProduct_Comments, IsActive, ParentBatchProduct_ID)
-VALUES
-    (@bid, @vid, @ptpId, @qty, 0, 0, @comment, 1, @parentId);
-SELECT LAST_INSERT_ID();";
-
 var pParent = row.CreateParameter();
 pParent.ParameterName = "@parentId";
 pParent.Value = (object?)parentId ?? DBNull.Value;
@@ -423,13 +416,6 @@ WHERE Batch_Id = @bid;";
         p3.Value = (object?)it.ProductToPartId ?? DBNull.Value;
         row.Parameters.Add(p3);
 
-        row.CommandText = @"
-INSERT INTO batches_products
-    (Batch_Id, Version_Id, ProductToPart_ID, Planned_Qty, Done_Qty, Priority, BatchProduct_Comments, IsActive, ParentBatchProduct_ID)
-VALUES
-    (@bid, @vid, @ptpId, @qty, 0, 0, @comment, 1, @parentId);
-SELECT LAST_INSERT_ID();";
-
 var pParent = row.CreateParameter();
 pParent.ParameterName = "@parentId";
 pParent.Value = (object?)parentId ?? DBNull.Value;
@@ -581,6 +567,7 @@ SUM(
              JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
              WHERE t2.BatchProduct_ID = bp.ID
                AND ts2.Step_Type = 1
+                AND (ts2.IsPainting = 0 OR ts2.IsPainting IS NULL)
                AND t2.Tasks_Status IN (2,3)
          )
          AND EXISTS (
@@ -589,6 +576,7 @@ SUM(
              JOIN toppartsteps ts3 ON ts3.ID = t3.TopPartStep_ID
              WHERE t3.BatchProduct_ID = bp.ID
                AND ts3.Step_Type = 1
+               AND (ts3.IsPainting = 0 OR ts3.IsPainting IS NULL)
                AND t3.Tasks_Status <> 3
          )
         THEN bp.Planned_Qty
@@ -608,6 +596,7 @@ SUM(
              JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
              WHERE t2.BatchProduct_ID = bp.ID
                AND ts2.Step_Type = 1
+                AND (ts2.IsPainting = 0 OR ts2.IsPainting IS NULL)
                AND t2.Tasks_Status IN (2,3)
          )
          AND NOT EXISTS (
@@ -616,6 +605,7 @@ SUM(
              JOIN toppartsteps ts3 ON ts3.ID = t3.TopPartStep_ID
              WHERE t3.BatchProduct_ID = bp.ID
                AND ts3.Step_Type = 1
+               AND (ts3.IsPainting = 0 OR ts3.IsPainting IS NULL)
                AND t3.Tasks_Status <> 3
          )
          AND NOT EXISTS (
@@ -624,6 +614,7 @@ SUM(
              JOIN toppartsteps ts4 ON ts4.ID = t4.TopPartStep_ID
              WHERE t4.BatchProduct_ID = bp.ID
                AND ts4.Step_Type = 2
+               AND (ts4.IsPainting = 0 OR ts4.IsPainting IS NULL)
                AND t4.Tasks_Status IN (2,3)
          )
         THEN bp.Planned_Qty
@@ -725,9 +716,9 @@ LEFT JOIN (
         t.BatchProduct_ID,
 
         -- Detailed
-        SUM(CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status IN (1,5) THEN 1 ELSE 0 END) AS DetPlannedCnt,
-        SUM(CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status IN (2,3) THEN 1 ELSE 0 END) AS DetStartedCnt,
-        SUM(CASE WHEN ts.Step_Type = 1 AND t.Tasks_Status <> 3 THEN 1 ELSE 0 END) AS DetNotFinishedCnt,
+        SUM(CASE WHEN ts.Step_Type = 1 AND (ts.IsPainting = 0 OR ts.IsPainting IS NULL) AND t.Tasks_Status IN (1,5) THEN 1 ELSE 0 END) AS DetPlannedCnt,
+        SUM(CASE WHEN ts.Step_Type = 1 AND (ts.IsPainting = 0 OR ts.IsPainting IS NULL) AND t.Tasks_Status IN (2,3) THEN 1 ELSE 0 END) AS DetStartedCnt,
+        SUM(CASE WHEN ts.Step_Type = 1 AND (ts.IsPainting = 0 OR ts.IsPainting IS NULL) AND t.Tasks_Status <> 3 THEN 1 ELSE 0 END) AS DetNotFinishedCnt,
 
         -- Assembly
         SUM(CASE WHEN ts.Step_Type = 2 AND t.Tasks_Status IN (2,3) THEN 1 ELSE 0 END) AS AsmStartedCnt,
@@ -738,6 +729,7 @@ LEFT JOIN (
         SUM(
             CASE 
                 WHEN ts.Step_Type = 3 
+                AND ts.IsPainting = 0
                 AND t.Tasks_Status IN (1,2)
                 THEN t.Qty_Done
                 ELSE 0 
@@ -907,15 +899,19 @@ JOIN toppartsteps ts
         OR
         (bp.ProductToPart_ID IS NOT NULL AND ts.Step_Type = 1)
     )
-    AND (
+AND (
     ts.Step_Type <> 1
-    OR ts.Step_Order <= COALESCE((
-        SELECT MIN(ts2.Step_Order)
-        FROM toppartsteps ts2
-        WHERE ts2.ProductToPart_ID = ptp.ID
-        AND ts2.IsActive = 1
-        AND ts2.IsFinal = 1
-    ), ts.Step_Order)
+    OR (
+        ts.Step_Order <= COALESCE((
+            SELECT MIN(ts2.Step_Order)
+            FROM toppartsteps ts2
+            WHERE ts2.ProductToPart_ID = ptp.ID
+              AND ts2.IsActive = 1
+              AND ts2.IsFinal = 1
+              AND (ts2.IsPainting = 0 OR ts2.IsPainting IS NULL)
+        ), ts.Step_Order)
+        AND (ts.IsPainting = 0 OR ts.IsPainting IS NULL)
+    )
 )
 
 LEFT JOIN tasks t
@@ -950,7 +946,14 @@ SELECT
     1
 FROM batches_products bp
 WHERE bp.Batch_Id = @bid
-  AND bp.IsActive = 1;";
+  AND bp.IsActive = 1
+  AND NOT EXISTS (
+        SELECT 1
+        FROM stock_movements sm
+        WHERE sm.BatchProduct_ID = bp.ID
+          AND sm.Move_Type = 'PLANNED'
+          AND sm.IsActive = 1
+  );";
 
     var pBid2 = smCmd.CreateParameter();
     pBid2.ParameterName = "@bid";
@@ -2044,6 +2047,7 @@ END AS DetailFinish,
                         WHERE t3.BatchProduct_ID = bp.ID
                         AND t3.IsActive = 1
                         AND ts3.Step_Type = 1
+                        AND ts3.IsPainting = 0
                         AND ts3.IsFinal = 1
                     ), '%Y-%m-%d'),
                     ':',
@@ -2070,6 +2074,7 @@ MAX(
             WHERE t3.BatchProduct_ID = bp.ID
               AND t3.IsActive = 1
               AND ts3.Step_Type = 1
+              AND ts3.IsPainting = 0
               AND ts3.IsFinal = 1
         )
         ELSE NULL

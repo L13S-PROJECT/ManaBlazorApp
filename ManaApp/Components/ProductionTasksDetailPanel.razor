@@ -30,6 +30,7 @@
     @key="SelectedBatch"
     SelectedBatch="SelectedBatch"
     IsReadOnly="IsChildRowSelected"
+    SelectedChildPartId="SelectedChildPartId"
     OnDataChanged="HandleDataChanged" />
 </div>
 }
@@ -64,6 +65,7 @@
     [Parameter] public bool IsReadOnly { get; set; }
     [Parameter] public EventCallback OnDataChanged { get; set; }
     [Parameter] public bool IsChildRowSelected { get; set; }
+    [Parameter] public int? SelectedChildPartId { get; set; }
     private void HandleDataChanged()
     {
         OnDataChanged.InvokeAsync(null);
