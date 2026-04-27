@@ -1,0 +1,81 @@
+<div class="parts-toolbar">
+
+    <!-- Kategorija -->
+    <div class="root-filter">
+
+    <button type="button"
+            class="root-pill @(SelectedRoot == null ? "active" : null)"
+            @onclick="@(() => OnRootChanged.InvokeAsync(null))">
+        Visi
+    </button>
+
+    <button type="button"
+            class="root-pill @(SelectedRoot == 1 ? "active" : null)"
+            @onclick="@(() => OnRootChanged.InvokeAsync(1))">
+        Kausi
+    </button>
+
+    <button type="button"
+            class="root-pill @(SelectedRoot == 2 ? "active" : null)"
+            @onclick="@(() => OnRootChanged.InvokeAsync(2))">
+        Adapteri
+    </button>
+
+    </div>
+
+    <!-- Meklēšana -->
+    <input type="text"
+       placeholder="Meklēt detaļu..."
+       @bind="_searchText"
+       @bind:event="oninput" />
+
+    <!-- Filtri -->
+    <label><input type="checkbox" checked="@PlannedOnly" @onchange="e => PlannedOnlyChanged.InvokeAsync((bool)e.Value!)" /> Plānots</label>
+<label><input type="checkbox" checked="@InProductionOnly" @onchange="e => InProductionOnlyChanged.InvokeAsync((bool)e.Value!)" /> Ražošanā</label>
+<label><input type="checkbox" checked="@OkOnly" @onchange="e => OkOnlyChanged.InvokeAsync((bool)e.Value!)" /> Ok</label>
+<label><input type="checkbox" checked="@ReservedOnly" @onchange="e => ReservedOnlyChanged.InvokeAsync((bool)e.Value!)" /> Rezervēts</label>
+<label><input type="checkbox" checked="@FreeOnly" @onchange="e => FreeOnlyChanged.InvokeAsync((bool)e.Value!)" /> Citi</label>
+
+    <!-- Switch -->
+    <label class="switch">
+        <input type="checkbox" />
+        <span>Toggle</span>
+    </label>
+
+</div>
+
+@code {
+[Parameter] public int? SelectedRoot { get; set; }
+[Parameter] public EventCallback<int?> OnRootChanged { get; set; }
+
+[Parameter] public string? SearchText { get; set; }
+[Parameter] public EventCallback<string?> SearchTextChanged { get; set; }
+[Parameter] public bool PlannedOnly { get; set; }
+[Parameter] public EventCallback<bool> PlannedOnlyChanged { get; set; }
+
+[Parameter] public bool InProductionOnly { get; set; }
+[Parameter] public EventCallback<bool> InProductionOnlyChanged { get; set; }
+
+[Parameter] public bool OkOnly { get; set; }
+[Parameter] public EventCallback<bool> OkOnlyChanged { get; set; }
+
+[Parameter] public bool ReservedOnly { get; set; }
+[Parameter] public EventCallback<bool> ReservedOnlyChanged { get; set; }
+
+[Parameter] public bool FreeOnly { get; set; }
+[Parameter] public EventCallback<bool> FreeOnlyChanged { get; set; }
+
+private string? _searchText
+{
+    get => SearchText;
+    set
+    {
+        if (SearchText != value)
+        {
+            SearchText = value;
+            SearchTextChanged.InvokeAsync(value);
+        }
+    }
+}
+
+}

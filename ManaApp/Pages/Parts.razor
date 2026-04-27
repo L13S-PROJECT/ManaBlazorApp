@@ -4,18 +4,61 @@
 @using ManaApp.Models
 @using System.Net.Http.Json
 @using System.Text.Json.Serialization
+@using ManaApp.Components.Parts
 
 @inject HttpClient Http
 @layout MainLayout
 
 <div class="parts-main">
-
     <!-- KREISĀ PUSE: saraksts -->
         <div class="parts-left">
+            <div class="parts-header">
             <h4>Detaļu saraksts</h4>
-
-            @foreach (var group in groupedData)
+            <PartsToolbar 
+                SelectedRoot="selectedRoot"
+                OnRootChanged="@(EventCallback.Factory.Create<int?>(this, SetRootFilter))"
+                @bind-SearchText="searchText" 
+                @bind-PlannedOnly="plannedOnly"
+                @bind-InProductionOnly="inProductionOnly"
+                @bind-OkOnly="okOnly"
+                @bind-ReservedOnly="reservedOnly"
+                @bind-FreeOnly="freeOnly"/>
+            </div>
+            
+            @foreach (
+                
+                var group in groupedData
+                .Where(g =>
+                    (!selectedRoot.HasValue || g.ParentCategoryId == selectedRoot)
+                    &&
+                    (string.IsNullOrWhiteSpace(searchText)
+                        || g.ProductName.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+                        || g.VersionName.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+                        || g.Parts.Any(p => p.TopPartName.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                    )
+                ))
             {
+                var filteredParts = group.Parts
+                    .Where(p =>
+                        string.IsNullOrWhiteSpace(searchText)
+                        || group.ProductName.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+                        || group.VersionName.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+                        || p.TopPartName.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+                    )
+                    .Where(p =>
+                        (!plannedOnly || p.PlannedQty > 0)
+                        && (!inProductionOnly || p.InProduction > 0)
+                        && (!okOnly || p.OkQty > 0)
+                        && (!reservedOnly || p.ReservedQty > 0)
+                        && (!freeOnly || p.FreeQty > 0)
+                    )
+                    .ToList();
+
+                @if (!filteredParts.Any())
+                {
+                    continue;
+                }
+
                 <!-- HEADER (Product + Version) -->
                 <div class="part-group-header">
                     <div>@group.ProductName</div>   <!-- ✔ -->
@@ -24,22 +67,20 @@
                     <div>Ražošanā</div>
                     <div>Ok</div>
                     <div>Rezervēts</div>
-                    <div>Brīvs</div>
+                    <div>Citi</div>
                 </div>
 
                 <!-- CHILD ROWS (TopParts) -->
-                @foreach (var part in group.Parts)
+                @foreach (var part in filteredParts)
                     {
                         <div class="part-row">
                             <div>@part.TopPartName</div>
                             <div></div> <!-- tukšs version -->
-                            <div>@part.PlannedQty</div>
-                            <div>@part.InProduction</div>
-                            <div>@part.OkQty</div>
-                            <div>@part.ReservedQty</div>
-                            <div style="color:@(part.FreeQty < 0 ? "red" : "inherit")">
-                                @part.FreeQty
-                            </div>
+                            <div class="@(part.PlannedQty == 0 ? "num-zero" : "num-value")">@part.PlannedQty</div>
+                            <div class="@(part.InProduction == 0 ? "num-zero" : "num-value")">@part.InProduction</div>
+                            <div class="@(part.OkQty == 0 ? "num-zero" : "num-value")">@part.OkQty</div>
+                            <div class="@(part.ReservedQty == 0 ? "num-zero" : "num-value")">@part.ReservedQty</div>
+                            <div class="@(part.FreeQty == 0 ? "num-zero" : "num-value")">@part.FreeQty</div>
                         </div>
                     }
             }
@@ -70,7 +111,7 @@
         public int ReservedQty { get; set; }
         public int InProduction { get; set; }
         public int StockQty { get; set; }
-        public int FreeQty => StockQty - ReservedQty;
+        public int FreeQty { get; set; }
     }
 
     private List<ProductPartGroup> groupedData = new();
@@ -79,12 +120,13 @@
     {
         public string ProductName { get; set; } = "";
         public string VersionName { get; set; } = "";
-
+        public string RootName { get; set; } = "";
+        public int? ParentCategoryId { get; set; }
         public int InProduction { get; set; }   // vēlāk no batch
         public int OkQty { get; set; }
         public int ReservedQty { get; set; }
         public int StockQty { get; set; }
-        public int FreeQty => StockQty - ReservedQty;
+        public int FreeQty { get; set; }
 
         public List<PartItem> Parts { get; set; } = new();
     }
@@ -98,14 +140,15 @@ public class PartItem
     public int OkQty { get; set; }
     public int ReservedQty { get; set; }
     public int StockQty { get; set; }
-    public int FreeQty => StockQty - ReservedQty;
+    public int FreeQty { get; set; }
 }
 
 public class ProductSummaryDto
 {
     public int ProductId { get; set; }
     public string ProductName { get; set; } = "";
-
+    public string RootName { get; set; } = "";
+    public int? ParentCategoryId { get; set; }
     public int VersionId { get; set; }
     public string VersionName { get; set; } = "";
 
@@ -120,16 +163,16 @@ protected override async Task OnInitializedAsync()
     var products = await Http.GetFromJsonAsync<List<ProductSummaryDto>>(
         "http://localhost:5270/api/products/planning-list");
 
-    // ✅ VIENREIZ
+  
     var production = await Http.GetFromJsonAsync<List<PartProductionDto>>(
-        "http://localhost:5270/api/parts/in-production");
+    "http://localhost:5270/api/topparts/in-production-correct?versionId=0");
 
     var productionMap = production?
     .ToDictionary(x => $"{x.VersionId}_{x.TopPartId}", x => x.InProduction)
     ?? new Dictionary<string, int>();
 
     var okData = await Http.GetFromJsonAsync<List<OkDto>>(
-        "http://localhost:5270/api/parts/ok-by-version");
+    "http://localhost:5270/api/topparts/ok-correct?versionId=0");
 
     var okMap = okData?
         .ToDictionary(x => $"{x.VersionId}_{x.TopPartId}", x => x.OkQty)
@@ -141,7 +184,7 @@ protected override async Task OnInitializedAsync()
     var reservedMap = reservedData?
         .ToDictionary(x => $"{x.VersionId}_{x.TopPartId}", x => x.ReservedQty)
         ?? new Dictionary<string, int>();
-    
+
     var plannedCache = new Dictionary<int, Dictionary<string, int>>();
 
     groupedData = new();
@@ -157,11 +200,18 @@ protected override async Task OnInitializedAsync()
         
         var parts = await Http.GetFromJsonAsync<List<PartRow>>(
             $"http://localhost:5270/api/parts/details-by-version?versionId={p.VersionId}");
+
+        var freeData = await Http.GetFromJsonAsync<List<FreeDto>>(
+        $"http://localhost:5270/api/topparts/free-correct?versionId={p.VersionId}");
+
+        var freeMap = freeData?
+            .ToDictionary(x => $"{x.VersionId}_{x.TopPartId}", x => x.FreeQty)
+            ?? new Dictionary<string, int>();
         
         if (!plannedCache.TryGetValue(p.VersionId, out var plannedMap))
             {
                 var plannedData = await Http.GetFromJsonAsync<List<PlannedDto>>(
-                    $"http://localhost:5270/api/topparts/planned-parts?versionId={p.VersionId}");
+    $"http://localhost:5270/api/topparts/planned-correct?versionId={p.VersionId}");
 
                 plannedMap = plannedData?
                     .GroupBy(x => $"{x.VersionId}_{x.TopPartId}")
@@ -175,7 +225,8 @@ protected override async Task OnInitializedAsync()
         {
             ProductName = p.ProductName,
             VersionName = p.VersionName ?? "",
-
+            ParentCategoryId = p.ParentCategoryId,
+            RootName = p.RootName ?? "",
             Parts = (parts ?? new())
     .GroupBy(r => r.TopPartId)
     .Select((g, i) =>
@@ -195,6 +246,7 @@ protected override async Task OnInitializedAsync()
                     StockQty = stockMap.ContainsKey(r.TopPartId) 
                         ? stockMap[r.TopPartId] 
                         : 0,
+                    FreeQty = freeMap.GetValueOrDefault($"{p.VersionId}_{r.TopPartId}", 0),
                 };
         })
     .ToList()
@@ -263,6 +315,26 @@ public class PlannedDto
     public int VersionId { get; set; }
     public int TopPartId { get; set; }
     public int PlannedQty { get; set; }
+}
+
+public class FreeDto
+{
+    public int VersionId { get; set; }
+    public int TopPartId { get; set; }
+    public int FreeQty { get; set; }
+}
+
+private int? selectedRoot = null;
+private string? searchText;
+private bool plannedOnly;
+private bool inProductionOnly;
+private bool okOnly;
+private bool reservedOnly;
+private bool freeOnly;
+
+private void SetRootFilter(int? value)
+{
+    selectedRoot = value;
 }
 
 }

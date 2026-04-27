@@ -837,6 +837,73 @@ public async Task<IActionResult> GetAssemblyAvailableReal([FromQuery] int batchP
     return Ok(Math.Max(available, 0));
 }
 
+[HttpPost("sync-detailed")]
+public async Task<IActionResult> SyncDetailed([FromQuery] int versionId)
+{
+    if (versionId <= 0)
+        return BadRequest("versionId required");
+
+    var batchProducts = await _db.BatchProducts
+        .Where(x => x.IsActive && x.Version_Id == versionId && x.ProductToPart_ID != null)
+        .ToListAsync();
+
+    foreach (var bp in batchProducts)
+    {
+        // 2) vai ir sākta vai pabeigta ražošana
+        var isFinished = await _db.Tasks
+            .Join(_db.TopPartSteps,
+                t => t.TopPartStep_ID,
+                ts => ts.Id,
+                (t, ts) => new { t, ts })
+            .Where(x =>
+                x.t.BatchProduct_ID == bp.ID &&
+                x.t.IsActive &&
+                x.ts.StepType == 1)
+            .GroupBy(x => x.ts.ProductToPartId)
+            .AnyAsync(g =>
+                g.Where(x => x.ts.IsFinal)
+                .All(x => x.t.Tasks_Status == 3));
+
+        if (!isFinished)
+            continue;
+        
+        var plannedQty = await _db.StockMovements
+            .Where(x =>
+                x.IsActive &&
+                x.BatchProduct_ID == bp.ID &&
+                x.Move_Type == MoveType.PLANNED)
+            .SumAsync(x => (int?)x.Stock_Qty) ?? 0;
+
+        if (plannedQty == 0)
+            continue;
+
+        // 3) veicam move PLANNED -> DETAILED
+        _db.StockMovements.Add(new StockMovement
+        {
+            Version_ID = bp.Version_Id,
+            BatchProduct_ID = bp.ID,
+            Move_Type = MoveType.PLANNED,
+            Stock_Qty = -plannedQty,
+            Created_At = DateTime.UtcNow,
+            IsActive = true
+        });
+
+        _db.StockMovements.Add(new StockMovement
+        {
+            Version_ID = bp.Version_Id,
+            BatchProduct_ID = bp.ID,
+            Move_Type = MoveType.DETAILED,
+            Stock_Qty = plannedQty,
+            Created_At = DateTime.UtcNow,
+            IsActive = true
+        });
+    }
+
+    await _db.SaveChangesAsync();
+
+    return Ok();
+}
+
    }
 
     
