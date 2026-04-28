@@ -6,10 +6,10 @@
     width: 100%;
     top: 0;
     z-index: 20;
-    background: #eff6ff; /* gaiši zils */
-    border: 1px solid #dbeafe;
+    background: #cee3ff; /* gaiši zils */
+    border: 1px solid #96c4ff;
 
-    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 
     width: 100%;
     display: block;
