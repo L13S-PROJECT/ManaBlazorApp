@@ -13,10 +13,11 @@
     <!-- KREISĀ PUSE: saraksts -->
         <div class="parts-left">
             <div class="parts-header">
-            <h4>Detaļu saraksts</h4>
             <PartsToolbar 
-                SelectedRoot="selectedRoot"
+                SelectedRoot="@selectedRoot"
                 OnRootChanged="@(EventCallback.Factory.Create<int?>(this, SetRootFilter))"
+                ShowArchived="@showArchived"
+                ShowArchivedChanged="@(v => showArchived = v)"
                 @bind-SearchText="searchText" 
                 @bind-PlannedOnly="plannedOnly"
                 @bind-InProductionOnly="inProductionOnly"
@@ -100,19 +101,20 @@
     [Parameter] public int? VersionId { get; set; }
 
     private List<PartRow> rows = new();
+    
     public class PartRow
-    {
-        public int ProductToPartId { get; set; }
-        public string? TopPartCode { get; set; }
-        public string? TopPartName { get; set; }
-        public int Quantity { get; set; }
-        public int TopPartId { get; set; }
-        public int OkQty { get; set; }
-        public int ReservedQty { get; set; }
-        public int InProduction { get; set; }
-        public int StockQty { get; set; }
-        public int FreeQty { get; set; }
-    }
+{
+    public int Id { get; set; }
+    public int TopPartId { get; set; }
+    public string? TopPartName { get; set; }
+    public int VersionId { get; set; }
+    public int PlannedQty { get; set; }
+    public int InProduction { get; set; }
+    public int OkQty { get; set; }
+    public int ReservedQty { get; set; }
+    public int StockQty { get; set; }
+    public int FreeQty { get; set; }
+}
 
     private List<ProductPartGroup> groupedData = new();
 
@@ -160,98 +162,70 @@ public class ProductSummaryDto
 
 protected override async Task OnInitializedAsync()
 {
-    var products = await Http.GetFromJsonAsync<List<ProductSummaryDto>>(
-        "http://localhost:5270/api/products/planning-list");
+    await LoadData();
+}
 
-  
-    var production = await Http.GetFromJsonAsync<List<PartProductionDto>>(
-    "http://localhost:5270/api/topparts/in-production-correct?versionId=0");
+private async Task LoadData()
+{
+    if (_isLoading)
+    return;
 
-    var productionMap = production?
-    .ToDictionary(x => $"{x.VersionId}_{x.TopPartId}", x => x.InProduction)
-    ?? new Dictionary<string, int>();
+    _isLoading = true;
 
-    var okData = await Http.GetFromJsonAsync<List<OkDto>>(
-    "http://localhost:5270/api/topparts/ok-correct?versionId=0");
+    StateHasChanged();
 
-    var okMap = okData?
-        .ToDictionary(x => $"{x.VersionId}_{x.TopPartId}", x => x.OkQty)
-        ?? new Dictionary<string, int>();
+    var url = showArchived
+    ? "http://localhost:5270/api/products/planning-list-archived"
+    : "http://localhost:5270/api/products/planning-list";
+
+    var products = await Http.GetFromJsonAsync<List<ProductSummaryDto>>(url);
     
-    var reservedData = await Http.GetFromJsonAsync<List<ReservedDto>>(
-    "http://localhost:5270/api/parts/reserved-by-version");
+    // 1. savācam visus versionId
+var versionIds = (products ?? new())
+    .Select(p => p.VersionId)
+    .Distinct()
+    .ToList();
 
-    var reservedMap = reservedData?
-        .ToDictionary(x => $"{x.VersionId}_{x.TopPartId}", x => x.ReservedQty)
-        ?? new Dictionary<string, int>();
+// 2. viens API call VISIEM
+var allParts = await Http.GetFromJsonAsync<List<PartRow>>(
+    $"http://localhost:5270/api/topparts/full-data-all?versionIds={string.Join(",", versionIds)}"
+);
 
-    var plannedCache = new Dictionary<int, Dictionary<string, int>>();
+// 3. sadalām pa versionId
+var partsByVersion = (allParts ?? new())
+    .GroupBy(x => x.VersionId)
+    .ToDictionary(g => g.Key, g => g.ToList());
 
-    groupedData = new();
+        // 4. būvējam UI datus
+        groupedData = (products ?? new()).Select(p =>
+        {
+            var parts = partsByVersion.GetValueOrDefault(p.VersionId) ?? new();
 
-    foreach (var p in products ?? new())
-    {
-            var stockData = await Http.GetFromJsonAsync<List<StockDto>>(
-     $"http://localhost:5270/api/topparts/stock-from-movements?versionId={p.VersionId}");
-
-        var stockMap = stockData?
-            .ToDictionary(x => x.TopPartId, x => x.StockQty)
-            ?? new Dictionary<int, int>();
-        
-        var parts = await Http.GetFromJsonAsync<List<PartRow>>(
-            $"http://localhost:5270/api/parts/details-by-version?versionId={p.VersionId}");
-
-        var freeData = await Http.GetFromJsonAsync<List<FreeDto>>(
-        $"http://localhost:5270/api/topparts/free-correct?versionId={p.VersionId}");
-
-        var freeMap = freeData?
-            .ToDictionary(x => $"{x.VersionId}_{x.TopPartId}", x => x.FreeQty)
-            ?? new Dictionary<string, int>();
-        
-        if (!plannedCache.TryGetValue(p.VersionId, out var plannedMap))
+            return new ProductPartGroup
             {
-                var plannedData = await Http.GetFromJsonAsync<List<PlannedDto>>(
-    $"http://localhost:5270/api/topparts/planned-correct?versionId={p.VersionId}");
+                ProductName = p.ProductName,
+                VersionName = p.VersionName ?? "",
+                ParentCategoryId = p.ParentCategoryId,
+                RootName = p.RootName ?? "",
 
-                plannedMap = plannedData?
-                    .GroupBy(x => $"{x.VersionId}_{x.TopPartId}")
-                    .ToDictionary(g => g.Key, g => g.Sum(x => x.PlannedQty))
-                    ?? new Dictionary<string, int>();
-
-                plannedCache[p.VersionId] = plannedMap;
-            }
-
-        groupedData.Add(new ProductPartGroup
-        {
-            ProductName = p.ProductName,
-            VersionName = p.VersionName ?? "",
-            ParentCategoryId = p.ParentCategoryId,
-            RootName = p.RootName ?? "",
-            Parts = (parts ?? new())
-    .GroupBy(r => r.TopPartId)
-    .Select((g, i) =>
-        {
-            var r = g.First();
-
-            return new PartItem
+                Parts = parts.Select((r, i) => new PartItem
                 {
                     Index = i + 1,
                     TopPartName = r.TopPartName ?? "",
-                    PlannedQty = plannedMap.GetValueOrDefault($"{p.VersionId}_{r.TopPartId}", 0),
-                    InProduction = productionMap.GetValueOrDefault($"{p.VersionId}_{r.TopPartId}", 0),
-                    OkQty = okMap.TryGetValue($"{p.VersionId}_{r.TopPartId}", out var val) ? val : 0,
-                    ReservedQty = reservedMap.TryGetValue($"{p.VersionId}_{r.TopPartId}", out var res)
-                        ? res
-                        : 0,
-                    StockQty = stockMap.ContainsKey(r.TopPartId) 
-                        ? stockMap[r.TopPartId] 
-                        : 0,
-                    FreeQty = freeMap.GetValueOrDefault($"{p.VersionId}_{r.TopPartId}", 0),
-                };
-        })
-    .ToList()
-        });
-    }
+                    PlannedQty = r.PlannedQty,
+                    InProduction = r.InProduction,
+                    OkQty = r.OkQty,
+                    ReservedQty = r.ReservedQty,
+                    StockQty = r.StockQty,
+                    FreeQty = r.FreeQty
+                }).ToList()
+            };
+        }).ToList();
+
+_isLoading = false;
+
+StateHasChanged();
+
 }
 
 public class OkDto
@@ -331,6 +305,23 @@ private bool inProductionOnly;
 private bool okOnly;
 private bool reservedOnly;
 private bool freeOnly;
+private bool _isLoading = false;
+private bool _showArchived;
+
+
+private bool showArchived
+{
+    get => _showArchived;
+    set
+    {
+        if (_showArchived == value) return;
+
+        _showArchived = value;
+
+        _isLoading = false; // ļaujam restartēt load
+        _ = LoadData();
+    }
+}
 
 private void SetRootFilter(int? value)
 {

@@ -433,5 +433,227 @@ var data = rawData
     return Ok(data);
 }
 
+[HttpGet("full-data")]
+public async Task<IActionResult> GetFullData([FromQuery] int versionId)
+{
+    if (versionId <= 0)
+        return BadRequest("versionId is required.");
+
+    var tasksQuery =
+    _db.Tasks
+        .Join(_db.TopPartSteps,
+            t => t.TopPartStep_ID,
+            ts => ts.Id,
+            (t, ts) => new { t, ts })
+        .Where(x => x.t.IsActive);
+
+    var parts = await (
+    from ptp in _db.ProductTopParts.AsNoTracking()
+        join tp in _db.TopParts on ptp.TopPartId equals tp.Id
+        where ptp.VersionId == versionId
+              && ptp.IsActive
+              && tp.IsActive
+        select new
+            {
+                ptp.Id,
+                ptp.TopPartId,
+                tp.TopPartName,
+
+                StockQty =
+                    _db.StockMovements
+                        .Where(sm =>
+                            sm.IsActive &&
+                            sm.Version_ID == ptp.VersionId &&
+                            sm.BatchProduct_ID == ptp.Id)
+                        .Sum(sm => (int?)sm.Stock_Qty) ?? 0,
+                PlannedQty =
+                    _db.BatchProducts
+                        .Where(bp =>
+                            bp.IsActive &&
+                            bp.Version_Id == ptp.VersionId &&
+                            bp.ProductToPart_ID == ptp.Id)
+                        .Sum(bp => (int?)bp.Planned_Qty) ?? 0,
+                InProduction =
+                    _db.BatchProducts
+                        .Where(bp =>
+                            bp.IsActive &&
+                            bp.Version_Id == ptp.VersionId &&
+                            bp.ProductToPart_ID == ptp.Id &&
+                            tasksQuery.Any(x =>
+                                x.t.BatchProduct_ID == bp.ID &&
+                                x.ts.StepType == 1 &&
+                                x.ts.IsFinal &&
+                                (x.t.Tasks_Status == 2 || x.t.Tasks_Status == 3)
+                            )
+                            &&
+                            tasksQuery.Any(x =>
+                                x.t.BatchProduct_ID == bp.ID &&
+                                x.ts.StepType == 1 &&
+                                x.ts.IsFinal &&
+                                x.t.Tasks_Status != 3
+                            )
+                        )
+                        .Sum(bp => (int?)bp.Planned_Qty) ?? 0,
+                
+                OkQty =
+                    _db.BatchProducts
+                        .Where(bp =>
+                            bp.IsActive &&
+                            bp.Version_Id == ptp.VersionId &&
+                            bp.ProductToPart_ID == ptp.Id &&
+
+                            !tasksQuery
+                                .Any(x =>
+                                    x.t.BatchProduct_ID == bp.ID &&
+                                    x.t.IsActive &&
+                                    x.ts.StepType == 1 &&
+                                    x.t.Tasks_Status != 3)
+                        )
+                        .Sum(bp => (int?)bp.Planned_Qty) ?? 0,
+
+                ReservedQty =
+                    tasksQuery
+                        .Where(x =>
+                            x.ts.StepType == 2 &&
+                            (x.t.Tasks_Status == 2 || x.t.Tasks_Status == 3) &&
+                            x.ts.ProductToPartId == ptp.Id)
+                        .Sum(x => (int?)x.t.Qty_Done) ?? 0,
+                FreeQty =
+                        (
+                            _db.BatchProducts
+                                .Where(bp =>
+                                    bp.IsActive &&
+                                    bp.Version_Id == ptp.VersionId &&
+                                    bp.ProductToPart_ID == ptp.Id)
+                                .Sum(bp => (int?)bp.Planned_Qty) ?? 0
+                        )
+                        - (
+                            tasksQuery
+                                .Where(x =>
+                                    x.ts.StepType == 2 &&
+                                    (x.t.Tasks_Status == 2 || x.t.Tasks_Status == 3) &&
+                                    x.ts.ProductToPartId == ptp.Id)
+                                .Sum(x => (int?)x.t.Qty_Done) ?? 0
+                        )
+            }
+    ).ToListAsync();
+
+    return Ok(parts);
+}
+
+
+[HttpGet("full-data-all")]
+public async Task<IActionResult> GetFullDataAll([FromQuery] string versionIds)
+{
+    if (string.IsNullOrWhiteSpace(versionIds))
+        return BadRequest("versionIds required");
+
+    var ids = versionIds
+        .Split(',')
+        .Select(int.Parse)
+        .ToList();
+
+    var tasksQuery =
+        _db.Tasks
+            .Join(_db.TopPartSteps,
+                t => t.TopPartStep_ID,
+                ts => ts.Id,
+                (t, ts) => new { t, ts })
+            .Where(x => x.t.IsActive);
+
+    var data = await (
+        from ptp in _db.ProductTopParts.AsNoTracking()
+            .Where(ptp =>
+                ids.Contains(ptp.VersionId)
+                && ptp.IsActive
+                && _db.TopPartSteps
+                    .Any(ts =>
+                        ts.ProductToPartId == ptp.Id &&
+                        ts.StepType == 1)
+            )
+        join tp in _db.TopParts on ptp.TopPartId equals tp.Id
+        where tp.IsActive
+        select new
+        {
+            ptp.VersionId,
+            ptp.TopPartId,
+            tp.TopPartName,
+
+            PlannedQty =
+                _db.BatchProducts
+                    .Where(bp =>
+                        bp.IsActive &&
+                        bp.Version_Id == ptp.VersionId &&
+                        bp.ProductToPart_ID == ptp.Id)
+                    .Sum(bp => (int?)bp.Planned_Qty) ?? 0,
+
+            InProduction =
+                _db.BatchProducts
+                    .Where(bp =>
+                        bp.IsActive &&
+                        bp.Version_Id == ptp.VersionId &&
+                        bp.ProductToPart_ID == ptp.Id &&
+                        tasksQuery.Any(x =>
+                            x.t.BatchProduct_ID == bp.ID &&
+                            x.ts.StepType == 1 &&
+                            x.ts.IsFinal &&
+                            (x.t.Tasks_Status == 2 || x.t.Tasks_Status == 3)
+                        )
+                        &&
+                        tasksQuery.Any(x =>
+                            x.t.BatchProduct_ID == bp.ID &&
+                            x.ts.StepType == 1 &&
+                            x.ts.IsFinal &&
+                            x.t.Tasks_Status != 3
+                        )
+                    )
+                    .Sum(bp => (int?)bp.Planned_Qty) ?? 0,
+
+            OkQty =
+                _db.BatchProducts
+                    .Where(bp =>
+                        bp.IsActive &&
+                        bp.Version_Id == ptp.VersionId &&
+                        bp.ProductToPart_ID == ptp.Id &&
+                        !tasksQuery.Any(x =>
+                            x.t.BatchProduct_ID == bp.ID &&
+                            x.ts.StepType == 1 &&
+                            x.t.Tasks_Status != 3)
+                    )
+                    .Sum(bp => (int?)bp.Planned_Qty) ?? 0,
+
+            ReservedQty =
+                tasksQuery
+                    .Where(x =>
+                        x.ts.StepType == 2 &&
+                        (x.t.Tasks_Status == 2 || x.t.Tasks_Status == 3) &&
+                        x.ts.ProductToPartId == ptp.Id)
+                    .Sum(x => (int?)x.t.Qty_Done) ?? 0,
+
+            FreeQty =
+                (
+                    _db.BatchProducts
+                        .Where(bp =>
+                            bp.IsActive &&
+                            bp.Version_Id == ptp.VersionId &&
+                            bp.ProductToPart_ID == ptp.Id)
+                        .Sum(bp => (int?)bp.Planned_Qty) ?? 0
+                )
+                -
+                (
+                    tasksQuery
+                        .Where(x =>
+                            x.ts.StepType == 2 &&
+                            (x.t.Tasks_Status == 2 || x.t.Tasks_Status == 3) &&
+                            x.ts.ProductToPartId == ptp.Id)
+                        .Sum(x => (int?)x.t.Qty_Done) ?? 0
+                )
+        }
+    ).ToListAsync();
+
+    return Ok(data);
+}
+
+
     }
 }

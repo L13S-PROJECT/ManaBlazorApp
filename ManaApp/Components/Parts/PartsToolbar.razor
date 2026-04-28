@@ -1,46 +1,67 @@
 <div class="parts-toolbar">
 
-    <!-- Kategorija -->
-    <div class="root-filter">
+    <!-- TOP ROW -->
+    <div class="toolbar-top">
 
-    <button type="button"
-            class="root-pill @(SelectedRoot == null ? "active" : null)"
-            @onclick="@(() => OnRootChanged.InvokeAsync(null))">
-        Visi
-    </button>
+        <div class="root-filter">
+            <button type="button"
+                    class="root-pill @(SelectedRoot == null ? "active" : null)"
+                    @onclick="@(() => OnRootChanged.InvokeAsync(null))">
+                Visi
+            </button>
 
-    <button type="button"
-            class="root-pill @(SelectedRoot == 1 ? "active" : null)"
-            @onclick="@(() => OnRootChanged.InvokeAsync(1))">
-        Kausi
-    </button>
+            <button type="button"
+                    class="root-pill @(SelectedRoot == 1 ? "active" : null)"
+                    @onclick="@(() => OnRootChanged.InvokeAsync(1))">
+                Kausi
+            </button>
 
-    <button type="button"
-            class="root-pill @(SelectedRoot == 2 ? "active" : null)"
-            @onclick="@(() => OnRootChanged.InvokeAsync(2))">
-        Adapteri
-    </button>
+            <button type="button"
+                    class="root-pill @(SelectedRoot == 2 ? "active" : null)"
+                    @onclick="@(() => OnRootChanged.InvokeAsync(2))">
+                Adapteri
+            </button>
+        </div>
+
+        <!-- Switch -->
+        <label class="archived-switch">
+            <input type="checkbox"
+                checked="@ShowArchived"
+                @onchange="e => ShowArchivedChanged.InvokeAsync((bool)e.Value!)" />
+            <span class="slider"></span>
+        </label>
 
     </div>
 
-    <!-- Meklēšana -->
-    <input type="text"
-       placeholder="Meklēt detaļu..."
-       @bind="_searchText"
-       @bind:event="oninput" />
+    <!-- BOTTOM ROW -->
+    <div class="toolbar-bottom">
 
-    <!-- Filtri -->
-    <label><input type="checkbox" checked="@PlannedOnly" @onchange="e => PlannedOnlyChanged.InvokeAsync((bool)e.Value!)" /> Plānots</label>
-<label><input type="checkbox" checked="@InProductionOnly" @onchange="e => InProductionOnlyChanged.InvokeAsync((bool)e.Value!)" /> Ražošanā</label>
-<label><input type="checkbox" checked="@OkOnly" @onchange="e => OkOnlyChanged.InvokeAsync((bool)e.Value!)" /> Ok</label>
-<label><input type="checkbox" checked="@ReservedOnly" @onchange="e => ReservedOnlyChanged.InvokeAsync((bool)e.Value!)" /> Rezervēts</label>
-<label><input type="checkbox" checked="@FreeOnly" @onchange="e => FreeOnlyChanged.InvokeAsync((bool)e.Value!)" /> Citi</label>
+        <!-- Meklēšana -->
+        <div class="search-wrapper">
+            <input type="text"
+                class="search-box"
+                placeholder="Meklēt..."
+                value="@_searchText"
+                @oninput="OnSearchInput" />
 
-    <!-- Switch -->
-    <label class="switch">
-        <input type="checkbox" />
-        <span>Toggle</span>
-    </label>
+            @if (!string.IsNullOrWhiteSpace(_searchText))
+            {
+                <button type="button" class="clear-btn" @onclick="ClearSearch">×</button>
+            }
+        </div>
+
+        <!-- Filtri -->
+    <div class="filters-wrapper">
+        <div class="filters">
+            <label><input type="checkbox" checked="@PlannedOnly" @onchange="e => PlannedOnlyChanged.InvokeAsync((bool)e.Value!)" /> Plānots</label>
+            <label><input type="checkbox" checked="@InProductionOnly" @onchange="e => InProductionOnlyChanged.InvokeAsync((bool)e.Value!)" /> Ražošanā</label>
+            <label><input type="checkbox" checked="@OkOnly" @onchange="e => OkOnlyChanged.InvokeAsync((bool)e.Value!)" /> Ok</label>
+            <label><input type="checkbox" checked="@ReservedOnly" @onchange="e => ReservedOnlyChanged.InvokeAsync((bool)e.Value!)" /> Rezervēts</label>
+            <label><input type="checkbox" checked="@FreeOnly" @onchange="e => FreeOnlyChanged.InvokeAsync((bool)e.Value!)" /> Citi</label>
+        </div>
+     </div>
+
+    </div>
 
 </div>
 
@@ -65,6 +86,9 @@
 [Parameter] public bool FreeOnly { get; set; }
 [Parameter] public EventCallback<bool> FreeOnlyChanged { get; set; }
 
+[Parameter] public bool ShowArchived { get; set; }
+[Parameter] public EventCallback<bool> ShowArchivedChanged { get; set; }
+
 private string? _searchText
 {
     get => SearchText;
@@ -76,6 +100,29 @@ private string? _searchText
             SearchTextChanged.InvokeAsync(value);
         }
     }
+}
+
+private CancellationTokenSource? _cts;
+
+private async Task OnSearchInput(ChangeEventArgs e)
+{
+    _cts?.Cancel();
+    _cts = new CancellationTokenSource();
+
+    var value = e.Value?.ToString();
+
+    try
+    {
+        await Task.Delay(300, _cts.Token); // debounce 300ms
+        _searchText = value;
+    }
+    catch (TaskCanceledException) { }
+}
+
+private async Task ClearSearch()
+{
+    _searchText = null;
+    await SearchTextChanged.InvokeAsync(null);
 }
 
 }

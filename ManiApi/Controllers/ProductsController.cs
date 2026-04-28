@@ -1380,6 +1380,44 @@ var list = new List<object>();
     return Ok(list);
 }
 
+[HttpGet("planning-list-archived")]
+public async Task<IActionResult> GetPlanningListArchived()
+{
+    var rows = await (
+        from v in _db.ProductVersions
+        join p in _db.Products on v.ProductId equals p.Id
+        join c in _db.Categories on p.CategoryId equals c.Id
+        join pc in _db.Categories on c.ParentId equals pc.Id into parentJoin
+        from pc in parentJoin.DefaultIfEmpty()
+
+        where v.IsActive == false   // !!! tikai arhivētās versijas
+
+        select new
+        {
+            Id = p.Id,
+            ProductCode = p.ProductCode,
+            ProductName = p.ProductName,
+            CategoryId = p.CategoryId,
+            ParentCategoryId = c.ParentId,
+            CategoryName = c.CategoryName,
+            RootName = c.ParentId == null
+                ? c.CategoryName
+                : pc.CategoryName,
+
+            VersionId = v.Id,
+            VersionName = v.VersionName,
+            VersionDate = v.VersionDate
+        }
+    )
+    .OrderBy(x => x.RootName)
+    .ThenBy(x => x.CategoryName)
+    .ThenBy(x => x.ProductName)
+    .ThenByDescending(x => x.VersionDate)
+    .ToListAsync();
+
+    return Ok(rows);
+}
+
 public sealed class SetPriorityRequest
 {
     public int VersionId { get; set; }
@@ -1465,7 +1503,6 @@ public async Task<IActionResult> GetStageStepMap(
 
     return Ok(rows);
 }
-
 
     } // ← beidzas klase ProductsController
     

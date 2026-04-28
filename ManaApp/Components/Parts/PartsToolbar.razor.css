@@ -1,14 +1,162 @@
 /* PartsToolbar.razor.css */
 
-.parts-toolbar {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: white;
 
+.parts-toolbar {
+    position: static;
+    width: 100%;
+    top: 0;
+    z-index: 20;
+    background: #eff6ff; /* gaiši zils */
+    border: 1px solid #dbeafe;
+
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+
+    width: 100%;
+    display: block;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px 8px;
+}
+
+/* TOP */
+.toolbar-top {
     display: flex;
-    gap: 10px;
+    justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
-    padding: 6px 0;
+}
+
+/* tabs */
+.root-filter {
+    display: flex;
+    gap: 6px;
+}
+
+.root-pill {
+    padding: 3px 6px;
+    border: 1px solid #3b5fc4;
+    border-radius: 6px;
+    background: white;
+    cursor: pointer;
+    min-width: 80px;
+    text-align: center;
+}
+
+.root-pill.active {
+    background: #3b5fc4;
+    color: white;
+}
+
+/* BOTTOM */
+.toolbar-bottom {
+    display: grid;
+    grid-template-columns: 3fr 5fr;
+    align-items: center;
+    margin-top: 6px;
+    gap: 0;
+}
+
+.filters-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-left: 10px;
+}
+
+/* search */
+.search-box {
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    width: 100%;
+}
+
+/* filtri */
+.filters {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+}
+
+.filters label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 14px;
+}
+
+.archived-switch{
+    position:relative;
+    display:inline-block;
+    width:48px;   /* mazliet platāks */
+    height:24px;
+}
+
+.archived-switch input{
+    opacity:0;
+    width:0;
+    height:0;
+}
+
+.archived-switch .slider{
+    position:absolute;
+    cursor:pointer;
+    inset:0;
+
+    background:#ffffff;              /* balts fons */
+    border:2px solid #1e40af;        /* zila kontūra */
+    border-radius:24px;
+
+    box-shadow:inset 0 2px 4px rgba(0,0,0,.25); /* iegrimis efekts */
+    transition:.25s;
+}
+
+.archived-switch .slider::before{
+    content:"";
+    position:absolute;
+
+    width:16px;
+    height:16px;
+
+    inset:3px auto auto 3px;   /* ņem vērā border */
+    
+    background:#cbd5e1;
+    border-radius:50%;
+    transition:.25s;
+}
+
+.archived-switch input:checked + .slider::before{
+    background:#3b82f6;
+    transform:translateX(22px);
+}
+
+
+.archived-switch input:checked + .slider::before{
+    transform:translateX(20px);
+}
+
+.search-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.search-box {
+    padding-right: 26px; /* vieta X ikonai */
+}
+
+.clear-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+
+    border: none;
+    background: transparent;
+    cursor: pointer;
+
+    font-size: 16px;
+    color: #9ca3af;
+}
+
+.clear-btn:hover {
+    color: #374151;
 }
