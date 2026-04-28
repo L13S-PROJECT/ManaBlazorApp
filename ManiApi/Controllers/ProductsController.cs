@@ -25,7 +25,7 @@ namespace ManiApi.Controllers
 public class UpdateProductRequest
 {
     public int ProductId { get; set; }
-
+    public bool IsHistoricalVersion { get; set; }
     public string? ProductName { get; set; }
     public string? ProductCode { get; set; }
     public int CategoryId { get; set; }
@@ -577,7 +577,8 @@ public async Task<IActionResult> GetWorksByVersion([FromQuery] int versionId)
                             .OrderByDescending(v => v.VersionDate)
                             .FirstOrDefaultAsync();
                     }
-                    if (prev is not null) prev.IsActive = false;
+                    if (prev is not null && !dto.IsHistoricalVersion)
+                        prev.IsActive = false;
 
                     // jaunas versijas datums
                     var parsedDate = DateOnly.FromDateTime(DateTime.UtcNow.Date);
@@ -598,7 +599,7 @@ public async Task<IActionResult> GetWorksByVersion([FromQuery] int versionId)
                         VersionRasejums = dto.VersionRasejums ?? "",
                         VersionDate = parsedDate,
                         VersionComment = dto.VersionComment ?? "",
-                        IsActive = true
+                        IsActive = !dto.IsHistoricalVersion
                     };
                     _db.ProductVersions.Add(newVer);
                     await _db.SaveChangesAsync();
@@ -670,12 +671,12 @@ var map = oldParts
                         return BadRequest("VersionId is required when CreateNewVersion = false.");
 
                     var ver = await _db.ProductVersions
-                        .FirstOrDefaultAsync(v => v.Id == dto.VersionId.Value && v.ProductId == product.Id && v.IsActive);
+                        .FirstOrDefaultAsync(v => v.Id == dto.VersionId.Value && v.ProductId == product.Id);
 
                     if (ver is null) return NotFound("Active version not found.");
 
                     if (dto.VersionRasejums is not null) ver.VersionRasejums = dto.VersionRasejums;
-                    if (dto.VersionComment is not null) ver.VersionComment = dto.VersionComment;
+                    ver.VersionComment = dto.VersionComment ?? "";
 
                     await _db.SaveChangesAsync();
                     return Ok(new { product.Id, VersionId = ver.Id });
@@ -771,11 +772,11 @@ var map = oldParts
             Console.WriteLine("CREATE STEP API CALLED");
             if (dto.ProductToPartId <= 0) return BadRequest("ProductToPartId is required.");
             if (string.IsNullOrWhiteSpace(dto.StepName)) return BadRequest("StepName is required.");
-           if (dto.WorkCentrId <= 0) return BadRequest("WorkCentrId required.");
+            if (dto.WorkCentrId <= 0) return BadRequest("WorkCentrId required.");
 
             // 1) Part must be active and belong to an ACTIVE version
             var ptp = await _db.ProductTopParts
-                .FirstOrDefaultAsync(p => p.Id == dto.ProductToPartId && p.IsActive);
+                .FirstOrDefaultAsync(p => p.Id == dto.ProductToPartId);
 
             if (ptp is null)
                 return NotFound("Part not found or inactive.");
@@ -791,14 +792,11 @@ var map = oldParts
             if (hasTasks)
                 return BadRequest("Nevar pievienot soli – šai detaļai jau ir uzdevumi.");
 
-            // papildus pārbaudām, vai saistītā versija ir aktīva
-            var versionActive = await _db.ProductVersions
-                .AnyAsync(v => v.Id == ptp.VersionId && v.IsActive);
+            // atļaujam arī neaktīvām (historical) versijām
 
-            if (!versionActive)
-                return BadRequest("Steps can be edited only for active version.");
         // ja UI nav atsūtījis StepType (vai 0) -> piešķiram pēc TopPart.Stage
-// tikai ja StepType NAV padots no UI → piešķiram pēc Stage
+
+        // tikai ja StepType NAV padots no UI → piešķiram pēc Stage
 if (dto.StepType <= 0)
 {
     var stage = await _db.TopParts
@@ -888,8 +886,8 @@ if (dto.StepType <= 0)
             var ptp = await _db.ProductTopParts.FirstOrDefaultAsync(p => p.Id == step.ProductToPartId && p.IsActive);
 
             if (ptp is null) return BadRequest("Part is inactive.");
-            var versionActive = await _db.ProductVersions.AnyAsync(v => v.Id == ptp.VersionId && v.IsActive);
-            if (!versionActive) return BadRequest("Steps can be edited only for active version.");
+
+            // atļaujam arī historical versijām
 
 // tikai ja StepType NAV padots no UI → izmanto mapping
 if (dto.StepType <= 0)
@@ -953,8 +951,8 @@ if (dto.StepType <= 0)
             // tikai aktīvai versijai
             var ptp = await _db.ProductTopParts.FirstOrDefaultAsync(p => p.Id == step.ProductToPartId && p.IsActive);
             if (ptp is null) return BadRequest("Part is inactive.");
-            var versionActive = await _db.ProductVersions.AnyAsync(v => v.Id == ptp.VersionId && v.IsActive);
-            if (!versionActive) return BadRequest("Steps can be edited only for active version.");
+
+            // atļaujam dzēst arī historical versijām
 
             var hasTasks = await _db.Tasks
                 .AnyAsync(t => t.TopPartStep_ID == step.Id && t.IsActive);
@@ -1014,6 +1012,7 @@ if (dto.StepType <= 0)
         public sealed class AddPartRequest
         {
             public int productId { get; set; }      // Produkta Id
+            public int versionId { get; set; }
             public int topPartId { get; set; }      // Detaļas Id
             public int qtyPerProduct { get; set; }  // Vesels skaitlis >=1
         }
@@ -1025,13 +1024,14 @@ if (dto.StepType <= 0)
                 return BadRequest(new { message = "Nepareizi parametri (productId, topPartId vai qtyPerProduct)." });
 
             // 1) Aktīvā versija šai precei
-            var versionId = await db.ProductVersions
-                .Where(v => v.ProductId == dto.productId && v.IsActive)
-                .Select(v => v.Id)
-                .SingleOrDefaultAsync();
+            // izmantojam konkrēto izvēlēto versiju
+            var versionId = dto.versionId;
 
-            if (versionId == 0)
-                return BadRequest(new { message = "Šai precei nav aktīvas versijas." });
+            var versionExists = await db.ProductVersions
+                .AnyAsync(v => v.Id == versionId);
+
+            if (!versionExists)
+                return BadRequest(new { message = "Versija nav atrasta." });
 
             // 2) Pārbaudām detaļu
             var topPartExists = await db.TopParts.AnyAsync(tp => tp.Id == dto.topPartId && tp.IsActive);

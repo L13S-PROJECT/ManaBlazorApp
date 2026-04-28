@@ -220,3 +220,35 @@
   border-color:#cbd5e1;
   color:#9ca3af;
 }
+
+.archived-label {
+    color: #d00000;
+    margin-left: 8px;
+    font-weight: 600;
+}
+
+.archived-panel {
+    background-color: #f3f3f3;
+    border-color: #d6d6d6;
+}
+
+.archived-panel .pc-input-flex,
+.archived-panel .pc-input-name,
+.archived-panel .pc-input-code,
+.archived-panel .pc-input-version,
+.archived-panel .pc-input-ras,
+.archived-panel .pc-input-date,
+.archived-panel .pc-notes-box {
+    background-color: #f9f9f9;
+    color: #555;
+}
+
+.archived-badge {
+    margin-left: 12px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+    background-color: #d00000;
+    border-radius: 6px;
+}

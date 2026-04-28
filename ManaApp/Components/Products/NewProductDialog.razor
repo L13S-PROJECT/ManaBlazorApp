@@ -128,6 +128,18 @@
                         </div>
                     }
 
+                @if (IsEdit && CreateNewVersion)
+                    {
+                        <div class="form-check my-2" style="margin:0;">
+                            <input class="form-check-input" type="checkbox"
+                                checked="@IsHistoricalVersion"
+                                @onchange="async e => await IsHistoricalVersionChanged.InvokeAsync(e.Value is bool b && b)" />
+                            <label class="form-check-label">
+                                Vēsturiskā versija (neaktivizēt)
+                            </label>
+                        </div>
+                    }
+
                 <!-- Versija (obligāts) -->
                 <div>
                     <label style="font-weight:600; display:block; margin-bottom:.25rem;">Versija</label>
@@ -181,9 +193,10 @@
                     <label style="font-weight:600; display:block; margin-bottom:.25rem;">Komentārs</label>
                     <textarea class="np-input np-textarea"
                         rows="3"
+                        value="@NewVersionComment"
                         @oninput="e => NewVersionCommentChanged.InvokeAsync(e.Value?.ToString())"
-                        placeholder="@(IsEdit ? "" : "Pievienot komentāru")"
-                        disabled="@(IsEdit && !CreateNewVersion)">@NewVersionComment</textarea>
+                        placeholder="@(IsEdit ? "" : "Pievienot komentāru")">
+                    </textarea>
                 </div>
             </div>
 
@@ -251,6 +264,10 @@
     // ---- Actions ----
     [Parameter] public EventCallback OnSave { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
+
+    // ---- History ----
+    [Parameter] public bool IsHistoricalVersion { get; set; }
+    [Parameter] public EventCallback<bool> IsHistoricalVersionChanged { get; set; }
 
     private async Task OnCreateNewVersionChanged(ChangeEventArgs e)
     {

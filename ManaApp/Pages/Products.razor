@@ -67,13 +67,13 @@
     Selected="selected"
     Details="selectedDetails"
     Loading="loadingDetails"
-    IsReadOnly="@(selected is not null && (!selected.IsActive || !selected.VersionIsActive))" />
+    IsReadOnly="false" />
 
             <!-- Tehnoloģija -->
 
 <ProductTechnologyBox
     Selected="selected"
-    IsReadOnly="@(selected is not null && (!selected.IsActive || !selected.VersionIsActive))"
+    IsReadOnly="false"
     LoadingPartDetails="loadingPartDetails"
     LoadingWorks="loadingWorks"
     SelectedPartDetails="selectedPartDetails"
@@ -120,7 +120,9 @@
     NewVersionComment="@newVersionComment"
     NewVersionCommentChanged="@(v => newVersionComment = v)"
     OnSave="SaveAsync"
-    OnCancel="CloseDialog" />
+    OnCancel="CloseDialog" 
+    IsHistoricalVersion="isHistoricalVersion"
+    IsHistoricalVersionChanged="@(v => isHistoricalVersion = v)" />
 
 <!-- === TEHNOLOĢIJAS SOĻI dialogs === -->
 <ProductStepsDialog
@@ -221,6 +223,7 @@
     // Režīmi dialogam
     bool isEdit = false;
     private bool _createNewVersion = false;
+    private bool isHistoricalVersion = false;
 
 private bool createNewVersion
 {
@@ -525,7 +528,8 @@ private void CloseDialog()
     versionComment  = newVersionComment,
 
     createNewVersion = createNewVersion,
-    copyTechnologySteps = createNewVersion && copyTechnologySteps
+    copyTechnologySteps = createNewVersion && copyTechnologySteps,
+    IsHistoricalVersion = createNewVersion && isHistoricalVersion
 };
 
 
@@ -1073,6 +1077,7 @@ private async Task SaveNewPart()
  var payload = new
 {
     productId     = selected!.id,              // ← API gaida productId
+    versionId     = selected!.VersionId,
     topPartId     = newPart.TopPartId!.Value,  // ← API gaida topPartId
     qtyPerProduct = newPart.QtyPerProduct      // ← API gaida qtyPerProduct (>=1)
 };
@@ -1087,10 +1092,10 @@ private async Task SaveNewPart()
 
     // atjauno sarakstus (gan detaļas, gan “Tehnoloģiju”)
 selectedPartDetails = await Http.GetFromJsonAsync<List<ProductDetailDto>>(
-    $"http://localhost:5270/api/products/details-by-product?id={selected!.id}") ?? new();
+    $"http://localhost:5270/api/products/details-by-version?versionId={selected!.VersionId}");
 
 worksByParts = await Http.GetFromJsonAsync<List<WorksByPartDto>>(
-    $"http://localhost:5270/api/products/works-by-product?id={selected!.id}") ?? new();
+    $"http://localhost:5270/api/products/works-by-version?versionId={selected!.VersionId}");
 
 SetMainDialog(null);
 
@@ -1499,6 +1504,7 @@ if (dto.IsActive)
         new
         {
             productId = selected.id,
+            versionId = selected.VersionId,
             topPartId = part.Id,
             qtyPerProduct = 1
         });

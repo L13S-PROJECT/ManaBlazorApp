@@ -1,11 +1,18 @@
 @namespace ManaApp.Components.Products
 @using ManaApp.Models
 
-<div class="product-content-panel @(IsReadOnly ? "readonly-panel" : "")">
+<div class="product-content-panel 
+    @(IsReadOnly ? "readonly-panel" : "") 
+    @(Selected is not null && !Selected.VersionIsActive ? "archived-panel" : "")">
 
     <div class="product-panel-header">
-    Preces apraksts
-</div>
+        Preces apraksts
+
+        @if (Selected is not null && !Selected.VersionIsActive)
+        {
+            <span class="archived-badge">ARHIVĒTS</span>
+        }
+    </div>
 
 <div class="product-panel-body">
 
@@ -34,7 +41,14 @@
         <div class="pc-row-namecode">
 
             <div class="pc-label-fixed">Nosaukums</div>
-            <div class="pc-input-name">@Details.ProductName</div>
+            <div class="pc-input-name">
+                @Details.ProductName
+
+                @if (Selected is not null && !Selected.VersionIsActive)
+                {
+                    <span class="archived-label">(ARHIVĒTS)</span>
+                }
+            </div>
 
             <div class="pc-label-code">Kods</div>
             <div class="pc-input-code">@Details.ProductCode</div>
