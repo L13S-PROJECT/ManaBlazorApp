@@ -1,0 +1,199 @@
+using ManiApi.Data;
+using ManiApi.DTOs.Tasks;
+using ManiApi.Models;
+using Microsoft.EntityFrameworkCore;
+using ManiApi.Services.Tasks;
+using ManiApi.Services.Stock;
+
+namespace ManiApi.Services.Finishing
+{
+    public class FinishingFlowService
+    {
+        private readonly AppDbContext _db;
+        private readonly StockService _stockService;
+
+        public FinishingFlowService(AppDbContext db, StockService stockService)
+        {
+            _db = db;
+            _stockService = stockService;
+        }
+
+        public async Task<OpenFinishingResultDto> OpenFinishing(OpenFinishingDto dto)
+        {
+            try
+                {
+// 1) INPUT VALIDATION -> Ievades datu pārbaude – pārliecināmies, ka visi obligātie parametri ir derīgi
+
+                    ValidateInput(dto);
+
+// 2) BEGIN TRANSACTION -> Sākam datubāzes transakciju, lai visas darbības izpildītos kā viens vesels
+
+                    await using var tx = await _db.Database.BeginTransactionAsync();
+
+// 3) GET FINISHING STEP - Atrodam konkrētajai detaļai definēto Finishing soli (StepType = 3)
+                    var finishingStep = await GetFinishingStep(dto.ProductToPartId);
+
+                    var batchProductId = dto.BatchProductId;
+
+// 4) CALCULATE ASSEMBLY AVAILABLE QTY ->
+//Aprēķinām pieejamo Assembly daudzumu, atņemot jau rezervēto Finishing apjomu
+
+                    var assemblyAvailable = await _stockService.CalculateAssemblyAvailable(batchProductId);
+
+// 5) GET WAITING FINISHING TASKS (status=5) ->
+// Atlasām visus gaidošos (status=5) Finishing uzdevumus šai partijai un detaļai
+
+                    var waitingTasks = await GetWaitingTasks(batchProductId, finishingStep.Id);
+
+// 6) CREATE OR SPLIT FINISHING WAVE -> 
+// Nosakām – vai veidojam jaunu Finishing vilni vai izmantojam/sadalām esošo
+
+                    var activeTask = await CreateOrSplitFinishingTask(
+                        waitingTasks,
+                        batchProductId,
+                        finishingStep.Id,
+                        assemblyAvailable,
+                        dto);
+
+        // 7) CREATE STOCK MOVEMENTS (ASSEMBLY -> FINISHING) -> 
+        // Veidojam stock kustības – pārvietojam daudzumu no Assembly uz Finishing
+
+                await _stockService.MoveAssemblyToFinishing(
+                        batchProductId,
+                        activeTask.ID,
+                        dto.Qty,
+                        dto.RalColorId);
+
+        // 8) COMMIT TRANSACTION - Apstiprinām transakciju – visas izmaiņas saglabājam datubāzē
+                await _db.SaveChangesAsync();
+                await tx.CommitAsync();
+
+        // 9) RETURN RESULT - Atgriežam rezultātu ar jaunizveidotā/atjauninātā uzdevuma ID
+
+                    return new OpenFinishingResultDto
+                    {
+                        TaskId = activeTask.ID
+                    };
+
+                    }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("ERROR open-finishing: " + ex.ToString());
+                    throw;
+                }
+        }
+// Palīgmetodes ievades datu validācijai (var izsaukt arī no kontroliera, ja nepieciešams) -
+// OpeningFinishing metodes sākumā var aizvietot tieši ar šo, lai kods būtu tīrāks un validācija centralizēta
+
+private void ValidateInput(OpenFinishingDto dto)
+    {
+        if (dto.BatchProductId <= 0 || dto.ProductToPartId <= 0 || dto.Qty <= 0)
+            throw new ArgumentException("BatchProductId, ProductToPartId un Qty ir obligāti, Qty > 0.");
+    }
+
+private async Task<TopPartStep> GetFinishingStep(int productToPartId)
+{
+    var finishingStep = await _db.TopPartSteps
+        .FirstOrDefaultAsync(ts =>
+            ts.ProductToPartId == productToPartId &&
+            ts.StepType == 3 &&
+            ts.IsActive);
+
+    if (finishingStep is null)
+        throw new ArgumentException("Šai detaļai nav definēts Finishing solis (StepType = 3).");
+
+    return finishingStep;
+}
+
+private async Task<List<ManiApi.Models.Tasks>> GetWaitingTasks(int batchProductId, int finishingStepId)
+{
+    return await _db.Tasks
+        .Where(t =>
+            t.IsActive &&
+            t.BatchProduct_ID == batchProductId &&
+            t.TopPartStep_ID == finishingStepId &&
+            t.Tasks_Status == 5)
+        .OrderBy(t => t.ID)
+        .ToListAsync();
+}
+
+private async Task<ManiApi.Models.Tasks> CreateOrSplitFinishingTask(
+    List<ManiApi.Models.Tasks> waitingTasks,
+    int batchProductId,
+    int finishingStepId,
+    int assemblyAvailable,
+    OpenFinishingDto dto)
+{
+    ManiApi.Models.Tasks activeTask;
+
+    if (waitingTasks.Count == 0)
+    {
+        activeTask = ManiApi.Services.Tasks.TaskFactory.CreateFinishingTask(
+            batchProductId,
+            finishingStepId,
+            dto.Qty,
+            dto.RalColorId,
+            dto.Comment);
+
+        _db.Tasks.Add(activeTask);
+        // SaveChanges tiks izsaukts augstāk (OpenFinishing)
+    }
+    else
+    {
+        var parent = waitingTasks[0];
+        var plannedQty = assemblyAvailable;
+        var requestQty = dto.Qty;
+
+        if (plannedQty <= 0 || requestQty >= plannedQty)
+        {
+            parent.Tasks_Status  = 1;
+            parent.Qty_Done      = requestQty > 0 ? requestQty : plannedQty;
+            parent.Tasks_Comment = dto.Comment;
+            parent.RAL_Color_ID  = dto.RalColorId;
+
+            foreach (var extra in waitingTasks.Skip(1))
+                extra.IsActive = false;
+
+            // SaveChanges tiks izsaukts augstāk (OpenFinishing)
+
+            activeTask = parent;
+        }
+        else
+        {
+            var remaining = plannedQty - requestQty;
+
+            parent.IsActive = false;
+
+            activeTask = ManiApi.Services.Tasks.TaskFactory.CreateFinishingTask(
+                batchProductId,
+                finishingStepId,
+                dto.Qty,
+                dto.RalColorId,
+                dto.Comment);
+
+            _db.Tasks.Add(activeTask);
+
+            var waitingRemainder = new ManiApi.Models.Tasks
+            {
+                BatchProduct_ID = parent.BatchProduct_ID,
+                TopPartStep_ID  = parent.TopPartStep_ID,
+                Tasks_Status    = 5,
+                IsActive        = true,
+                Qty_Done        = remaining,
+                Qty_Scrap       = 0
+            };
+
+            _db.Tasks.Add(waitingRemainder);
+
+            foreach (var extra in waitingTasks.Skip(1))
+                extra.IsActive = false;
+
+            // SaveChanges tiks izsaukts augstāk (OpenFinishing)
+        }
+    }
+
+    return activeTask;
+}
+
+    }
+}

@@ -5,7 +5,8 @@ using System.Text.Json.Serialization; // <- pie using augšā
 using ManiApi.Services.Products;
 using ManiApi.Services.Detail;
 using ManiApi.Services.Finishing;
-using ManiApi.Services.Tasks;   
+using ManiApi.Services.Tasks; 
+using ManiApi.Services.Stock;  
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -36,6 +37,9 @@ builder.Services.AddScoped<FinishingTasksService>();
 builder.Services.AddScoped<VersionService>();
 builder.Services.AddScoped<TaskManagementService>();
 builder.Services.AddScoped<TaskQueryService>();
+builder.Services.AddScoped<FinishingFlowService>();
+builder.Services.AddScoped<StockService>();
+
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
