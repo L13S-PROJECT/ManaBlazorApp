@@ -1024,5 +1024,626 @@ LIMIT 1;";
     return await cmd.ExecuteScalarAsync() != null;
 }
 
+// GET: /api/tasks/detailed-summary-by-batch?batchId=123
+public async Task<List<object>> GetDetailedSummaryByBatch(int batchId)
+{
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+SELECT 
+    ts.ProductToPart_ID,
+    MIN(CASE 
+            WHEN t.Tasks_Status IN (2,3) THEN t.Started_At 
+        END) AS StartedAt,
+    CASE 
+        WHEN SUM(CASE WHEN t.Tasks_Status <> 3 THEN 1 ELSE 0 END) = 0
+             AND MAX(t.Finished_At) IS NOT NULL
+        THEN MAX(t.Finished_At)
+        ELSE NULL
+    END AS FinishedAt
+FROM tasks t
+JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+JOIN toppartsteps     ts ON ts.ID = t.TopPartStep_ID
+WHERE t.IsActive      = 1
+  AND bp.IsActive     = 1
+  AND bp.Batch_Id     = @batch
+  AND ts.Step_Type    = 1
+GROUP BY ts.ProductToPart_ID;
+";
+
+    var pBatch = cmd.CreateParameter();
+    pBatch.ParameterName = "@batch";
+    pBatch.Value = batchId;
+    cmd.Parameters.Add(pBatch);
+
+    var list = new List<object>();
+    await using var r = await cmd.ExecuteReaderAsync();
+    while (await r.ReadAsync())
+    {
+        list.Add(new
+        {
+            ProductToPartId = r.GetInt32(0),
+            StartedAt       = r.IsDBNull(1) ? (DateTime?)null : r.GetDateTime(1),
+            FinishedAt      = r.IsDBNull(2) ? (DateTime?)null : r.GetDateTime(2)
+        });
+    }
+
+    return list;
+}
+
+public async Task<List<object>> GetDetailedSummaryByBatchProduct(int batchProductId)
+{
+    if (batchProductId <= 0)
+        throw new ArgumentException("batchProductId is required.");
+
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+cmd.CommandText = @"
+SELECT 
+    ts.ProductToPart_ID,
+    ts.Step_Type AS StepType,   -- 1 = Detailed, 2 = Assembly, 3 = Finishing
+
+    -- Sākums:
+    --  Detailed/Assembly: Step_Order = 10 + status 2/3
+    --  Finishing: jebkurš solis ar statusu 2/3
+    MIN(
+        CASE 
+            WHEN ts.Step_Type IN (1,2)
+                 AND ts.Step_Order = 10 
+                 AND t.Tasks_Status IN (2,3)
+            THEN t.Started_At 
+            WHEN ts.Step_Type = 3
+                 AND t.Tasks_Status IN (2,3)
+            THEN t.Started_At
+        END
+    ) AS StartedAt,
+
+    -- Beigas: IsFinal = 1 šim Step_Type, kad pabeigts (statuss = 3)
+    MAX(
+        CASE 
+            WHEN ts.IsFinal = 1
+                 AND t.Tasks_Status = 3
+            THEN t.Finished_At
+        END
+    ) AS FinishedAt
+
+FROM tasks t
+JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+JOIN toppartsteps     ts ON ts.ID = t.TopPartStep_ID
+WHERE t.IsActive      = 1
+  AND bp.IsActive     = 1
+  AND bp.ID           = @bpId          -- KONKRĒTAIS BatchProduct
+  AND ts.Step_Type    IN (1,2,3)       -- ← PIEVIENOTS 3 (Finishing)
+GROUP BY 
+    ts.ProductToPart_ID,
+    ts.Step_Type;
+";
+
+    var p = cmd.CreateParameter();
+    p.ParameterName = "@bpId";
+    p.Value = batchProductId;
+    cmd.Parameters.Add(p);
+
+    var list = new List<object>();
+    await using var r = await cmd.ExecuteReaderAsync();
+    while (await r.ReadAsync())
+    {
+        list.Add(new
+        {
+            ProductToPartId = r.GetInt32(0),
+            StepType        = r.GetInt32(1),  // 1 = Detailed, 2 = Assembly
+            StartedAt       = r.IsDBNull(2) ? (DateTime?)null : r.GetDateTime(2),
+            FinishedAt      = r.IsDBNull(3) ? (DateTime?)null : r.GetDateTime(3)
+        });
+    }
+
+    return list;
+}
+
+public async Task<List<object>> GetFinishingWaves(int batchProductId, int productToPartId)
+{
+    if (batchProductId <= 0 || productToPartId <= 0)
+        throw new ArgumentException("batchProductId and productToPartId are required.");
+
+    var list = await _db.Tasks
+        .Join(_db.TopPartSteps,
+            t => t.TopPartStep_ID,
+            ts => ts.Id,
+            (t, ts) => new { t, ts })
+        .GroupJoin(_db.Set<RalColor>(),
+            x => x.t.RAL_Color_ID,
+            rc => rc.ID,
+            (x, rc) => new { x.t, x.ts, rc })
+        .SelectMany(
+            x => x.rc.DefaultIfEmpty(),
+            (x, rc) => new { x.t, x.ts, rc })
+            .Where(x =>
+    x.t.IsActive &&
+    x.t.BatchProduct_ID == batchProductId &&
+    x.ts.ProductToPartId == productToPartId &&
+    x.ts.StepType == 3 &&
+    x.t.Tasks_Status != 5          // ✅ ŠIS
+)
+
+        .OrderByDescending(x => x.t.ID)
+        .Select(x => new
+            {
+                TaskId = x.t.ID,
+                Status = x.t.Tasks_Status,
+                Qty = x.t.Qty_Done,
+                Assigned_To = x.t.Assigned_To,
+                Claimed_By = x.t.Claimed_By,
+                StartedAt = x.t.Started_At,
+                FinishedAt = x.t.Finished_At,
+                Comment = x.t.Tasks_Comment,
+                RalName = x.rc != null ? x.rc.Name : null
+            })
+
+        .ToListAsync();
+
+Console.WriteLine("[finishing-waves] " + string.Join(" | ", list.Select(x => $"{x.TaskId}:{x.RalName}:{(x.Comment ?? "NULL")}")));
+
+    return list.Cast<object>().ToList();
+}
+
+public async Task<int> GetFinishingInProgressByVersion(int versionId)
+{
+    var conn = _db.Database.GetDbConnection();
+
+    if (conn.State != ConnectionState.Open)
+        await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+
+    cmd.CommandText = @"
+SELECT COALESCE(SUM(t.Qty_Done), 0) AS FinishingInProgress
+FROM tasks t
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID AND ts.IsActive = 1
+JOIN batches_products bp ON bp.ID = t.BatchProduct_ID AND bp.IsActive = 1
+WHERE bp.Version_Id = @vid
+  AND t.IsActive = 1
+  AND ts.Step_Type = 3
+  AND t.Tasks_Status = 2;";
+
+    cmd.Parameters.Add(new MySqlParameter("@vid", versionId));
+
+    return Convert.ToInt32(await cmd.ExecuteScalarAsync());
+}
+
+public async Task<int> GetFinishingAllocatedByVersion(int versionId)
+{
+    var conn = _db.Database.GetDbConnection();
+
+    if (conn.State != ConnectionState.Open)
+        await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+
+    cmd.CommandText = @"
+SELECT COALESCE(SUM(t.Qty_Done), 0) AS FinishingAllocated
+FROM tasks t
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID AND ts.IsActive = 1
+JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID AND ptp.IsActive = 1
+WHERE ptp.Version_ID = @vid
+  AND t.IsActive = 1
+  AND ts.Step_Type = 3
+  AND t.Tasks_Status IN (1,2);";
+
+    cmd.Parameters.Add(new MySqlParameter("@vid", versionId));
+
+    return Convert.ToInt32(await cmd.ExecuteScalarAsync());
+}
+
+public async Task<List<object>> GetDetailedIndicators(int batchProductId)
+{
+    var conn = _db.Database.GetDbConnection();
+
+    if (conn.State != ConnectionState.Open)
+        await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+
+    cmd.CommandText = @"
+SELECT
+    ts.ProductToPart_ID,
+
+    SUM(CASE WHEN t.Tasks_Status = 1 THEN 1 ELSE 0 END) AS Cnt1,
+    SUM(CASE WHEN t.Tasks_Status = 2 THEN 1 ELSE 0 END) AS Cnt2,
+    SUM(CASE WHEN t.Tasks_Status = 3 THEN 1 ELSE 0 END) AS Cnt3,
+    SUM(CASE WHEN t.Tasks_Status = 5 THEN 1 ELSE 0 END) AS Cnt5,
+    COUNT(*) AS TotalCnt
+
+FROM tasks t
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+
+WHERE t.IsActive = 1
+  AND ts.Step_Type = 1
+  AND t.BatchProduct_ID IN (
+      SELECT bp2.ID
+      FROM batches_products bp2
+      WHERE bp2.IsActive = 1
+        AND bp2.Batch_Id = (
+            SELECT bp0.Batch_Id
+            FROM batches_products bp0
+            WHERE bp0.ID = @bp
+            LIMIT 1
+        )
+        AND bp2.Version_Id = (
+            SELECT bp0.Version_Id
+            FROM batches_products bp0
+            WHERE bp0.ID = @bp
+            LIMIT 1
+        )
+  )
+
+GROUP BY ts.ProductToPart_ID;
+";
+
+    cmd.Parameters.Add(new MySqlParameter("@bp", batchProductId));
+
+    var list = new List<object>();
+
+    await using var r = await cmd.ExecuteReaderAsync();
+
+    while (await r.ReadAsync())
+    {
+        int cnt1 = r.GetInt32(1);
+        int cnt2 = r.GetInt32(2);
+        int cnt3 = r.GetInt32(3);
+        int cnt5 = r.GetInt32(4);
+        int total = r.GetInt32(5);
+
+        string state =
+            cnt5 == total ? "gray" :
+            cnt3 == total ? "green" :
+            cnt2 > 0      ? "yellow" :
+            cnt1 == total ? "blue" :
+                            "gray";
+
+        list.Add(new
+        {
+            ProductToPartId = r.GetInt32(0),
+            State = state
+        });
+    }
+
+    return list;
+}
+
+public async Task<List<object>> GetAssemblyIndicators(int batchProductId)
+{
+    var conn = _db.Database.GetDbConnection();
+
+    if (conn.State != ConnectionState.Open)
+        await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+
+    cmd.CommandText = @"
+SELECT
+    ts.ProductToPart_ID,
+
+    SUM(CASE WHEN t.Tasks_Status = 1 THEN 1 ELSE 0 END) AS Cnt1,
+    SUM(CASE WHEN t.Tasks_Status = 2 THEN 1 ELSE 0 END) AS Cnt2,
+    SUM(CASE WHEN t.Tasks_Status = 3 THEN 1 ELSE 0 END) AS Cnt3,
+    SUM(CASE WHEN t.Tasks_Status = 5 THEN 1 ELSE 0 END) AS Cnt5,
+    COUNT(*) AS TotalCnt
+
+FROM tasks t
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+
+WHERE t.IsActive = 1
+  AND t.BatchProduct_ID = @bp
+  AND ts.Step_Type = 2
+
+GROUP BY ts.ProductToPart_ID;
+";
+
+    cmd.Parameters.Add(new MySqlParameter("@bp", batchProductId));
+
+    var list = new List<object>();
+
+    await using var r = await cmd.ExecuteReaderAsync();
+
+    while (await r.ReadAsync())
+    {
+        int cnt1 = r.GetInt32(1);
+        int cnt2 = r.GetInt32(2);
+        int cnt3 = r.GetInt32(3);
+        int cnt5 = r.GetInt32(4);
+        int total = r.GetInt32(5);
+
+        string state =
+            cnt5 == total ? "gray" :
+            cnt3 == total ? "green" :
+            cnt2 > 0      ? "yellow" :
+            cnt1 == total ? "blue" :
+                            "gray";
+
+        list.Add(new
+        {
+            ProductToPartId = r.GetInt32(0),
+            State = state
+        });
+    }
+
+    return list;
+}
+
+public async Task<List<object>> GetFinishingIndicators(int batchProductId)
+{
+    var conn = _db.Database.GetDbConnection();
+
+    if (conn.State != ConnectionState.Open)
+        await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+
+    cmd.CommandText = @"
+SELECT
+    ts.ProductToPart_ID,
+
+    SUM(CASE WHEN t.Tasks_Status = 1 THEN 1 ELSE 0 END) AS Cnt1,
+    SUM(CASE WHEN t.Tasks_Status = 2 THEN 1 ELSE 0 END) AS Cnt2,
+    SUM(CASE WHEN t.Tasks_Status = 3 THEN 1 ELSE 0 END) AS Cnt3,
+    COUNT(*) AS TotalCnt
+
+FROM tasks t
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+WHERE t.IsActive = 1
+  AND t.BatchProduct_ID = @bp
+  AND ts.Step_Type = 3
+GROUP BY ts.ProductToPart_ID;
+";
+
+    cmd.Parameters.Add(new MySqlParameter("@bp", batchProductId));
+
+    var list = new List<object>();
+
+    await using var r = await cmd.ExecuteReaderAsync();
+
+    while (await r.ReadAsync())
+    {
+        int cnt1 = r.GetInt32(1);
+        int cnt2 = r.GetInt32(2);
+        int cnt3 = r.GetInt32(3);
+        int total = r.GetInt32(4);
+
+        string state =
+            total == 0
+                ? "gray"
+                : cnt3 == total
+                    ? "green"
+                    : (cnt1 > 0 || cnt2 > 0)
+                        ? "yellow"
+                        : "gray";
+
+        list.Add(new
+        {
+            ProductToPartId = r.GetInt32(0),
+            State = state
+        });
+    }
+
+    return list;
+}
+
+public async Task<List<object>> GetByStep(int batchProductId, int topPartStepId)
+{
+    var conn = _db.Database.GetDbConnection();
+
+    if (conn.State != ConnectionState.Open)
+        await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+
+    cmd.CommandText = @"
+SELECT
+    t.ID            AS TaskId,
+    t.Tasks_Status  AS Status,
+    t.Assigned_To   AS AssignedTo,
+    COALESCE(t.Qty_Done, 0) AS Done
+FROM tasks t
+WHERE t.IsActive = 1
+  AND t.BatchProduct_ID = @bp
+  AND t.TopPartStep_ID  = @step
+ORDER BY t.ID;
+";
+
+    cmd.Parameters.Add(new MySqlParameter("@bp", batchProductId));
+    cmd.Parameters.Add(new MySqlParameter("@step", topPartStepId));
+
+    var list = new List<object>();
+
+    await using var r = await cmd.ExecuteReaderAsync();
+
+    while (await r.ReadAsync())
+    {
+        list.Add(new
+        {
+            TaskId      = r.GetInt32(0),
+            Status      = r.GetInt32(1),
+            Assigned_To = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
+            Done        = r.GetInt32(3)
+        });
+    }
+
+    return list;
+}
+
+public async Task<List<object>> GetTasksByBatch(int batchProductId, int stepType)
+{
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+SELECT
+    t.ID               AS TaskId,
+    t.Tasks_Status     AS Status,
+    t.Assigned_To,
+    t.Claimed_By,
+    COALESCE(t.Qty_Done, 0) AS Done,
+    ts.ID AS TopPartStepId,
+    COALESCE(ptpParent.ID, ptp.ID) AS ProductToPartId,
+    tp.ID              AS TopPartId,
+    ptp.TopPart_ID     AS TopPartIdRaw,
+    t.Started_At,
+    t.Finished_At,
+    t.Tasks_Comment AS Comment,
+    t.Is_Comment_For_Employee AS IsCommentForEmployee,
+    tp.TopPart_Name AS PartName,
+    rc.Name AS RalName,
+    bp.ParentBatchProduct_ID,
+    bp.ProductToPart_ID,
+    bp.Planned_Qty AS BatchPlannedQty,
+    ptp.Qty_Per_product AS QtyPerProduct
+
+FROM tasks t
+JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+
+JOIN toppartsteps    ts  ON ts.ID = t.TopPartStep_ID
+
+JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
+JOIN toppart         tp  ON tp.ID  = ptp.TopPart_ID
+
+LEFT JOIN producttopparts ptpParent
+    ON ptpParent.Version_ID = bp.Version_Id
+    AND ptpParent.TopPart_ID = ptp.TopPart_ID
+    AND ptpParent.IsActive = 1
+
+LEFT JOIN ral_colors rc ON rc.ID = t.RAL_Color_ID
+WHERE t.IsActive = 1
+  AND ts.Step_Type = @stepType
+  AND t.BatchProduct_ID IN (
+      SELECT bp2.ID
+      FROM batches_products bp2
+      WHERE bp2.IsActive = 1
+        AND bp2.Batch_Id = (
+            SELECT bp0.Batch_Id
+            FROM batches_products bp0
+            WHERE bp0.ID = @bpId
+            LIMIT 1
+        )
+        AND bp2.Version_Id = (
+            SELECT bp0.Version_Id
+            FROM batches_products bp0
+            WHERE bp0.ID = @bpId
+            LIMIT 1
+        )
+  )
+ORDER BY ts.Step_Order, t.ID;
+";
+    cmd.Parameters.Add(new MySqlParameter("@bpId", batchProductId));
+    cmd.Parameters.Add(new MySqlParameter("@stepType", stepType));
+
+    var list = new List<object>();
+    await using var r = await cmd.ExecuteReaderAsync();
+    while (await r.ReadAsync())
+    {
+            list.Add(new
+            {
+                TaskId        = r.GetInt32(0),
+                Status        = r.GetInt32(1),
+                Assigned_To   = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
+                Claimed_By    = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
+                Done          = r.IsDBNull(4) ? 0 : r.GetInt32(4),
+                TopPartStepId = r.GetInt32(5),
+                ProductToPartId = r.GetInt32(6),
+                TopPartId     = r.GetInt32(7),
+                TopPartIdRaw  = r.GetInt32(8),
+                StartedAt     = r.IsDBNull(9) ? (DateTime?)null : r.GetDateTime(9),
+                FinishedAt    = r.IsDBNull(10) ? (DateTime?)null : r.GetDateTime(10),
+                Comment = r.IsDBNull(11) ? null : r.GetString(11),
+                IsCommentForEmployee = !r.IsDBNull(12) && r.GetBoolean(12),
+                PartName = r.IsDBNull(13) ? null : r.GetString(13),
+                RalName = r.IsDBNull(14) ? null : r.GetString(14),
+                ParentBatchProductId = r.IsDBNull(15) ? (int?)null : r.GetInt32(15),
+                ProductToPartId_BP   = r.IsDBNull(16) ? (int?)null : r.GetInt32(16),   
+                BatchPlannedQty = r.IsDBNull(17) ? 0 : r.GetInt32(17),
+                QtyPerProduct   = r.IsDBNull(18) ? 0 : r.GetInt32(18),  
+            });
+
+    }
+
+    return list;
+}
+
+public async Task<List<string>> GetWorkCenters()
+{
+    return await _db.WorkCenters
+        .Where(x => x.IsActive)
+        .OrderBy(x => x.WorkCenter_Order)
+        .Select(x => x.WorkCentr_Name)
+        .ToListAsync();
+}
+
+public async Task<int> GetAssemblyAvailableUi(int batchProductId)
+{
+    var assemblyStock = await _db.StockMovements
+        .Where(x =>
+            x.IsActive &&
+            x.BatchProduct_ID == batchProductId &&
+            x.Move_Type == MoveType.ASSEMBLY)
+        .SumAsync(x => (int?)x.Stock_Qty) ?? 0;
+
+    return Math.Max(assemblyStock, 0);
+}
+
+public async Task<object> GetEmployeeLoad(int empId)
+{
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    string? employeeName = null;
+    string? workCenterName = null;
+    int? employeeWorkCenterId = null;
+
+    // 🔹 Header (employee + workcenter)
+    await using (var cmdHeader = conn.CreateCommand())
+    {
+        cmdHeader.CommandText = @"
+SELECT ID, Employee_Name, WorkCentrTypeID
+FROM employees
+WHERE ID = @empId;";
+
+        cmdHeader.Parameters.Add(new MySqlParameter("@empId", empId));
+
+        await using var rHeader = await cmdHeader.ExecuteReaderAsync();
+
+        if (await rHeader.ReadAsync())
+        {
+            employeeName = rHeader.IsDBNull(1) ? null : rHeader.GetString(1);
+            employeeWorkCenterId = rHeader.IsDBNull(2) ? (int?)null : rHeader.GetInt32(2);
+        }
+
+        await rHeader.DisposeAsync();
+
+        if (employeeWorkCenterId.HasValue)
+        {
+            await using var wcCmd = conn.CreateCommand();
+            wcCmd.CommandText = @"SELECT Workcentr_Name FROM workcentr_type WHERE ID = @id";
+            wcCmd.Parameters.Add(new MySqlParameter("@id", employeeWorkCenterId.Value));
+
+            var wcObj = await wcCmd.ExecuteScalarAsync();
+            workCenterName = wcObj?.ToString();
+        }
+    }
+
+    // ⚠️ Pārējo loģiku (3 query + mapping) vēl NEPĀRVĒL — tas būs nākamais solis
+
+    return new
+    {
+        EmployeeName = employeeName,
+        WorkCenterName = workCenterName,
+        WorkCentrTypeID = employeeWorkCenterId
+    };
+}
+
     }
 }

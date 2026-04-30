@@ -24,18 +24,25 @@ namespace ManiApi.Controllers
     private readonly DetailTasksService _detailService;
     private readonly TaskManagementService _taskManagementService;
     private readonly FinishingFlowService _finishingFlowService;
+    private readonly FinishingTasksService _finishingTasksService;
+    private readonly TaskQueryService _taskQueryService;
     
     public TasksController(
         AppDbContext db,
         TaskService taskService,
         DetailTasksService detailService,
         TaskManagementService taskManagementService,
-        FinishingFlowService finishingFlowService)
+        FinishingFlowService finishingFlowService,
+        FinishingTasksService finishingTasksService,
+        TaskQueryService taskQueryService)
     {
         _db = db;
         _taskService = taskService;
         _detailService = detailService;
         _taskManagementService = taskManagementService;
+        _taskQueryService = taskQueryService;
+        _finishingFlowService = finishingFlowService;
+        _finishingTasksService = finishingTasksService;
         _finishingFlowService = finishingFlowService;
     }
 
@@ -606,50 +613,8 @@ public async Task<IActionResult> GetDetailedSummaryByBatch([FromQuery] int batch
     if (batchId <= 0)
         return BadRequest("batchId is required.");
 
-    var conn = _db.Database.GetDbConnection();
-    await conn.OpenAsync();
-
-    await using var cmd = conn.CreateCommand();
-    cmd.CommandText = @"
-SELECT 
-    ts.ProductToPart_ID,
-    MIN(CASE 
-            WHEN t.Tasks_Status IN (2,3) THEN t.Started_At 
-        END) AS StartedAt,
-    CASE 
-        WHEN SUM(CASE WHEN t.Tasks_Status <> 3 THEN 1 ELSE 0 END) = 0
-             AND MAX(t.Finished_At) IS NOT NULL
-        THEN MAX(t.Finished_At)
-        ELSE NULL
-    END AS FinishedAt
-FROM tasks t
-JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
-JOIN toppartsteps     ts ON ts.ID = t.TopPartStep_ID
-WHERE t.IsActive      = 1
-  AND bp.IsActive     = 1
-  AND bp.Batch_Id     = @batch
-  AND ts.Step_Type    = 1      -- Detailed
-GROUP BY ts.ProductToPart_ID;
-";
-
-    var pBatch = cmd.CreateParameter();
-    pBatch.ParameterName = "@batch";
-    pBatch.Value = batchId;
-    cmd.Parameters.Add(pBatch);
-
-    var list = new List<object>();
-    await using var r = await cmd.ExecuteReaderAsync();
-    while (await r.ReadAsync())
-    {
-        list.Add(new
-        {
-            ProductToPartId = r.GetInt32(0),
-            StartedAt       = r.IsDBNull(1) ? (DateTime?)null : r.GetDateTime(1),
-            FinishedAt      = r.IsDBNull(2) ? (DateTime?)null : r.GetDateTime(2)
-        });
-    }
-
-    return Ok(list);
+    var list = await _taskQueryService.GetDetailedSummaryByBatch(batchId);
+return Ok(list);
 }
 
 [HttpGet("finishing-waves")]
@@ -658,45 +623,8 @@ public async Task<IActionResult> GetFinishingWaves([FromQuery] int batchProductI
     if (batchProductId <= 0 || productToPartId <= 0)
         return BadRequest("batchProductId and productToPartId are required.");
 
-    var list = await _db.Tasks
-        .Join(_db.TopPartSteps,
-            t => t.TopPartStep_ID,
-            ts => ts.Id,
-            (t, ts) => new { t, ts })
-        .GroupJoin(_db.Set<RalColor>(),
-            x => x.t.RAL_Color_ID,
-            rc => rc.ID,
-            (x, rc) => new { x.t, x.ts, rc })
-        .SelectMany(
-            x => x.rc.DefaultIfEmpty(),
-            (x, rc) => new { x.t, x.ts, rc })
-            .Where(x =>
-    x.t.IsActive &&
-    x.t.BatchProduct_ID == batchProductId &&
-    x.ts.ProductToPartId == productToPartId &&
-    x.ts.StepType == 3 &&
-    x.t.Tasks_Status != 5          // ✅ ŠIS
-)
-
-        .OrderByDescending(x => x.t.ID)
-        .Select(x => new
-            {
-                TaskId = x.t.ID,
-                Status = x.t.Tasks_Status,
-                Qty = x.t.Qty_Done,
-                Assigned_To = x.t.Assigned_To,
-                Claimed_By = x.t.Claimed_By,
-                StartedAt = x.t.Started_At,
-                FinishedAt = x.t.Finished_At,
-                Comment = x.t.Tasks_Comment,
-                RalName = x.rc != null ? x.rc.Name : null
-            })
-
-        .ToListAsync();
-
-Console.WriteLine("[finishing-waves] " + string.Join(" | ", list.Select(x => $"{x.TaskId}:{x.RalName}:{(x.Comment ?? "NULL")}")));
-
-    return Ok(list);
+  var list = await _taskQueryService.GetFinishingWaves(batchProductId, productToPartId);
+        return Ok(list);
 }
 
 
@@ -707,122 +635,25 @@ public async Task<IActionResult> GetDetailedSummaryByBatchProduct([FromQuery] in
     if (batchProductId <= 0)
         return BadRequest("batchProductId is required.");
 
-    var conn = _db.Database.GetDbConnection();
-    await conn.OpenAsync();
-
-    await using var cmd = conn.CreateCommand();
-cmd.CommandText = @"
-SELECT 
-    ts.ProductToPart_ID,
-    ts.Step_Type AS StepType,   -- 1 = Detailed, 2 = Assembly, 3 = Finishing
-
-    -- Sākums:
-    --  Detailed/Assembly: Step_Order = 10 + status 2/3
-    --  Finishing: jebkurš solis ar statusu 2/3
-    MIN(
-        CASE 
-            WHEN ts.Step_Type IN (1,2)
-                 AND ts.Step_Order = 10 
-                 AND t.Tasks_Status IN (2,3)
-            THEN t.Started_At 
-            WHEN ts.Step_Type = 3
-                 AND t.Tasks_Status IN (2,3)
-            THEN t.Started_At
-        END
-    ) AS StartedAt,
-
-    -- Beigas: IsFinal = 1 šim Step_Type, kad pabeigts (statuss = 3)
-    MAX(
-        CASE 
-            WHEN ts.IsFinal = 1
-                 AND t.Tasks_Status = 3
-            THEN t.Finished_At
-        END
-    ) AS FinishedAt
-
-FROM tasks t
-JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
-JOIN toppartsteps     ts ON ts.ID = t.TopPartStep_ID
-WHERE t.IsActive      = 1
-  AND bp.IsActive     = 1
-  AND bp.ID           = @bpId          -- KONKRĒTAIS BatchProduct
-  AND ts.Step_Type    IN (1,2,3)       -- ← PIEVIENOTS 3 (Finishing)
-GROUP BY 
-    ts.ProductToPart_ID,
-    ts.Step_Type;
-";
-
-    var p = cmd.CreateParameter();
-    p.ParameterName = "@bpId";
-    p.Value = batchProductId;
-    cmd.Parameters.Add(p);
-
-    var list = new List<object>();
-    await using var r = await cmd.ExecuteReaderAsync();
-    while (await r.ReadAsync())
-    {
-        list.Add(new
-        {
-            ProductToPartId = r.GetInt32(0),
-            StepType        = r.GetInt32(1),  // 1 = Detailed, 2 = Assembly
-            StartedAt       = r.IsDBNull(2) ? (DateTime?)null : r.GetDateTime(2),
-            FinishedAt      = r.IsDBNull(3) ? (DateTime?)null : r.GetDateTime(3)
-        });
-    }
-
-    return Ok(list);
+    var list = await _taskQueryService.GetDetailedSummaryByBatchProduct(batchProductId);
+        return Ok(list);
 }
+
 
 [HttpGet("finishing-inprogress-by-version")]
 public async Task<IActionResult> GetFinishingInProgressByVersion([FromQuery] int versionId)
 {
-    var conn = _db.Database.GetDbConnection();
-    await conn.OpenAsync();
+    var val = await _taskQueryService.GetFinishingInProgressByVersion(versionId);
+return Ok(new { finishingInProgress = val });
 
-    await using var cmd = conn.CreateCommand();
-    cmd.CommandText = @"
-SELECT COALESCE(SUM(t.Qty_Done), 0) AS FinishingInProgress
-FROM tasks t
-JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID AND ts.IsActive = 1
-JOIN batches_products bp ON bp.ID = t.BatchProduct_ID AND bp.IsActive = 1
-WHERE bp.Version_Id = @vid
-  AND t.IsActive = 1
-  AND ts.Step_Type = 3
-  AND t.Tasks_Status = 2;";
-
-    var p = cmd.CreateParameter();
-    p.ParameterName = "@vid";
-    p.Value = versionId;
-    cmd.Parameters.Add(p);
-
-    var val = Convert.ToInt32(await cmd.ExecuteScalarAsync());
-    return Ok(new { finishingInProgress = val });
 }
+
 
 [HttpGet("finishing-allocated-by-version")]
 public async Task<IActionResult> GetFinishingAllocatedByVersion([FromQuery] int versionId)
 {
-    var conn = _db.Database.GetDbConnection();
-    await conn.OpenAsync();
-
-    await using var cmd = conn.CreateCommand();
-    cmd.CommandText = @"
-SELECT COALESCE(SUM(t.Qty_Done), 0) AS FinishingAllocated
-FROM tasks t
-JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID AND ts.IsActive = 1
-JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID AND ptp.IsActive = 1
-WHERE ptp.Version_ID = @vid
-  AND t.IsActive = 1
-  AND ts.Step_Type = 3
-  AND t.Tasks_Status IN (1,2);";   // 1=allocated, 2=in progress
-
-    var p = cmd.CreateParameter();
-    p.ParameterName = "@vid";
-    p.Value = versionId;
-    cmd.Parameters.Add(p);
-
-    var val = Convert.ToInt32(await cmd.ExecuteScalarAsync());
-    return Ok(new { finishingAllocated = val });
+    var val = await _taskQueryService.GetFinishingAllocatedByVersion(versionId);
+        return Ok(new { finishingAllocated = val });
 }
 
 
@@ -857,78 +688,8 @@ public async Task<IActionResult> GetDetailedIndicators([FromQuery] int batchProd
     if (batchProductId <= 0)
         return BadRequest("batchProductId is required.");
 
-    var conn = _db.Database.GetDbConnection();
-    await conn.OpenAsync();
-
-    await using var cmd = conn.CreateCommand();
-   cmd.CommandText = @"
-SELECT
-    ts.ProductToPart_ID,
-
-    SUM(CASE WHEN t.Tasks_Status = 1 THEN 1 ELSE 0 END) AS Cnt1,
-    SUM(CASE WHEN t.Tasks_Status = 2 THEN 1 ELSE 0 END) AS Cnt2,
-    SUM(CASE WHEN t.Tasks_Status = 3 THEN 1 ELSE 0 END) AS Cnt3,
-    SUM(CASE WHEN t.Tasks_Status = 5 THEN 1 ELSE 0 END) AS Cnt5,
-    COUNT(*) AS TotalCnt
-
-FROM tasks t
-JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
-
-WHERE t.IsActive = 1
-  AND ts.Step_Type = 1
-  AND t.BatchProduct_ID IN (
-      SELECT bp2.ID
-      FROM batches_products bp2
-      WHERE bp2.IsActive = 1
-        AND bp2.Batch_Id = (
-            SELECT bp0.Batch_Id
-            FROM batches_products bp0
-            WHERE bp0.ID = @bp
-            LIMIT 1
-        )
-        AND bp2.Version_Id = (
-            SELECT bp0.Version_Id
-            FROM batches_products bp0
-            WHERE bp0.ID = @bp
-            LIMIT 1
-        )
-  )
-
-GROUP BY ts.ProductToPart_ID;
-";
-
-    var p = cmd.CreateParameter();
-    p.ParameterName = "@bp";
-    p.Value = batchProductId;
-    cmd.Parameters.Add(p);
-
-    var list = new List<object>();
-    await using var r = await cmd.ExecuteReaderAsync();
-    while (await r.ReadAsync())
-    {
-        int cnt1 = r.GetInt32(1);
-        int cnt2 = r.GetInt32(2);
-        int cnt3 = r.GetInt32(3);
-        int cnt5 = r.GetInt32(4);
-        int total = r.GetInt32(5);          
-
-        string state =
-            cnt5 == total ? "gray" :
-            cnt3 == total ? "green" :
-            cnt2 > 0      ? "yellow" :
-            cnt1 == total ? "blue" :
-                            "gray";
-
-
-        list.Add(new
-        {
-            ProductToPartId = r.GetInt32(0),
-            State = state
-        });
-    }
-
-    return Ok(list);
+    var list = await _taskQueryService.GetDetailedIndicators(batchProductId);
+        return Ok(list);
 }
 
 // GET: /api/tasks/assembly-indicators?batchProductId=123
@@ -938,57 +699,8 @@ public async Task<IActionResult> GetAssemblyIndicators([FromQuery] int batchProd
     if (batchProductId <= 0)
         return BadRequest("batchProductId is required.");
 
-    var conn = _db.Database.GetDbConnection();
-    await conn.OpenAsync();
-
-    await using var cmd = conn.CreateCommand();
-    cmd.CommandText = @"
-SELECT
-    ts.ProductToPart_ID,
-
-    SUM(CASE WHEN t.Tasks_Status = 1 THEN 1 ELSE 0 END) AS Cnt1,
-    SUM(CASE WHEN t.Tasks_Status = 2 THEN 1 ELSE 0 END) AS Cnt2,
-    SUM(CASE WHEN t.Tasks_Status = 3 THEN 1 ELSE 0 END) AS Cnt3,
-    SUM(CASE WHEN t.Tasks_Status = 5 THEN 1 ELSE 0 END) AS Cnt5,
-    COUNT(*) AS TotalCnt
-
-FROM tasks t
-JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-
-WHERE t.IsActive = 1
-  AND t.BatchProduct_ID = @bp
-  AND ts.Step_Type = 2          -- 🔵 TIKAI ASSEMBLY
-
-GROUP BY ts.ProductToPart_ID;
-";
-
-    cmd.Parameters.Add(new MySqlParameter("@bp", batchProductId));
-
-    var list = new List<object>();
-    await using var r = await cmd.ExecuteReaderAsync();
-    while (await r.ReadAsync())
-    {
-        int cnt1 = r.GetInt32(1);
-        int cnt2 = r.GetInt32(2);
-        int cnt3 = r.GetInt32(3);
-        int cnt5 = r.GetInt32(4);
-        int total = r.GetInt32(5);
-
-        string state =
-            cnt5 == total ? "gray" :
-            cnt3 == total ? "green" :
-            cnt2 > 0      ? "yellow" :
-            cnt1 == total ? "blue" :
-                            "gray";
-
-        list.Add(new
-        {
-            ProductToPartId = r.GetInt32(0),
-            State = state
-        });
-    }
-
-    return Ok(list);
+    var list = await _taskQueryService.GetAssemblyIndicators(batchProductId);
+        return Ok(list);
 }
 
 
@@ -999,59 +711,8 @@ public async Task<IActionResult> GetFinishingIndicators([FromQuery] int batchPro
     if (batchProductId <= 0)
         return BadRequest("batchProductId is required.");
 
-    var conn = _db.Database.GetDbConnection();
-    await conn.OpenAsync();
-
-    // 1) Statusu skaitīšana FINISHING
-    await using var cmd = conn.CreateCommand();
-    cmd.CommandText = @"
-SELECT
-    ts.ProductToPart_ID,
-
-    SUM(CASE WHEN t.Tasks_Status = 1 THEN 1 ELSE 0 END) AS Cnt1,
-    SUM(CASE WHEN t.Tasks_Status = 2 THEN 1 ELSE 0 END) AS Cnt2,
-    SUM(CASE WHEN t.Tasks_Status = 3 THEN 1 ELSE 0 END) AS Cnt3,
-    COUNT(*) AS TotalCnt
-
-FROM tasks t
-JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-WHERE t.IsActive = 1
-  AND t.BatchProduct_ID = @bp
-  AND ts.Step_Type = 3       -- !!! Finishing
-GROUP BY ts.ProductToPart_ID;
-";
-    cmd.Parameters.Add(new MySqlParameter("@bp", batchProductId));
-
-    var list = new List<object>();
-
-    await using var r = await cmd.ExecuteReaderAsync();
-    while (await r.ReadAsync())
-    {
-        int cnt1 = r.GetInt32(1);
-        int cnt2 = r.GetInt32(2);
-        int cnt3 = r.GetInt32(3);
-        int total = r.GetInt32(4);
-
-        // 🔑 loģika, par kuru vienojāmies
-
-            string state =
-    total == 0
-        ? "gray"        // nav vispār finishing tasku
-        : cnt3 == total
-            ? "green"   // 🔑 VISI finishing taski = 3
-            : (cnt1 > 0 || cnt2 > 0)
-                ? "yellow"  // iesākts
-                : "gray";   // vēl nav sācies
-
-
-        list.Add(new
-        {
-            ProductToPartId = r.GetInt32(0),
-            State = state
-        });
-    }
-
-    return Ok(list);
+    var list = await _taskQueryService.GetFinishingIndicators(batchProductId);
+        return Ok(list);
 }
 
 [HttpPost("update-comment")]
@@ -1091,40 +752,8 @@ public async Task<IActionResult> GetByStep(
     if (batchProductId <= 0 || topPartStepId <= 0)
         return BadRequest("batchProductId and topPartStepId are required.");
 
-    var conn = _db.Database.GetDbConnection();
-    await conn.OpenAsync();
-
-    await using var cmd = conn.CreateCommand();
-    cmd.CommandText = @"
-SELECT
-    t.ID            AS TaskId,
-    t.Tasks_Status  AS Status,
-    t.Assigned_To   AS AssignedTo,
-    COALESCE(t.Qty_Done, 0) AS Done
-FROM tasks t
-WHERE t.IsActive = 1
-  AND t.BatchProduct_ID = @bp
-  AND t.TopPartStep_ID  = @step
-ORDER BY t.ID;
-";
-
-    cmd.Parameters.Add(new MySqlParameter("@bp", batchProductId));
-    cmd.Parameters.Add(new MySqlParameter("@step", topPartStepId));
-
-    var list = new List<object>();
-    await using var r = await cmd.ExecuteReaderAsync();
-    while (await r.ReadAsync())
-    {
-        list.Add(new
-        {
-            TaskId      = r.GetInt32(0),
-            Status      = r.GetInt32(1),
-            Assigned_To = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
-            Done        = r.GetInt32(3)
-        });
-    }
-
-    return Ok(list);
+    var list = await _taskQueryService.GetByStep(batchProductId, topPartStepId);
+        return Ok(list);
 }
 
 // GET: /api/tasks/by-batch?batchProductId=123&stepType=1
@@ -1136,100 +765,8 @@ public async Task<IActionResult> GetTasksByBatch(
     if (batchProductId <= 0)
         return BadRequest("batchProductId is required.");
 
-    var conn = _db.Database.GetDbConnection();
-    await conn.OpenAsync();
-
-    await using var cmd = conn.CreateCommand();
-    cmd.CommandText = @"
-SELECT
-    t.ID               AS TaskId,
-    t.Tasks_Status     AS Status,
-    t.Assigned_To,
-    t.Claimed_By,
-    COALESCE(t.Qty_Done, 0) AS Done,
-    ts.ID AS TopPartStepId,
-    COALESCE(ptpParent.ID, ptp.ID) AS ProductToPartId,
-    tp.ID              AS TopPartId,
-    ptp.TopPart_ID     AS TopPartIdRaw,
-    t.Started_At,
-    t.Finished_At,
-    t.Tasks_Comment AS Comment,
-    t.Is_Comment_For_Employee AS IsCommentForEmployee,
-    tp.TopPart_Name AS PartName,
-    rc.Name AS RalName,
-    bp.ParentBatchProduct_ID,
-    bp.ProductToPart_ID,
-    bp.Planned_Qty AS BatchPlannedQty,
-    ptp.Qty_Per_product AS QtyPerProduct
-
-FROM tasks t
-JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
-
-JOIN toppartsteps    ts  ON ts.ID = t.TopPartStep_ID
-
-JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
-JOIN toppart         tp  ON tp.ID  = ptp.TopPart_ID
-
-LEFT JOIN producttopparts ptpParent
-    ON ptpParent.Version_ID = bp.Version_Id
-    AND ptpParent.TopPart_ID = ptp.TopPart_ID
-    AND ptpParent.IsActive = 1
-
-LEFT JOIN ral_colors rc ON rc.ID = t.RAL_Color_ID
-WHERE t.IsActive = 1
-  AND ts.Step_Type = @stepType
-  AND t.BatchProduct_ID IN (
-      SELECT bp2.ID
-      FROM batches_products bp2
-      WHERE bp2.IsActive = 1
-        AND bp2.Batch_Id = (
-            SELECT bp0.Batch_Id
-            FROM batches_products bp0
-            WHERE bp0.ID = @bpId
-            LIMIT 1
-        )
-        AND bp2.Version_Id = (
-            SELECT bp0.Version_Id
-            FROM batches_products bp0
-            WHERE bp0.ID = @bpId
-            LIMIT 1
-        )
-  )
-ORDER BY ts.Step_Order, t.ID;
-";
-    cmd.Parameters.Add(new MySqlParameter("@bpId", batchProductId));
-    cmd.Parameters.Add(new MySqlParameter("@stepType", stepType));
-
-    var list = new List<object>();
-    await using var r = await cmd.ExecuteReaderAsync();
-    while (await r.ReadAsync())
-    {
-            list.Add(new
-            {
-                TaskId        = r.GetInt32(0),
-                Status        = r.GetInt32(1),
-                Assigned_To   = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
-                Claimed_By    = r.IsDBNull(3) ? (int?)null : r.GetInt32(3),
-                Done          = r.IsDBNull(4) ? 0 : r.GetInt32(4),
-                TopPartStepId = r.GetInt32(5),
-                ProductToPartId = r.GetInt32(6),
-                TopPartId     = r.GetInt32(7),
-                TopPartIdRaw  = r.GetInt32(8),
-                StartedAt     = r.IsDBNull(9) ? (DateTime?)null : r.GetDateTime(9),
-                FinishedAt    = r.IsDBNull(10) ? (DateTime?)null : r.GetDateTime(10),
-                Comment = r.IsDBNull(11) ? null : r.GetString(11),
-                IsCommentForEmployee = !r.IsDBNull(12) && r.GetBoolean(12),
-                PartName = r.IsDBNull(13) ? null : r.GetString(13),
-                RalName = r.IsDBNull(14) ? null : r.GetString(14),
-                ParentBatchProductId = r.IsDBNull(15) ? (int?)null : r.GetInt32(15),
-                ProductToPartId_BP   = r.IsDBNull(16) ? (int?)null : r.GetInt32(16),   
-                BatchPlannedQty = r.IsDBNull(17) ? 0 : r.GetInt32(17),
-                QtyPerProduct   = r.IsDBNull(18) ? 0 : r.GetInt32(18),  
-            });
-
-    }
-
-    return Ok(list);
+    var list = await _taskQueryService.GetTasksByBatch(batchProductId, stepType);
+        return Ok(list);
 }
 
 [HttpPost("update-comment-visibility")]
@@ -1305,7 +842,7 @@ SELECT
     CASE 
         WHEN bp.ProductToPart_ID IS NOT NULL 
              AND bp.ParentBatchProduct_ID IS NULL
-        THEN bp.Planned_Qty   -- 🔥 SINGLE CHILD
+        THEN bp.Planned_Qty   --  SINGLE CHILD
         ELSE bp.Planned_Qty * ptp.Qty_Per_product
     END
     WHEN ts.Step_Type = 3 THEN t.Qty_Done
@@ -2036,13 +1573,8 @@ return Ok(result);
 [HttpGet("workcenters")]
 public async Task<IActionResult> GetWorkCenters()
 {
-    var list = await _db.WorkCenters
-        .Where(x => x.IsActive)
-        .OrderBy(x => x.WorkCenter_Order)
-        .Select(x => x.WorkCentr_Name)
-        .ToListAsync();
-
-    return Ok(list);
+    var list = await _taskQueryService.GetWorkCenters();
+        return Ok(list);
 }
 
 // GET: /api/tasks/aggregated-by-batch?batchProductId=123&stepType=1
@@ -2344,17 +1876,9 @@ public async Task<IActionResult> GetFinishingByVersionRal([FromQuery] int versio
 [HttpGet("assembly-available-ui")]
 public async Task<IActionResult> GetAssemblyAvailableUi([FromQuery] int batchProductId)
 {
-    if (batchProductId <= 0)
-        return BadRequest("batchProductId is required.");
-
-    var assemblyStock = await _db.StockMovements
-        .Where(x =>
-            x.IsActive &&
-            x.BatchProduct_ID == batchProductId &&
-            x.Move_Type == MoveType.ASSEMBLY)
-        .SumAsync(x => (int?)x.Stock_Qty) ?? 0;
-
-    return Ok(Math.Max(assemblyStock, 0));
+    var val = await _taskQueryService.GetAssemblyAvailableUi(batchProductId);
+    return Ok(val);
+    
 }
 
 
@@ -2809,8 +2333,6 @@ public async Task<IActionResult> GetAllActiveTasks()
 {
     return Ok(await _taskService.GetAllActiveTasks());
 }
-
-
 
 
 // GET: /api/tasks/detail-tasks?batchProductId=123
