@@ -6,77 +6,24 @@ using Microsoft.EntityFrameworkCore;
 using ManiApi.Data;
 using ManiApi.Models;
 using MySqlConnector;
+using ManiApi.DTOs.Products;
+using ManiApi.Services.Products;
 
 namespace ManiApi.Controllers
 
 { 
-    public class CreateProductRequest
-    {
-    public string ProductName { get; set; } = "";
-    public string ProductCode { get; set; } = "";
-    public int CategoryId { get; set; }
-
-    // Versijas lauki (visi nav obligāti)
-    public string? VersionName { get; set; }
-    public string? VersionRasejums { get; set; }
-    public string? VersionDate { get; set; }
-    public string? VersionComment { get; set; }
-    }
-public class UpdateProductRequest
-{
-    public int ProductId { get; set; }
-    public bool IsHistoricalVersion { get; set; }
-    public string? ProductName { get; set; }
-    public string? ProductCode { get; set; }
-    public int CategoryId { get; set; }
-
-    public bool CreateNewVersion { get; set; }  // true → izveido jaunu versiju
-    public int? VersionId { get; set; }         // vajadzīgs, ja labo esošo (CreateNewVersion=false)
-
-    public string? VersionName { get; set; }
-    public string? VersionRasejums { get; set; }
-    public string? VersionDate { get; set; }    // "yyyy-MM-dd"
-    public string? VersionComment { get; set; }
-    public bool CopyTechnologySteps { get; set; } // true -> kopēt soļus jaunajai versijai
-
-}
-
-public class CreateStepRequest
-{
-    public int ProductToPartId { get; set; }   // ProductTopPart.Id
-    public int StepOrder { get; set; }         // ja 0 → likšu max+10
-    public string StepName { get; set; } = "";
-    public int StepType { get; set; }          // StepTypes.Id
-    public int WorkCentrId { get; set; }       // WorkCentrs.Id
-    public int? EstimatedMinutes { get; set; }
-    public int ParallelGroup { get; set; } = 0;
-    public bool IsMandatory { get; set; }
-    public bool IsFinal { get; set; }
-    public bool IsPainting { get; set; }
-    public string? Comments { get; set; }
-}
-
-public class UpdateStepRequest
-{
-    public int Id { get; set; }                // TopPartSteps.Id
-    public int StepOrder { get; set; }
-    public string StepName { get; set; } = "";
-    public int StepType { get; set; }
-    public int WorkCentrId { get; set; }
-    public int? EstimatedMinutes { get; set; }
-    public int ParallelGroup { get; set; } = 0;
-    public bool IsMandatory { get; set; }
-    public bool IsFinal { get; set; }
-    public bool IsPainting { get; set; }
-    public string? Comments { get; set; }
-}
 
     [ApiController]
     [Route("api/[controller]")]
     public class ProductsController : ControllerBase
     {
         private readonly AppDbContext _db;
-        public ProductsController(AppDbContext db) => _db = db;
+        private readonly VersionService _versionService;
+        public ProductsController(AppDbContext db, VersionService versionService)
+            {
+                _db = db;
+                _versionService = versionService;
+            }
 
 
 [HttpGet("list")]
@@ -140,86 +87,26 @@ var result = rows.Select(x => new ProductListItemDto
 }
 
         
-        [HttpGet("list-simple")]
+ [HttpGet("list-simple")]
 public async Task<IActionResult> GetListSimple()
 {
-    var rows = await _db.Products.AsNoTracking()
-        .Where(p => p.IsActive)
-        .Select(p => new
-        {
-            p.Id,
-            p.ProductCode,
-            p.ProductName,
-            CategoryName = _db.Categories
-                .Where(c => c.Id == p.CategoryId && c.IsActive)
-                .Select(c => c.CategoryName)
-                .FirstOrDefault()
-        })
-        .ToListAsync();
-
-    var result = rows.Select(x => new
-    {
-        x.Id,
-        x.ProductCode,
-        x.ProductName,
-        x.CategoryName
-    });
+    
+    var result = await _versionService.GetListSimple();
 
     return Ok(result);
+   
 }
 
         // JAUNĀ METODE: GET /api/products/content?id={id}
 [HttpGet("content")]
 public async Task<IActionResult> GetContent([FromQuery] int versionId)
 {
-    var version = await _db.ProductVersions
-        .AsNoTracking()
-        .Where(v => v.Id == versionId)
-        .Select(v => new
-        {
-            v.Id,
-            v.VersionName,
-            v.VersionRasejums,
-            v.VersionDate,
-            v.VersionComment,
-            v.ProductId
-        })
-        .FirstOrDefaultAsync();
+  var result = await _versionService.GetContent(versionId);
 
-    if (version is null)
-        return NotFound();
+if (result == null)
+    return NotFound();
 
-    var product = await _db.Products
-        .AsNoTracking()
-        .Where(p => p.Id == version.ProductId)
-        .Select(p => new
-        {
-            p.ProductName,
-            p.ProductCode,
-            p.CategoryId
-        })
-        .FirstOrDefaultAsync();
-
-    if (product is null)
-        return NotFound();
-
-    var categoryName = await _db.Categories
-        .AsNoTracking()
-        .Where(c => c.Id == product.CategoryId && c.IsActive)
-        .Select(c => c.CategoryName)
-        .FirstOrDefaultAsync();
-
-    return Ok(new
-    {
-        VersionId = version.Id,
-        CategoryName = categoryName,
-        ProductName = product.ProductName,
-        ProductCode = product.ProductCode,
-        VersionName = version.VersionName,
-        VersionRasejums = version.VersionRasejums,
-        VersionDate = version.VersionDate,
-        VersionComment = version.VersionComment
-    });
+return Ok(result);
 }
 
         [HttpGet("details")]
@@ -339,23 +226,9 @@ public async Task<IActionResult> GetTopPartSteps(
 [HttpGet("details-by-version")]
 public async Task<IActionResult> GetDetailsByVersion([FromQuery] int versionId)
 {
-    var rows = await _db.ProductTopParts.AsNoTracking()
-        .Where(pt => pt.VersionId == versionId && pt.IsActive)
-        .Join(_db.TopParts.Where(tp => tp.IsActive),
-              pt => pt.TopPartId,
-              tp => tp.Id,
-              (pt, tp) => new
-              {
-                  TopPartId = pt.TopPartId,
-                  tp.TopPartName,
-                  tp.TopPartCode,
-                  tp.Stage,
-                  Quantity = pt.QtyPerProduct,
-                  ProductToPartId = pt.Id
-              })
-        .ToListAsync();
+    var result = await _versionService.GetDetailsByVersion(versionId);
 
-    return Ok(rows);
+    return Ok(result);
 }
 
 [HttpGet("stage-step-type-map")]
@@ -486,57 +359,13 @@ public async Task<IActionResult> GetWorksByVersion([FromQuery] int versionId)
                               $"VerName={dto.VersionName}, VerRasejums={dto.VersionRasejums}, VerDate={dto.VersionDate}, VerComment={dto.VersionComment}");
             try
             {
-                if (string.IsNullOrWhiteSpace(dto.ProductName) || string.IsNullOrWhiteSpace(dto.ProductCode))
-                    return BadRequest("Nosaukums un kods ir obligāti.");
-
-                var product = new Product
-                {
-                    ProductName = dto.ProductName,
-                    ProductCode = dto.ProductCode,
-                    CategoryId = dto.CategoryId,
-                    IsActive = true
-                };
-
-                _db.Products.Add(product);
-                await _db.SaveChangesAsync();
-
-                int? versionId = null;
-
-                // Izveidojam versiju, ja ir vismaz viens versijas lauks
-                if (!string.IsNullOrWhiteSpace(dto.VersionName)
-                    || !string.IsNullOrWhiteSpace(dto.VersionRasejums)
-                    || !string.IsNullOrWhiteSpace(dto.VersionDate)
-                    || !string.IsNullOrWhiteSpace(dto.VersionComment))
-                {
-                    var parsedDate = DateOnly.FromDateTime(DateTime.UtcNow.Date);
-                    if (!string.IsNullOrWhiteSpace(dto.VersionDate)
-                        && DateOnly.TryParse(dto.VersionDate, out var d))
-                    {
-                        parsedDate = d;
-                    }
-
-                    var ver = new ProductVersion
-                    {
-                        ProductId = product.Id,
-                        VersionName = dto.VersionName ?? "",
-                        VersionRasejums = dto.VersionRasejums ?? "",
-                        VersionDate = parsedDate,
-                        VersionComment = dto.VersionComment ?? "",
-                        IsActive = true
-                    };
-
-                    _db.ProductVersions.Add(ver);
-                    await _db.SaveChangesAsync();
-                    versionId = ver.Id;
-                }
-
-                return Ok(new { product.Id, VersionId = versionId });
+                var result = await _versionService.Create(dto);
+                    return Ok(result);
             }
             catch (Exception ex)
-            {
-                Console.WriteLine("[API CREATE ERROR] " + ex.ToString());
-                return StatusCode(500, "CREATE failed: " + ex.Message);
-            }
+                {
+                    return StatusCode(500, ex.Message);
+                }
         }
 
         [HttpPut("update")]
@@ -1008,15 +837,6 @@ if (dto.StepType <= 0)
             return Ok(rows);
         }
 
-          // DTO
-        public sealed class AddPartRequest
-        {
-            public int productId { get; set; }      // Produkta Id
-            public int versionId { get; set; }
-            public int topPartId { get; set; }      // Detaļas Id
-            public int qtyPerProduct { get; set; }  // Vesels skaitlis >=1
-        }
-
         [HttpPost("add-part")]
         public async Task<IActionResult> AddPart([FromBody] AddPartRequest dto, [FromServices] AppDbContext db)
         {
@@ -1141,17 +961,6 @@ step.StepType = dto.StepType;
 
     return Ok();
 }
-
-        // === DTO pievienošanai ===
-        public class AddPartDto
-        {
-            public int VersionId { get; set; }
-            public int TopPartId { get; set; }
-            public int QtyPerProduct { get; set; }
-        }
-
-        // DTO
-        public sealed class StepTypeRequest { public int Id { get; set; } public string? Name { get; set; } }
 
         // GET dropdownam – tikai aktīvie
         [HttpGet("/api/steptypes")]
@@ -1418,11 +1227,6 @@ public async Task<IActionResult> GetPlanningListArchived()
     return Ok(rows);
 }
 
-public sealed class SetPriorityRequest
-{
-    public int VersionId { get; set; }
-    public bool IsPriority { get; set; }
-}
 
 [HttpPut("set-priority")]
 public async Task<IActionResult> SetPriority([FromBody] SetPriorityRequest dto)
@@ -1463,29 +1267,6 @@ public async Task<IActionResult> TogglePart([FromBody] TogglePartRequest dto)
     await _db.SaveChangesAsync();
 
     return Ok();
-}
-
-public class TogglePartRequest
-{
-    public int ProductToPartId { get; set; }
-    public bool IsActive { get; set; }
-}
-
-public class ProductListItemDto
-{
-    public int Id { get; set; }
-    public string ProductCode { get; set; } = "";
-    public string ProductName { get; set; } = "";
-    public string? CategoryName { get; set; }
-    public string? RootName { get; set; }
-    public int VersionId { get; set; }
-    public string? VersionName { get; set; }
-    public DateOnly? VersionDate { get; set; }
-    public bool VersionIsActive { get; set; }
-    public bool IsPriority { get; set; }
-
-    public int GroupType { get; set; }  
-    public bool IsActive { get; set; } 
 }
 
 [HttpGet("/api/stage-step-map")]

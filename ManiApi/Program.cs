@@ -2,7 +2,10 @@ using ManiApi.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Text.Json.Serialization; // <- pie using augšā
-using ManiApi.Services;
+using ManiApi.Services.Products;
+using ManiApi.Services.Detail;
+using ManiApi.Services.Finishing;
+using ManiApi.Services.Tasks;   
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,7 +29,13 @@ builder.Services.AddDbContextPool<AppDbContext>(options =>
 
 builder.Services.AddHttpClient();
 
+
 builder.Services.AddScoped<TaskService>();
+builder.Services.AddScoped<DetailTasksService>();
+builder.Services.AddScoped<FinishingTasksService>();
+builder.Services.AddScoped<VersionService>();
+builder.Services.AddScoped<TaskManagementService>();
+builder.Services.AddScoped<TaskQueryService>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -37,7 +46,6 @@ builder.Services.AddSwaggerGen(c =>
     c.MapType<TimeOnly>(() => new OpenApiSchema { Type = "string", Format = "time" });
 });
 
-builder.Services.AddScoped<DetailTasksService>();
 
 builder.Services.AddControllers()
     .AddJsonOptions(o =>

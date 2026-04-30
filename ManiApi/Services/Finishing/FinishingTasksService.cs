@@ -2,7 +2,7 @@ using ManiApi.Data;
 using Microsoft.EntityFrameworkCore;
 using ManiApi.Models;
 
-namespace ManiApi.Services
+namespace ManiApi.Services.Finishing
 {
     public class FinishingTasksService
     {

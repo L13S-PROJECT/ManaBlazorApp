@@ -2,7 +2,7 @@ using ManiApi.Data;
 using ManiApi.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace ManiApi.Services
+namespace ManiApi.Services.Detail
 {
     public class DetailTasksService
     {

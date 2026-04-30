@@ -7,6 +7,10 @@ using MySqlConnector;
 using ManiApi.Models;
 using System.Data;
 using ManiApi.Services;
+using ManiApi.DTOs.Tasks;
+using ManiApi.Services.Detail;
+using ManiApi.Services.Finishing;
+using ManiApi.Services.Tasks;
 
 
 namespace ManiApi.Controllers
@@ -14,21 +18,23 @@ namespace ManiApi.Controllers
     [ApiController]
     [Route("api/[controller]")]
     public class TasksController : ControllerBase
-    {
-        private readonly AppDbContext _db;
-private readonly DetailTasksService _detailService;
-
-public TasksController(
-    AppDbContext db,
-    TaskService taskService,
-    DetailTasksService detailService)
 {
-    _db = db;
-    _taskService = taskService;
-    _detailService = detailService;
-}
-
-        private readonly TaskService _taskService;
+    private readonly AppDbContext _db;
+    private readonly TaskService _taskService;
+    private readonly DetailTasksService _detailService;
+    private readonly TaskManagementService _taskManagementService;
+    
+    public TasksController(
+        AppDbContext db,
+        TaskService taskService,
+        DetailTasksService detailService,
+        TaskManagementService taskManagementService)
+    {
+        _db = db;
+        _taskService = taskService;
+        _detailService = detailService;
+        _taskManagementService = taskManagementService;
+    }
 
         // GET: /api/tasks/for-employee?empId=101
 // Rāda: Prioritārie (Tasks_Priority=1) ar statusu 1 (nav iesākts) + paša iesāktie (statuss=2)
@@ -540,109 +546,16 @@ WHERE Task_ID = @taskId
     await tx.CommitAsync();
     return Ok(new { taskId = dto.TaskId, status = newStatus, done = newDoneOut });*/
 }
-
-        public sealed class FinishDto
-{
-    public int TaskId { get; set; }
-
-    // Tikai Finishing gadījumam:
-    // cik gabalus darbinieks pabeidza šajā reizē
-    public int? QtyDoneAdd { get; set; }
-}
-
-        public sealed class ClaimDto
-        {
-            public int TaskId { get; set; }
-            public int EmpId  { get; set; }
-        }
+     
 
 // POST: /api/tasks/update-steps
 // Body: [ { "taskId": 123, "tasks_Priority": true, "assigned_To": 101 }, ... ]
+
 [HttpPost("update-steps")]
 public async Task<IActionResult> UpdateSteps([FromBody] List<UpdateStepDto> steps)
 {
-    if (steps == null || steps.Count == 0)
-        return BadRequest("Nav neviena soļa, ko atjaunināt.");
-
-    var conn = _db.Database.GetDbConnection();
-    await conn.OpenAsync();
-    await using var tx = await conn.BeginTransactionAsync();
-
-    int totalUpdated = 0;
-
-    foreach (var dto in steps)
-    {
-        
-        if (dto == null || dto.TaskId <= 0)
-            continue;
-
-        // Dinamiski būvējam SET daļu atkarībā no tā, kas patiešām jāmaina
-        var setParts = new List<string>();
-
-        if (dto.Tasks_Priority.HasValue)
-        {
-            setParts.Add("Tasks_Priority = @prio");
-        }
-
-        if (dto.Tasks_Push.HasValue)
-        {
-            setParts.Add("Tasks_Push = @push");
-        }
-
-// Assigned_To vienmēr iekļaujam (arī NULL gadījumā)
-setParts.Add("Assigned_To = @assigned");
-
-        // Ja nav ko mainīt – ejam tālāk
-        if (setParts.Count == 0)
-            continue;
-
-        await using var cmd = conn.CreateCommand();
-        cmd.Transaction = tx;
-
-        cmd.CommandText = $@"
-UPDATE tasks
-   SET {string.Join(", ", setParts)}
- WHERE ID = @id
-   AND IsActive = 1;";
-
-        // obligāta – kurš tasks
-        var pId = cmd.CreateParameter();
-        pId.ParameterName = "@id";
-        pId.Value = dto.TaskId;
-        cmd.Parameters.Add(pId);
-
-        // ja jāmaina prioritāte
-        if (dto.Tasks_Priority.HasValue)
-        {
-            var pPrio = cmd.CreateParameter();
-            pPrio.ParameterName = "@prio";
-            // Tasks_Priority ir TINYINT(1) NOT NULL → vienmēr 0 vai 1
-            pPrio.Value = dto.Tasks_Priority.Value ? 1 : 0;
-            cmd.Parameters.Add(pPrio);
-        }
-
-
-        // ja jāmaina Assigned_To (var būt arī null -> noņem assignment)
-            var pAssigned = cmd.CreateParameter();
-            pAssigned.ParameterName = "@assigned";
-            pAssigned.Value = (object?)dto.Assigned_To ?? DBNull.Value;
-            cmd.Parameters.Add(pAssigned);
-
-            if (dto.Tasks_Push.HasValue)
-            {
-                var pPush = cmd.CreateParameter();
-                pPush.ParameterName = "@push";
-                pPush.Value = dto.Tasks_Push.Value ? 1 : 0;
-                cmd.Parameters.Add(pPush);
-            }
-
-        var affected = await cmd.ExecuteNonQueryAsync();
-        totalUpdated += affected;
-    }
-
-    await tx.CommitAsync();
-
-    return Ok(new { updated = totalUpdated });
+    var updated = await _taskManagementService.UpdateSteps(steps);
+    return Ok(new { updated });
 }
 
 
@@ -652,73 +565,14 @@ UPDATE tasks
 [HttpPost("activate-part")]
 public async Task<IActionResult> ActivatePart([FromBody] ActivatePartDto dto)
 {
-    Console.WriteLine(
-    $"[activate-part] BatchProductId={dto.BatchProductId}, ProductToPartId={dto.ProductToPartId}"
-);
-    
-    if (dto is null || dto.BatchProductId <= 0 || dto.ProductToPartId <= 0)
-    return BadRequest("BatchId un ProductToPartId ir obligāti.");
+    var updated = await _taskManagementService.ActivatePart(dto);
+return Ok(new { updated });
 
-    var conn = _db.Database.GetDbConnection();
-    await conn.OpenAsync();
-
-    await using var cmd = conn.CreateCommand();
-cmd.CommandText = @"
-UPDATE tasks t
-JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-SET t.Tasks_Status = 1
-WHERE t.IsActive = 1
-  AND t.Tasks_Status IN (5)
-  AND t.BatchProduct_ID IN (
-    SELECT ID FROM batches_products
-    WHERE IsActive = 1
-      AND Batch_Id = (
-          SELECT Batch_Id FROM batches_products WHERE ID = @bp
-      )
-      AND Version_Id = (
-          SELECT Version_Id FROM batches_products WHERE ID = @bp
-      )
-)
-  AND ts.ProductToPart_ID = @ptp
-";
-
-    var pBp = cmd.CreateParameter();
-pBp.ParameterName = "@bp";
-pBp.Value = dto.BatchProductId;
-cmd.Parameters.Add(pBp);
-
-var pPtp = cmd.CreateParameter();
-pPtp.ParameterName = "@ptp";
-pPtp.Value = dto.ProductToPartId;
-cmd.Parameters.Add(pPtp);
-
-
-    var affected = await cmd.ExecuteNonQueryAsync();
-
-    System.Diagnostics.Debug.WriteLine($"ACTIVATE RESULT: updated rows = {affected}");
-Console.WriteLine($"ACTIVATE RESULT: updated rows = {affected}");   
-
-    return Ok(new { updated = affected });
-}
-
-// POST: /api/tasks/open-finishing
-// DTO no Blazor → API, lai atvērtu Finishing tasku
-public sealed class OpenFinishingDto
-{
-    // ŠEIT arī strādājam ar BatchProductId
-    public int BatchProductId { get; set; }
-    public int ProductToPartId { get; set; }
-    public int Qty { get; set; }
-    public int? RalColorId { get; set; }
-    public string? Comment { get; set; }
 }
 
 
 // Ko atdodam atpakaļ Blazoram
-public sealed class OpenFinishingResultDto
-{
-    public int TaskId { get; set; }
-}
+
 
 [HttpPost("open-finishing")]
 public async Task<IActionResult> OpenFinishing([FromBody] OpenFinishingDto dto)
@@ -928,79 +782,12 @@ catch (Exception ex)
 }
 }
 
-/// šo vajag pie ProductioTasks.razor "ķeksim" 5->1
-public sealed class ActivatePartDto
-{
-    public int BatchProductId { get; set; }
-    public int ProductToPartId { get; set; }
-}
-
-
-public sealed class UpdateStepDto
-{
-    // Kurš konkrētais tasks (tasks.ID)
-    public int TaskId { get; set; }
-
-    // Vai solis ir prioritārs (var nebūt padots -> atstājam kā ir)
-    public bool? Tasks_Priority { get; set; }
-
-    public bool? Tasks_Push { get; set; }
-
-    // Kam tiek piešķirts (var būt null -> noņemam Assignment)
-    public int? Assigned_To { get; set; }
-}
-
 // GET: /api/tasks/active-parts?batchId=123
 // Atgriež ProductToPart_ID sarakstu šai partijai ar statusu 1
 [HttpGet("active-parts")]
 public async Task<IActionResult> GetActiveParts([FromQuery] int batchProductId)
 {
-    if (batchProductId <= 0)
-    return BadRequest("batchProductId is required.");
-
-    var conn = _db.Database.GetDbConnection();
-    await conn.OpenAsync();
-
-    await using var cmd = conn.CreateCommand();
-cmd.CommandText = @"
-SELECT DISTINCT ts.ProductToPart_ID
-FROM tasks t
-JOIN batches_products bp   ON bp.ID = t.BatchProduct_ID
-JOIN toppartsteps ts       ON ts.ID = t.TopPartStep_ID
-JOIN producttopparts ptp   ON ptp.ID = ts.ProductToPart_ID
-WHERE t.IsActive = 1
-  AND t.Tasks_Status IN (1,2,3)
-  AND ptp.IsActive = 1
-  AND t.BatchProduct_ID IN (
-      SELECT bp2.ID
-      FROM batches_products bp2
-      WHERE bp2.IsActive = 1
-        AND bp2.Batch_Id = (
-            SELECT bp0.Batch_Id
-            FROM batches_products bp0
-            WHERE bp0.ID = @bp
-            LIMIT 1
-        )
-        AND bp2.Version_Id = (
-            SELECT bp0.Version_Id
-            FROM batches_products bp0
-            WHERE bp0.ID = @bp
-            LIMIT 1
-        )
-  );
-";
-
-    var pBatch = cmd.CreateParameter();
-    pBatch.ParameterName = "@bp";
-    pBatch.Value = batchProductId;
-    cmd.Parameters.Add(pBatch);
-
-    var list = new List<int>();
-    await using var r = await cmd.ExecuteReaderAsync();
-    while (await r.ReadAsync())
-    {
-        list.Add(r.GetInt32(0));
-    }
+    var list = await _taskManagementService.GetActiveParts(batchProductId);
 
     return Ok(list);
 }
@@ -1467,100 +1254,25 @@ public async Task<IActionResult> UpdateComment([FromBody] UpdateCommentDto dto)
     if (dto is null || dto.TaskId <= 0)
         return BadRequest("TaskId is required.");
 
-    var baseTask = await _db.Tasks
-    .Where(x => x.ID == dto.TaskId && x.IsActive)
-    .Select(x => new { x.TopPartStep_ID, x.BatchProduct_ID })
-    .FirstOrDefaultAsync();
+    var updated = await _taskManagementService.UpdateComment(dto);
 
-if (baseTask is null)
-    return NotFound();
+    if (updated == 0)
+        return NotFound();
 
-var relatedBatchProducts = await _db.Set<BatchProduct>()
-    .Where(x =>
-        x.IsActive &&
-        x.Batch_Id == _db.Set<BatchProduct>()
-            .Where(b => b.ID == baseTask.BatchProduct_ID)
-            .Select(b => b.Batch_Id)
-            .FirstOrDefault() &&
-        x.Version_Id == _db.Set<BatchProduct>()
-            .Where(b => b.ID == baseTask.BatchProduct_ID)
-            .Select(b => b.Version_Id)
-            .FirstOrDefault()
-    )
-    .Select(x => x.ID)
-    .ToListAsync();
-
-var tasks = await _db.Tasks
-    .Where(x =>
-        x.IsActive &&
-        x.TopPartStep_ID == baseTask.TopPartStep_ID &&
-        relatedBatchProducts.Contains(x.BatchProduct_ID))
-    .ToListAsync();
-
-foreach (var t in tasks)
-{
-    t.Tasks_Comment = string.IsNullOrWhiteSpace(dto.Comment)
-        ? null
-        : dto.Comment;
-}
-
-await _db.SaveChangesAsync();
-
-    return Ok(new { updated = true, taskId = dto.TaskId });
+    return Ok(new { updated });
 }
 
 
-public sealed class UpdateCommentDto
-{
-    public int TaskId { get; set; }
-    public string? Comment { get; set; }
-    public bool IsForEmployee { get; set; }
-
-}
-
-
-public sealed class UpdateFinishingQtyDto
-{
-    public int TaskId { get; set; }
-    public int Qty { get; set; }
-    public string? Comment { get; set; }
-}
 
 // piešķir konkrētam tasksam konkrētu darbinieku - Assigned_TO
-public sealed class UpdateTaskAssigneeDto
-{
-    public int TaskId { get; set; }
-    public int? Assigned_To { get; set; } // null = noņemt
-}
+
 
 [HttpPost("update-assignee")]
 public async Task<IActionResult> UpdateAssignee([FromBody] UpdateTaskAssigneeDto dto)
 {
-    if (dto is null || dto.TaskId <= 0)
-        return BadRequest("TaskId is required.");
+    var updated = await _taskManagementService.UpdateAssignee(dto);
 
-    var conn = _db.Database.GetDbConnection();
-    await conn.OpenAsync();
-
-    await using var cmd = conn.CreateCommand();
-    cmd.CommandText = @"
-UPDATE tasks
-SET Assigned_To = @emp
-WHERE ID = @id
-  AND IsActive = 1;
-";
-
-    cmd.Parameters.Add(new MySqlParameter("@id", dto.TaskId));
-    cmd.Parameters.Add(new MySqlParameter(
-        "@emp",
-        (object?)dto.Assigned_To ?? DBNull.Value
-    ));
-
-    var affected = await cmd.ExecuteNonQueryAsync();
-    if (affected == 0)
-        return NotFound("Task not found or inactive.");
-
-    return Ok(new { ok = true, taskId = dto.TaskId, assignedTo = dto.Assigned_To });
+    return Ok(new { updated });
 }
 
 // GET: /api/tasks/by-step?batchProductId=123&topPartStepId=456
@@ -1724,12 +1436,6 @@ public async Task<IActionResult> UpdateCommentVisibility([FromBody] UpdateCommen
     await _db.SaveChangesAsync();
 
     return Ok();
-}
-
-public sealed class UpdateCommentVisibilityDto
-{
-    public int TaskId { get; set; }
-    public bool IsCommentForEmployee { get; set; }
 }
 
 // GET: /api/tasks/employee-load?empId=123 - 13.02.2026
@@ -2745,242 +2451,33 @@ public async Task<IActionResult> UpdateAssigneeAggregated([FromBody] UpdateAssig
     if (dto is null || dto.BatchProductId <= 0 || dto.ProductToPartId <= 0)
         return BadRequest();
 
-    var conn = _db.Database.GetDbConnection();
-    await conn.OpenAsync();
-
-    var batchInfo = await _db.BatchProducts
-        .Where(x => x.ID == dto.BatchProductId)
-        .Select(x => new { x.Batch_Id, x.Version_Id })
-        .FirstAsync();
-
-    await using var cmd = conn.CreateCommand();
-if (dto.RowType == "SingleChild")
-{
-    cmd.CommandText = @"
-UPDATE tasks t
-JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-SET t.Assigned_To = @emp
-WHERE t.IsActive = 1
-AND t.Tasks_Status = 1
-AND t.BatchProduct_ID IN (
-    SELECT bp2.ID
-    FROM batches_products bp2
-    WHERE bp2.IsActive = 1
-      AND bp2.Batch_Id = (
-          @batchId
-      )
-      AND bp2.Version_Id = (
-          @versionId
-      )
-)
-AND ts.ID = @step;
-";
-}
-
-else
-
-{
-    // Parent vai Parent+ChildMerged
-    cmd.CommandText = @"
-UPDATE tasks t
-JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-SET t.Assigned_To = @emp
-WHERE t.IsActive = 1
-AND t.Tasks_Status = 1
-AND t.BatchProduct_ID IN (
-    SELECT bp2.ID
-    FROM batches_products bp2
-    WHERE bp2.IsActive = 1
-      AND bp2.Batch_Id = (
-          @batchId
-      )
-      AND bp2.Version_Id = (
-          @versionId
-      )
-)
-AND ts.ID = @step
-";
-}
-
-    cmd.Parameters.Add(new MySqlParameter("@emp", (object?)dto.Assigned_To ?? DBNull.Value));
-    cmd.Parameters.Add(new MySqlParameter("@bp", dto.BatchProductId));
-    cmd.Parameters.Add(new MySqlParameter("@batchId", batchInfo.Batch_Id));
-    cmd.Parameters.Add(new MySqlParameter("@versionId", batchInfo.Version_Id));
-    cmd.Parameters.Add(new MySqlParameter("@step", dto.TopPartStepId));
-    cmd.Parameters.Add(new MySqlParameter("@rowType", dto.RowType ?? ""));
-    var affected = await cmd.ExecuteNonQueryAsync();
-
-    Console.WriteLine($"UPDATED ROWS: {affected}");
+    var affected = await _taskManagementService.UpdateAssigneeAggregated(dto);
 
     return Ok(new { updated = affected });
-    
 }
+
 
 [HttpPost("update-assignee-root")]
 public async Task<IActionResult> UpdateAssigneeRoot([FromBody] UpdateAssigneeDto dto)
 {
-    if (dto.BatchProductId <= 0)
-        return BadRequest();
+    if (dto is null || dto.BatchProductId <= 0)
+        return BadRequest("BatchProductId is required.");
 
-    var conn = _db.Database.GetDbConnection();
-    await conn.OpenAsync();
+    var updated = await _taskManagementService.UpdateAssigneeRoot(dto);
 
-    await using var cmd = conn.CreateCommand();
+    if (updated == 0)
+        return NotFound();
 
-    cmd.CommandText = @"
-UPDATE tasks t
-JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
-
-SET t.Assigned_To = @empId
-
-WHERE bp.Batch_Id = (
-        SELECT Batch_Id FROM batches_products WHERE ID = @bpId
-    )
-AND bp.Version_Id = (
-        SELECT Version_Id FROM batches_products WHERE ID = @bpId
-    )
-AND t.TopPartStep_ID = @stepId
-AND EXISTS (
-    SELECT 1
-    FROM toppartsteps ts
-    WHERE ts.ID = t.TopPartStep_ID
-      AND ts.ProductToPart_ID = @partId
-)
-AND t.IsActive = 1;
-";
-
-    var p1 = cmd.CreateParameter();
-    p1.ParameterName = "@empId";
-    p1.Value = (object?)dto.Assigned_To ?? DBNull.Value;
-    cmd.Parameters.Add(p1);
-
-    var p2 = cmd.CreateParameter();
-    p2.ParameterName = "@bpId";
-    p2.Value = dto.BatchProductId;
-    cmd.Parameters.Add(p2);
-
-    var p3 = cmd.CreateParameter();
-    p3.ParameterName = "@stepId";
-    p3.Value = dto.TopPartStepId;
-    cmd.Parameters.Add(p3);
-
-    var p4 = cmd.CreateParameter();
-    p4.ParameterName = "@partId";
-    p4.Value = dto.ProductToPartId;
-    cmd.Parameters.Add(p4);
-
-    await cmd.ExecuteNonQueryAsync();
-
-    return Ok();
+    return Ok(new { updated });
 }
 
-public sealed class UpdateAssigneeDto
-{
-    public int BatchProductId { get; set; }
-    public int TopPartStepId { get; set; }
-    public int ProductToPartId { get; set; }
-    public int? Assigned_To { get; set; }
-}
-
-public sealed class UpdateAssigneeAggregatedDto
-{
-    public int BatchProductId { get; set; }
-    public int TopPartStepId { get; set; }
-    public string? RowType { get; set; }
-    public int ProductToPartId { get; set; }
-    public int? Assigned_To { get; set; }
-}
-
-private sealed class RawTaskRow
-{
-    public int TaskId { get; set; }
-    public int BatchProductId { get; set; }
-    public int TopPartStepId { get; set; }
-    public int Status { get; set; }
-    public int? Assigned_To { get; set; }
-    public int? Claimed_By { get; set; }
-    public DateTime? StartedAt { get; set; }
-    public DateTime? FinishedAt { get; set; }
-    public int Qty { get; set; }
-    public string? StepName { get; set; }
-    public string? TopPartName { get; set; }
-    public int ProductToPartId { get; set; }
-    public string? Comment { get; set; }
-    public bool IsCommentForEmployee { get; set; }
-}
-
-private sealed class DetailQtyRow
-{
-    public int ProductToPartId { get; set; }
-    public int ParentQty { get; set; }
-    public int ChildQty { get; set; }
-}
-
-public sealed class SetPartPriorityDto
-{
-    public int BatchProductId { get; set; }
-    public int ProductToPartId { get; set; }
-    public bool Tasks_Priority { get; set; }
-}
 
 [HttpPost("set-part-priority")]
 public async Task<IActionResult> SetPartPriority([FromBody] SetPartPriorityDto dto)
 {
-    if (dto is null || dto.BatchProductId <= 0 || dto.ProductToPartId <= 0)
-        return BadRequest("BatchProductId un ProductToPartId ir obligāti.");
+    var updated = await _taskManagementService.SetPartPriority(dto);
+return Ok(new { updated });
 
-    var conn = _db.Database.GetDbConnection();
-    await conn.OpenAsync();
-
-    // DEBUG: paskatāmies, kādi ProductToPart_ID atbilst šim filtram
-    await using var cmdDbg = conn.CreateCommand();
-    cmdDbg.CommandText = @"
-SELECT DISTINCT ts.ProductToPart_ID
-FROM tasks t
-JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-WHERE t.IsActive = 1
-  AND t.Tasks_Status = 1
-  AND t.BatchProduct_ID = @bp
-  AND ts.ProductToPart_ID = @ptp;
-";
-    cmdDbg.Parameters.Add(new MySqlConnector.MySqlParameter("@bp", dto.BatchProductId));
-    cmdDbg.Parameters.Add(new MySqlConnector.MySqlParameter("@ptp", dto.ProductToPartId));
-
-    var touchedPtp = new List<int>();
-    await using (var r = await cmdDbg.ExecuteReaderAsync())
-    {
-        while (await r.ReadAsync())
-            touchedPtp.Add(r.GetInt32(0));
-    }
-
-    // UPDATE: uzliek/noņem prioritāti visiem status=1 soļiem šai detaļai šajā batchProduct
-    await using var cmd = conn.CreateCommand();
-    cmd.CommandText = @"
-UPDATE tasks t
-JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-SET t.Tasks_Priority = @prio
-WHERE t.IsActive = 1
-  AND t.Tasks_Status = 1
-  AND t.BatchProduct_ID IN (
-      SELECT bp2.ID
-      FROM batches_products bp2
-      WHERE bp2.IsActive = 1
-        AND bp2.Batch_Id = (
-            SELECT bp0.Batch_Id FROM batches_products bp0 WHERE bp0.ID = @bp LIMIT 1
-        )
-        AND bp2.Version_Id = (
-            SELECT bp0.Version_Id FROM batches_products bp0 WHERE bp0.ID = @bp LIMIT 1
-        )
-  )
-  AND ts.ProductToPart_ID = @ptp;
-";
-    cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@prio", dto.Tasks_Priority ? 1 : 0));
-    cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@bp", dto.BatchProductId));
-    cmd.Parameters.Add(new MySqlConnector.MySqlParameter("@ptp", dto.ProductToPartId));
-
-    var affected = await cmd.ExecuteNonQueryAsync();
-
-    return Ok(new { updated = affected, requestedPtp = dto.ProductToPartId, touchedPtp });
 }
 
 
@@ -3054,62 +2551,13 @@ public async Task<IActionResult> GetAssemblyAvailableUi([FromQuery] int batchPro
     return Ok(Math.Max(assemblyStock, 0));
 }
 
-public class SetTaskPushDto
-{
-    public int BatchProductId { get; set; }
-    public int ProductToPartId { get; set; }
-    public bool Tasks_Push { get; set; }
-}
 
 [HttpPost("set-task-push")]
 public async Task<IActionResult> SetTaskPush([FromBody] SetTaskPushDto dto)
 {
-    if (dto == null || dto.BatchProductId <= 0 || dto.ProductToPartId <= 0)
-        return BadRequest("Invalid data.");
+    var updated = await _taskManagementService.SetTaskPush(dto);
+        return Ok(new { updated });
 
-    var conn = _db.Database.GetDbConnection();
-    if (conn.State != System.Data.ConnectionState.Open)
-    await conn.OpenAsync();
-
-    using var cmd = conn.CreateCommand();
-
-    cmd.CommandText = @"
-    UPDATE tasks t
-    JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-    SET t.Tasks_Push = @push
-    WHERE t.IsActive = 1
-      AND t.BatchProduct_ID IN (
-          SELECT bp2.ID
-          FROM batches_products bp2
-          WHERE bp2.IsActive = 1
-            AND bp2.Batch_Id = (
-                SELECT bp0.Batch_Id FROM batches_products bp0 WHERE bp0.ID = @bp LIMIT 1
-            )
-            AND bp2.Version_Id = (
-                SELECT bp0.Version_Id FROM batches_products bp0 WHERE bp0.ID = @bp LIMIT 1
-            )
-      )
-      AND ts.ProductToPart_ID = @ptp;
-    ";
-
-    var p1 = cmd.CreateParameter();
-    p1.ParameterName = "@push";
-    p1.Value = dto.Tasks_Push;
-    cmd.Parameters.Add(p1);
-
-    var p2 = cmd.CreateParameter();
-    p2.ParameterName = "@bp";
-    p2.Value = dto.BatchProductId;
-    cmd.Parameters.Add(p2);
-
-    var p3 = cmd.CreateParameter();
-    p3.ParameterName = "@ptp";
-    p3.Value = dto.ProductToPartId;
-    cmd.Parameters.Add(p3);
-
-    await cmd.ExecuteNonQueryAsync();
-
-    return Ok(new { updated = true });
 }
 
 [HttpGet("employee-load-v2")]
@@ -3287,93 +2735,11 @@ continue;
 [HttpPost("update-assignee-bulk")]
 public async Task<IActionResult> UpdateAssigneeBulk([FromBody] List<UpdateAssigneeRequest> list)
 {
-    var ids = list.Select(x => x.TaskId).ToList();
-
-    var tasks = await _db.Tasks
-        .Where(t => ids.Contains(t.ID))
-        .ToListAsync();
-
-    foreach (var t in tasks)
-    {
-        var item = list.First(x => x.TaskId == t.ID);
-
-        t.Assigned_To = item.Assigned_To;
-    }
-
-    await _db.SaveChangesAsync();
+    await _taskManagementService.UpdateAssigneeBulk(list);
 
     return Ok();
 }
 
-public class UpdateAssigneeRequest
-{
-    public int TaskId { get; set; }
-    public int? Assigned_To { get; set; }
-}
-
-public class EmployeeTaskRowV2
-{
-    public int RootId { get; set; }
-    public int BatchProductId { get; set; }    
-    public bool BatchPriority { get; set; }
-    public int ProductToPartId { get; set; }    
-    public string? BatchCode { get; set; }
-    public string? ProductName { get; set; }
-    public string? TopPartName { get; set; }
-    public string? StepName { get; set; }
-    public string? QtyBreakdown { get; set; }
-    public int DisplayQty { get; set; }
-    public int DisplayMinutes { get; set; }
-    public int TopPartStepId { get; set; }
-    public int Status { get; set; }
-    public bool? CanStart { get; set; }
-
-    public int? Assigned_To { get; set; }
-    public bool Tasks_Priority { get; set; }
-    public bool Tasks_Push { get; set; }
-
-    // 🔥 jaunais
-    public string RowType { get; set; } = ""; // Parent / ParentChildMerged / SingleChild
-    public bool ShowChildMark { get; set; }   // priekš "*"
-}
-
-private sealed class TaskRowDto
-{
-    public int TaskId { get; set; }
-    public byte Priority { get; set; }
-    public bool BatchPriority { get; set; }
-    public int ProductToPartId { get; set; }
-    public int Status { get; set; }
-    public int PriorityLevel { get; set; }
-    public bool Tasks_Push { get; set; }
-    public DateTime? StartedAt { get; set; }
-    public DateTime? FinishedAt { get; set; }
-
-    public bool IsCommentForEmployee { get; set; }
-    public string? Comment { get; set; }
-
-    public string? ProductName { get; set; }
-    public string? PartName { get; set; }
-    public string? StepName { get; set; }
-
-    public int EstimatedMinutes { get; set; }
-    public int ActualMinutes { get; set; }
-    public int EstimatedTotalMinutes { get; set; }
-    public int EstimatedStartMinutes { get; set; }
-
-    public string? BatchCode { get; set; }
-
-    public int Done { get; set; }
-    public int? Assigned_To { get; set; }
-    public int Planned { get; set; }
-
-    public int StepOrder { get; set; }
-
-    public int StepType { get; set; }
-    public int BatchId { get; set; }
-    public int VersionId { get; set; }
-    public int BatchProductId { get; set; }
-}
 
 [HttpGet("unassigned-v2")]
 public async Task<IActionResult> GetUnassignedTasksV2()
@@ -3631,45 +2997,14 @@ foreach (var g in groups)
 return Ok(result);
 }
 
+
 [HttpGet("all-active")]
 public async Task<IActionResult> GetAllActiveTasks()
 {
     return Ok(await _taskService.GetAllActiveTasks());
 }
 
-public sealed class UnassignedTaskV2Dto
-{
-    public string? WorkCenter { get; set; }
-    public int? WorkCenterSort { get; set; }
 
-    public int TaskId { get; set; }
-    public int RootId { get; set; }
-    public int TopPartStepId { get; set; }
-    public int BatchProductId { get; set; }
-    public int ProductToPartId { get; set; }
-
-    public string? BatchCode { get; set; }
-    public string? ProductName { get; set; }
-    public string? TopPartName { get; set; }
-    public string? StepName { get; set; }
-
-    public int Qty { get; set; }
-    public string? QtyBreakdown { get; set; } // "x+y"
-    public int EstimatedMinutes { get; set; }
-
-    public int Status { get; set; }
-    public bool CanStart { get; set; }
-
-    public int? Assigned_To { get; set; }
-
-    public bool BatchPriority { get; set; }
-    public bool Tasks_Priority { get; set; }
-    public bool Tasks_Push { get; set; }
-
-    public int StepOrder { get; set; }
-
-    public string RowType { get; set; } = ""; // Parent / ParentChildMerged / SingleChild
-}
 
 
 // GET: /api/tasks/detail-tasks?batchProductId=123
@@ -3695,11 +3030,7 @@ public async Task<IActionResult> StartTask([FromBody] StartTaskRequest req)
     return Ok(result);
 }
 
-public class StartTaskRequest
-{
-    public int EmployeeId { get; set; }
-    public long DisplayGroupId { get; set; }
-}
+
 
     }
 }
