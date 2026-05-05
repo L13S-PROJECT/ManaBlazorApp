@@ -2541,5 +2541,67 @@ return result;
 
 }
 
+public async Task<List<ReadyDetailPartDto>> GetReadyDetailParts(int batchProductId)
+{
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    var result = new List<ReadyDetailPartDto>();
+
+    await using var cmd = conn.CreateCommand();
+    cmd.CommandText = @"
+SELECT 
+    ptp.ID AS ProductToPartId,
+    tp.TopPart_Name,
+    SUM(bp.Planned_Qty) AS Qty,
+    CASE 
+        WHEN SUM(CASE WHEN t.Tasks_Status <> 3 THEN 1 ELSE 0 END) = 0 
+        THEN 'done'
+        ELSE 'notdone'
+    END AS State
+FROM tasks t
+JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
+JOIN toppart tp ON tp.ID = ptp.TopPart_ID
+JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+
+WHERE t.IsActive = 1
+    AND ts.Step_Type = 1
+    AND t.BatchProduct_ID IN (
+    SELECT bp2.ID
+    FROM batches_products bp2
+    WHERE bp2.IsActive = 1
+            AND bp2.Batch_Id = (
+                SELECT Batch_Id FROM batches_products WHERE ID = @bpId
+            )
+            AND bp2.Version_Id = (
+                SELECT Version_Id FROM batches_products WHERE ID = @bpId
+            )
+        )
+    AND bp.ProductToPart_ID IS NOT NULL
+
+GROUP BY ptp.ID, tp.TopPart_Name
+
+HAVING 
+    SUM(CASE WHEN t.Tasks_Status <> 3 THEN 1 ELSE 0 END) = 0
+";
+
+    cmd.Parameters.Add(new MySqlParameter("@bpId", batchProductId));
+
+    await using var r = await cmd.ExecuteReaderAsync();
+    while (await r.ReadAsync())
+    {
+        result.Add(new ReadyDetailPartDto
+        {
+            ProductToPartId = r.GetInt32(0),
+            Name = r.GetString(1),
+            Qty = r.GetInt32(2),
+            State = r.GetString(3)          
+        });
+    }
+
+    return result;
+}
+
     }
 }

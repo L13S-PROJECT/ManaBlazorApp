@@ -88,6 +88,33 @@
         <div></div>
     </div>
 
+@if (ReadyDetailParts.TryGetValue(p.ProductToPartId, out var list) && list.Any())
+{
+    <div class="ptv2-tasks-row assembly sub">
+        
+        <!-- 1. NOSAUKUMS -->
+        <div style="padding-left:20px;">
+            @foreach (var d in list)
+            {
+                <div style="margin-bottom:2px;
+                            color:@(d.state == "done" ? "#111827" : "#9ca3af");">
+                    @d.name (@d.qty)
+                </div>
+            }
+        </div>
+
+        <!-- pārējās kolonnas -->
+        <div></div>
+        <div></div>
+        <div></div>
+        <div></div>
+        <div></div>
+        <div></div>
+        <div></div>
+        <div></div>
+    </div>
+}
+
 @foreach (var step in p.Steps)
 {
 
@@ -213,6 +240,7 @@ else
 private List<DetailPartRow> Parts = new();
 private Dictionary<int, string> DetailIndicatorsFromApi = new();
 private Dictionary<int, List<DetailTaskRow>> TasksByStep = new();
+private Dictionary<int, List<(string name, int qty, string state)>> ReadyDetailParts = new();
 // key = TopPartStepId
 private List<DetailPartRow> DetailParts = new();
 protected override async Task OnParametersSetAsync()
@@ -286,6 +314,25 @@ protected override async Task OnParametersSetAsync()
          ?? "gray"
 );
 
+var readyParts = await Http.GetFromJsonAsync<List<ReadyDetailDto>>(
+    $"http://localhost:5270/api/tasks/ready-detail-parts?batchProductId={bpId}"
+) ?? new();
+
+ReadyDetailParts = readyParts
+    .GroupBy(x => x.ProductToPartId)
+    .ToDictionary(
+        g => g.Key,
+        g => g.Select(x => (x.Name, x.Qty, x.State)).ToList()
+    );
+
+}
+
+private sealed class ReadyDetailDto
+{
+    public int ProductToPartId { get; set; }
+    public string Name { get; set; } = "";
+    public int Qty { get; set; }
+    public string State { get; set; } = "";
 }
 
 private sealed class DetailQtyRow

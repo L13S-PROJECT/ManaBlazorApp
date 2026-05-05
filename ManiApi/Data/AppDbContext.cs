@@ -32,6 +32,9 @@ namespace ManiApi.Data
         public DbSet<BatchProductLink> BatchProductLinks { get; set; }
         public DbSet<BatchProductMaterial> BatchProductMaterials { get; set; }
         public DbSet<BatchProduct> BatchProducts { get; set; }
+        public DbSet<Order> Orders { get; set; }
+        public DbSet<OrderItem> OrderItems { get; set; }
+        public DbSet<CustomerCodeMap> CustomerCodeMaps { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         
 {
@@ -40,7 +43,9 @@ namespace ManiApi.Data
     modelBuilder.Entity<EmployeeAvailability>().ToTable("employee_availability");
     // <- PIESPIED tabulas nosaukumu ar underscore
     modelBuilder.Entity<StockMovement>().ToTable("stock_movements");
-
+    modelBuilder.Entity<Order>().ToTable("orders");
+    modelBuilder.Entity<OrderItem>().ToTable("order_items");
+    modelBuilder.Entity<CustomerCodeMap>().ToTable("customer_code_map");
     modelBuilder.Entity<StockMovement>()
         .Property(sm => sm.Move_Type)
         .HasConversion<string>();

@@ -15,9 +15,11 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.0" PrivateAssets="all" />
-    <PackageReference Include="Syncfusion.Blazor" Version="31.1.23" />
-    <PackageReference Include="Syncfusion.Blazor.Themes" Version="31.1.23" />
-    <PackageReference Include="Syncfusion.Licensing" Version="31.1.23" />
+    <PackageReference Include="Syncfusion.Blazor" Version="33.2.5" />
+    <PackageReference Include="Syncfusion.Blazor.Themes" Version="33.2.5" />
+    <PackageReference Include="Syncfusion.Licensing" Version="33.2.5" />
+    <PackageReference Include="Syncfusion.Pdf.Net.Core" Version="33.2.5" />
+    <PackageReference Include="UglyToad.PdfPig" Version="1.7.0-custom-5" />
   </ItemGroup>
 
 </Project>

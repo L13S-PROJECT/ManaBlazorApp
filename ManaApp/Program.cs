@@ -15,7 +15,7 @@ builder.Services.AddScoped(sp => new HttpClient
 {
     BaseAddress = new Uri("http://localhost:5270/")
 });
-
+builder.Services.AddScoped<PdfService>();
 
 
 SyncfusionLicenseProvider.RegisterLicense("Ngo9BigBOggjGyl/Vkd+XU9FcVRDX3xKf0x/TGpQb19xflBPallYVBYiSV9jS3tSdkVkWH1ceHZXQWlcWU91Xg==");    

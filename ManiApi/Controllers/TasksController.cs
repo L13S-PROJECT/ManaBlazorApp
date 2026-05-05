@@ -1408,7 +1408,17 @@ public async Task<IActionResult> StartTask([FromBody] StartTaskRequest req)
     return Ok(result);
 }
 
+// GET: /api/tasks/ready-detail-parts?batchProductId=123
+[HttpGet("ready-detail-parts")]
+public async Task<IActionResult> GetReadyDetailParts([FromQuery] int batchProductId)
+{
+    if (batchProductId <= 0)
+        return BadRequest("batchProductId is required.");
 
+    var list = await _taskQueryService.GetReadyDetailParts(batchProductId);
+
+    return Ok(list);
+}
 
     }
 }

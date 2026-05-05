@@ -406,3 +406,18 @@
     color: #111827;   /* melns */
     font-weight: 500;
 }
+
+.ptv2-tasks-row.assembly.sub {
+    font-size: 11px;
+    background: #f8fbff;
+    color: #1e293b;
+}
+
+.ptv2-tasks-row.assembly.sub > div:first-child {
+    padding-left: 18px; /* nobīde zem parent */
+    font-weight: 500;
+}
+
+.ptv2-tasks-row.assembly.sub > div:nth-child(8) {
+    text-align: left; /* lai teksts nelien centrā */
+}

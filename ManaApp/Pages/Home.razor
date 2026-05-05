@@ -1,32 +1,63 @@
 @page "/"
 @using System.Net.Http.Json
-@inject HttpClient Http
+@using ManaApp.Services
+@inject PdfService PdfService
 
 <h3>Kategorijas</h3>
+<InputFile OnChange="OnFileSelected" />
 
-@if (items is null)
+@if (header is not null)
 {
-    <p>Ielādēju...</p>
+    <div>
+        <p><b>Order Nr:</b> @header.OrderNumber</p>
+        <p><b>Date:</b> @header.Date</p>
+        <p><b>Customer:</b> @header.Customer</p>
+    </div>
 }
-else
-{
-    <ul>
-        @foreach (var c in items)
+
+<table>
+    <thead>
+        <tr>
+            <th>Code</th>
+            <th>Name</th>
+            <th>Quantity</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var i in pdfItems ?? new())
         {
-            <li>@c.id — @c.categoryName (@(c.isActive ? "aktīva" : "neaktīva"))</li>
+            <tr>
+                <td>
+                    <InputText @bind-Value="i.Code" style="width:120px" />
+                </td>
+                <td>
+                    <InputText @bind-Value="i.Name" style="width:300px" />
+                </td>
+                <td>
+                    <InputNumber @bind-Value="i.Quantity" style="width:80px" />
+                </td>
+            </tr>
         }
-    </ul>
-}
+    </tbody>
+</table>
+    
 
 @code {
-    List<CategoryDto>? items;
+    List<PdfService.OrderItem>? pdfItems;
+    PdfService.OrderHeader? header;
+    
+private async Task OnFileSelected(InputFileChangeEventArgs e)
+{
+    var file = e.File;
 
-    protected override async Task OnInitializedAsync()
-    {
-        // API adrese
-        items = await Http.GetFromJsonAsync<List<CategoryDto>>(
-    "http://localhost:5270/api/categories");
-    }
+    using var ms = new MemoryStream();
+    await file.OpenReadStream(long.MaxValue).CopyToAsync(ms);
 
-    public record CategoryDto(int id, string categoryName, int? parentId, bool isActive);
+    var result = PdfService.ParseDocument(ms.ToArray());
+
+    header = result.Header;
+    pdfItems = result.Items;
+
+}
+
 }
