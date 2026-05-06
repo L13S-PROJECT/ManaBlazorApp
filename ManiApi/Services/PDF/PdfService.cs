@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
 
-namespace ManaApp.Services;
+namespace ManiApi.Services.Pdf;
 
 public class PdfService
 {    

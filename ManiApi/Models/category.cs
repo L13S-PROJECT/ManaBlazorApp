@@ -14,7 +14,7 @@ namespace ManiApi.Models
         [Column("parent_ID")]
         public int? ParentId { get; set; }
 
- 
+        [Column("IsActive")]
         public bool IsActive { get; set; }
 
     }

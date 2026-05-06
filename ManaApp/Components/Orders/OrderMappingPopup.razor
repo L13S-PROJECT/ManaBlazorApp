@@ -1,0 +1,304 @@
+@using ManaApp.Models.Orders
+@using System.Linq
+@inject HttpClient Http
+
+@if (IsVisible && Item is not null)
+{
+    <div style="
+        position:fixed;
+        top:20%;
+        left:35%;
+        background:white;
+        border:1px solid black;
+        padding:20px;
+        z-index:1000;
+        width:400px;">
+
+        <h3>Mapping editor</h3>
+
+        <p>
+            <b>Customer code:</b>
+            @Item.CustomerCode
+        </p>
+
+        <p>
+            <b>PDF name:</b>
+            @Item.Name
+        </p>
+
+        <div style="margin-top:20px;">
+
+@*Produkta drop-down *@
+
+        <div style="margin-bottom:10px;">
+            <label>Type</label>
+            <br />
+
+            <select
+                @bind="selectedParentCategoryId"
+                style="width:100%;">
+
+                <option value="">Select type</option>
+
+                @foreach (var p in MappingList
+                    .GroupBy(x => x.ParentCategoryId)
+                    .Select(g => g.First())
+                    .OrderBy(x => x.ParentCategoryName))
+                {
+                    <option value="@p.ParentCategoryId">
+                        @p.ParentCategoryName
+                    </option>
+                }
+
+            </select>
+        </div>
+
+            <div style="margin-bottom:10px;">
+                <label>Category</label>
+                <br />
+
+                <select
+                    @bind="selectedCategoryId"
+                    style="width:100%;">
+
+                    <option value="">Select category</option>
+                    @foreach (var c in Categories)
+                        {
+                            <option value="@c.CategoryId">
+                                @c.CategoryName
+                            </option>
+                        }
+
+                </select>
+            </div>
+
+            <div style="margin-bottom:10px;">
+                <label>Product</label>
+                <br />
+
+                <select
+                    @bind="selectedProductId"
+                    style="width:100%;">
+
+                    <option value="">Select product</option>
+                    @foreach (var p in Products)
+                        {
+                            <option value="@p.ProductId">
+                                @p.ProductName
+                            </option>
+                        }
+
+                </select>
+            </div>
+
+        </div>
+
+     
+
+                <div style="margin-bottom:10px;">
+
+                    <label>
+                        <input
+                            type="checkbox"
+                            checked="@isProduct"
+                            @onchange="e => ToggleProduct((bool)e.Value!)" />
+                        Product
+                    </label>
+
+                    <label style="margin-left:20px;">
+                        <input
+                            type="checkbox"
+                            checked="@isPart"
+                            @onchange="e => TogglePart((bool)e.Value!)" />
+                        Part
+                    </label>
+
+                </div>
+
+                <div style="margin-bottom:10px;">
+
+    <label>Version</label>
+    <br />
+
+    <select
+        @bind="selectedVersionId"
+        @bind:after="LoadStage1Parts"
+        style="width:100%;">
+
+        <option value="">Select version</option>
+
+        @foreach (var v in Versions)
+        {
+            <option value="@v.VersionId">
+                @(v.VersionIsActive
+                    ? v.VersionName
+                    : $"{v.VersionName} [ARCHIVED]")
+            </option>
+        }
+
+    </select>
+
+</div>
+
+                @if (isPart)
+{
+    <div style="margin-bottom:10px;">
+
+        <label>TopPart</label>
+        <br />
+
+        <select
+            @bind="selectedProductToPartId"
+            style="width:100%;">
+
+            <option value="">
+                Select top part
+            </option>
+
+            @foreach (var p in stage1Parts)
+            {
+                <option value="@p.Id">
+                    @p.TopPartName
+                </option>
+            }
+
+        </select>
+
+    </div>
+}
+
+       
+                <div style="margin-bottom:10px;">
+
+                    <label>RAL color</label>
+                    <br />
+
+                    <select
+                        @bind="selectedRalColorId"
+                        style="width:100%;">
+
+                        <option value="">
+                            Select RAL
+                        </option>
+
+                        @foreach (var r in ralColors)
+                        {
+                            <option value="@r.Id">
+                                @r.Name
+                            </option>
+                        }
+
+                    </select>
+
+                </div>
+
+                <button>
+                    Save mapping
+                </button>
+
+        <button @onclick="Close">
+            Close
+        </button>
+
+    </div>
+}
+
+@code {
+
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    [Parameter]
+    public OrderDraftItemViewModel? Item { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+    [Parameter]
+    public List<MappingListItem> MappingList { get; set; } = new();
+    
+    List<Stage1PartItem> stage1Parts = new();
+    List<RalColor> ralColors = new();
+
+int? selectedRalColorId;
+
+    int? selectedProductToPartId;
+    async Task Close()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    int? selectedParentCategoryId;
+    int? selectedCategoryId;
+    int? selectedProductId;
+    int? selectedVersionId;
+    bool isProduct;
+    bool isPart;
+
+    IEnumerable<MappingListItem> Categories =>
+    MappingList
+        .Where(x => x.ParentCategoryId == selectedParentCategoryId)
+        .GroupBy(x => x.CategoryId)
+        .Select(g => g.First())
+        .OrderBy(x => x.CategoryName);
+
+    IEnumerable<MappingListItem> Products =>
+    MappingList
+        .Where(x => x.CategoryId == selectedCategoryId)
+        .GroupBy(x => x.ProductId)
+        .Select(g => g.First())
+        .OrderBy(x => x.ProductName);
+    
+    IEnumerable<MappingListItem> Versions =>
+    isProduct
+        ? MappingList
+            .Where(x =>
+                x.ProductId == selectedProductId &&
+                x.VersionIsActive)
+            .OrderByDescending(x => x.VersionName)
+
+        : MappingList
+            .Where(x => x.ProductId == selectedProductId)
+            .OrderByDescending(x => x.VersionIsActive)
+            .ThenByDescending(x => x.VersionName);
+
+    void ToggleProduct(bool value)
+        {
+            isProduct = value;
+
+            if (value)
+            {
+                isPart = false;
+            }
+        }
+
+void TogglePart(bool value)
+        {
+            isPart = value;
+
+            if (value)
+            {
+                isProduct = false;
+            }
+        }
+
+async Task LoadStage1Parts()
+{
+    if (selectedVersionId is null)
+    {
+        stage1Parts.Clear();
+        return;
+    }
+
+    stage1Parts = await Http.GetFromJsonAsync<List<Stage1PartItem>>(
+        $"http://localhost:5270/api/products/details-stage1?versionId={selectedVersionId}")
+        ?? new();
+}
+
+protected override async Task OnInitializedAsync()
+{
+    ralColors = await Http.GetFromJsonAsync<List<RalColor>>(
+        "http://localhost:5270/api/products/ral-list")
+        ?? new();
+}
+
+}

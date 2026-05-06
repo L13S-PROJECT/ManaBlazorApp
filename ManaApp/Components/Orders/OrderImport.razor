@@ -1,0 +1,181 @@
+// Ordersimprt.razor - šeit būs pasūtījumu importēšanas funkcionalitāte
+
+@using ManaApp.Services
+@using System.Net.Http.Json
+@using ManaApp.Models.Pdf
+@using ManaApp.DTOs.Orders
+@using ManaApp.Models.Orders
+@inject HttpClient Http
+
+<h3>Kategorijas</h3>
+<InputFile OnChange="OnFileSelected" />
+
+@if (header is not null)
+{
+    <div>
+        <p><b>Order Nr:</b> @header.OrderNumber</p>
+        <p><b>Date:</b> @header.Date</p>
+        <p><b>Customer:</b> @header.Customer</p>
+    </div>
+}
+
+<table>
+    <thead>
+        <tr>
+            <th>Code</th>
+            <th>Name</th>
+            <th>Quantity</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var i in pdfItems ?? new())
+        {
+            <tr>
+                <td>
+                    <InputText @bind-Value="i.CustomerCode" style="width:120px" />
+                </td>
+                <td>
+                    <InputText @bind-Value="i.Name" style="width:300px" />
+                </td>
+                <td>
+                    <InputNumber @bind-Value="i.Quantity" style="width:80px" />
+                </td>
+                <td>
+                    @if (i.IsMapped)
+                    {
+                        <span style="color:green;">Mapped</span>
+                    }
+                    else
+                    {
+                        <span style="color:red;">Not mapped</span>
+                        <button @onclick="() => OpenMappingPopup(i)">
+                            +
+                        </button>
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<OrderMappingPopup
+    IsVisible="showMappingPopup"
+    Item="selectedItem"
+    MappingList="mappingList"
+    OnClose="ClosePopup" />  
+
+@code {
+    List<OrderDraftItemViewModel> pdfItems = new();
+    OrderHeader? header;
+    List<CustomerCodeMapResult> mapResults = new();
+        
+    bool showMappingPopup = false;
+    OrderDraftItemViewModel? selectedItem;
+
+protected override async Task OnInitializedAsync()
+{
+    var response = await Http.GetAsync(
+        "http://localhost:5270/api/OrderDraft/latest");
+
+    if (!response.IsSuccessStatusCode)
+        return;
+
+    var result = await response.Content
+        .ReadFromJsonAsync<OrderDraftLoadResult>();
+
+    if (result is null)
+        return;
+
+    header = new OrderHeader
+    {
+        OrderNumber = result.Draft.OrderNumber,
+        Customer = result.Draft.CustomerName,
+        Date = result.Draft.OrderDate?.ToString("yyyy-MM-dd") ?? ""
+    };
+
+    pdfItems = result.Items.Select(x => new OrderDraftItemViewModel
+    {
+        CustomerCode = x.CustomerCode,
+        Name = x.Name,
+        Quantity = x.Quantity,
+        VersionId = x.VersionId,
+        ProductToPartId = x.ProductToPartId,
+        RalColorId = x.RalColorId,
+        IsMapped = x.IsMapped
+    }).ToList();
+
+    mappingList = await Http.GetFromJsonAsync<List<MappingListItem>>(
+    "http://localhost:5270/api/products/mapping-list")
+    ?? new();
+
+}
+private async Task OnFileSelected(InputFileChangeEventArgs e)
+{
+    var file = e.File;
+
+    using var ms = new MemoryStream();
+    await file.OpenReadStream(long.MaxValue).CopyToAsync(ms);
+
+    using var content = new MultipartFormDataContent();
+
+content.Add(
+    new ByteArrayContent(ms.ToArray()),
+    "file",
+    file.Name);
+
+var response = await Http.PostAsync(
+    "http://localhost:5270/api/Pdf/parse",
+    content);
+
+var result = await response.Content.ReadFromJsonAsync<PdfParseResult>();
+
+if (result is null)
+    return;
+
+header = result.Header;
+pdfItems = result.Items.Select(x => new OrderDraftItemViewModel
+{
+    CustomerCode = x.Code,
+    Name = x.Name,
+    Quantity = x.Quantity
+}).ToList();
+
+var draftItems = pdfItems.Select(x => new OrderItem
+{
+    Code = x.CustomerCode,
+    Name = x.Name,
+    Quantity = x.Quantity
+}).ToList();
+
+await Http.PostAsJsonAsync(
+    "http://localhost:5270/api/OrderDraft",
+    new
+    {
+        Header = header,
+        Items = draftItems
+    });
+
+var codes = pdfItems
+    .Select(x => x.CustomerCode)
+    .ToList();
+
+}
+
+void OpenMappingPopup(OrderDraftItemViewModel item)
+{
+    selectedItem = item;
+
+    showMappingPopup = true;
+}
+
+void ClosePopup()
+{
+    showMappingPopup = false;
+
+    selectedItem = null;
+}
+
+List<MappingListItem> mappingList = new();
+
+}

@@ -7,6 +7,9 @@ using ManiApi.Services.Detail;
 using ManiApi.Services.Finishing;
 using ManiApi.Services.Tasks; 
 using ManiApi.Services.Stock;  
+using ManiApi.Services.Orders;
+using ManiApi.Services.Pdf;
+
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -39,7 +42,9 @@ builder.Services.AddScoped<TaskManagementService>();
 builder.Services.AddScoped<TaskQueryService>();
 builder.Services.AddScoped<FinishingFlowService>();
 builder.Services.AddScoped<StockService>();
-
+builder.Services.AddScoped<OrderService>();
+builder.Services.AddScoped<PdfService>();
+builder.Services.AddScoped<OrderDraftService>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();

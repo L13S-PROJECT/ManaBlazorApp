@@ -10,12 +10,13 @@ public class BatchProduct
 
     public int Batch_Id { get; set; }
 
-     public int Version_Id { get; set; }
+    public int Version_Id { get; set; }
 
     public int Planned_Qty { get; set; }
 
     public int Done_Qty { get; set; }
-
+    
+    [Column("IsActive")]
     public bool IsActive { get; set; }
 
     public bool is_priority { get; set; }

@@ -1,10 +1,13 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+
 
 namespace ManiApi.Models
 {
     [Table("toppart")]
     public class TopPart
     {
+        [Key]
         [Column("ID")]
         public int Id { get; set; }
 

@@ -1285,6 +1285,102 @@ public async Task<IActionResult> GetStageStepMap(
     return Ok(rows);
 }
 
+[HttpGet("details-stage1")]
+public async Task<IActionResult> GetDetailsStage1(
+    [FromQuery] int versionId)
+{
+    var cs = _db.Database.GetConnectionString();
+
+    await using var conn = new MySqlConnection(cs);
+
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+
+    cmd.CommandText = @"
+SELECT
+    pt.ID AS Id,
+    tp.TopPart_Name AS TopPartName
+FROM producttopparts pt
+JOIN toppart tp
+    ON tp.ID = pt.TopPart_ID
+WHERE
+    pt.Version_ID = @versionId
+    AND pt.IsActive = 1
+    AND tp.IsActive = 1
+    AND tp.Stage = 1
+ORDER BY tp.TopPart_Name;
+";
+
+    cmd.Parameters.AddWithValue("@versionId", versionId);
+
+    var result = new List<object>();
+
+    await using var reader = await cmd.ExecuteReaderAsync();
+
+    while (await reader.ReadAsync())
+    {
+        result.Add(new
+        {
+            Id = reader.GetInt32("Id"),
+            TopPartName = reader.GetString("TopPartName")
+        });
+    }
+
+    return Ok(result);
+}
+
+[HttpGet("mapping-list")]
+public async Task<IActionResult> GetMappingList()
+{
+    var rows = await (
+        from p in _db.Products.AsNoTracking()
+        join v in _db.ProductVersions on p.Id equals v.ProductId
+        join c in _db.Categories on p.CategoryId equals c.Id
+        join pc in _db.Categories on c.ParentId equals pc.Id
+
+        select new
+        {
+            ParentCategoryId = pc.Id,
+            ParentCategoryName = pc.CategoryName,
+
+            CategoryId = c.Id,
+            CategoryName = c.CategoryName,
+
+            ProductId = p.Id,
+            ProductName = p.ProductName,
+
+            VersionId = v.Id,
+            VersionName = v.VersionName,
+
+            VersionIsActive = v.IsActive
+        }
+    )
+    .OrderBy(x => x.CategoryName)
+    .ThenBy(x => x.ProductName)
+    .ThenByDescending(x => x.VersionIsActive)
+    .ToListAsync();
+
+    return Ok(rows);
+}
+
+[HttpGet("ral-list")]
+public async Task<IActionResult> GetRalList()
+{
+    var rows = await _db.RalColors
+        .AsNoTracking()
+        .Where(x => x.IsActive)
+        .OrderBy(x => x.Name)
+        .Select(x => new
+        {
+            x.ID,
+            x.Name
+        })
+        .ToListAsync();
+
+    return Ok(rows);
+}
+
     } // ← beidzas klase ProductsController
     
 } // ← beidzas namespace

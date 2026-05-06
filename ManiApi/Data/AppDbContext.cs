@@ -35,6 +35,8 @@ namespace ManiApi.Data
         public DbSet<Order> Orders { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<CustomerCodeMap> CustomerCodeMaps { get; set; }
+        public DbSet<OrderDraft> OrderDrafts { get; set; }
+        public DbSet<OrderDraftItem> OrderDraftItems { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         
 {
@@ -66,6 +68,18 @@ namespace ManiApi.Data
         .HasForeignKey(e => e.Step_Type_ID)
         .OnDelete(DeleteBehavior.Restrict);
 });
+    modelBuilder.Entity<CustomerCodeMap>()
+    .Property(e => e.ProductToPartId)
+    .HasColumnName("producttopart_id");
+    modelBuilder.Entity<OrderDraft>().ToTable("order_drafts");
+
+    modelBuilder.Entity<OrderDraftItem>().ToTable("order_draft_items");
+
+    modelBuilder.Entity<OrderDraftItem>()
+    .Property(e => e.ProductToPartId)
+    .HasColumnName("producttopart_id");
+
+
     
 }
   

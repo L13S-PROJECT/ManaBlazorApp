@@ -15,10 +15,10 @@ builder.Services.AddScoped(sp => new HttpClient
 {
     BaseAddress = new Uri("http://localhost:5270/")
 });
-builder.Services.AddScoped<PdfService>();
 
 
-SyncfusionLicenseProvider.RegisterLicense("Ngo9BigBOggjGyl/Vkd+XU9FcVRDX3xKf0x/TGpQb19xflBPallYVBYiSV9jS3tSdkVkWH1ceHZXQWlcWU91Xg==");    
+
+SyncfusionLicenseProvider.RegisterLicense("Ngo9BigBOggjHTQxAR8/V1JHaF1cWGhIfEx1RHxQdld5ZFRHallYTnNWUj0eQnxTdENjXH9YcXRRQGFUUUNyXUleYA==");    
 
 // Syncfusion komponentēm (SfDialog u.c.)
 builder.Services.AddSyncfusionBlazor();
