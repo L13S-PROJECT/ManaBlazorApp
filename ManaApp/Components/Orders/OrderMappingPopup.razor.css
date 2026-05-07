@@ -1,0 +1,320 @@
+.mapping-popup {
+    
+    width: 420px;
+    background: #ffffff;
+    border: 2px solid #4da3ff;
+    border-radius: 24px;
+    padding: 24px 28px;
+    box-sizing: border-box;
+}
+
+.mapping-overlay {
+    position: fixed;
+
+    inset: 0;
+
+    background: rgba(0, 0, 0, 0.35);
+
+    backdrop-filter: blur(2px);
+
+    z-index: 999;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mapping-title {
+    text-align: center;
+
+    font-size: 18px;
+    font-weight: 700;
+
+    margin-bottom: 24px;
+
+    color: #000;
+}
+
+.mapping-info-row {
+    display: flex;
+    align-items: center;
+
+    margin-bottom: 14px;
+}
+
+.mapping-label {
+    width: 110px;
+
+    font-size: 14px;
+    font-weight: 700;
+
+    color: #000;
+}
+
+.mapping-value {
+    font-size: 16px;
+    font-weight: 500;
+
+    color: #000;
+}
+
+.mapping-name {
+    font-size: 14px;
+    font-weight: 400;
+
+    color: #000;
+
+    line-height: 1.2;
+}
+
+.mapping-field {
+    margin-top: 10px;
+    margin-bottom: 12px;
+}
+
+.mapping-field-label {
+    display: block;
+
+    margin-bottom: 5px;
+
+    font-size: 14px;
+    font-weight: 700;
+
+    color: #000;
+}
+
+.mapping-select {
+    width: 100%;
+    height: 36px;
+
+    padding: 0 12px;
+
+    font-size: 14px;
+    font-style: italic;
+
+    color: #9a9a9a;
+
+    border: 2px solid #7dc8f7;
+    border-radius: 7px;
+
+    background: white;
+
+    box-sizing: border-box;
+
+    outline: none;
+}
+
+.mapping-select option {
+    color: #000;
+    font-style: normal;
+}
+
+.mapping-select:invalid {
+    color: #9a9a9a;
+    font-style: italic;
+}
+
+.custom-dropdown {
+    position: relative;
+}
+
+.custom-dropdown-selected {
+    position: relative;
+
+    height: 36px;
+
+    padding: 0 42px 0 12px;
+
+    border: 2px solid #7dc8f7;
+    border-radius: 8px;
+
+    background: #fff;
+
+    display: flex;
+    align-items: center;
+
+    cursor: pointer;
+
+    font-size: 14px;
+
+    color: #9a9a9a;
+    font-style: italic;
+
+    box-sizing: border-box;
+}
+
+.custom-dropdown-selected::after {
+    content: "";
+
+    position: absolute;
+
+    right: 14px;
+    top: 50%;
+
+    width: 8px;
+    height: 8px;
+
+    border-right: 2px solid #4da3ff;
+    border-bottom: 2px solid #4da3ff;
+
+    transform: translateY(-60%) rotate(45deg);
+}
+
+.custom-dropdown-selected.open {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.custom-dropdown-menu {
+    position: absolute;
+
+    top: 100%;
+    left: 0;
+    right: 0;
+
+    background: white;
+
+    border: 2px solid #7dc8f7;
+    border-top: none;
+
+    z-index: 2000;
+}
+
+.custom-dropdown-item {
+    padding: 10px 12px;
+
+    cursor: pointer;
+
+    font-size: 14px;
+
+    color: #000;
+}
+
+.custom-dropdown-item:hover {
+    background: #eaf6ff;
+}
+
+.custom-dropdown-selected.selected {
+    color: #000;
+    font-style: normal;
+
+    border-color: #4da3ff;
+
+    box-shadow:
+        0 0 0 2px rgba(77, 163, 255, 0.12),
+        0 2px 6px rgba(77, 163, 255, 0.18);
+}
+
+.mapping-checkbox-row {
+    display: flex;
+    gap: 22px;
+
+    margin-top: 14px;
+    margin-bottom: 14px;
+}
+
+.mapping-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    font-size: 14px;
+
+    color: #000;
+
+    cursor: pointer;
+}
+
+.mapping-warning {
+    background: #fff1f1;
+
+    border: 1px solid #ffb8b8;
+    border-radius: 8px;
+
+    color: #c62828;
+
+    font-size: 13px;
+
+    padding: 10px 12px;
+
+    margin-bottom: 10px;
+}
+
+.mapping-button-row {
+    display: flex;
+    justify-content: space-between;
+
+    margin-top: 22px;
+}
+
+.mapping-save-button,
+.mapping-close-button {
+    min-width: 150px;
+    height: 42px;
+
+    border-radius: 10px;
+
+    font-size: 15px;
+    font-weight: 700;
+
+    cursor: pointer;
+
+    transition: 0.15s ease;
+}
+
+.mapping-save-button {
+    border: none;
+
+    background: #28b6f6;
+
+    color: white;
+
+    box-shadow:
+        0 2px 6px rgba(40, 182, 246, 0.25);
+}
+
+.mapping-save-button:hover {
+    background: #14a8eb;
+}
+
+.mapping-close-button {
+    background: white;
+
+    color: #4f8fdc;
+
+    border: 2px solid #28b6f6;
+}
+
+.mapping-close-button:hover {
+    background: #eef8ff;
+}
+
+.validation-error {
+    border-color: #ff6b6b !important;
+
+    background: #fff4f4;
+
+    box-shadow:
+        0 0 0 2px rgba(255, 107, 107, 0.12),
+        0 2px 6px rgba(255, 107, 107, 0.18);
+}
+
+.validation-error .custom-dropdown-selected {
+    border-color: #ff6b6b !important;
+
+    background: #fff5f5;
+
+    box-shadow:
+        0 0 0 2px rgba(255, 107, 107, 0.10),
+        0 2px 6px rgba(255, 107, 107, 0.16);
+}
+
+.mapping-checkbox-warning {
+    color: #e53935;
+
+    font-size: 13px;
+    font-weight: 600;
+
+    margin-top: 6px;
+    margin-bottom: 6px;
+}

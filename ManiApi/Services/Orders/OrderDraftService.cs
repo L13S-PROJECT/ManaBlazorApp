@@ -192,4 +192,19 @@ public async Task<List<OrderDraftItemDto>> GetDraftItemDtos(int draftId)
     return result;
 }
 
+public async Task DeleteDraft()
+{
+    var items = await _db.OrderDraftItems
+        .ToListAsync();
+
+    _db.OrderDraftItems.RemoveRange(items);
+
+    var drafts = await _db.OrderDrafts
+        .ToListAsync();
+
+    _db.OrderDrafts.RemoveRange(drafts);
+
+    await _db.SaveChangesAsync();
+}
+
 }

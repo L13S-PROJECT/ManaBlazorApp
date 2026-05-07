@@ -1,4 +1,4 @@
-// Ordersimprt.razor - šeit būs pasūtījumu importēšanas funkcionalitāte
+@* Ordersimprt.razor - šeit būs pasūtījumu importēšanas funkcionalitāte *@
 
 @using ManaApp.Services
 @using System.Net.Http.Json
@@ -6,74 +6,158 @@
 @using ManaApp.DTOs.Orders
 @using ManaApp.Models.Orders
 @inject HttpClient Http
+@inject IJSRuntime JS
 
-<h3>Kategorijas</h3>
-<InputFile OnChange="OnFileSelected" />
 
-@if (header is not null)
-{
-    <div>
-        <p><b>Order Nr:</b> @header.OrderNumber</p>
-        <p><b>Date:</b> @header.Date</p>
-        <p><b>Customer:</b> @header.Customer</p>
-        <p>["@header.Customer"]</p>
-    </div>
+@{
+    bool hasDraft = header is not null;
+
+    bool allMapped =
+        pdfItems.Any() &&
+        pdfItems.All(x => x.IsMapped);
 }
 
-<table>
+<div class="orders-header">
+
+    <div class="orders-header-center">
+
+        <div class="orders-header-left">
+
+            <label for="pdfUpload"
+                class="orders-upload-button @(hasDraft ? "upload-disabled" : "")">
+
+                Pievienot
+
+            </label>
+
+            <div class="hidden-file-input">
+                <InputFile id="pdfUpload"
+                        OnChange="OnFileSelected"
+                        disabled="@hasDraft" />
+            </div>
+
+        </div>
+
+        <div class="orders-header-box">
+        <span class="orders-header-label">Pasūtītājs:</span>
+
+        @if (header is not null)
+        {
+            <span>@header.Customer</span>
+        }
+
+    </div>
+
+    <div class="orders-header-box">
+        <span class="orders-header-label">Pasūtījuma Nr:</span>
+
+            @if (header is not null)
+            {
+                <span>@header.OrderNumber</span>
+            }
+
+        </div>
+
+        <div class="orders-header-box">
+            <span class="orders-header-label">Datums:</span>
+
+            @if (header is not null)
+            {
+                <span>@header.Date</span>
+            }
+
+        </div>
+
+    </div>
+
+    <div class="orders-header-right">
+
+        <button class="orders-delete-button"
+                disabled="@(!hasDraft)"
+                @onclick="DeleteDraft">
+            DZĒST
+        </button>
+
+        <button class="orders-save-button"
+                disabled="@(!allMapped)">
+            SAGLABĀT
+        </button>
+
+    </div>
+
+</div>
+
+<div class="orders-table-container">
+
+<table class="orders-table">
+    <colgroup>
+        <col style="width: 180px;" />
+        <col style="width: 520px;" />
+        <col style="width: 80px;" />
+        <col style="width: 90px;" />
+        <col style="width: 140px;" />
+        <col style="width: 90px;" />
+        <col style="width: 140px;" />
+        <col style="width: 120px;" />
+        <col style="width: 220px;" />
+    </colgroup>
     <thead>
         <tr>
             <th>Code</th>
             <th>Name</th>
             <th>Quantity</th>
             <th>Status</th>
-            <th>Product</th>
-            <th>Version</th>
-            <th>RAL</th>
-            <th>Type</th>
-            <th>TopPart</th>
+            <th class="cell-product">Product</th>
+            <th class="cell-version">Version</th>
+            <th class="cell-ral">RAL</th>
+            <th class="cell-type">Type</th>
+            <th class="cell-toppart">TopPart</th>
         </tr>
     </thead>
     <tbody>
         @foreach (var i in pdfItems ?? new())
-        {
-            <tr>
+{
+            <tr class="@(i.IsMapped ? "" : "row-not-mapped")">
                 <td>
-                    <InputText @bind-Value="i.CustomerCode" style="width:120px" />
+                    <input @bind="i.CustomerCode" class="input-code" />
                 </td>
                 <td>
-                    <InputText @bind-Value="i.Name" style="width:300px" />
+                    <input @bind="i.Name" class="input-name" />
                 </td>
                 <td>
-                    <InputNumber @bind-Value="i.Quantity" style="width:80px" />
+                    <input type="number" @bind="i.Quantity" class="input-qty" />
                 </td>
-                <td>
+                <td class="status-cell @(i.IsMapped ? "status-ok" : "status-error")">
+
                     @if (i.IsMapped)
                     {
-                        <span style="color:green;">Mapped</span>
+                        <span>✓</span>
                     }
                     else
                     {
-                        <span style="color:red;">Not mapped</span>
-                        <button @onclick="() => OpenMappingPopup(i)">
+                        <span class="map-action"
+                            title="Pievienot aprakstu"
+                            @onclick="() => OpenMappingPopup(i)">
                             +
-                        </button>
+                        </span>
                     }
+
                 </td>
 
-                <td>@i.ProductName</td>
+                <td class="cell-product">@i.ProductName</td>
 
-                <td>@i.VersionName</td>
+                <td class="cell-version">@i.VersionName</td>
 
-                <td>@i.RalColorName</td>
+                <td class="cell-ral">@i.RalColorName</td>
 
-                <td>@i.MappingType</td>
+                <td class="cell-type">@i.MappingType</td>
 
-                <td>@i.TopPartName</td>
+                <td class="cell-toppart">@i.TopPartName</td>
             </tr>
         }
     </tbody>
 </table>
+</div>
 
 <OrderMappingPopup
     IsVisible="showMappingPopup"
@@ -81,6 +165,7 @@
     MappingList="mappingList"
     OnClose="ClosePopup"
     OnSaved="ReloadDraftItems" />
+
 
 @code {
     List<OrderDraftItemViewModel> pdfItems = new();
@@ -298,6 +383,28 @@ async Task ReloadDraftItems()
         TopPartName = x.TopPartName,
         MappingType = x.MappingType
     }).ToList();
+
+    StateHasChanged();
+}
+
+async Task DeleteDraft()
+{
+    var confirmed = await JS.InvokeAsync<bool>(
+        "confirm",
+        "Vai tiešām dzēst melnrakstu?");
+
+    if (!confirmed)
+        return;
+
+    var response = await Http.DeleteAsync(
+        "http://localhost:5270/api/OrderDraft");
+
+    if (!response.IsSuccessStatusCode)
+        return;
+
+    header = null;
+
+    pdfItems.Clear();
 
     StateHasChanged();
 }

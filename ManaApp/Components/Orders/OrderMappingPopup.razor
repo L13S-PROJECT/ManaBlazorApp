@@ -4,237 +4,399 @@
 
 @if (IsVisible && Item is not null)
 {
-    <div style="
-        position:fixed;
-        top:20%;
-        left:35%;
-        background:white;
-        border:1px solid black;
-        padding:20px;
-        z-index:1000;
-        width:400px;">
+    <div class="mapping-overlay">
 
-        <h3>Mapping editor</h3>
+        <div class="mapping-popup">
 
-        <p>
-            <b>Customer code:</b>
-            @Item.CustomerCode
-        </p>
+        <h3 class="mapping-title">
+            Kodu salāgošana
+        </h3>
 
-        <p>
-            <b>PDF name:</b>
+        <div class="mapping-info-row">
+            <div class="mapping-label">
+                Kods
+            </div>
+
+            <div class="mapping-value">
+                    @Item.CustomerCode
+                </div>
+            </div>
+
+    <div class="mapping-info-row">
+        <div class="mapping-label">
+            Nosaukums
+        </div>
+
+        <div class="mapping-name">
             @Item.Name
-        </p>
+        </div>
+    </div>
 
         <div style="margin-top:20px;">
 
 @*Produkta drop-down *@
 
-        <div style="margin-bottom:10px;">
-            <label>Type</label>
-            <br />
+        <div class="mapping-field">
 
-            <select
-                @bind="selectedParentCategoryId"
-                style="width:100%;">
+            <label class="mapping-field-label">
+                Veids
+            </label>
 
-                <option value="">Select type</option>
+            <div class="custom-dropdown
+                @(showValidationErrors && selectedParentCategoryId is null
+                    ? "validation-error"
+                    : "")">
 
-                @foreach (var p in MappingList
-                    .GroupBy(x => x.ParentCategoryId)
-                    .Select(g => g.First())
-                    .OrderBy(x => x.ParentCategoryName))
-                {
-                    <option value="@p.ParentCategoryId">
-                        @p.ParentCategoryName
-                    </option>
-                }
+    <div
+        class="custom-dropdown-selected
+        @(selectedParentCategoryId is not null ? "selected" : "")
+        @(showParentDropdown ? "open" : "")"
+        @onclick="ToggleParentDropdown">
 
-            </select>
-        </div>
+        @(selectedParentCategoryId is null
+            ? "Izvēlies veidu"
+            : SelectedParentName)
 
-            <div style="margin-bottom:10px;">
-                <label>Category</label>
-                <br />
+    </div>
 
-                <select
-                    @bind="selectedCategoryId"
-                    @bind:after="ResetFromCategory"
-                    style="width:100%;">
+    @if (showParentDropdown)
+    {
+        <div class="custom-dropdown-menu">
 
-                    <option value="">Select category</option>
-                    @foreach (var c in Categories)
-                        {
-                            <option value="@c.CategoryId">
-                                @c.CategoryName
-                            </option>
-                        }
+            @foreach (var p in MappingList
+                .GroupBy(x => x.ParentCategoryId)
+                .Select(g => g.First())
+                .OrderBy(x => x.ParentCategoryName))
+            {
+                <div
+                    class="custom-dropdown-item"
+                    @onclick="() => SelectParentCategory(p.ParentCategoryId, p.ParentCategoryName)">
 
-                </select>
-            </div>
-
-            <div style="margin-bottom:10px;">
-                <label>Product</label>
-                <br />
-
-                <select
-                    @bind="selectedProductId"
-                    @bind:after="ResetFromProduct"
-                    style="width:100%;">
-
-                    <option value="">Select product</option>
-                    @foreach (var p in Products)
-                        {
-                            <option value="@p.ProductId">
-                                @p.ProductName
-                            </option>
-                        }
-
-                </select>
-            </div>
-
-        </div>
-
-     
-
-                <div style="margin-bottom:10px;">
-
-                    <label>
-                        <input
-                            type="checkbox"
-                            checked="@isProduct"
-                            @onchange="e => ToggleProduct((bool)e.Value!)" />
-                        Product
-                    </label>
-
-                    <label style="margin-left:20px;">
-                        <input
-                            type="checkbox"
-                            checked="@isPart"
-                            @onchange="e => TogglePart((bool)e.Value!)" />
-                        Part
-                    </label>
+                    @p.ParentCategoryName
 
                 </div>
+            }
 
-                <div style="margin-bottom:10px;">
+        </div>
+    }
 
-    <label>Version</label>
-    <br />
+</div>
 
-    <select
-    @bind="selectedVersionId"
-    @bind:after="OnVersionChanged"
-    style="width:100%;">
+</div>
 
-        <option value="">Select version</option>
+            <div class="mapping-field">
 
-        @foreach (var v in Versions)
+    <label class="mapping-field-label">
+        Kategorija
+    </label>
+
+    <div class="custom-dropdown
+        @(showValidationErrors && selectedCategoryId is null
+            ? "validation-error"
+            : "")">
+
+        <div
+            class="custom-dropdown-selected
+            @(selectedCategoryId is not null ? "selected" : "")
+            @(showCategoryDropdown ? "open" : "")"
+            @onclick="ToggleCategoryDropdown">
+
+            @(selectedCategoryId is null
+                ? "Izvēlies kategoriju"
+                : SelectedCategoryName)
+
+        </div>
+
+        @if (showCategoryDropdown)
         {
-            <option value="@v.VersionId">
-                @(v.VersionIsActive
-                    ? v.VersionName
-                    : $"{v.VersionName} [ARCHIVED]")
-            </option>
+            <div class="custom-dropdown-menu">
+
+                @foreach (var c in Categories)
+                {
+                    <div
+                        class="custom-dropdown-item"
+                        @onclick="() => SelectCategory(c.CategoryId, c.CategoryName)">
+
+                        @c.CategoryName
+
+                    </div>
+                }
+
+            </div>
         }
 
-    </select>
+    </div>
+
+</div>
+
+
+
+     <div class="mapping-field">
+
+    <label class="mapping-field-label">
+        Prece
+    </label>
+
+    <div class="custom-dropdown
+        @(showValidationErrors && selectedProductId is null
+            ? "validation-error"
+            : "")">
+
+        <div
+            class="custom-dropdown-selected
+            @(selectedProductId is not null ? "selected" : "")
+            @(showProductDropdown ? "open" : "")"
+            @onclick="ToggleProductDropdown">
+
+            @(selectedProductId is null
+                ? "Izvēlies preci"
+                : SelectedProductName)
+
+        </div>
+
+        @if (showProductDropdown)
+        {
+            <div class="custom-dropdown-menu">
+
+                @foreach (var p in Products)
+                {
+                    <div
+                        class="custom-dropdown-item"
+                        @onclick="() => SelectProduct(p.ProductId, p.ProductName)">
+
+                        @p.ProductName
+
+                    </div>
+                }
+
+            </div>
+        }
+
+    </div>
+
+</div>
+</div>
+
+@if (showValidationErrors && !isProduct && !isPart)
+{
+    <div class="mapping-checkbox-warning">
+
+        Izvēlies veidu
+
+    </div>
+}
+
+<div class="mapping-checkbox-row
+@(showValidationErrors && !isProduct && !isPart
+    ? "checkbox-validation-error"
+    : "")">
+
+    <label class="mapping-checkbox-label">
+
+        <input
+            type="checkbox"
+            checked="@isProduct"
+            @onchange="e => ToggleProduct((bool)e.Value!)" />
+
+        Produkts
+
+    </label>
+
+    <label class="mapping-checkbox-label">
+
+        <input
+            type="checkbox"
+            checked="@isPart"
+            @onchange="e => TogglePart((bool)e.Value!)" />
+
+        Detaļa
+
+    </label>
+
+</div>
+
+                <div class="mapping-field">
+
+    <label class="mapping-field-label">
+        Versija
+    </label>
+
+    <div class="custom-dropdown
+        @(showValidationErrors && selectedVersionId is null
+            ? "validation-error"
+            : "")">
+
+        <div
+            class="custom-dropdown-selected
+            @(selectedVersionId is not null ? "selected" : "")
+            @(showVersionDropdown ? "open" : "")"
+            @onclick="ToggleVersionDropdown">
+
+            @(selectedVersionId is null
+                ? "Izvēlies versiju"
+                : SelectedVersionName)
+
+        </div>
+
+        @if (showVersionDropdown)
+        {
+            <div class="custom-dropdown-menu">
+
+                @foreach (var v in Versions)
+                {
+                    <div
+                        class="custom-dropdown-item"
+                        @onclick="() => SelectVersion(v.VersionId, v.VersionName)">
+
+                        @(v.VersionIsActive
+                            ? v.VersionName
+                            : $"{v.VersionName} [ARCHIVED]")
+
+                    </div>
+                }
+
+            </div>
+        }
+
+    </div>
 
 </div>
 
                 @if (isPart)
 {
-    <div style="margin-bottom:10px;">
+    <div class="mapping-field">
 
-        <label>TopPart</label>
-        <br />
+    <label class="mapping-field-label">
+        Detaļa
+    </label>
 
-        @if (selectedVersionId is not null &&
-     !stage1Parts.Any())
-{
-    <div style="
-        background:#ffe5e5;
-        color:#b00000;
-        padding:10px;
-        margin-bottom:10px;
-        border:1px solid #ffb3b3;">
+    @if (selectedVersionId is not null &&
+         !stage1Parts.Any())
+    {
+        <div class="mapping-warning">
 
-        WARNING:
-        Selected version has no TopParts.
+            Izvēlētajai versijai nav pievienota neviena detaļa.
+            
+        </div>
+    }
 
-        Product card is incomplete.
+    <div class="custom-dropdown
+        @(showValidationErrors && selectedProductToPartId is null
+            ? "validation-error"
+            : "")">
+
+        <div
+            class="custom-dropdown-selected
+            @(selectedProductToPartId is not null ? "selected" : "")
+            @(showTopPartDropdown ? "open" : "")"
+            @onclick="ToggleTopPartDropdown">
+
+            @(selectedProductToPartId is null
+                ? "Izvēlies TopPart"
+                : SelectedTopPartName)
+
+        </div>
+
+        @if (showTopPartDropdown)
+        {
+            <div class="custom-dropdown-menu">
+
+                @foreach (var p in stage1Parts)
+                {
+                    <div
+                        class="custom-dropdown-item"
+                        @onclick="() => SelectTopPart(p.Id, p.TopPartName, p.TopPartId)">
+
+                        @p.TopPartName
+
+                    </div>
+                }
+
+            </div>
+        }
+
     </div>
-}
 
-        <select
-    @bind="selectedProductToPartId"
-    @bind:after="OnTopPartChanged"
-    style="width:100%;">
-
-
-            <option value="">
-                Select top part
-            </option>
-
-            @foreach (var p in stage1Parts)
-            {
-                <option value="@p.Id">
-                    @p.TopPartName
-                </option>
-            }
-
-        </select>
-
-    </div>
+</div>
 }
 
        
-                <div style="margin-bottom:10px;">
+                <div class="mapping-field">
 
-                    <label>RAL color</label>
-                    <br />
+    <label class="mapping-field-label">
+        RAL krāsa
+    </label>
 
-                    <select
-                        @bind="selectedRalColorId"
-                        style="width:100%;">
+    <div class="custom-dropdown
+        @(showValidationErrors && selectedRalColorId is null
+            ? "validation-error"
+            : "")">
 
-                        <option value="">
-                            Select RAL
-                        </option>
+        <div
+            class="custom-dropdown-selected
+            @(selectedRalColorId is not null ? "selected" : "")
+            @(showRalDropdown ? "open" : "")"
+            @onclick="ToggleRalDropdown">
 
-                        @foreach (var r in ralColors)
+            @(selectedRalColorId is null
+                ? "Izvēlies RAL"
+                : SelectedRalName)
+
+        </div>
+
+        @if (showRalDropdown)
+        {
+            <div class="custom-dropdown-menu">
+
+                @foreach (var r in ralColors)
+                {
+                    <div
+                        class="custom-dropdown-item"
+                        @onclick="() => SelectRal(r.Id, r.Name)">
+
+                        @r.Name
+
+                    </div>
+                }
+
+            </div>
+        }
+
+    </div>
+
+</div>
+
+                @if (showValidationErrors && HasValidationErrors)
                         {
-                            <option value="@r.Id">
-                                @r.Name
-                            </option>
-                        }
+                            <div class="mapping-warning">
 
-                    </select>
+                                Aizpildi visus obligātos laukus.
 
-                </div>
-
-                @if (!string.IsNullOrWhiteSpace(validationMessage))
-                        {
-                            <div style="
-                                background:#ffe5e5;
-                                color:#b00000;
-                                padding:10px;
-                                margin-bottom:10px;
-                                border:1px solid #ffb3b3;">
-
-                                @validationMessage
                             </div>
                         }
 
-                <button @onclick="SaveMapping">
-                    Save mapping
-                </button>
+<div class="mapping-button-row">
 
-        <button @onclick="Close">
-            Close
-        </button>
+    <button
+        class="mapping-save-button"
+        @onclick="SaveMapping">
+
+        SAGLABĀT
+
+    </button>
+
+    <button
+        class="mapping-close-button"
+        @onclick="Close">
+
+        AIZVĒRT
+
+    </button>
+
+</div>
 
     </div>
+</div>
 }
 
 @code {
@@ -254,8 +416,38 @@
     
     List<Stage1PartItem> stage1Parts = new();
     List<RalColor> ralColors = new();
-
+bool showValidationErrors;
 int? selectedRalColorId;
+bool showParentDropdown;
+
+string SelectedParentName = "";
+
+bool showCategoryDropdown;
+
+string SelectedCategoryName = "";
+bool showProductDropdown;
+
+string SelectedProductName = "";
+bool showVersionDropdown;
+
+string SelectedVersionName = "";
+bool showRalDropdown;
+
+string SelectedRalName = "";
+
+bool showTopPartDropdown;
+
+string SelectedTopPartName = "";
+
+bool HasValidationErrors =>
+    selectedParentCategoryId is null ||
+    selectedCategoryId is null ||
+    selectedProductId is null ||
+    selectedVersionId is null ||
+    selectedRalColorId is null ||
+    (!isProduct && !isPart) ||
+    (isPart && selectedProductToPartId is null);
+
 
     int? selectedProductToPartId;
     int? selectedTopPartId;
@@ -358,6 +550,128 @@ void TogglePart(bool value)
             }
         }
 
+void ToggleParentDropdown()
+{
+    showParentDropdown = !showParentDropdown;
+}
+
+void SelectParentCategory(int id, string name)
+{
+    selectedParentCategoryId = id;
+
+    SelectedParentName = name;
+
+    showParentDropdown = false;
+
+    selectedCategoryId = null;
+    selectedProductId = null;
+    selectedVersionId = null;
+
+    SelectedCategoryName = "";
+    SelectedProductName = "";
+
+    selectedProductToPartId = null;
+    selectedTopPartId = null;
+    selectedRalColorId = null;
+
+    stage1Parts.Clear();
+
+    validationMessage = null;
+}
+
+void ToggleCategoryDropdown()
+{
+    showCategoryDropdown = !showCategoryDropdown;
+}
+
+void SelectCategory(int id, string name)
+{
+    selectedCategoryId = id;
+
+    SelectedCategoryName = name;
+
+    showCategoryDropdown = false;
+
+    selectedProductId = null;
+    selectedVersionId = null;
+
+    SelectedProductName = "";
+
+    selectedProductToPartId = null;
+    selectedTopPartId = null;
+    selectedRalColorId = null;
+
+    stage1Parts.Clear();
+
+    validationMessage = null;
+}
+
+void ToggleProductDropdown()
+{
+    showProductDropdown = !showProductDropdown;
+}
+
+void SelectProduct(int id, string name)
+{
+    selectedProductId = id;
+
+    SelectedProductName = name;
+
+    showProductDropdown = false;
+
+    ResetFromProduct();
+}
+void ToggleVersionDropdown()
+{
+    showVersionDropdown = !showVersionDropdown;
+}
+
+async Task SelectVersion(int id, string name)
+{
+    selectedVersionId = id;
+
+    SelectedVersionName = name;
+
+    showVersionDropdown = false;
+
+    ResetFromVersion();
+
+    await LoadStage1Parts();
+}
+
+void ToggleRalDropdown()
+{
+    showRalDropdown = !showRalDropdown;
+}
+
+void SelectRal(int id, string name)
+{
+    selectedRalColorId = id;
+
+    SelectedRalName = name;
+
+    showRalDropdown = false;
+}
+
+void ToggleTopPartDropdown()
+{
+    showTopPartDropdown = !showTopPartDropdown;
+}
+
+void SelectTopPart(
+    int id,
+    string name,
+    int topPartId)
+{
+    selectedProductToPartId = id;
+
+    selectedTopPartId = topPartId;
+
+    SelectedTopPartName = name;
+
+    showTopPartDropdown = false;
+}
+
 async Task LoadStage1Parts()
 {
     if (selectedVersionId is null)
@@ -387,7 +701,17 @@ protected override async Task OnInitializedAsync()
 
 async Task SaveMapping()
 {
-validationMessage = null;
+    showValidationErrors = true;
+
+if (selectedParentCategoryId is null ||
+    selectedCategoryId is null ||
+    selectedProductId is null ||
+    selectedVersionId is null ||
+    selectedRalColorId is null ||
+    (!isProduct && !isPart))
+{
+    return;
+}
 
 if (isPart && selectedProductToPartId is null)
 {
@@ -419,6 +743,7 @@ await Http.PostAsJsonAsync(
     "http://localhost:5270/api/OrderDraft/save-map",
     dto);
 
+showValidationErrors = false;
 await OnSaved.InvokeAsync();
 
 await Close();
@@ -441,6 +766,18 @@ protected override void OnParametersSet()
         isPart = false;
 
         stage1Parts.Clear();
+        showParentDropdown = false;
+        SelectedParentName = "";
+        showCategoryDropdown = false;
+        SelectedCategoryName = "";
+        showProductDropdown = false;
+        SelectedProductName = "";
+        showVersionDropdown = false;
+        SelectedVersionName = "";
+        showRalDropdown = false;
+        SelectedRalName = "";
+        showTopPartDropdown = false;
+        SelectedTopPartName = "";
     }
 }
 

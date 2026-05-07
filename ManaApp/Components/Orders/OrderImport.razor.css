@@ -1,0 +1,296 @@
+.orders-table {
+    border-spacing: 0;
+    table-layout: auto;
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.orders-table td:empty::after {
+    content: "";
+    display: block;
+    min-height: 20px;
+}
+
+.orders-table th,
+.orders-table td {
+    border: 1px solid #999;
+    padding: 2px 10px;
+    vertical-align: middle;
+    background-color: white;
+}
+
+.orders-table th {
+    font-weight: 600;
+
+    background: linear-gradient(
+        180deg,
+        #2d2bb8 0%,
+        #1f1d8f 100%
+    );
+
+    color: white;
+
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+.cell-product {
+    min-width: 120px;
+}
+
+.cell-version {
+    min-width: 80px;
+}
+
+.cell-ral {
+    min-width: 120px;
+}
+
+.cell-type {
+    min-width: 100px;
+}
+
+.cell-toppart {
+    min-width: 180px;
+}
+
+.status-cell {
+    width: 80px;
+    text-align: center;
+}
+
+.status-ok {
+    background-color: white !important;
+    color: #1976d2;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.status-error {
+    background-color: #e57373 !important;
+}
+
+.map-action {
+    cursor: pointer;
+
+    font-size: 24px;
+    font-weight: 300;
+
+    color: #444;
+
+    line-height: 1;
+
+    user-select: none;
+
+    transition: all 0.12s ease;
+}
+
+.map-action:hover {
+    font-weight: 600;
+    transform: scale(1.25);
+    color: #111;
+}
+
+.row-not-mapped td {
+    background-color: #ffe5e5;
+}
+
+.orders-table input {
+    border: none;
+    outline: none;
+    background: transparent;
+    width: 100%;
+}
+
+.input-code {
+    width: 120px;
+}
+
+.input-name {
+    width: 500px;
+}
+
+.input-qty {
+    width: 50px;
+}
+
+.orders-table-container {
+    border: 1px solid #b5b5b5;
+    border-radius: 4px;
+
+    overflow-y: auto;
+    overflow-x: auto;
+
+    max-height: calc(100vh - 180px);
+
+    background: white;
+}
+
+.orders-table tbody tr {
+    transition: background-color 0.12s ease;
+}
+
+.orders-table tbody tr:hover td {
+    background-color: #e8f2ff !important;
+}
+
+.orders-table tbody tr.row-not-mapped:hover td {
+    background-color: #ffc9c9 !important;
+}
+
+.orders-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 10px;
+
+    padding: 6px 10px;
+
+    background: linear-gradient(
+        180deg,
+        #5d46ff 0%,
+        #4b35f0 100%
+    );
+
+    border: 1px solid #2f5b8c;
+    border-bottom: none;
+}
+
+.orders-header-left {
+    display: flex;
+    align-items: center;
+}
+
+.orders-header-center {
+    display: flex;
+    gap: 8px;
+
+    flex: 1;
+}
+
+.orders-header-box {
+    min-width: 160px;
+
+    background: white;
+
+    border: 1px solid #c8c8c8;
+
+    padding: 4px 8px;
+
+    font-size: 14px;
+}
+
+.orders-header-label {
+    font-weight: 700;
+    margin-right: 6px;
+}
+
+.orders-header-right {
+    display: flex;
+    align-items: center;
+}
+
+.orders-save-button,
+.orders-delete-button {
+    min-width: 120px;
+
+    padding: 4px 12px;
+
+    border-radius: 4px;
+
+    font-size: 14px;
+    font-weight: 600;
+
+    transition: all 0.15s ease;
+}
+
+.orders-save-button {
+    border: 1px solid #2f5b8c;
+    background: white;
+    cursor: pointer;
+}
+
+.orders-save-button:hover:not(:disabled) {
+    background-color: #eaf3ff;
+}
+
+.orders-delete-button {
+    border: 1px solid #432bf4;
+    background: white;
+    cursor: pointer;
+}
+
+.orders-delete-button:hover:not(:disabled) {
+    background-color: #e9e7fc;
+    color: #432bf4;
+    border: 1px solid #ffffff;
+    box-shadow: 1px 1px 4px rgb(255, 255, 255);
+}
+
+.orders-save-button:disabled,
+.orders-delete-button:disabled,
+.orders-header input[type="file"]:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.orders-header-right {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.orders-upload-button {
+    position: relative;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 120px;
+
+    padding: 4px 12px;
+
+    border: 1px solid #0f71e0;
+    border-radius: 4px;
+
+    background: white;
+
+    font-size: 14px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    overflow: hidden;
+
+    transition: all 0.15s ease;
+}
+
+.orders-upload-button:hover {
+    background-color: #b6d6ff;
+}
+
+.orders-upload-button input[type="file"] {
+    position: absolute;
+
+    inset: 0;
+
+    opacity: 0;
+
+    cursor: pointer;
+}
+
+.upload-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.upload-disabled input[type="file"] {
+    pointer-events: none;
+}
+
+.hidden-file-input {
+    display: none;
+}

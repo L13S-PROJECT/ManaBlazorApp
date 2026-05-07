@@ -49,4 +49,12 @@ public async Task<IActionResult> SaveMap(
     return Ok();
 }
 
+[HttpDelete]
+public async Task<IActionResult> DeleteDraft()
+{
+    await _draftService.DeleteDraft();
+
+    return Ok();
+}
+
 }
