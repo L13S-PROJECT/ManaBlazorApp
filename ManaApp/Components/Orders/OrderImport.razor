@@ -16,6 +16,7 @@
         <p><b>Order Nr:</b> @header.OrderNumber</p>
         <p><b>Date:</b> @header.Date</p>
         <p><b>Customer:</b> @header.Customer</p>
+        <p>["@header.Customer"]</p>
     </div>
 }
 
@@ -26,6 +27,11 @@
             <th>Name</th>
             <th>Quantity</th>
             <th>Status</th>
+            <th>Product</th>
+            <th>Version</th>
+            <th>RAL</th>
+            <th>Type</th>
+            <th>TopPart</th>
         </tr>
     </thead>
     <tbody>
@@ -54,6 +60,16 @@
                         </button>
                     }
                 </td>
+
+                <td>@i.ProductName</td>
+
+                <td>@i.VersionName</td>
+
+                <td>@i.RalColorName</td>
+
+                <td>@i.MappingType</td>
+
+                <td>@i.TopPartName</td>
             </tr>
         }
     </tbody>
@@ -63,7 +79,8 @@
     IsVisible="showMappingPopup"
     Item="selectedItem"
     MappingList="mappingList"
-    OnClose="ClosePopup" />  
+    OnClose="ClosePopup"
+    OnSaved="ReloadDraftItems" />
 
 @code {
     List<OrderDraftItemViewModel> pdfItems = new();
@@ -102,7 +119,22 @@ protected override async Task OnInitializedAsync()
         VersionId = x.VersionId,
         ProductToPartId = x.ProductToPartId,
         RalColorId = x.RalColorId,
-        IsMapped = x.IsMapped
+        IsMapped = x.IsMapped,
+        TopPartId = x.TopPartId,
+
+        IsProduct = x.IsProduct,
+
+        IsPart = x.IsPart,
+
+        ProductName = x.ProductName,
+
+        VersionName = x.VersionName,
+
+        RalColorName = x.RalColorName,
+
+        TopPartName = x.TopPartName,
+
+        MappingType = x.MappingType
     }).ToList();
 
     mappingList = await Http.GetFromJsonAsync<List<MappingListItem>>(
@@ -156,15 +188,68 @@ await Http.PostAsJsonAsync(
         Items = draftItems
     });
 
-var codes = pdfItems
-    .Select(x => x.CustomerCode)
-    .ToList();
+await Http.PostAsJsonAsync(
+    "http://localhost:5270/api/OrderDraft",
+    new
+    {
+        Header = header,
+        Items = draftItems
+    });
+
+var reloadResponse = await Http.GetAsync(
+    "http://localhost:5270/api/OrderDraft/latest");
+
+if (!reloadResponse.IsSuccessStatusCode)
+    return;
+
+var reloadResult = await reloadResponse.Content
+    .ReadFromJsonAsync<OrderDraftLoadResult>();
+
+if (reloadResult is null)
+    return;
+
+
+pdfItems = reloadResult.Items.Select(x => new OrderDraftItemViewModel
+{
+    CustomerCode = x.CustomerCode,
+    Name = x.Name,
+    Quantity = x.Quantity,
+
+    VersionId = x.VersionId,
+    ProductToPartId = x.ProductToPartId,
+    RalColorId = x.RalColorId,
+    TopPartId = x.TopPartId,
+
+    IsMapped = x.IsMapped,
+    IsProduct = x.IsProduct,
+    IsPart = x.IsPart,
+
+    ProductName = x.ProductName,
+    VersionName = x.VersionName,
+    RalColorName = x.RalColorName,
+    TopPartName = x.TopPartName,
+    MappingType = x.MappingType
+}).ToList();
 
 }
 
 void OpenMappingPopup(OrderDraftItemViewModel item)
 {
     selectedItem = item;
+
+    selectedItem = new OrderDraftItemViewModel
+        {
+            CustomerCode = item.CustomerCode,
+            Name = item.Name,
+            Quantity = item.Quantity,
+
+            VersionId = item.VersionId,
+            ProductToPartId = item.ProductToPartId,
+            TopPartId = item.TopPartId,
+            RalColorId = item.RalColorId,
+
+            IsMapped = item.IsMapped
+        };
 
     showMappingPopup = true;
 }
@@ -177,5 +262,44 @@ void ClosePopup()
 }
 
 List<MappingListItem> mappingList = new();
+
+async Task ReloadDraftItems()
+{
+    var reloadResponse = await Http.GetAsync(
+        "http://localhost:5270/api/OrderDraft/latest");
+
+    if (!reloadResponse.IsSuccessStatusCode)
+        return;
+
+    var reloadResult = await reloadResponse.Content
+        .ReadFromJsonAsync<OrderDraftLoadResult>();
+
+    if (reloadResult is null)
+        return;
+
+    pdfItems = reloadResult.Items.Select(x => new OrderDraftItemViewModel
+    {
+        CustomerCode = x.CustomerCode,
+        Name = x.Name,
+        Quantity = x.Quantity,
+
+        VersionId = x.VersionId,
+        ProductToPartId = x.ProductToPartId,
+        RalColorId = x.RalColorId,
+        TopPartId = x.TopPartId,
+
+        IsMapped = x.IsMapped,
+        IsProduct = x.IsProduct,
+        IsPart = x.IsPart,
+
+        ProductName = x.ProductName,
+        VersionName = x.VersionName,
+        RalColorName = x.RalColorName,
+        TopPartName = x.TopPartName,
+        MappingType = x.MappingType
+    }).ToList();
+
+    StateHasChanged();
+}
 
 }

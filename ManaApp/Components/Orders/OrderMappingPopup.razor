@@ -59,6 +59,7 @@
 
                 <select
                     @bind="selectedCategoryId"
+                    @bind:after="ResetFromCategory"
                     style="width:100%;">
 
                     <option value="">Select category</option>
@@ -78,6 +79,7 @@
 
                 <select
                     @bind="selectedProductId"
+                    @bind:after="ResetFromProduct"
                     style="width:100%;">
 
                     <option value="">Select product</option>
@@ -121,9 +123,9 @@
     <br />
 
     <select
-        @bind="selectedVersionId"
-        @bind:after="LoadStage1Parts"
-        style="width:100%;">
+    @bind="selectedVersionId"
+    @bind:after="OnVersionChanged"
+    style="width:100%;">
 
         <option value="">Select version</option>
 
@@ -147,9 +149,28 @@
         <label>TopPart</label>
         <br />
 
+        @if (selectedVersionId is not null &&
+     !stage1Parts.Any())
+{
+    <div style="
+        background:#ffe5e5;
+        color:#b00000;
+        padding:10px;
+        margin-bottom:10px;
+        border:1px solid #ffb3b3;">
+
+        WARNING:
+        Selected version has no TopParts.
+
+        Product card is incomplete.
+    </div>
+}
+
         <select
-            @bind="selectedProductToPartId"
-            style="width:100%;">
+    @bind="selectedProductToPartId"
+    @bind:after="OnTopPartChanged"
+    style="width:100%;">
+
 
             <option value="">
                 Select top part
@@ -192,7 +213,20 @@
 
                 </div>
 
-                <button>
+                @if (!string.IsNullOrWhiteSpace(validationMessage))
+                        {
+                            <div style="
+                                background:#ffe5e5;
+                                color:#b00000;
+                                padding:10px;
+                                margin-bottom:10px;
+                                border:1px solid #ffb3b3;">
+
+                                @validationMessage
+                            </div>
+                        }
+
+                <button @onclick="SaveMapping">
                     Save mapping
                 </button>
 
@@ -214,6 +248,8 @@
     [Parameter]
     public EventCallback OnClose { get; set; }
     [Parameter]
+    public EventCallback OnSaved { get; set; }
+    [Parameter]
     public List<MappingListItem> MappingList { get; set; } = new();
     
     List<Stage1PartItem> stage1Parts = new();
@@ -222,6 +258,7 @@
 int? selectedRalColorId;
 
     int? selectedProductToPartId;
+    int? selectedTopPartId;
     async Task Close()
     {
         await OnClose.InvokeAsync();
@@ -233,6 +270,44 @@ int? selectedRalColorId;
     int? selectedVersionId;
     bool isProduct;
     bool isPart;
+
+    string? validationMessage;
+
+    void ResetFromCategory()
+{
+    selectedProductId = null;
+    selectedVersionId = null;
+
+    selectedProductToPartId = null;
+    selectedTopPartId = null;
+    selectedRalColorId = null;
+
+    stage1Parts.Clear();
+
+    validationMessage = null;
+}
+
+void ResetFromProduct()
+{
+    selectedVersionId = null;
+
+    selectedProductToPartId = null;
+    selectedTopPartId = null;
+    selectedRalColorId = null;
+
+    stage1Parts.Clear();
+
+    validationMessage = null;
+}
+
+void ResetFromVersion()
+{
+    selectedProductToPartId = null;
+    selectedTopPartId = null;
+    selectedRalColorId = null;
+
+    validationMessage = null;
+}
 
     IEnumerable<MappingListItem> Categories =>
     MappingList
@@ -268,6 +343,7 @@ int? selectedRalColorId;
             if (value)
             {
                 isPart = false;
+                ResetFromProduct();
             }
         }
 
@@ -278,6 +354,7 @@ void TogglePart(bool value)
             if (value)
             {
                 isProduct = false;
+                ResetFromProduct();
             }
         }
 
@@ -293,12 +370,85 @@ async Task LoadStage1Parts()
         $"http://localhost:5270/api/products/details-stage1?versionId={selectedVersionId}")
         ?? new();
 }
+void OnTopPartChanged()
+{
+    var selected = stage1Parts
+        .FirstOrDefault(x => x.Id == selectedProductToPartId);
+
+    selectedTopPartId = selected?.TopPartId;
+}
 
 protected override async Task OnInitializedAsync()
 {
     ralColors = await Http.GetFromJsonAsync<List<RalColor>>(
         "http://localhost:5270/api/products/ral-list")
         ?? new();
+}
+
+async Task SaveMapping()
+{
+validationMessage = null;
+
+if (isPart && selectedProductToPartId is null)
+{
+    validationMessage =
+        "Part mapping requires TopPart selection.";
+
+    return;
+}
+
+var dto = new
+{
+    CustomerName = "SIT RIGHT AB",
+    CustomerCode = Item!.CustomerCode,
+
+    VersionId = selectedVersionId,
+
+    ProductToPartId = selectedProductToPartId,
+
+    TopPartId = selectedTopPartId,
+
+    RalColorId = selectedRalColorId,
+
+    IsProduct = isProduct,
+
+    IsPart = isPart
+};
+
+await Http.PostAsJsonAsync(
+    "http://localhost:5270/api/OrderDraft/save-map",
+    dto);
+
+await OnSaved.InvokeAsync();
+
+await Close();
+}
+
+protected override void OnParametersSet()
+{
+    if (IsVisible)
+    {
+        selectedParentCategoryId = null;
+        selectedCategoryId = null;
+        selectedProductId = null;
+        selectedVersionId = null;
+
+        selectedProductToPartId = null;
+        selectedTopPartId = null;
+        selectedRalColorId = null;
+
+        isProduct = false;
+        isPart = false;
+
+        stage1Parts.Clear();
+    }
+}
+
+async Task OnVersionChanged()
+{
+    ResetFromVersion();
+
+    await LoadStage1Parts();
 }
 
 }

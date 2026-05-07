@@ -31,5 +31,16 @@ namespace ManiApi.Models
 
         [Column("Is_Active")]
         public bool IsActive { get; set; }
+        [Column("top_part_id")]
+        public int? TopPartId { get; set; }
+
+        [Column("is_product")]
+        public bool IsProduct { get; set; }
+
+        [Column("is_part")]
+        public bool IsPart { get; set; }
+
+        [Column("customer_code_map_id")]
+        public int? CustomerCodeMapId { get; set; }
     }
 }

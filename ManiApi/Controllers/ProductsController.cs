@@ -1300,14 +1300,13 @@ public async Task<IActionResult> GetDetailsStage1(
     cmd.CommandText = @"
 SELECT
     pt.ID AS Id,
+    pt.TopPart_ID AS TopPartId,
     tp.TopPart_Name AS TopPartName
 FROM producttopparts pt
 JOIN toppart tp
     ON tp.ID = pt.TopPart_ID
 WHERE
     pt.Version_ID = @versionId
-    AND pt.IsActive = 1
-    AND tp.IsActive = 1
     AND tp.Stage = 1
 ORDER BY tp.TopPart_Name;
 ";
@@ -1323,6 +1322,7 @@ ORDER BY tp.TopPart_Name;
         result.Add(new
         {
             Id = reader.GetInt32("Id"),
+            TopPartId = reader.GetInt32("TopPartId"),
             TopPartName = reader.GetString("TopPartName")
         });
     }

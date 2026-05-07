@@ -79,7 +79,33 @@ namespace ManiApi.Data
     .Property(e => e.ProductToPartId)
     .HasColumnName("producttopart_id");
 
+modelBuilder.Entity<CustomerCodeMap>()
+    .Property(e => e.CustomerName)
+    .HasColumnName("customer_name");
 
+modelBuilder.Entity<CustomerCodeMap>()
+    .Property(e => e.CustomerCode)
+    .HasColumnName("customer_code");
+
+modelBuilder.Entity<CustomerCodeMap>()
+    .Property(e => e.TopPartId)
+    .HasColumnName("top_part_id");
+
+modelBuilder.Entity<CustomerCodeMap>()
+    .Property(e => e.RalColorId)
+    .HasColumnName("ral_color_id");
+
+modelBuilder.Entity<CustomerCodeMap>()
+    .Property(e => e.IsProduct)
+    .HasColumnName("is_product");
+
+modelBuilder.Entity<CustomerCodeMap>()
+    .Property(e => e.IsPart)
+    .HasColumnName("is_part");
+
+modelBuilder.Entity<CustomerCodeMap>()
+    .Property(e => e.VersionId)
+    .HasColumnName("version_id");
     
 }
   

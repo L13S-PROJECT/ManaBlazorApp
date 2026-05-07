@@ -15,4 +15,19 @@ public class OrderDraftItemDto
     public int? RalColorId { get; set; }
 
     public bool IsMapped { get; set; }
+
+    public string? ProductName { get; set; }
+
+public string? VersionName { get; set; }
+
+public string? RalColorName { get; set; }
+
+public string? TopPartName { get; set; }
+
+public string? MappingType { get; set; }
+public int? TopPartId { get; set; }
+
+public bool IsProduct { get; set; }
+
+public bool IsPart { get; set; }
 }

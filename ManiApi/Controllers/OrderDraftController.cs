@@ -31,7 +31,7 @@ public async Task<IActionResult> GetLatest()
     if (draft is null)
         return NotFound();
 
-    var items = await _draftService.GetDraftItems(draft.Id);
+    var items = await _draftService.GetDraftItemDtos(draft.Id);
 
     return Ok(new
     {
@@ -39,4 +39,14 @@ public async Task<IActionResult> GetLatest()
         Items = items
     });
 }
+
+[HttpPost("save-map")]
+public async Task<IActionResult> SaveMap(
+    [FromBody] SaveCustomerCodeMapRequest dto)
+{
+    await _draftService.SaveCustomerMap(dto);
+
+    return Ok();
+}
+
 }

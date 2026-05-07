@@ -45,7 +45,7 @@ namespace ManiApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("categories");
+                    b.ToTable("categories", (string)null);
                 });
 
             modelBuilder.Entity("ManiApi.Models.Product", b =>
@@ -77,7 +77,7 @@ namespace ManiApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("products");
+                    b.ToTable("products", (string)null);
                 });
 
             modelBuilder.Entity("ManiApi.Models.ProductTopPart", b =>
@@ -107,7 +107,7 @@ namespace ManiApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("producttopparts");
+                    b.ToTable("producttopparts", (string)null);
                 });
 
             modelBuilder.Entity("ManiApi.Models.ProductVersion", b =>
@@ -148,7 +148,7 @@ namespace ManiApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("versions");
+                    b.ToTable("versions", (string)null);
                 });
 
             modelBuilder.Entity("ManiApi.Models.StepType", b =>
@@ -171,7 +171,7 @@ namespace ManiApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("step_type");
+                    b.ToTable("step_type", (string)null);
                 });
 
             modelBuilder.Entity("ManiApi.Models.StockMovement", b =>
@@ -203,7 +203,7 @@ namespace ManiApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("StockMovements");
+                    b.ToTable("StockMovements", (string)null);
                 });
 
             modelBuilder.Entity("ManiApi.Models.TopPart", b =>
@@ -231,7 +231,7 @@ namespace ManiApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("toppart");
+                    b.ToTable("toppart", (string)null);
                 });
 
             modelBuilder.Entity("ManiApi.Models.TopPartStep", b =>
@@ -286,7 +286,7 @@ namespace ManiApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("toppartsteps");
+                    b.ToTable("toppartsteps", (string)null);
                 });
 
             modelBuilder.Entity("ManiApi.Models.WorkCenter", b =>
@@ -314,7 +314,7 @@ namespace ManiApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("workcentr_type");
+                    b.ToTable("workcentr_type", (string)null);
                 });
 #pragma warning restore 612, 618
         }
