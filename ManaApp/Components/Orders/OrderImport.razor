@@ -79,7 +79,8 @@
         </button>
 
         <button class="orders-save-button"
-                disabled="@(!allMapped)">
+        disabled="@(!allMapped)"
+        @onclick="SaveOrder">
             SAGLABĀT
         </button>
 
@@ -146,7 +147,21 @@
 
                 <td class="cell-product">@i.ProductName</td>
 
-                <td class="cell-version">@i.VersionName</td>
+                <td class="cell-version">
+
+                    @if (!string.IsNullOrWhiteSpace(i.VersionName))
+                    {
+                        @i.VersionName
+
+                        @if (!i.VersionIsActive)
+                        {
+                            <span class="archived-label">
+                                (arhivēts)
+                            </span>
+                        }
+                    }
+
+                </td>
 
                 <td class="cell-ral">@i.RalColorName</td>
 
@@ -198,10 +213,12 @@ protected override async Task OnInitializedAsync()
 
     pdfItems = result.Items.Select(x => new OrderDraftItemViewModel
     {
+        CustomerCodeMapId = x.CustomerCodeMapId,
         CustomerCode = x.CustomerCode,
         Name = x.Name,
         Quantity = x.Quantity,
         VersionId = x.VersionId,
+        VersionIsActive = x.VersionIsActive,
         ProductToPartId = x.ProductToPartId,
         RalColorId = x.RalColorId,
         IsMapped = x.IsMapped,
@@ -273,14 +290,6 @@ await Http.PostAsJsonAsync(
         Items = draftItems
     });
 
-await Http.PostAsJsonAsync(
-    "http://localhost:5270/api/OrderDraft",
-    new
-    {
-        Header = header,
-        Items = draftItems
-    });
-
 var reloadResponse = await Http.GetAsync(
     "http://localhost:5270/api/OrderDraft/latest");
 
@@ -296,11 +305,13 @@ if (reloadResult is null)
 
 pdfItems = reloadResult.Items.Select(x => new OrderDraftItemViewModel
 {
+    CustomerCodeMapId = x.CustomerCodeMapId,
     CustomerCode = x.CustomerCode,
     Name = x.Name,
     Quantity = x.Quantity,
 
     VersionId = x.VersionId,
+    VersionIsActive = x.VersionIsActive,
     ProductToPartId = x.ProductToPartId,
     RalColorId = x.RalColorId,
     TopPartId = x.TopPartId,
@@ -329,6 +340,7 @@ void OpenMappingPopup(OrderDraftItemViewModel item)
             Quantity = item.Quantity,
 
             VersionId = item.VersionId,
+            VersionIsActive = item.VersionIsActive,
             ProductToPartId = item.ProductToPartId,
             TopPartId = item.TopPartId,
             RalColorId = item.RalColorId,
@@ -364,11 +376,13 @@ async Task ReloadDraftItems()
 
     pdfItems = reloadResult.Items.Select(x => new OrderDraftItemViewModel
     {
+        CustomerCodeMapId = x.CustomerCodeMapId,
         CustomerCode = x.CustomerCode,
         Name = x.Name,
         Quantity = x.Quantity,
 
         VersionId = x.VersionId,
+        VersionIsActive = x.VersionIsActive,
         ProductToPartId = x.ProductToPartId,
         RalColorId = x.RalColorId,
         TopPartId = x.TopPartId,
@@ -407,6 +421,49 @@ async Task DeleteDraft()
     pdfItems.Clear();
 
     StateHasChanged();
+}
+
+async Task SaveOrder()
+{
+    if (!pdfItems.All(x => x.IsMapped))
+    {
+        await JS.InvokeVoidAsync(
+            "alert",
+            "Visām rindām jābūt Mapping.");
+
+        return;
+    }
+
+    var response = await Http.PostAsJsonAsync(
+    "http://localhost:5270/api/orders/save-draft",
+    new SaveOrderRequest
+    {
+        OrderNumber = header?.OrderNumber ?? ""
+    });
+
+    if (!response.IsSuccessStatusCode)
+{
+    var error = await response.Content.ReadAsStringAsync();
+
+    await JS.InvokeVoidAsync(
+        "alert",
+        error);
+
+    return;
+}
+
+var confirmed = await JS.InvokeAsync<bool>(
+    "confirm",
+    "Vai saglabāt pasūtījumu?");
+
+if (!confirmed)
+    return;
+
+header = null;
+
+pdfItems.Clear();
+
+StateHasChanged();
 }
 
 }

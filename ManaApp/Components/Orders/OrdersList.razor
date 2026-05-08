@@ -1,0 +1,415 @@
+@* OrdersList.razor *@
+
+@inject HttpClient Http
+@using ManaApp.Components.Orders
+
+<div class="orders-list-container">
+
+    <div class="orders-list-header">
+
+    <h3>Pasūtījuma reģistra saraksts</h3>
+
+    <div class="orders-header-actions">
+
+            <button
+                    class="clear-filter-button"
+                    @onclick="ClearFilters">
+
+                    Notīrīt filtrus
+
+                </button>
+
+            <button
+                class="action-button add-button"
+                @onclick="() => showImportPopup = true">
+                Pievienot jaunu @(hasDraft ? "(1)" : "")
+            </button>
+
+            <button
+                class="action-button delete-button"
+                disabled="@(selectedOrderId is null)"
+                @onclick="OpenDeletePopup">
+                Dzēst
+            </button>
+
+            <div class="status-toggle">
+
+                <span>Izpildītie</span>
+
+                <label class="switch">
+                    <input
+                        type="checkbox"
+                        checked="@showArchived"
+                        @onchange="OnArchivedChanged" />
+                    <span class="slider"></span>
+                </label>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="orders-list-toolbar">
+
+            <input
+                class="search-input"
+                placeholder="Meklēt"
+                value="@search"
+                @oninput="OnSearchChanged" />
+
+
+                <div class="date-filter-group">
+
+                    <label>Datums no</label>
+
+                    <input
+                        type="date"
+                        class="date-input"
+                        value="@(dateFrom?.ToString("yyyy-MM-dd"))"
+                        @onchange="OnDateFromChanged" />
+
+                </div>
+
+            <div class="date-filter-group">
+
+                    <label>Datums līdz</label>
+
+                    <input
+                        type="date"
+                        class="date-input"
+                        value="@(dateTo?.ToString("yyyy-MM-dd"))"
+                        @onchange="OnDateToChanged" />
+
+                </div>
+
+            <select class="progress-select">
+                <option>Statuss</option>
+            </select>
+
+    </div>
+
+    <div class="orders-table-wrapper">
+
+        <table class="orders-table">
+
+            <thead>
+                <tr>
+                    <th style="width: 90px;">Pasūtījums</th>
+
+                    <th style="width: 110px;">Datums</th>
+
+                    <th style="width: 140px;">Klients</th> 
+
+                    <th style="width: 80px;">Statuss</th>
+
+                    <th style="width: 110px;">Izpildīts</th>
+
+                    <th style="min-width: 320px;">Komentāri</th> 
+                </tr>
+            </thead>
+
+            <tbody>
+                @foreach (var order in orders)
+                    {
+                        <tr
+                            class="@(selectedOrderId == order.Id ? "selected-row" : "")"
+                            @onclick="() => selectedOrderId = order.Id">
+                            <td>@order.OrderNumber</td>
+                            <td>@order.OrderDate?.ToString("yyyy-MM-dd")</td>
+                            <td>@order.CustomerName</td>
+                            <td>Jauns</td>
+                            <td>
+                                -
+                            </td>
+                            <td class="comment-cell">
+
+                                <span>@order.Comment</span>
+
+                                <button
+                                    class="comment-edit-button"
+                                    @onclick="() => OpenCommentPopup(order)">
+
+                                    ✎
+
+                                </button>
+
+                            </td>
+                        </tr>
+                    }
+            </tbody>
+
+        </table>
+
+    </div>
+</div>
+
+@if (showImportPopup)
+{
+    <div class="orders-popup-overlay">
+
+        <div class="orders-popup-content">
+
+    <div class="orders-popup-header">
+
+        <button
+            class="orders-popup-close"
+            @onclick="() => showImportPopup = false">
+
+            ✕
+
+        </button>
+
+    </div>
+
+    <OrderImport />
+
+</div>
+
+    </div>
+}
+
+@if (showDeletePopup)
+{
+    <div class="orders-popup-overlay">
+
+        <div class="delete-popup">
+
+            <h3>Dzēst pasūtījumu</h3>
+
+            <textarea
+                class="delete-comment-input"
+                placeholder="Norādi dzēšanas iemeslu..."
+                @bind="deleteComment">
+            </textarea>
+
+            <div class="delete-popup-actions">
+
+                <button
+                    class="action-button delete-button"
+                    @onclick="ConfirmDelete">
+
+                    Dzēst
+
+                </button>
+
+                <button
+                    class="action-button"
+                    @onclick="() => showDeletePopup = false">
+
+                    Atcelt
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+@if (showCommentPopup)
+{
+    <div class="orders-popup-overlay">
+
+        <div class="delete-popup">
+
+            <h3>Komentārs</h3>
+
+            <textarea
+                class="delete-comment-input"
+                @bind="editComment">
+            </textarea>
+
+            <div class="delete-popup-actions">
+
+                <button
+                    class="action-button"
+                    @onclick="SaveComment">
+
+                    Saglabāt
+
+                </button>
+
+                <button
+                    class="action-button delete-button"
+                    @onclick="() => showCommentPopup = false">
+
+                    Atcelt
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+@code {
+
+    private List<OrderRow> orders = new();
+
+    public class OrderRow
+        {
+            public int Id { get; set; }
+
+            public string OrderNumber { get; set; } = "";
+
+            public DateTime? OrderDate { get; set; }
+
+            public string CustomerName { get; set; } = "";
+
+            public string? Comment { get; set; }
+        }
+
+protected override async Task OnInitializedAsync()
+{
+    var draftResponse = await Http.GetAsync(
+        "http://localhost:5270/api/OrderDraft/latest");
+
+    hasDraft = draftResponse.IsSuccessStatusCode;
+
+    await LoadOrders();
+}
+
+private string search = "";
+private DateTime? dateFrom;
+
+private DateTime? dateTo;
+
+private int? selectedOrderId;
+
+private async Task LoadOrders()
+{
+    orders = await Http.GetFromJsonAsync<List<OrderRow>>(
+    $"http://localhost:5270/api/orders?search={search}&dateFrom={dateFrom:yyyy-MM-dd}&dateTo={dateTo:yyyy-MM-dd}&showArchived={showArchived}")
+    ?? new();
+}
+
+private async Task OnSearchChanged(ChangeEventArgs e)
+{
+    search = e.Value?.ToString() ?? "";
+    await LoadOrders();
+}
+
+private async Task OnDateFromChanged(ChangeEventArgs e)
+{
+    if (DateTime.TryParse(e.Value?.ToString(), out var value))
+    {
+        dateFrom = value;
+    }
+    else
+    {
+        dateFrom = null;
+    }
+
+    await LoadOrders();
+}
+
+private async Task OnDateToChanged(ChangeEventArgs e)
+{
+    if (DateTime.TryParse(e.Value?.ToString(), out var value))
+    {
+        dateTo = value;
+    }
+    else
+    {
+        dateTo = null;
+    }
+
+    await LoadOrders();
+}
+
+private async Task ClearFilters()
+{
+    search = "";
+    dateFrom = null;
+    dateTo = null;
+
+    await LoadOrders();
+}
+
+private bool showImportPopup;
+
+private bool hasDraft;
+
+private bool showDeletePopup;
+
+private bool showArchived;
+
+private string deleteComment = "";
+
+private void OpenDeletePopup()
+{
+    if (selectedOrderId is null)
+        return;
+
+    deleteComment = "";
+
+    showDeletePopup = true;
+}
+
+private async Task ConfirmDelete()
+{
+    if (selectedOrderId is null)
+        return;
+
+    showDeletePopup = false;
+
+    await Http.PostAsJsonAsync(
+    "http://localhost:5270/api/orders/delete",
+    new
+    {
+        Id = selectedOrderId.Value,
+        Comment = deleteComment
+    });
+
+await LoadOrders();
+
+selectedOrderId = null;
+}
+
+private async Task OnArchivedChanged(
+    ChangeEventArgs e)
+{
+    showArchived =
+        (bool?)e.Value == true;
+
+    await LoadOrders();
+}
+
+private bool showCommentPopup;
+
+private string editComment = "";
+
+private int? commentOrderId;
+
+private void OpenCommentPopup(OrderRow order)
+{
+    commentOrderId = order.Id;
+
+    editComment = order.Comment ?? "";
+
+    showCommentPopup = true;
+}
+
+private async Task SaveComment()
+{
+if (commentOrderId is null)
+    return;
+
+await Http.PostAsJsonAsync(
+    "http://localhost:5270/api/orders/comment",
+    new
+    {
+        Id = commentOrderId.Value,
+        Comment = editComment
+    });
+
+await LoadOrders();
+showCommentPopup = false;
+
+}
+
+}

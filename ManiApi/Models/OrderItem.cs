@@ -9,10 +9,7 @@ namespace ManiApi.Models
         public string Name { get; set; } = "";
         public int Quantity { get; set; }
 
-        public int? VersionId { get; set; }
-        public int? ProductToPartId { get; set; }
-        public int? RalColorId { get; set; }
-
         public bool IsActive { get; set; }
+        public int? CustomerCodeMapId { get; set; }
     }
 }

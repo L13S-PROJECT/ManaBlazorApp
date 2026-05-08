@@ -2,6 +2,21 @@
 
 @page "/orders"
 
-<h3>Pasūtījumi</h3>
 
-<OrderImport />
+@* <OrderImport /> *@
+
+<div class="orders-layout">
+
+    <div class="orders-block block-list">
+    <OrdersList />
+    </div>
+
+    <div class="orders-block block-details">
+    <OrderDetails />
+    </div>
+
+    <div class="orders-block block-dispatch">
+    <OrderDispatch />
+    </div>
+
+</div>

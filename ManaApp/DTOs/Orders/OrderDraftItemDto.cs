@@ -20,6 +20,8 @@ public class OrderDraftItemDto
 
 public string? VersionName { get; set; }
 
+public bool VersionIsActive { get; set; }
+
 public string? RalColorName { get; set; }
 
 public string? TopPartName { get; set; }
@@ -30,4 +32,6 @@ public int? TopPartId { get; set; }
 public bool IsProduct { get; set; }
 
 public bool IsPart { get; set; }
+
+public int? CustomerCodeMapId { get; set; }
 }

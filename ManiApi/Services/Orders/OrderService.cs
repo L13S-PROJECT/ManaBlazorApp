@@ -1,5 +1,7 @@
 using ManiApi.Data;
 using ManiApi.Models;
+using ManiApi.DTOs.Orders;
+using Microsoft.EntityFrameworkCore;
 
 namespace ManiApi.Services.Orders;
 
@@ -66,6 +68,169 @@ public async Task<List<object>> MapCustomerCodes(string customer, List<string> c
     return await Task.FromResult(result);
 }
 
+public async Task SaveDraftOrder(
+    string orderNumber,
+    string? comment)
 
+{
+    var draft = await _db.OrderDrafts
+        .FirstOrDefaultAsync(x =>
+            x.OrderNumber == orderNumber);
+
+    if (draft is null)
+    {
+        throw new Exception("Pasūtījuma melnraksts nav atrasts.");
+    }
+
+    var exists = await _db.Orders.AnyAsync(x =>
+    x.OrderNumber == draft.OrderNumber &&
+    x.CustomerName == draft.CustomerName &&
+    x.IsActive);
+
+if (exists)
+{
+    throw new Exception(
+        "Tāds pasūtījums jau eksistē.");
+}
+
+var draftItems = await _db.OrderDraftItems
+    .Where(x => x.OrderDraftId == draft.Id)
+    .ToListAsync();
+
+var order = new Order
+{
+    OrderNumber = draft.OrderNumber,
+    CustomerName = draft.CustomerName,
+    Comment = comment,
+    OrderDate = draft.OrderDate,
+    CreatedAt = DateTime.UtcNow,
+    IsActive = true
+};
+
+_db.Orders.Add(order);
+
+await _db.SaveChangesAsync();
+
+foreach (var item in draftItems)
+{
+    _db.OrderItems.Add(new OrderItem
+    {
+        OrderId = order.Id,
+
+        CustomerCode = item.CustomerCode,
+        Name = item.Name,
+        Quantity = item.Quantity,
+
+        CustomerCodeMapId = item.CustomerCodeMapId,
+
+        IsActive = true
+    });
+}
+
+await _db.SaveChangesAsync();
+
+_db.OrderDraftItems.RemoveRange(draftItems);
+
+_db.OrderDrafts.Remove(draft);
+
+await _db.SaveChangesAsync();
+
+
+}
+
+public async Task<List<OrderListDto>> GetOrders(
+    GetOrdersRequest request)
+{
+    var query = _db.Orders
+    .AsQueryable();
+
+        if (request.ShowArchived)
+        {
+            query = query.Where(x => !x.IsActive);
+        }
+        else
+        {
+            query = query.Where(x => x.IsActive);
+        }
+
+if (!string.IsNullOrWhiteSpace(request.Search))
+{
+    query = query.Where(x =>
+        x.OrderNumber.Contains(request.Search) ||
+        x.CustomerName.Contains(request.Search) ||
+        (x.Comment != null &&
+         x.Comment.Contains(request.Search)));
+}
+
+if (request.DateFrom.HasValue)
+{
+    query = query.Where(x =>
+        x.OrderDate >= request.DateFrom.Value);
+}
+
+if (request.DateTo.HasValue)
+{
+    query = query.Where(x =>
+        x.OrderDate <= request.DateTo.Value);
+}
+    
+    return await query
+        .Select(x => new OrderListDto
+        {
+            Id = x.Id,
+            OrderNumber = x.OrderNumber,
+            OrderDate = x.OrderDate,
+            CustomerName = x.CustomerName,
+            Comment = x.Comment
+        })
+        .ToListAsync();
+}
+
+public async Task DeleteOrder(
+    DeleteOrderRequest request)
+{
+    var order = await _db.Orders
+        .FirstOrDefaultAsync(x =>
+            x.Id == request.Id);
+
+    if (order is null)
+    {
+        throw new Exception(
+            "Pasūtījums nav atrasts.");
+    }
+
+    order.IsActive = false;
+
+    var deleteText =
+    $"DZĒSTS: {request.Comment}";
+
+        if (string.IsNullOrWhiteSpace(order.Comment))
+        {
+            order.Comment = deleteText;
+        }
+        else
+        {
+            order.Comment +=
+                $"\n---\n{deleteText}";
+        }
+}
+
+public async Task UpdateComment(
+    UpdateOrderCommentRequest request)
+{
+var order = await _db.Orders
+    .FirstOrDefaultAsync(x =>
+        x.Id == request.Id);
+
+if (order is null)
+{
+    throw new Exception(
+        "Pasūtījums nav atrasts.");
+}
+
+order.Comment = request.Comment;
+
+await _db.SaveChangesAsync();
+}
 
 }

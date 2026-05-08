@@ -106,7 +106,45 @@ modelBuilder.Entity<CustomerCodeMap>()
 modelBuilder.Entity<CustomerCodeMap>()
     .Property(e => e.VersionId)
     .HasColumnName("version_id");
-    
+modelBuilder.Entity<Order>()
+    .Property(e => e.OrderNumber)
+    .HasColumnName("order_number");
+
+modelBuilder.Entity<Order>()
+    .Property(e => e.CustomerName)
+    .HasColumnName("customer_name");
+
+modelBuilder.Entity<Order>()
+    .Property(e => e.Comment)
+    .HasColumnName("comment");
+
+modelBuilder.Entity<Order>()
+    .Property(e => e.OrderDate)
+    .HasColumnName("order_date");
+
+modelBuilder.Entity<Order>()
+    .Property(e => e.CreatedAt)
+    .HasColumnName("created_at");
+
+modelBuilder.Entity<Order>()
+    .Property(e => e.IsActive)
+    .HasColumnName("is_active");
+modelBuilder.Entity<OrderItem>()
+    .Property(e => e.CustomerCode)
+    .HasColumnName("customer_code");
+
+modelBuilder.Entity<OrderItem>()
+    .Property(e => e.CustomerCodeMapId)
+    .HasColumnName("customer_code_map_id");
+
+modelBuilder.Entity<OrderItem>()
+    .Property(e => e.OrderId)
+    .HasColumnName("order_id");
+
+modelBuilder.Entity<OrderItem>()
+    .Property(e => e.IsActive)
+    .HasColumnName("is_active");
+
 }
   
 

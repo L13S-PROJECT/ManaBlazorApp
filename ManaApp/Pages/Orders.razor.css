@@ -1,0 +1,39 @@
+/* Orders.razor.css */
+
+.orders-layout {
+    display: grid;
+    grid-template-columns: 2fr 1.2fr;
+    grid-template-rows: 45% 55%;
+    gap: 12px;
+
+    height: calc(100vh - 20px);
+    width: 100%;
+
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+.orders-block {
+    border: 2px solid #4a90e2;
+    border-radius: 14px;
+
+    background-color: #eef5ff;
+
+    padding: 4px;
+    overflow: auto;
+}
+
+.block-list {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.block-details {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+.block-dispatch {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+}

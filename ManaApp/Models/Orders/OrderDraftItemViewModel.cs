@@ -31,7 +31,9 @@ public class OrderDraftItemViewModel
     public bool IsProduct { get; set; }
 
     public bool IsPart { get; set; }
+    public bool VersionIsActive { get; set; }
 
+    public int? CustomerCodeMapId { get; set; }
     
 }
 }

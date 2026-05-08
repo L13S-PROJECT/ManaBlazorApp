@@ -166,6 +166,8 @@ public async Task<List<OrderDraftItemDto>> GetDraftItemDtos(int draftId)
             RalColorId = map?.RalColorId,
             TopPartId = map?.TopPartId,
 
+            CustomerCodeMapId = map?.Id,
+
             IsMapped = map is not null,
             IsProduct = map?.IsProduct ?? false,
             IsPart = map?.IsPart ?? false,
@@ -173,6 +175,7 @@ public async Task<List<OrderDraftItemDto>> GetDraftItemDtos(int draftId)
             ProductName = product?.ProductName,
 
             VersionName = version?.VersionName,
+            VersionIsActive = version?.IsActive ?? false,
 
             RalColorName = ralColors
                 .FirstOrDefault(r => r.ID == map?.RalColorId)

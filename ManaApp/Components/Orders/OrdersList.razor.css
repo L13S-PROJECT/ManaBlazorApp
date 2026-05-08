@@ -1,0 +1,438 @@
+/* OrdersList.razor.css */
+
+.orders-list-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.orders-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    margin-bottom: 6px;
+    gap: 10px;
+}
+
+.orders-list-header h3 {
+    margin: 0;
+    color: #2f80ed;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.orders-list-toolbar {
+    display: flex;
+    gap: 4px;
+
+    align-items: center;
+
+    margin-top: 0;
+    margin-bottom: 2px;
+
+    flex-wrap: wrap;
+}
+
+.search-input,
+.date-input,
+.progress-select {
+    height: 26px;
+
+    padding: 0 8px;
+    margin: 0;
+
+    border: 1px solid #9ec5ff;
+    border-radius: 3px;
+
+    font-size: 12px;
+
+    background-color: white;
+    outline: none;
+}
+
+.search-input:focus,
+.date-input:focus,
+.progress-select:focus {
+    border-color: #2f80ed;
+    box-shadow: 0 0 0 1px #2f80ed;
+}
+
+.search-input {
+    min-width: 180px;
+}
+
+.date-input {
+    width: 140px;
+}
+
+.progress-select {
+    width: 140px;
+}
+
+.orders-table-wrapper {
+    flex: 1;
+    overflow: auto;
+
+    margin-top: 4px;
+
+    border: 1px solid #2f80ed;
+    border-radius: 2px;
+
+    background-color: white;
+    padding: 0;
+}
+
+.orders-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.orders-table thead {
+    position: sticky;
+    top: 0;
+
+    background-color: #2f80ed;
+    color: white;
+}
+
+.orders-table th {
+    text-align: left;
+
+    padding: 6px 10px;
+
+    font-size: 12px;
+    font-weight: 600;
+
+    border-right: 1px solid #7fb2ff;
+    border-bottom: 1px solid #2f80ed;
+}
+
+.orders-table td {
+    padding: 4px 10px;
+
+    font-size: 12px;
+
+    border-right: 1px solid #cfe2ff;
+    border-bottom: 1px solid #cfe2ff;
+}
+
+.orders-table tbody tr:hover {
+    background-color: #f5f9ff;
+    cursor: pointer;
+}
+
+.orders-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.action-button {
+    height: 30px;
+    min-width: 110px;
+
+    padding: 0 14px;
+
+    border: 1px solid #2f80ed;
+    border-radius: 6px;
+
+    background-color: #2f80ed;
+    color: white;
+
+    font-size: 12px;
+    font-weight: 600;
+
+    cursor: pointer;
+}
+
+.action-button:hover {
+    opacity: 0.92;
+}
+
+.delete-button {
+    background-color: #e9eefc;
+    color: #2f80ed;
+}
+
+.status-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    font-size: 12px;
+    font-weight: 600;
+    color: #2f80ed;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+
+    width: 42px;
+    height: 22px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    inset: 0;
+
+    background-color: #d0d0d0;
+    border-radius: 20px;
+
+    transition: 0.2s;
+}
+
+.slider::before {
+    content: "";
+
+    position: absolute;
+
+    width: 16px;
+    height: 16px;
+
+    left: 3px;
+    top: 3px;
+
+    background-color: white;
+    border-radius: 50%;
+
+    transition: 0.2s;
+}
+
+.switch input:checked + .slider {
+    background-color: #2f80ed;
+}
+
+.switch input:checked + .slider::before {
+    transform: translateX(20px);
+}
+.orders-list-container {
+    padding: 2px;
+}
+
+.orders-table {
+    margin: 0;
+}
+
+.orders-table th:last-child,
+.orders-table td:last-child {
+    border-right: none;
+}
+
+.date-filter-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.date-filter-group label {
+    font-size: 12px;
+    color: #2f80ed;
+    font-weight: 600;
+}
+
+.clear-filter-button {
+    height: 26px;
+
+    padding: 0 10px;
+
+    border: 1px solid #9ec5ff;
+    border-radius: 3px;
+
+    background-color: white;
+    color: #2f80ed;
+
+    font-size: 12px;
+    font-weight: 600;
+
+    cursor: pointer;
+}
+
+.clear-filter-button:hover {
+    background-color: #f5f9ff;
+}
+
+.orders-popup-overlay {
+    position: fixed;
+    inset: 0;
+
+    background: rgba(0, 0, 0, 0.45);
+
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    z-index: 2000;
+}
+
+.orders-popup-content {
+    width: 96vw;
+    height: 94vh;
+
+    background: #f4f7fb;
+
+    border-radius: 8px;
+
+    overflow: hidden;
+
+    box-shadow: 0 12px 34px rgba(0,0,0,0.28);
+}
+
+.orders-popup-close {
+    width: 20px;
+    height: 20px;
+
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 10%;
+
+    background: rgba(255,255,255,0.92);
+
+    font-size: 22px;
+    color: #4b35f0;
+
+    cursor: pointer;
+
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 0;
+
+    line-height: 1;
+}
+
+.orders-popup-close:hover {
+    background: white;
+
+    transform: scale(1.06);
+
+    box-shadow: 0 0 10px rgba(255,255,255,0.45);
+}
+
+.orders-popup-header {
+    height: 28px;
+
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+
+    padding: 0 10px;
+
+    background: linear-gradient(
+    180deg,
+    #5d46ff 0%,
+    #4b35f0 100%
+);
+
+    border-bottom: 1px solid #1d4f99;
+}
+
+.selected-row td {
+    background-color: #dbeafe !important;
+}
+
+.delete-popup {
+    width: 420px;
+
+    background: white;
+
+    border-radius: 10px;
+
+    overflow: hidden;
+
+    box-shadow: 0 12px 34px rgba(0,0,0,0.28);
+}
+
+.delete-popup h3 {
+    margin: 0;
+
+    padding: 14px 18px;
+
+    background: linear-gradient(
+        180deg,
+        #5d46ff 0%,
+        #4b35f0 100%
+    );
+
+    color: white;
+
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.delete-comment-input {
+    width: calc(100% - 36px);
+    height: 120px;
+
+    margin: 18px;
+
+    padding: 12px;
+
+    resize: none;
+
+    border: 1px solid #cfd8e3;
+    border-radius: 6px;
+
+    outline: none;
+
+    font-size: 14px;
+
+    box-sizing: border-box;
+}
+
+.delete-comment-input:focus {
+    border-color: #4b35f0;
+
+    box-shadow: 0 0 0 2px rgba(75,53,240,0.12);
+}
+
+.delete-popup-actions {
+    display: flex;
+    justify-content: flex-end;
+
+    gap: 10px;
+
+    padding: 0 18px 18px 18px;
+}
+
+.comment-cell {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 8px;
+}
+
+.comment-edit-button {
+    border: none;
+
+    background: transparent;
+
+    color: #4b35f0;
+
+    font-size: 14px;
+
+    cursor: pointer;
+
+    opacity: 0.65;
+
+    transition: all 0.15s ease;
+}
+
+.comment-edit-button:hover {
+    opacity: 1;
+
+    transform: scale(1.15);
+}

@@ -1,0 +1,97 @@
+/* DispatchItemList.razor.css */
+
+.dispatch-item-list-container {
+    flex: 1;
+
+    overflow: auto;
+
+    border: 1px solid #2f80ed;
+    border-radius: 2px;
+
+    background-color: white;
+
+    min-height: 200px;
+}
+
+.dispatch-item-list-container {
+    flex: 1;
+
+    overflow: auto;
+
+    border: 1px solid #2f80ed;
+    border-radius: 4px;
+
+    background-color: white;
+
+    min-height: 200px;
+}
+
+.dispatch-items-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.dispatch-items-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+
+    background-color: #2f80ed;
+    color: white;
+}
+
+.dispatch-items-table th {
+    padding: 5px 6px;
+
+    font-size: 11px;
+    font-weight: 600;
+
+    text-align: left;
+
+    border-right: 1px solid #7fb2ff;
+    border-bottom: 1px solid #2f80ed;
+
+    white-space: nowrap;
+}
+
+.dispatch-items-table td {
+    padding: 4px 6px;
+
+    font-size: 11px;
+
+    border-right: 1px solid #d9e9ff;
+    border-bottom: 1px solid #d9e9ff;
+
+    white-space: nowrap;
+}
+
+.dispatch-items-table th:last-child,
+.dispatch-items-table td:last-child {
+    border-right: none;
+}
+
+.dispatch-order-row td {
+    background-color: #ececec;
+
+    font-weight: 700;
+    color: #333;
+
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+.dispatch-items-table tbody tr:hover:not(.dispatch-order-row) {
+    background-color: #eef5ff;
+}
+
+.checkbox-cell {
+    width: 34px;
+    text-align: center;
+}
+
+.checkbox-cell input {
+    width: 14px;
+    height: 14px;
+
+    cursor: pointer;
+}
