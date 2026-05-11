@@ -1,6 +1,7 @@
 @* OrdersList.razor *@
 
 @inject HttpClient Http
+@using Microsoft.AspNetCore.Components
 @using ManaApp.Components.Orders
 
 <div class="orders-list-container">
@@ -114,7 +115,7 @@
                     {
                         <tr
                             class="@(selectedOrderId == order.Id ? "selected-row" : "")"
-                            @onclick="() => selectedOrderId = order.Id">
+                            @onclick="() => SelectOrder(order.Id)">
                             <td>@order.OrderNumber</td>
                             <td>@order.OrderDate?.ToString("yyyy-MM-dd")</td>
                             <td>@order.CustomerName</td>
@@ -250,6 +251,8 @@
 
     private List<OrderRow> orders = new();
 
+        [Parameter]
+        public EventCallback<int?> SelectedOrderIdChanged { get; set; }
     public class OrderRow
         {
             public int Id { get; set; }
@@ -279,6 +282,13 @@ private DateTime? dateFrom;
 private DateTime? dateTo;
 
 private int? selectedOrderId;
+
+private async Task SelectOrder(int id)
+{
+    selectedOrderId = id;
+
+    await SelectedOrderIdChanged.InvokeAsync(id);
+}
 
 private async Task LoadOrders()
 {

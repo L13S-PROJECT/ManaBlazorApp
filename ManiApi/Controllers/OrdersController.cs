@@ -77,4 +77,12 @@ public async Task<IActionResult> UpdateComment(
     return Ok();
 }
 
+[HttpGet("{orderId}/items")]
+public async Task<IActionResult> GetOrderItems(int orderId)
+{
+    var result = await _orderService.GetOrderItems(orderId);
+
+    return Ok(result);
+}
+
 }

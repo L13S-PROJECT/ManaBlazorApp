@@ -1,3 +1,8 @@
+@* OrderDetails.razor  *@
+
+@inject HttpClient Http
+@using Microsoft.AspNetCore.Components
+
 <div class="order-details-container">
 
     <div class="order-details-header">
@@ -23,35 +28,91 @@
                     <th>Izdots</th>
                     <th>Atl.</th>
                     <th>Stock</th>
-                    <th>Raž.</th>
                     <th>Izpild.</th>
                 </tr>
             </thead>
 
             <tbody>
-                <tr>
-                    <td>1</td>
-                    <td>
-                        <button class="dispatch-add-button">+</button>
-                    </td>
-                    <td>Produkts A</td>
-                    <td>PRD-001</td>
-                    <td>V1</td>
-                    <td>Prece</td>
-                    <td>Detalizācija</td>
-                    <td>RAL9005</td>
-                    <td>CL-001</td>
-                    <td>100</td>
-                    <td>20</td>
-                    <td>80</td>
-                    <td>35</td>
-                    <td>15</td>
-                    <td>Nē</td>
-                </tr>
-            </tbody>
+
+    @foreach (var item in items)
+    {
+        <tr>
+
+            <td>@item.Id</td>
+
+            <td>
+                <button class="dispatch-add-button">+</button>
+            </td>
+
+            <td>@item.Name</td>
+
+            <td>@item.ProductCode</td>
+
+            <td>@item.VersionName</td>
+
+            <td>@item.ItemType</td>
+
+            <td>@item.TopPartName</td>
+
+            <td>@item.RalName</td>
+
+            <td>@item.CustomerCode</td>
+
+            <td>@item.Quantity</td>
+
+            <td>0</td>
+
+            <td>@item.Quantity</td>
+
+            <td>0</td>
+
+            <td>Nē</td>
+
+        </tr>
+    }
+
+</tbody>
 
         </table>
 
     </div>
 
 </div>
+
+@code {
+
+    [Parameter]
+    public int? OrderId { get; set; }
+
+    private List<OrderItemRow> items = new();
+
+    public class OrderItemRow
+    {
+        public int Id { get; set; }
+
+        public string CustomerCode { get; set; } = "";
+
+        public string Name { get; set; } = "";
+
+        public int Quantity { get; set; }
+        public string? VersionName { get; set; }
+        public string ProductCode { get; set; } = "";
+        public string ItemType { get; set; } = "";
+        public string TopPartName { get; set; } = "";
+        public string RalName { get; set; } = "";
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (OrderId is null)
+        {
+            items.Clear();
+            return;
+        }
+
+        items = await Http.GetFromJsonAsync<List<OrderItemRow>>(
+            $"http://localhost:5270/api/orders/{OrderId}/items")
+            ?? new();
+    }
+
+}

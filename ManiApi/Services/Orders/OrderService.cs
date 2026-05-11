@@ -233,4 +233,81 @@ order.Comment = request.Comment;
 await _db.SaveChangesAsync();
 }
 
+public async Task<List<object>> GetOrderItems(
+    int orderId)
+{
+    var result = await (
+        from oi in _db.OrderItems
+
+        join map in _db.CustomerCodeMaps
+            on oi.CustomerCodeMapId equals map.Id into mapJoin
+
+        from map in mapJoin.DefaultIfEmpty()
+
+        join version in _db.ProductVersions
+            on map.VersionId equals version.Id into versionJoin
+
+        from version in versionJoin.DefaultIfEmpty()
+
+        join product in _db.Products
+            on version.ProductId equals product.Id into productJoin
+
+        from product in productJoin.DefaultIfEmpty()
+                join topPart in _db.TopParts
+            on map.TopPartId equals topPart.Id into topPartJoin
+
+        from topPart in topPartJoin.DefaultIfEmpty()
+
+        join ral in _db.RalColors
+            on map.RalColorId equals ral.ID into ralJoin
+
+        from ral in ralJoin.DefaultIfEmpty()
+
+        where
+            oi.OrderId == orderId &&
+            oi.IsActive
+
+        orderby oi.Id
+
+        select new
+        {
+            oi.Id,
+            CustomerCode = oi.CustomerCode,
+
+            ProductCode =
+                product != null
+                    ? product.ProductCode
+                    : "-",
+            Name =
+            product != null
+                ? product.ProductName
+                : oi.Name,
+            oi.Quantity,
+
+            VersionName =
+                version != null
+                    ? version.VersionName
+                    : null,
+            ItemType =
+                map != null && map.IsProduct
+                    ? "Prece"
+                    : map != null && map.IsPart
+                        ? "Detaļa"
+                        : "-",
+            TopPartName =
+                topPart != null
+                    ? topPart.TopPartName
+                    : "-",
+            RalName =
+                ral != null
+                    ? ral.Name
+                    : "-",
+
+        }
+
+    ).ToListAsync();
+
+    return result.Cast<object>().ToList();
+}
+
 }

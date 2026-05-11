@@ -8,11 +8,11 @@
 <div class="orders-layout">
 
     <div class="orders-block block-list">
-    <OrdersList />
+    <OrdersList SelectedOrderIdChanged="OnSelectedOrderChanged" />
     </div>
 
     <div class="orders-block block-details">
-    <OrderDetails />
+    <OrderDetails OrderId="@selectedOrderId" />
     </div>
 
     <div class="orders-block block-dispatch">
@@ -20,3 +20,14 @@
     </div>
 
 </div>
+
+@code {
+
+    private int? selectedOrderId;
+
+    private void OnSelectedOrderChanged(int? orderId)
+    {
+        selectedOrderId = orderId;
+    }
+
+}
