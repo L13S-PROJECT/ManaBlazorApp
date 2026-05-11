@@ -1,0 +1,280 @@
+
+@*Planning Parts Panel - detaļu saraksts priekš plānošanas Planning.razor*@ 
+@using ManaApp.Models
+@using ManaApp.Components.Parts
+@using System.Net.Http.Json
+@using System.Text.Json.Serialization
+
+@inject HttpClient Http
+
+<div class="parts-main">
+
+    <!-- KREISĀ PUSE -->
+    <div class="parts-left">
+        <div class="parts-table">
+
+        <PartsToolbar_2
+            ShowArchived="@showArchived"
+            ShowArchivedChanged="@(v => showArchived = v)"
+            @bind-PlannedOnly="plannedOnly"
+            @bind-InProductionOnly="inProductionOnly"
+            @bind-OkOnly="okOnly"
+            @bind-ReservedOnly="reservedOnly"
+            @bind-FreeOnly="freeOnly"/>
+        @foreach (
+                
+                var group in groupedData
+                .Where(g =>
+                    (!selectedRoot.HasValue || g.ParentCategoryId == selectedRoot)
+                    &&
+                    (string.IsNullOrWhiteSpace(searchText)
+                        || g.ProductName.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+                        || g.VersionName.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+                        || g.Parts.Any(p => p.TopPartName.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                    )
+                ))
+            {
+                var filteredParts = group.Parts
+                    .Where(p =>
+                        string.IsNullOrWhiteSpace(searchText)
+                        || group.ProductName.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+                        || group.VersionName.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+                        || p.TopPartName.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+                    )
+                    .Where(p =>
+                        (!plannedOnly || p.PlannedQty > 0)
+                        && (!inProductionOnly || p.InProduction > 0)
+                        && (!okOnly || p.OkQty > 0)
+                        && (!reservedOnly || p.ReservedQty > 0)
+                        && (!freeOnly || p.FreeQty > 0)
+                    )
+                    .ToList();
+
+                @if (!filteredParts.Any())
+                {
+                    continue;
+                }
+
+                <!-- HEADER (Product + Version) -->
+                <div class="part-group-header parts-grid">
+                    <div class="col-name">@group.ProductName</div>
+                    <div class="col-version">@group.VersionName</div>
+
+                    <div class="col-plus"></div>
+
+                    <div class="col-num">Plānots</div>
+                    <div class="col-num">Ražošanā</div>
+                    <div class="col-num">Ok</div>
+                    <div class="col-num">Rezervēts</div>
+                    <div class="col-num">Citi</div>
+                </div>
+
+                <!-- CHILD ROWS (TopParts) -->
+                @foreach (var part in filteredParts)
+                    {
+                        <div class="part-row parts-grid">
+
+                                <div class="col-name">
+                                    @part.TopPartName
+                                </div>
+
+                                <div class="col-version"></div>
+
+                                <div class="col-plus">
+                                    <button type="button" class="part-add-btn">
+                                        +
+                                    </button>
+                                </div>
+
+                                <div class="col-num @(part.PlannedQty == 0 ? "num-zero" : "num-value")">
+                                    @part.PlannedQty
+                                </div>
+
+                                <div class="col-num @(part.InProduction == 0 ? "num-zero" : "num-value")">
+                                    @part.InProduction
+                                </div>
+
+                                <div class="col-num @(part.OkQty == 0 ? "num-zero" : "num-value")">
+                                    @part.OkQty
+                                </div>
+
+                                <div class="col-num @(part.ReservedQty == 0 ? "num-zero" : "num-value")">
+                                    @part.ReservedQty
+                                </div>
+
+                                <div class="col-num @(part.FreeQty == 0 ? "num-zero" : "num-value")">
+                                    @part.FreeQty
+                                </div>
+
+                            </div>
+                    }
+            }
+
+    </div>
+
+    </div>
+
+</div>
+
+@code {
+
+[Parameter] public int? SelectedRoot { get; set; }
+
+private int? selectedRoot => SelectedRoot;
+[Parameter] public string? SearchText { get; set; }
+
+private string? searchText => SearchText;
+
+private bool plannedOnly;
+private bool inProductionOnly;
+private bool okOnly;
+private bool reservedOnly;
+private bool freeOnly;
+
+private bool _showArchived;
+
+private bool showArchived
+{
+    get => _showArchived;
+    set
+    {
+        if (_showArchived == value)
+            return;
+
+        _showArchived = value;
+
+        _isLoading = false;
+        _ = LoadData();
+    }
+}
+
+private List<ProductPartGroup> groupedData = new();
+
+public class ProductPartGroup
+    {
+        public string ProductName { get; set; } = "";
+        public string VersionName { get; set; } = "";
+        public string RootName { get; set; } = "";
+        public int? ParentCategoryId { get; set; }
+        public int InProduction { get; set; }   // vēlāk no batch
+        public int OkQty { get; set; }
+        public int ReservedQty { get; set; }
+        public int StockQty { get; set; }
+        public int FreeQty { get; set; }
+
+        public List<PartItem> Parts { get; set; } = new();
+    }
+
+public class PartItem
+{
+    public int Index { get; set; }
+    public string TopPartName { get; set; } = "";
+    public int PlannedQty { get; set; }
+    public int InProduction { get; set; }
+    public int OkQty { get; set; }
+    public int ReservedQty { get; set; }
+    public int StockQty { get; set; }
+    public int FreeQty { get; set; }
+}
+
+protected override async Task OnInitializedAsync()
+{
+    await LoadData();
+}
+
+private async Task LoadData()
+{
+    if (_isLoading)
+    return;
+
+    _isLoading = true;
+
+    StateHasChanged();
+
+    var url = showArchived
+    ? "http://localhost:5270/api/products/planning-list-archived"
+    : "http://localhost:5270/api/products/planning-list";
+
+    var products = await Http.GetFromJsonAsync<List<ProductSummaryDto>>(url);
+    
+    // 1. savācam visus versionId
+var versionIds = (products ?? new())
+    .Select(p => p.VersionId)
+    .Distinct()
+    .ToList();
+
+// 2. viens API call VISIEM
+var allParts = await Http.GetFromJsonAsync<List<PartRow>>(
+    $"http://localhost:5270/api/topparts/full-data-all?versionIds={string.Join(",", versionIds)}"
+);
+
+// 3. sadalām pa versionId
+var partsByVersion = (allParts ?? new())
+    .GroupBy(x => x.VersionId)
+    .ToDictionary(g => g.Key, g => g.ToList());
+
+        // 4. būvējam UI datus
+        groupedData = (products ?? new()).Select(p =>
+        {
+            var parts = partsByVersion.GetValueOrDefault(p.VersionId) ?? new();
+
+            return new ProductPartGroup
+            {
+                ProductName = p.ProductName,
+                VersionName = p.VersionName ?? "",
+                ParentCategoryId = p.ParentCategoryId,
+                RootName = p.RootName ?? "",
+
+                Parts = parts.Select((r, i) => new PartItem
+                {
+                    Index = i + 1,
+                    TopPartName = r.TopPartName ?? "",
+                    PlannedQty = r.PlannedQty,
+                    InProduction = r.InProduction,
+                    OkQty = r.OkQty,
+                    ReservedQty = r.ReservedQty,
+                    StockQty = r.StockQty,
+                    FreeQty = r.FreeQty
+                }).ToList()
+            };
+        }).ToList();
+
+_isLoading = false;
+
+StateHasChanged();
+
+}
+
+private bool _isLoading = false;
+
+public class PartRow
+{
+    public int Id { get; set; }
+    public int TopPartId { get; set; }
+    public string? TopPartName { get; set; }
+    public int VersionId { get; set; }
+    public int PlannedQty { get; set; }
+    public int InProduction { get; set; }
+    public int OkQty { get; set; }
+    public int ReservedQty { get; set; }
+    public int StockQty { get; set; }
+    public int FreeQty { get; set; }
+}
+
+public class ProductSummaryDto
+{
+    public int ProductId { get; set; }
+    public string ProductName { get; set; } = "";
+    public string RootName { get; set; } = "";
+    public int? ParentCategoryId { get; set; }
+    public int VersionId { get; set; }
+    public string VersionName { get; set; } = "";
+
+    public int InProduction { get; set; }
+    public int OkQty { get; set; }
+    public int ReservedQty { get; set; }
+    public int FreeQty { get; set; }
+}
+
+
+}

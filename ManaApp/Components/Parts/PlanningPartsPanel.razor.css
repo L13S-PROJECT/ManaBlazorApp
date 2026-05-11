@@ -1,0 +1,227 @@
+/* PlanningPartsPanel.razor.css */
+
+
+.parts-main {
+    display: flex;
+    gap: 20px;
+}
+
+.parts-left {
+    flex: 1;
+
+    border: 1px solid #B7C8E6;
+    border-radius: 6px;
+
+    background: #ffffff;
+
+    overflow: auto;
+    max-height: calc(100vh - 120px);
+
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.parts-right {
+    flex: 1;
+    border: 1px solid #ccc;
+    padding: 10px;
+}
+
+.part-group-header,
+.part-row {
+    display: grid;
+    grid-template-columns: 2.2fr 1fr 44px repeat(5, 0.8fr);
+    align-items: center;
+}
+
+.part-group-header {
+    display: grid;
+    grid-template-columns: 2.2fr 1fr 44px repeat(5, 0.8fr);
+    font-weight: 600;
+    padding: 4px 8px;   /* bija lielāks */
+    font-size: 13px;    /* mazāks teksts */
+    white-space: nowrap;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+
+    background: #a4bff4;
+    color: #fff;
+
+    border-bottom: 1px solid #1E4FCC;
+    min-height: 24px;
+}
+
+.part-row {
+    background: #ffffff;
+    display: grid;
+    grid-template-columns: 2.2fr 1fr 44px repeat(5, 0.8fr);
+    padding: 0px 5px;
+    border-bottom: 1px solid #eee;
+    white-space: nowrap;
+    align-items: center;
+    min-height: 18px;
+    background: #ffffff;
+
+    border-bottom: 1px solid #E5E7EB;
+
+    transition: background 0.15s ease;
+}
+
+/* visi cipari centrā (izņemot 1. un 2. kolonu) */
+.part-row > div:not(:nth-child(1)):not(:nth-child(2)) {
+    text-align: center;
+}
+
+/* nosaukums pa kreisi */
+.part-row > div:nth-child(1) {
+    text-align: left;
+}
+
+/* versija arī pa kreisi vai centrā (izvēlies) */
+.part-row > div:nth-child(2) {
+    text-align: center;
+}
+
+/* pirmā kolonna (nosaukums) pa kreisi */
+.part-row > div:first-child {
+    text-align: left;
+}
+
+.col-num {
+    text-align: center;
+}
+
+.col-index {
+    text-align: center;
+    color: #666;
+}
+
+.part-group-header > div {
+    text-align: center;
+}
+
+/* pirmā kolonna (nosaukums) pa kreisi */
+.part-group-header > div:nth-child(1) {
+    text-align: left;
+}
+
+/* versija centrā (var atstāt kā ir) */
+.part-group-header > div:nth-child(2) {
+    text-align: center;
+}
+
+.num-zero {
+    color: #c1c7d0; /* gaiši pelēks */
+}
+
+.num-value {
+    color: #111827; /* tumšs */
+    font-weight: 600;
+}
+
+.parts-header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: #eff6ff;
+}
+
+.parts-header h4 {
+    margin: 0 0 8px 0;
+}
+
+.parts-table {
+    width: 100%;
+}
+
+.parts-table > .parts-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+
+    background: #ffffff;
+    border-bottom: 1px solid #D6E0F5;
+}
+
+
+/* ROW */
+
+.part-row:hover {
+    background: #EAF2FF;
+}
+
+/* CELLS */
+.part-group-header > div,
+.part-row > div {
+    padding: 0px 5px;
+    box-sizing: border-box;
+}
+
+/* NAME */
+.col-name {
+    text-align: left;
+    font-weight: 600;
+}
+
+/* VERSION */
+.col-version {
+    text-align: center;
+    opacity: 0.75;
+}
+
+/* NUMBERS */
+.col-num {
+    text-align: center;
+}
+
+/* PLUS */
+.col-plus {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.part-add-btn {
+    width: 22px;
+    height: 22px;
+
+    border: 1px solid #1E3A8A;
+    border-radius: 4px;
+
+    background: #C2EAF9;
+    color: #1E3A8A;
+
+    font-weight: 700;
+    cursor: pointer;
+
+    transition: all 0.15s ease;
+}
+
+.part-add-btn:hover {
+    background: #1E3A8A;
+    color: #ffffff;
+}
+
+.part-row .col-name {
+    font-size: 12px;
+    line-height: 1.1;
+}
+
+.part-row .col-num,
+.part-row .col-version {
+    font-size: 12px;
+    line-height: 1;
+}
+
+.parts-grid {
+    display: grid;
+    grid-template-columns:
+        minmax(220px, 2fr)
+        minmax(120px, 1fr)
+        42px
+        repeat(5, minmax(70px, 0.7fr));
+
+    align-items: center;
+    width: 100%;
+}

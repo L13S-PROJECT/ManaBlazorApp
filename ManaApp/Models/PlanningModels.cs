@@ -30,6 +30,7 @@ public sealed class ProductRow
     public int FinishingInProgress { get; set; }
     public int FinishingAllocated { get; set; }
     public List<FinishingRalRow> FinishingRal { get; set; } = new();
+    public int OrderQty { get; set; }
     public string? RalCode { get; set; }
     public int NormalOrder { get; set; }
 }
@@ -128,7 +129,7 @@ public sealed class ProductGroupRow : IPlanningRow
     public string CategoryName { get; set; } = "";
     public string ProductCode { get; set; } = "";
     public string ProductName { get; set; } = "";
-
+    public int OrderQty { get; set; }
     public int InStock { get; set; }
     public int Planned { get; set; }
     public int DetailedInProgress { get; set; }
@@ -178,4 +179,5 @@ public sealed class FinishingRalRow
     public string? RalCode { get; set; }
     public int Qty { get; set; }
     public int Status { get; set; }
+    public int OrderQty { get; set; }
 }

@@ -6,9 +6,11 @@
 @using Syncfusion.Blazor.Grids
 @inject IJSRuntime JS
 @using ManaApp.Shared
-
+@using ManaApp.Components.Parts
 @using ManaApp.Models
+@using ManaApp.Models.DTOs
 @using ManaApp.Components
+
 
 <div class="planning-page-root">
 
@@ -28,14 +30,25 @@
     SearchTextChanged="(v) => searchText = v"
     SelectedView="@selectedView"
     SelectedViewChanged="(v) => selectedView = v"
+    PlanningView="@planningView"
+    PlanningViewChanged="(v) => planningView = v"
     OnDownloadExcel="DownloadPlanningExcel" />
 
 @* <PlanningGrid Rows="@groupedRows" /> *@
 
-<PlanningTable
-    Groups="@FilteredRows"
-    PlannedPlus="OnPlannedPlus"
-    DraftVersionIds="batchItems.Select(x => x.VersionId).ToList()" />
+@if (planningView == "products")
+{
+    <PlanningTable
+        Groups="@FilteredRows"
+        PlannedPlus="OnPlannedPlus"
+        DraftVersionIds="batchItems.Select(x => x.VersionId).ToList()" />
+}
+else
+{
+    <PlanningPartsPanel
+    SelectedRoot="@(selectedView == ProductViewType.Kauss ? 1 : 2)"
+    SearchText="@searchText" />
+}
 
            @if (selected is not null && Summary is not null)
            {
@@ -165,6 +178,7 @@ private List<SalesAllocateDialog.BatchRow> sellBatches = new();
 private List<ProductToPartDto> editParts = new();  
 private string? addProductName;
 private string? editProductName;
+private int? selectedPartsRoot = null;
 private List<ProductToPartDto> addParts = new();
 
 // EDIT dialoga stāvoklis
@@ -172,6 +186,8 @@ private bool isEditOpen = false;
 
 // rinda, ko labo
 private ProductionTasks.BatchLine? editLine;
+
+private string planningView = "products";
 
 // nosaukums edit dialogam
 
@@ -528,6 +544,9 @@ private async Task ReloadPlanningDataAsync()
         .GroupBy(x => x.VersionId)
         .ToDictionary(g => g.Key, g => g.Sum(x => x.Qty));
 
+    var orderRals = await Http.GetFromJsonAsync<List<OrderRalDto>>(
+    "http://localhost:5270/api/orders/planning-order-rals")
+    ?? new();
 
     // 4) Aizpildām rindas
     foreach (var r in rows)
@@ -582,7 +601,9 @@ groupedRows = rows
             CategoryName = cat,
             ProductCode  = code,
             ProductName  = first.productName ?? "",
-
+            OrderQty = orderRals
+                .Where(x => g.Any(v => v.VersionId == x.VersionId))
+                .Sum(x => x.Qty),
             InStock = g
                 .Where(x => !x.IsRalRow)
                 .Sum(x => x.InStock),
@@ -611,22 +632,54 @@ groupedRows = rows
                         list.Add(v);
                     }
 
-                    if (v.FinishingRal != null && v.FinishingRal.Count > 0)
+                    if (
+                        (v.FinishingRal != null && v.FinishingRal.Count > 0)
+                        || orderRals.Any(x => x.VersionId == v.VersionId)
+                    )
                     {
-                        foreach (var ral in v.FinishingRal)
-                        {
-                            list.Add(new ProductRow
+                            var stockRals = v.FinishingRal ?? new();
+
+                            var orderRalRows = orderRals
+                                .Where(x => x.VersionId == v.VersionId);
+
+                            var allRalCodes = stockRals
+                                .Select(x => x.RalCode)
+                                .Union(orderRalRows.Select(x => x.RalCode))
+                                .Distinct()
+                                .ToList();
+
+                            foreach (var ralCode in allRalCodes)
                             {
-                                productName = v.productName,
-                                productCode = v.productCode,
-                                versionName = v.versionName,
-                                RalCode = ral.RalCode,
-                                FinishingInProgress = ral.Status == 3 ? 0 : ral.Qty,
-                                InStock = ral.Status == 3 ? ral.Qty : 0,
-                                FinishingStatus = ral.Status,
-                                IsRalRow = true
-                            });
-                        }
+                                var stockRal = stockRals
+                                    .FirstOrDefault(x => x.RalCode == ralCode);
+
+                                var orderRal = orderRalRows
+                                    .FirstOrDefault(x => x.RalCode == ralCode);
+
+                                list.Add(new ProductRow
+                                {
+                                    productName = v.productName,
+                                    productCode = v.productCode,
+                                    versionName = v.versionName,
+
+                                    RalCode = ralCode,
+
+                                    InStock = stockRal?.Status == 3
+                                        ? stockRal.Qty
+                                        : 0,
+
+                                    FinishingInProgress = stockRal?.Status != 3
+                                        ? stockRal?.Qty ?? 0
+                                        : 0,
+
+                                    OrderQty = orderRal?.Qty ?? 0,
+
+                                    FinishingStatus = stockRal?.Status ?? 0,
+
+                                    IsRalRow = true
+                                });
+                            }
+                        
                     }
 
                     return list;

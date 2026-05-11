@@ -1,0 +1,192 @@
+/* PartsToolbar_2.razor.css */
+
+
+.parts-toolbar {
+    position: sticky;
+    width: 100%;
+    top: 0;
+    z-index: 20;
+    background: #2F6FED;
+    border: 1px solid #b7c8e6;
+
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+
+    width: 100%;
+    display: block;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px 8px;
+}
+
+/* TOP */
+.toolbar-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* tabs */
+.root-filter {
+    display: flex;
+    gap: 6px;
+}
+
+.root-pill {
+    padding: 3px 6px;
+    border: 1px solid #3b5fc4;
+    border-radius: 6px;
+    background: white;
+    cursor: pointer;
+    min-width: 80px;
+    text-align: center;
+}
+
+.root-pill.active {
+    background: #3b5fc4;
+    color: white;
+}
+
+
+.filters-wrapper {
+    display: grid;
+    grid-template-columns:
+        minmax(220px, 2fr)
+        minmax(120px, 1fr)
+        42px
+        repeat(5, minmax(70px, 0.7fr));
+
+    align-items: center;
+    width: 100%;
+}
+
+.filters-wrapper .col-num label {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+}
+
+/* search */
+.search-box {
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    width: 100%;
+}
+
+.filters-wrapper .col-num {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+}
+
+.archived-switch{
+    position:relative;
+    display:inline-block;
+    width:48px;   /* mazliet platāks */
+    height:24px;
+}
+
+.archived-switch input{
+    opacity:0;
+    width:0;
+    height:0;
+}
+
+.archived-switch .slider{
+    position:absolute;
+    cursor:pointer;
+    inset:0;
+
+    background:#ffffff;              /* balts fons */
+    border:2px solid #1e40af;        /* zila kontūra */
+    border-radius:24px;
+
+    box-shadow:inset 0 2px 4px rgba(0,0,0,.25); /* iegrimis efekts */
+    transition:.25s;
+}
+
+.archived-switch .slider::before{
+    content:"";
+    position:absolute;
+
+    width:16px;
+    height:16px;
+
+    inset:3px auto auto 3px;   /* ņem vērā border */
+    
+    background:#cbd5e1;
+    border-radius:50%;
+    transition:.25s;
+}
+
+.archived-switch input:checked + .slider::before{
+    background:#3b82f6;
+    transform:translateX(22px);
+}
+
+
+.archived-switch input:checked + .slider::before{
+    transform:translateX(20px);
+}
+
+.search-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.search-box {
+    padding-right: 26px; /* vieta X ikonai */
+}
+
+.clear-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+
+    border: none;
+    background: transparent;
+    cursor: pointer;
+
+    font-size: 16px;
+    color: #9ca3af;
+}
+
+.clear-btn:hover {
+    color: #374151;
+}
+
+.archived-col {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+}
+
+.parts-grid {
+    display: grid;
+    grid-template-columns:
+        minmax(220px, 2fr)
+        minmax(120px, 1fr)
+        42px
+        repeat(5, minmax(70px, 0.7fr));
+
+    align-items: center;
+    width: 100%;
+}
+
+.archived-col {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.archived-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1E4FCC;
+    white-space: nowrap;
+}

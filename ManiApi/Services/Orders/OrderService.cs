@@ -1,6 +1,7 @@
 using ManiApi.Data;
 using ManiApi.Models;
 using ManiApi.DTOs.Orders;
+using ManiApi.DTOs.Planning;
 using Microsoft.EntityFrameworkCore;
 
 namespace ManiApi.Services.Orders;
@@ -308,6 +309,84 @@ public async Task<List<object>> GetOrderItems(
     ).ToListAsync();
 
     return result.Cast<object>().ToList();
+}
+
+public async Task<List<object>> GetPlanningOrdersRals()
+{
+    var result = await (
+        from oi in _db.OrderItems
+
+        join o in _db.Orders
+            on oi.OrderId equals o.Id
+
+        join map in _db.CustomerCodeMaps
+            on oi.CustomerCodeMapId equals map.Id
+
+        join ral in _db.RalColors
+            on map.RalColorId equals ral.ID into ralJoin
+
+        from ral in ralJoin.DefaultIfEmpty()
+
+        where
+            oi.IsActive &&
+            o.IsActive &&
+            map.VersionId != null
+
+        group oi by new
+        {
+            map.VersionId,
+            map.RalColorId,
+            RalCode = ral != null ? ral.Name : null
+        }
+        into g
+
+        select new
+        {
+            VersionId = g.Key.VersionId,
+            RalColorId = g.Key.RalColorId,
+            RalCode = g.Key.RalCode,
+            Qty = g.Sum(x => x.Quantity)
+        }
+
+    ).ToListAsync();
+
+    return result.Cast<object>().ToList();
+}
+
+public async Task<List<PlanningRalDto>> GetPlanningOrders()
+{
+    var result = await (
+        from oi in _db.OrderItems
+
+        join map in _db.CustomerCodeMaps
+            on oi.CustomerCodeMapId equals map.Id
+
+        join ral in _db.RalColors
+            on map.RalColorId equals ral.ID
+
+        where
+            oi.IsActive &&
+            map.VersionId != null &&
+            map.RalColorId != null
+
+        group oi by new
+        {
+            map.VersionId,
+            map.RalColorId,
+            ral.Name
+        }
+        into g
+
+        select new PlanningRalDto
+        {
+            VersionId = g.Key.VersionId!.Value,
+            RalColorId = g.Key.RalColorId,
+            RalCode = g.Key.Name,
+            Qty = g.Sum(x => x.Quantity)
+        }
+    ).ToListAsync();
+
+    return result;
 }
 
 }

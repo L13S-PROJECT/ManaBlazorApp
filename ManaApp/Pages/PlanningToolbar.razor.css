@@ -99,3 +99,35 @@
     color: #ffffff;
 }
 
+.planning-view-switch {
+    display: flex;
+    gap: 0;
+    margin-right: 18px;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #F8FAFC;
+}
+
+.planning-view-btn {
+    border: none;
+    background: transparent;
+    padding: 0 14px;
+    height: 32px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    transition: background .15s ease, color .15s ease;
+}
+
+.planning-view-btn:hover {
+    background: #2563EB;
+    color: white;
+}
+
+.planning-view-btn.active {
+    background: #1D4ED8;
+    color: white;
+}
+

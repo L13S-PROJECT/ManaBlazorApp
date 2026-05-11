@@ -4,6 +4,22 @@
 
 <div class="products-toolbar">
 
+    <div class="planning-view-switch">
+
+    <button type="button"
+            class="planning-view-btn @(PlanningView == "products" ? "active" : "")"
+            @onclick='() => PlanningViewChanged.InvokeAsync("products")'>
+        Preces
+    </button>
+
+    <button type="button"
+            class="planning-view-btn @(PlanningView == "parts" ? "active" : "")"
+            @onclick='() => PlanningViewChanged.InvokeAsync("parts")'>
+        Detaļas
+    </button>
+
+</div>
+
     <div class="root-switch">
     <div class="root-switch-track">
         <div class="root-switch-thumb @(SelectedView == ProductViewType.Adapteris ? "right" : "")"></div>
@@ -56,6 +72,10 @@
     [Parameter] public ProductViewType SelectedView { get; set; }
 
     [Parameter] public EventCallback<ProductViewType> SelectedViewChanged { get; set; }
+
+    [Parameter] public string PlanningView { get; set; } = "products";
+
+    [Parameter] public EventCallback<string> PlanningViewChanged { get; set; }
 
 
 }

@@ -6,6 +6,7 @@
 <thead>
     <tr>
         <th class="col-name">Nosaukums</th>
+        <th>Order</th>
         <th>Stock</th>
         <th>Plan</th>
         <th class="col-plus"></th>
@@ -41,6 +42,10 @@
                 <span class="product-name product-main">
                     @grp.ProductName
                 </span>
+                </td>
+
+                <td class="@(grp.OrderQty > 0 ? "cell-plan-strong" : "cell-zero")">
+                    @grp.OrderQty
                 </td>
 
                 <td class="@(grp.InStock > 0 ? "cell-stock" : "cell-zero")">
@@ -102,12 +107,19 @@
                 </div>
             </td>
 
-<td>
-    @if(ver.IsRalRow)
-    {
-        <span class="instock-value">@ver.InStock</span>
-    }
-</td>
+            <td>
+                @if(ver.IsRalRow)
+                {
+                    <span class="planned-value">@ver.OrderQty</span>
+                }
+            </td>
+
+            <td>
+                @if(ver.IsRalRow)
+                {
+                    <span class="instock-value">@ver.InStock</span>
+                }
+            </td>
 
             <td>
             @if(!ver.IsRalRow)
