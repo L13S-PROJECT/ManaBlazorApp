@@ -1135,7 +1135,8 @@ SELECT DISTINCT
     END             AS RootName,
     v.ID            AS Version_Id,
     v.Version_Name  AS VersionName,
-    v.Version_Date  AS VersionDate
+    v.Version_Date  AS VersionDate,
+    v.IsActive      AS VersionIsActive
 FROM versions v
 JOIN products p      ON p.ID = v.Product_ID AND p.IsActive = 1
 JOIN categories c    ON c.ID = p.Category_ID AND c.IsActive = 1
@@ -1182,7 +1183,8 @@ var list = new List<object>();
                 RootName = r.IsDBNull(6) ? "" : r.GetString(6),
                 VersionId = r.GetInt32(7),
                 VersionName = r.IsDBNull(8) ? null : r.GetString(8),
-                VersionDate = r.IsDBNull(9) ? null : r.GetValue(9)?.ToString()
+                VersionDate = r.IsDBNull(9) ? null : r.GetValue(9)?.ToString(),
+                VersionIsActive = r.GetBoolean(10)
             });
     }
 
@@ -1215,7 +1217,8 @@ public async Task<IActionResult> GetPlanningListArchived()
 
             VersionId = v.Id,
             VersionName = v.VersionName,
-            VersionDate = v.VersionDate
+            VersionDate = v.VersionDate,
+            VersionIsActive = v.IsActive
         }
     )
     .OrderBy(x => x.RootName)

@@ -32,6 +32,7 @@ namespace ManiApi.Data
         public DbSet<BatchProductLink> BatchProductLinks { get; set; }
         public DbSet<BatchProductMaterial> BatchProductMaterials { get; set; }
         public DbSet<BatchProduct> BatchProducts { get; set; }
+        public DbSet<Batch> Batches { get; set; }
         public DbSet<Order> Orders { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<CustomerCodeMap> CustomerCodeMaps { get; set; }

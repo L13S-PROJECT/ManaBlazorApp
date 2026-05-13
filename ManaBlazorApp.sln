@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ManiApi", "ManiApi\ManiApi.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ManaApp", "ManaApp\ManaApp.csproj", "{83D01BBB-BB5C-4454-B4CF-B54DB5C1F733}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ManaApp.Shared", "ManaApp.Shared\ManaApp.Shared.csproj", "{05ABAFAF-9079-4CC9-98BC-2AC45B8D8185}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{83D01BBB-BB5C-4454-B4CF-B54DB5C1F733}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{83D01BBB-BB5C-4454-B4CF-B54DB5C1F733}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{83D01BBB-BB5C-4454-B4CF-B54DB5C1F733}.Release|Any CPU.Build.0 = Release|Any CPU
+		{05ABAFAF-9079-4CC9-98BC-2AC45B8D8185}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{05ABAFAF-9079-4CC9-98BC-2AC45B8D8185}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{05ABAFAF-9079-4CC9-98BC-2AC45B8D8185}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{05ABAFAF-9079-4CC9-98BC-2AC45B8D8185}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

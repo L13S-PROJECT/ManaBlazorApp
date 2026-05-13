@@ -7,6 +7,7 @@
 @using Syncfusion.Blazor.Grids
 @using ManaApp.Models
 @using ManaApp.Components
+@using ManaApp.Shared.DTOs.Planning
 
 
 <div class="productiontasks-root">
@@ -650,7 +651,7 @@ public sealed class BatchLine
     [JsonPropertyName("BatchProductId")] public int BatchProductId { get; set; }
     [JsonPropertyName("Version_Id")]     public int VersionId { get; set; }
     [JsonPropertyName("versionName")] public string? VersionName { get; set; }
-    [JsonPropertyName("SelectedParts")] public List<ManaApp.Pages.Planning.ProductToPartDto>? SelectedParts { get; set; }
+    [JsonPropertyName("SelectedParts")] public List<ProductToPartDto>? SelectedParts { get; set; }
     [JsonPropertyName("Planned")]        public int Planned { get; set; }
     [JsonPropertyName("Detailed")]       public int Detailed { get; set; }
     [JsonPropertyName("Assembly")]       public int Assembly { get; set; }

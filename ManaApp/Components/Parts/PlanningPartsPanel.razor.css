@@ -225,3 +225,9 @@
     align-items: center;
     width: 100%;
 }
+
+.part-add-active {
+    background: #111;
+    color: white;
+    border-color: #111;
+}

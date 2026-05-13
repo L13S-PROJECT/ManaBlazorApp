@@ -4,6 +4,8 @@ using Syncfusion.Blazor;
 using Syncfusion.Licensing;
 using ManaApp;
 using ManaApp.Services;
+using ManaApp.Services.Planning;
+
 
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
@@ -26,9 +28,14 @@ builder.Services.AddSyncfusionBlazor();
 builder.Services.AddScoped<ManaApp.Services.AppState>();
 
 builder.Services.AddScoped<GanttChartService>();
+builder.Services.AddScoped<PlanningLookupService>();
+builder.Services.AddScoped<PlanningDataService>();
+
 
 var culture = new System.Globalization.CultureInfo("lv-LV");
 System.Globalization.CultureInfo.DefaultThreadCurrentCulture = culture;
 System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = culture;
 
 await builder.Build().RunAsync();
+
+

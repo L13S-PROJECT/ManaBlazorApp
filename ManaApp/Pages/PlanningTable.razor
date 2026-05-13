@@ -1,4 +1,5 @@
 @using ManaApp.Models
+@using ManaApp.Shared.DTOs.Planning
 
 <div class="planning-container">
 <table class="excel-table">
@@ -157,29 +158,29 @@
 
 @code {
     [Parameter] 
-    public List<ProductGroupRow> Groups { get; set; } = new();
+    public List<PlanningGroupDto> Groups { get; set; } = new();
 
     [Parameter] 
-    public EventCallback<ProductGroupRow> PlannedPlus { get; set; }
+    public EventCallback<PlanningGroupDto> PlannedPlus { get; set; }
 
     [Parameter]
     public List<int> DraftVersionIds { get; set; } = new();
-    private async Task OnPlannedPlus(ProductGroupRow row)
+    private async Task OnPlannedPlus(PlanningGroupDto row)
     {
         if (PlannedPlus.HasDelegate)
             await PlannedPlus.InvokeAsync(row);
     }
 
     [Parameter]
-public EventCallback<ProductRow> PlannedMinus { get; set; }
+public EventCallback<ProductRowDto> PlannedMinus { get; set; }
 
-private async Task OnPlannedMinus(ProductRow row)
+private async Task OnPlannedMinus(ProductRowDto row)
 {
     if (PlannedMinus.HasDelegate)
         await PlannedMinus.InvokeAsync(row);
 }
 
-private bool IsInDraft(ProductGroupRow grp)
+private bool IsInDraft(PlanningGroupDto grp)
 {
     var ver = grp.Versions?.FirstOrDefault();
     if (ver?.VersionId is not int v)

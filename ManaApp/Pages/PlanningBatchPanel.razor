@@ -3,6 +3,7 @@
 @using ManaApp.Shared
 @using ManaApp.Components
 @using ManaApp.Models
+@using ManaApp.Shared.DTOs.Planning
 @using ManaApp.Pages
 
 <div class="planning-batch-panel">
@@ -552,7 +553,7 @@ private int editIndex = -1;
 private string? editProductName;
 
 
-private List<ManaApp.Pages.Planning.ProductToPartDto> editParts = new();
+private List<ProductToPartDto> editParts = new();
 
 private enum BatchPanelSheet
 {

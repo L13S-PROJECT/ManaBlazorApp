@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ManiApi.Data;
 using ManiApi.Models;
+using ManaApp.Shared.DTOs.Planning;
 
 namespace ManiApi.Controllers
 {
@@ -98,15 +99,156 @@ public async Task<IActionResult> GetByVersion(int versionId)
         where ptp.VersionId == versionId 
             && ptp.IsActive
             && tp.Stage == 1
-        select new
-        {
-            Id = ptp.Id,
-            TopPart_Id = tp.Id,
-            TopPart_Name = tp.TopPartName
-        }
-    )
+        select new ProductToPartDto
+{
+    Id = ptp.Id,
+    TopPart_Id = tp.Id,
+    TopPart_Name = tp.TopPartName,
+
+    OrderQty =
+            (
+                from oi in _db.OrderItems
+
+                join map in _db.CustomerCodeMaps
+                    on oi.CustomerCodeMapId equals map.Id
+
+                where
+                    oi.IsActive &&
+                    map.ProductToPartId == ptp.Id &&
+                    map.VersionId == ptp.VersionId &&
+                    map.RalColorId != null
+
+                select (int?)oi.Quantity
+            ).Sum() ?? 0,
+
+    ProductOrderQty =
+
+(
+    from oi in _db.OrderItems
+
+    join map in _db.CustomerCodeMaps
+        on oi.CustomerCodeMapId equals map.Id
+
+    where
+        oi.IsActive &&
+        map.VersionId == ptp.VersionId &&
+        map.ProductToPartId == null
+
+    select (int?)oi.Quantity
+).Sum() > 0
+
+?
+
+(
+    from oi in _db.OrderItems
+
+    join map in _db.CustomerCodeMaps
+        on oi.CustomerCodeMapId equals map.Id
+
+    where
+        oi.IsActive &&
+        map.VersionId == ptp.VersionId &&
+        map.ProductToPartId == null
+
+    select (int?)oi.Quantity
+).Sum() ?? 0
+
+:
+
+(
+    from oi in _db.OrderItems
+
+    join map in _db.CustomerCodeMaps
+        on oi.CustomerCodeMapId equals map.Id
+
+    where
+        oi.IsActive &&
+        map.VersionId == ptp.VersionId &&
+        map.ProductToPartId != null
+
+    select (int?)oi.Quantity
+).Sum() ?? 0,
+})
     .OrderBy(x => x.TopPart_Name)
     .ToListAsync();
+
+    foreach (var row in rows)
+{
+    var productRalRows = await (
+    from oi in _db.OrderItems
+
+    join map in _db.CustomerCodeMaps
+        on oi.CustomerCodeMapId equals map.Id
+
+    join ral in _db.RalColors
+        on map.RalColorId equals ral.ID
+
+    where
+        oi.IsActive &&
+        map.VersionId == versionId &&
+        map.ProductToPartId == null &&
+        map.RalColorId != null
+
+    group oi by ral.Name into g
+
+    select new RalRowDto
+    {
+        RalCode = g.Key,
+        Qty = g.Sum(x => x.Quantity)
+    }
+).ToListAsync();
+
+row.ProductRalRows = productRalRows.Any()
+
+    ? productRalRows
+
+    : await (
+        from oi in _db.OrderItems
+
+        join map in _db.CustomerCodeMaps
+            on oi.CustomerCodeMapId equals map.Id
+
+        join ral in _db.RalColors
+            on map.RalColorId equals ral.ID
+
+        where
+            oi.IsActive &&
+            map.VersionId == versionId &&
+            map.ProductToPartId != null &&
+            map.RalColorId != null
+
+        group oi by ral.Name into g
+
+        select new RalRowDto
+        {
+            RalCode = g.Key,
+            Qty = g.Sum(x => x.Quantity)
+        }
+    ).ToListAsync();
+
+    row.PartRalRows = await (
+        from oi in _db.OrderItems
+
+        join map in _db.CustomerCodeMaps
+            on oi.CustomerCodeMapId equals map.Id
+
+        join ral in _db.RalColors
+            on map.RalColorId equals ral.ID
+
+        where
+            oi.IsActive &&
+            map.ProductToPartId == row.Id &&
+            map.RalColorId != null
+
+        group oi by ral.Name into g
+
+        select new RalRowDto
+        {
+            RalCode = g.Key,
+            Qty = g.Sum(x => x.Quantity)
+        }
+    ).ToListAsync();
+}
 
     return Ok(rows);
 }
@@ -467,12 +609,18 @@ public async Task<IActionResult> GetFullData([FromQuery] int versionId)
                             sm.BatchProduct_ID == ptp.Id)
                         .Sum(sm => (int?)sm.Stock_Qty) ?? 0,
                 PlannedQty =
-                    _db.BatchProducts
-                        .Where(bp =>
+                    (
+                        from bp in _db.BatchProducts
+                        join b in _db.Batches
+                            on bp.Batch_Id equals b.ID
+                        where
                             bp.IsActive &&
+                            b.IsActive &&
+                            b.Batches_Statuss == 1 &&
                             bp.Version_Id == ptp.VersionId &&
-                            bp.ProductToPart_ID == ptp.Id)
-                        .Sum(bp => (int?)bp.Planned_Qty) ?? 0,
+                            bp.ProductToPart_ID == ptp.Id
+                        select bp.Planned_Qty
+                    ).Sum(),
                 InProduction =
                     _db.BatchProducts
                         .Where(bp =>
@@ -577,15 +725,22 @@ public async Task<IActionResult> GetFullDataAll([FromQuery] string versionIds)
         {
             ptp.VersionId,
             ptp.TopPartId,
+            ProductToPartId = ptp.Id,
             tp.TopPartName,
 
             PlannedQty =
-                _db.BatchProducts
-                    .Where(bp =>
+                (
+                    from bp in _db.BatchProducts
+                    join b in _db.Batches
+                        on bp.Batch_Id equals b.ID
+                    where
                         bp.IsActive &&
+                        b.IsActive &&
+                        b.Batches_Statuss == 1 &&
                         bp.Version_Id == ptp.VersionId &&
-                        bp.ProductToPart_ID == ptp.Id)
-                    .Sum(bp => (int?)bp.Planned_Qty) ?? 0,
+                        bp.ProductToPart_ID == ptp.Id
+                    select (int?)bp.Planned_Qty
+                ).Sum() ?? 0,
 
             InProduction =
                 _db.BatchProducts
@@ -652,6 +807,55 @@ public async Task<IActionResult> GetFullDataAll([FromQuery] string versionIds)
     ).ToListAsync();
 
     return Ok(data);
+}
+
+[HttpGet("ral-summary-all")]
+public async Task<IActionResult> GetRalSummaryAll(
+    [FromQuery] string versionIds)
+{
+    if (string.IsNullOrWhiteSpace(versionIds))
+        return BadRequest("versionIds required");
+
+    var ids = versionIds
+        .Split(',')
+        .Select(int.Parse)
+        .Distinct()
+        .ToList();
+
+    var orderRows = await (
+        from oi in _db.OrderItems
+
+        join map in _db.CustomerCodeMaps
+            on oi.CustomerCodeMapId equals map.Id
+
+        join ral in _db.RalColors
+            on map.RalColorId equals ral.ID
+
+        where
+            oi.IsActive &&
+            map.VersionId != null &&
+            map.RalColorId != null &&
+            map.ProductToPartId != null &&
+            ids.Contains(map.VersionId.Value)
+
+        group oi by new
+            {
+                map.VersionId,
+                map.ProductToPartId,
+                ral.Name
+            }
+            into g
+
+            select new
+            {
+                VersionId = g.Key.VersionId!.Value,
+                ProductToPartId = g.Key.ProductToPartId,
+                RalCode = g.Key.Name,
+                OrderQty = g.Sum(x => x.Quantity)
+            }
+    ).ToListAsync();
+
+    return Ok(orderRows);
 }
 
 

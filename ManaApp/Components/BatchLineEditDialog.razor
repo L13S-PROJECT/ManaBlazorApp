@@ -1,6 +1,7 @@
 @*batch line edit dialog*@ 
 
 @using ManaApp.Pages
+@using ManaApp.Shared.DTOs.Planning
 @inject IJSRuntime JS
 
 @if (!IsOpen)
@@ -10,82 +11,153 @@
 else
 {
     <!-- Pārklājums -->
-    <div style="
-        position:fixed;
-        inset:0;
-        background:rgba(0,0,0,0.4);
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        z-index:9999;">
+    <div class="dialog-overlay">
 
         <!-- Dialoga saturs -->
-        <div style="
-            background:white;
-            padding:16px;
-            border-radius:6px;
-            min-width:340px;
-            max-width:420px;
-            box-shadow:0 0 10px rgba(0,0,0,0.35);">
+        <div class="dialog-window">
 
-<h3>
-    @(IsAddMode ? "Pievienot preci" : "Labot pievienoto preci")
+<h3 class="dialog-title">
+    @(IsAddMode ? "Pievienot preci" : "Labot preci")
+    <strong> @ProductName </strong>
 </h3>
 
-@if (!string.IsNullOrWhiteSpace(ProductName))
+<div class="parts-layout">
+
+@if (_parts.Any())
 {
-    <div style="margin-bottom:8px; font-weight:600;">
-        @ProductName
+    
+    var productQty = _parts.FirstOrDefault()?.ProductOrderQty ?? 0;
+
+    var productRals = _parts
+    .FirstOrDefault()?
+    .ProductRalRows?
+    .OrderBy(x => x.RalCode)
+    .Select(x => new
+    {
+        Ral = x.RalCode,
+        Qty = x.Qty
+    })
+    .ToList()
+
+    ?? new();
+
+    <div class="dialog-card">
+
+        <div class="section-title">
+            Pasūtījumu kopsavilkums
+        </div>
+
+        <div class="summary-block">
+
+            <div class="product-row">
+                Produkts:
+                <span style="font-weight:400;">
+                    @(productQty > 0
+                        ? $"{productQty} gab."
+                        : "-")
+                </span>
+            </div>
+
+            @foreach (var r in productRals)
+            {
+                <div class="ral-row">
+
+                    <span>• @r.Ral</span>
+                    <span>@r.Qty gab.</span>
+                </div>
+            }
+        </div>
+
+        <div class="parts-title">
+            Detaļas
+        </div>
+
+        @foreach (var p in _parts)
+        {
+            <div class="part-item">
+
+                <div class="part-row">
+
+                    <span>@p.TopPart_Name</span>
+
+                    <span>
+                        @(p.OrderQty > 0
+                            ? $"{p.OrderQty} gab."
+                            : "-")
+                    </span>
+                </div>
+
+                @foreach (var r in p.PartRalRows ?? new())
+                {
+                    <div class="ral-row">
+
+                        <span>• @r.RalCode</span>
+                        <span>@r.Qty gab.</span>
+                    </div>
+                }
+            </div>
+        }
     </div>
 }
 
             @if (Line is null)
             {
-                <div style="color:red;">Dati nav ielādēti.</div>
+                <div class="error-text">Dati nav ielādēti.</div>
             }
             else
             {
-                <div style="margin-bottom:8px;">
-                    <b>Plānots (gab.):</b><br />
-                    <input type="number"
+
+<div class="right-side-layout">
+    <div class="dialog-card">
+        <b>Plānots (gab.):</b><br />
+                        <input type="number"
                            min="0"
-                           style="width:120px; text-align:right;"
+                           class="planned-input"
                            @bind="_planned"
-                           disabled="@(!_canEditQty)" />
+                           disabled="@(!_canEditQty || IsArchivedVersion)" />
                 </div>
 
-                <div style="margin-bottom:12px;">
-                    <b>Detaļa:</b><br />
+                <div class="dialog-card">
+
+                    <div class="card-title">
+                        Ražošanā iekļaujamās detaļas
+                    </div>
             
-                        @foreach (var p in Parts)
+                        @foreach (var p in _parts)
                             {
-                                <div style="display:flex; gap:8px; margin-bottom:6px;">
+                                <div class="part-select-row">
                                     <input type="checkbox"
                                         @bind="p.IsSelected" />
 
-                                    <span style="flex:1">@p.TopPart_Name</span>
+                                    <span class="part-name">@p.TopPart_Name</span>
 
                                     <input type="number"
                                         min="0"
-                                        style="width:70px;"
+                                        class="part-qty-input"
                                         @bind="p.Qty"
                                         disabled="@(!p.IsSelected)" />
                                 </div>
                             }
                 </div>
 
-                <div style="margin-bottom:12px;">
+                <div class="comment-block">
                     <b>Komentārs:</b><br />
                     <textarea rows="3"
-                              style="width:100%;"
+                              class="comment-input"
                               @bind="_comment">
                     </textarea>
                 </div>
-            }
 
-                    <div style="text-align:right;">
-                        <button class="e-btn e-flat"
-                            style="margin-right:8px;"
+            </div>
+            
+
+                            }
+            
+</div>
+                
+
+                    <div class="dialog-footer">
+                        <button class="e-btn e-flat cancel-btn"
                             @onclick="Close">
                         Atcelt
                     </button>
@@ -95,10 +167,11 @@ else
                             @(IsAddMode ? "Pievienot" : "OK")
                         </button>
                     </div>
-
+                </div>
         </div>
-    </div>
+    
 }
+
 
 @code {
     // Vai dialogs ir atvērts
@@ -109,9 +182,10 @@ else
 
     // Rinda, ko labo (no ProductionTasks BatchLine)
     [Parameter] public ProductionTasks.BatchLine? Line { get; set; }
-    [Parameter] public List<ManaApp.Pages.Planning.ProductToPartDto> Parts { get; set; } = new();
+    [Parameter] public List<ProductToPartDto>? Parts { get; set; }
+    private List<ProductToPartDto> _parts = new();
     [Parameter] public string? ProductName { get; set; }
-
+    [Parameter] public bool IsArchivedVersion { get; set; }
 
     // Notikums, kad saglabāts
     [Parameter] public EventCallback<ProductionTasks.BatchLine> OnSaved { get; set; }
@@ -129,10 +203,8 @@ else
             _comment = Line.Comment;
 
             // nodrošina ka Parts tiek pārzīmēts edit režīmā
-                if (Parts != null)
-                {
-                    Parts = Parts.ToList();
-                }
+                _parts = Parts?.ToList() ?? new();
+
             // Loģika:
             // - ja statuss = 5 (VISIS) → var mainīt qty
             // - citādi qty nedrīkst mainīt, ja ir StartedAt
@@ -182,7 +254,8 @@ private async Task SaveClicked()
     var qtyChanged     = _planned != Line.Planned;
     var commentChanged = _comment != Line.Comment;
 
-    var partsChanged = Parts.Any(p => p.IsSelected && p.Qty > 0);
+    var partsChanged = (_parts)
+        .Any(p => p.IsSelected && p.Qty > 0);
 
     if (!qtyChanged && !commentChanged && !partsChanged)
     {
@@ -199,7 +272,7 @@ private async Task SaveClicked()
         if (!ok)
             return;
     }
-Console.WriteLine($"Selected parts count: {Parts.Count(x => x.IsSelected)}");
+Console.WriteLine($"Selected parts count: {(_parts).Count(x => x.IsSelected)}");
     
     var updated = new ProductionTasks.BatchLine
     {
@@ -214,7 +287,7 @@ Console.WriteLine($"Selected parts count: {Parts.Count(x => x.IsSelected)}");
         Comment        = _comment,
         StartedAt      = Line.StartedAt,
         BatchStatus    = Line.BatchStatus,
-        SelectedParts = Parts
+        SelectedParts = (_parts)
             .Where(x => x.IsSelected && x.Qty > 0)
             .ToList()
     };
@@ -226,5 +299,6 @@ Console.WriteLine($"Selected parts count: {Parts.Count(x => x.IsSelected)}");
 }
 
 [Parameter] public bool IsAddMode { get; set; } = false;
+[Parameter] public bool IsPartOnlyMode { get; set; }
 
 }

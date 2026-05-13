@@ -61,7 +61,7 @@
                     <div class="col-version">@group.VersionName</div>
 
                     <div class="col-plus"></div>
-
+                    <div class="col-num">Order</div>
                     <div class="col-num">Plānots</div>
                     <div class="col-num">Ražošanā</div>
                     <div class="col-num">Ok</div>
@@ -72,6 +72,9 @@
                 <!-- CHILD ROWS (TopParts) -->
                 @foreach (var part in filteredParts)
                     {
+                        var totalOrderQty =
+                            (part.Rals ?? Enumerable.Empty<PartRalItem>())
+                            .Sum(x => x.OrderQty);
                         <div class="part-row parts-grid">
 
                                 <div class="col-name">
@@ -81,9 +84,17 @@
                                 <div class="col-version"></div>
 
                                 <div class="col-plus">
-                                    <button type="button" class="part-add-btn">
+                                    <button
+                                        type="button"
+                                        disabled="@part.IsInDraft"
+                                        class="part-add-btn @(part.IsInDraft ? "part-add-active" : "")"
+                                        @onclick="() => OpenPartPlanning(part)">
                                         +
                                     </button>
+                                </div>
+
+                                <div class="col-num @(totalOrderQty == 0 ? "num-zero" : "num-value")">
+                                    @totalOrderQty
                                 </div>
 
                                 <div class="col-num @(part.PlannedQty == 0 ? "num-zero" : "num-value")">
@@ -106,7 +117,35 @@
                                     @part.FreeQty
                                 </div>
 
-                            </div>
+                        </div>
+
+                        @if (part.Rals != null && part.Rals.Any())
+                                {
+                                    @foreach (var ral in part.Rals)
+                                    {
+                                        <div class="part-row parts-grid ral-child-row">
+
+                                            <div class="col-name ral-child-name">
+                                                <span class="ral-dot">●</span>
+                                                <span>@ral.RalCode</span>
+                                            </div>
+
+                                            <div class="col-version"></div>
+
+                                            <div class="col-plus"></div>
+
+                                            <div class="col-num @(ral.OrderQty == 0 ? "num-zero" : "num-value")">
+                                                @ral.OrderQty
+                                            </div>
+
+                                            <div class="col-num"></div>
+                                            <div class="col-num"></div>
+                                            <div class="col-num"></div>
+                                            <div class="col-num"></div>
+
+                                        </div>
+                                    }
+                                }
                     }
             }
 
@@ -122,6 +161,9 @@
 
 private int? selectedRoot => SelectedRoot;
 [Parameter] public string? SearchText { get; set; }
+
+[Parameter]
+public EventCallback<PartItem> PlannedPlus { get; set; }
 
 private string? searchText => SearchText;
 
@@ -175,6 +217,20 @@ public class PartItem
     public int ReservedQty { get; set; }
     public int StockQty { get; set; }
     public int FreeQty { get; set; }
+    public List<PartRalItem> Rals { get; set; } = new();
+    public bool IsInDraft { get; set; }
+    public int? DraftBatchProductId { get; set; }
+    public int ProductToPartId { get; set; }
+    public int VersionId { get; set; }
+    public bool VersionIsActive { get; set; }
+    public string ProductName { get; set; } = "";
+    public string VersionName { get; set; } = "";
+}
+
+public class PartRalItem
+{
+    public string RalCode { get; set; } = "";
+    public int OrderQty { get; set; }
 }
 
 protected override async Task OnInitializedAsync()
@@ -208,10 +264,30 @@ var allParts = await Http.GetFromJsonAsync<List<PartRow>>(
     $"http://localhost:5270/api/topparts/full-data-all?versionIds={string.Join(",", versionIds)}"
 );
 
+var allRals = await Http.GetFromJsonAsync<List<PartRalDto>>(
+    $"http://localhost:5270/api/topparts/ral-summary-all?versionIds={string.Join(",", versionIds)}"
+);
+
+var draftItems = await Http.GetFromJsonAsync<List<DraftItemDto>>(
+    "http://localhost:5270/api/batches/draft/items"
+);
+
 // 3. sadalām pa versionId
 var partsByVersion = (allParts ?? new())
     .GroupBy(x => x.VersionId)
     .ToDictionary(g => g.Key, g => g.ToList());
+
+var ralsByPart = (allRals ?? new())
+    .Where(x => x.ProductToPartId != null)
+    .GroupBy(x => x.ProductToPartId!.Value)
+    .ToDictionary(g => g.Key, g => g.ToList());
+
+var draftByPart = (draftItems ?? new())
+    .Where(x => x.ProductToPartId != null)
+    .ToDictionary(
+        x => x.ProductToPartId!.Value,
+        x => x
+    );
 
         // 4. būvējam UI datus
         groupedData = (products ?? new()).Select(p =>
@@ -229,12 +305,29 @@ var partsByVersion = (allParts ?? new())
                 {
                     Index = i + 1,
                     TopPartName = r.TopPartName ?? "",
+                    ProductToPartId = r.ProductToPartId,
+                    VersionId = r.VersionId,
+                    ProductName = p.ProductName,
+                    VersionName = p.VersionName ?? "",
+                    VersionIsActive = p.VersionIsActive,
                     PlannedQty = r.PlannedQty,
                     InProduction = r.InProduction,
                     OkQty = r.OkQty,
                     ReservedQty = r.ReservedQty,
                     StockQty = r.StockQty,
-                    FreeQty = r.FreeQty
+                    FreeQty = r.FreeQty,
+                    IsInDraft = draftByPart.ContainsKey(r.ProductToPartId),
+                    DraftBatchProductId =
+                        draftByPart.TryGetValue(r.ProductToPartId, out var d)
+                            ? d.BatchProductId
+                            : null,
+                    Rals = ralsByPart.TryGetValue(r.ProductToPartId, out var ralRows)
+                        ? ralRows.Select(x => new PartRalItem
+                        {
+                            RalCode = x.RalCode,
+                            OrderQty = x.OrderQty
+                        }).ToList()
+                        : new List<PartRalItem>()
                 }).ToList()
             };
         }).ToList();
@@ -245,6 +338,15 @@ StateHasChanged();
 
 }
 
+private async Task OpenPartPlanning(PartItem part)
+{
+    if (part.IsInDraft)
+        return;
+
+    if (PlannedPlus.HasDelegate)
+        await PlannedPlus.InvokeAsync(part);
+}
+
 private bool _isLoading = false;
 
 public class PartRow
@@ -253,12 +355,29 @@ public class PartRow
     public int TopPartId { get; set; }
     public string? TopPartName { get; set; }
     public int VersionId { get; set; }
+    public int ProductToPartId { get; set; }
     public int PlannedQty { get; set; }
     public int InProduction { get; set; }
     public int OkQty { get; set; }
     public int ReservedQty { get; set; }
     public int StockQty { get; set; }
     public int FreeQty { get; set; }
+}
+
+public class PartRalDto
+{
+    public int VersionId { get; set; }
+    public int? ProductToPartId { get; set; }
+    public string RalCode { get; set; } = "";
+    public int OrderQty { get; set; }
+}
+
+public class DraftItemDto
+{
+    public int BatchProductId { get; set; }
+    public int VersionId { get; set; }
+    public int? ProductToPartId { get; set; }
+    public int PlannedQty { get; set; }
 }
 
 public class ProductSummaryDto
@@ -269,12 +388,14 @@ public class ProductSummaryDto
     public int? ParentCategoryId { get; set; }
     public int VersionId { get; set; }
     public string VersionName { get; set; } = "";
-
+    public bool VersionIsActive { get; set; }
     public int InProduction { get; set; }
     public int OkQty { get; set; }
     public int ReservedQty { get; set; }
     public int FreeQty { get; set; }
 }
+
+
 
 
 }

@@ -5,6 +5,7 @@ using ManiApi.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
 using MySqlConnector;
+using ManaApp.Shared.DTOs.Batches;
 namespace ManiApi.Controllers
 
 {
@@ -289,7 +290,7 @@ UPDATE batches_products
 
         // POST: /api/batches/draft/update
         [HttpPost("draft/update")]
-        public async Task<IActionResult> UpdateDraft([FromBody] BatchCartModel dto)
+        public async Task<IActionResult> UpdateDraft([FromBody] DraftUpdateRequestDto dto)
         {
             if (dto is null) return BadRequest("Tukšs pieprasījums.");
             if (!(dto.BatchId.HasValue && dto.BatchId > 0)) return BadRequest("BatchId ir obligāts.");
@@ -332,7 +333,7 @@ UPDATE batches
             }
 
 // 🛡️ drošības filtrs – tikai derīgie ieraksti
-dto.Items = (dto.Items ?? new List<BatchCartItem>())
+dto.Items = (dto.Items ?? new List<DraftUpdateItemDto>())
     .Where(x => x.Qty > 0)
     .ToList();
             // 3) Rindas (UPSERT pēc (Batch_Id, Version_Id))
@@ -2324,6 +2325,60 @@ GROUP BY ptp.ID, tp.TopPart_Name;
     return Ok(list);
 }
 
+// GET: /api/batches/draft/items
+[HttpGet("draft/items")]
+public async Task<IActionResult> GetDraftItems()
+{
+    var conn = _db.Database.GetDbConnection();
+    await conn.OpenAsync();
+
+    await using var cmd = conn.CreateCommand();
+
+    cmd.CommandText = @"
+SELECT
+    bp.ID,
+    bp.Version_Id,
+    bp.ProductToPart_ID,
+    bp.Planned_Qty
+FROM batches_products bp
+JOIN batches b
+    ON b.ID = bp.Batch_Id
+WHERE b.Batches_Statuss = 4
+  AND b.IsActive = 1
+  AND bp.IsActive = 1;
+";
+
+    var list = new List<object>();
+
+    await using var r = await cmd.ExecuteReaderAsync();
+
+    while (await r.ReadAsync())
+    {
+        list.Add(new
+        {
+            BatchProductId = r.GetInt32(0),
+            VersionId = r.GetInt32(1),
+            ProductToPartId = r.IsDBNull(2)
+                ? (int?)null
+                : r.GetInt32(2),
+
+            PlannedQty = r.GetInt32(3)
+        });
+    }
+
+    return Ok(list);
+}
+
+[HttpPost("draft/open-from-part")]
+public IActionResult OpenFromPart([FromBody] OpenDraftFromPartDto dto)
+{
+    return Ok(new
+    {
+        dto.VersionId,
+        dto.ProductToPartId
+    });
+}
+
     } // <-- beidzas public class BatchesController
 
     // === DTO (tie paši nosaukumi, ko izmanto Blazor) ===
@@ -2364,6 +2419,12 @@ public sealed class UpdateBatchCommentDto
 {
     public int BatchId { get; set; }
     public string? Comment { get; set; }
+}
+
+public sealed class OpenDraftFromPartDto
+{
+    public int VersionId { get; set; }
+    public int ProductToPartId { get; set; }
 }
 
 
