@@ -11,6 +11,44 @@
         <h3 class="mapping-title">
             Kodu salāgošana
         </h3>
+        <div class="mapping-scroll">
+
+        @if (Item?.VersionId is not null)
+                {
+                    <div class="mapping-suggestion-box">
+
+                        Atrasts iepriekšējais mapping —
+                        pārbaudi un apstiprini.
+
+                    </div>
+                }
+            
+            @if (Item?.VersionId is null)
+                {
+                    <div class="mapping-warning">
+
+                        Mapping nav atrasts —
+                        izvēlies produktu vai izveido arhivētu versiju.
+
+                    </div>
+                }
+                    <button
+                        type="button"
+                        class="mapping-create-version-btn"
+                        @onclick="CreateHistoricalVersion">
+
+                        Izveidot arhivētu versiju
+
+                    </button>
+                @if (Item?.VersionIsActive == false)
+                {
+                    <div class="mapping-archived-warning">
+
+                        Versija ir arhivēta —
+                        pārbaudi!
+
+                    </div>
+                }
 
         <div class="mapping-info-row">
             <div class="mapping-label">
@@ -18,9 +56,9 @@
             </div>
 
             <div class="mapping-value">
-                    @Item.CustomerCode
-                </div>
+                @Item!.CustomerCode
             </div>
+     </div>
 
     <div class="mapping-info-row">
         <div class="mapping-label">
@@ -394,7 +432,7 @@
     </button>
 
 </div>
-
+</div>
     </div>
 </div>
 }
@@ -416,6 +454,9 @@
     
     List<Stage1PartItem> stage1Parts = new();
     List<RalColor> ralColors = new();
+
+    [Parameter]
+public EventCallback<OrderDraftItemViewModel> OnCreateHistoricalVersion { get; set; }
 bool showValidationErrors;
 int? selectedRalColorId;
 bool showParentDropdown;
@@ -516,17 +557,10 @@ void ResetFromVersion()
         .OrderBy(x => x.ProductName);
     
     IEnumerable<MappingListItem> Versions =>
-    isProduct
-        ? MappingList
-            .Where(x =>
-                x.ProductId == selectedProductId &&
-                x.VersionIsActive)
-            .OrderByDescending(x => x.VersionName)
-
-        : MappingList
-            .Where(x => x.ProductId == selectedProductId)
-            .OrderByDescending(x => x.VersionIsActive)
-            .ThenByDescending(x => x.VersionName);
+    MappingList
+        .Where(x => x.ProductId == selectedProductId)
+        .OrderByDescending(x => x.VersionIsActive)
+        .ThenByDescending(x => x.VersionId);
 
     void ToggleProduct(bool value)
         {
@@ -723,6 +757,8 @@ if (isPart && selectedProductToPartId is null)
 
 var dto = new
 {
+    OrderDraftItemId = Item!.Id,
+
     CustomerName = "SIT RIGHT AB",
     CustomerCode = Item!.CustomerCode,
 
@@ -746,25 +782,46 @@ await Http.PostAsJsonAsync(
 showValidationErrors = false;
 await OnSaved.InvokeAsync();
 
-await Close();
+
 }
 
 protected override void OnParametersSet()
-{
-    if (IsVisible)
+{   
+    if (Item is not null)
+        {
+            selectedVersionId = Item.VersionId;
+            SelectedVersionName = Item.VersionName ?? "";
+            selectedProductToPartId = Item.ProductToPartId;
+            SelectedTopPartName = Item.TopPartName ?? "";
+            selectedTopPartId = Item.TopPartId;
+
+            selectedRalColorId = Item.RalColorId;
+            SelectedRalName = Item.RalColorName ?? "";
+            isProduct = Item.IsProduct;
+
+            isPart = Item.IsPart;
+
+            var mapping = MappingList
+                .FirstOrDefault(x => x.VersionId == Item.VersionId);
+
+            if (mapping is not null)
+            {
+                selectedParentCategoryId = mapping.ParentCategoryId;
+                SelectedParentName = mapping.ParentCategoryName;
+
+                selectedCategoryId = mapping.CategoryId;
+                SelectedCategoryName = mapping.CategoryName;
+
+                selectedProductId = mapping.ProductId;
+                SelectedProductName = mapping.ProductName;
+            }
+        }
+
+    if (IsVisible && Item is null)
     {
         selectedParentCategoryId = null;
         selectedCategoryId = null;
         selectedProductId = null;
-        selectedVersionId = null;
-
-        selectedProductToPartId = null;
-        selectedTopPartId = null;
-        selectedRalColorId = null;
-
-        isProduct = false;
-        isPart = false;
-
         stage1Parts.Clear();
         showParentDropdown = false;
         SelectedParentName = "";
@@ -779,6 +836,25 @@ protected override void OnParametersSet()
         showTopPartDropdown = false;
         SelectedTopPartName = "";
     }
+
+    if (selectedVersionId is not null)
+        {
+            _ = LoadStage1Parts();
+        }
+    
+    if (selectedVersionId is not null)
+        {
+            var existingVersion = Versions
+                .FirstOrDefault(x => x.VersionId == selectedVersionId);
+
+            if (existingVersion is not null)
+            {
+                SelectedVersionName = existingVersion.VersionIsActive
+                    ? existingVersion.VersionName
+                    : $"{existingVersion.VersionName} [ARCHIVED]";
+            }
+        }
+
 }
 
 async Task OnVersionChanged()
@@ -786,6 +862,16 @@ async Task OnVersionChanged()
     ResetFromVersion();
 
     await LoadStage1Parts();
+}
+
+async Task CreateHistoricalVersion()
+{
+    if (Item is null)
+        return;
+
+    Item.ProductToPartId = selectedProductId;
+
+    await OnCreateHistoricalVersion.InvokeAsync(Item);
 }
 
 }

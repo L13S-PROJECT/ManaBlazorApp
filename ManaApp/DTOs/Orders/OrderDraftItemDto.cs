@@ -34,4 +34,6 @@ public bool IsProduct { get; set; }
 public bool IsPart { get; set; }
 
 public int? CustomerCodeMapId { get; set; }
+
+public int Id { get; set; }
 }

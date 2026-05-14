@@ -421,6 +421,17 @@ public async Task<IActionResult> GetWorksByVersion([FromQuery] int versionId)
                         }
                     }
 
+                    var versionExists = await _db.ProductVersions
+                            .AnyAsync(x =>
+                                x.ProductId == product.Id &&
+                                x.VersionName == dto.VersionName);
+
+                        if (versionExists)
+                        {
+                            return BadRequest(
+                                "Šāda versija šai precei jau eksistē.");
+                        }
+
                     var newVer = new ProductVersion
                     {
                         ProductId = product.Id,

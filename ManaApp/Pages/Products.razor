@@ -198,6 +198,7 @@
 
     private bool isStepTypesOpen = false;
     private bool isWorkCentersOpen = false;
+    DotNetObjectReference<Products>? objRef;
     public class CategoryDto
     {
         public int Id { get; set; }
@@ -286,6 +287,12 @@ private bool createNewVersion
 {
     try
     {
+        objRef = DotNetObjectReference.Create(this);
+
+        await JS.InvokeVoidAsync(
+            "setProductsPageRef",
+            objRef);
+
         // 1) ielādē preces sarakstu (minimāli nepieciešamais)
         rows = await Http.GetFromJsonAsync<List<ProductRow>>("http://localhost:5270/api/products/list") 
                ?? new();
@@ -349,6 +356,21 @@ private bool createNewVersion
         await JS.InvokeVoidAsync("alert", "Kļūda ielādējot datus: " + ex.Message);
         rows = new(); allRows = new(); // ļaujam lapai atvērties tukšai
     }
+}
+
+[JSInvokable]
+public async Task OpenHistoricalVersionDialogJs(
+    int productId,
+    string versionName)
+{
+    await InvokeAsync(() =>
+    {
+        OpenHistoricalVersionDialog(
+            productId,
+            versionName);
+
+        StateHasChanged();
+    });
 }
  
 
@@ -462,6 +484,52 @@ private bool createNewVersion
     SetMainDialog("Product");
 }
 
+public void OpenHistoricalVersionDialog(
+    int productId,
+    string versionName)
+{
+    var row = allRows
+        .FirstOrDefault(x => x.id == productId);
+
+    if (row is null)
+        return;
+
+    selected = row;
+
+    isEdit = true;
+
+    createNewVersion = true;
+
+    copyTechnologySteps = true;
+
+    isHistoricalVersion = true;
+
+    selectedChildId = categories
+        .FirstOrDefault(c =>
+            c.CategoryName == row.categoryName)
+        ?.Id;
+
+    selectedParentId = categories
+        .FirstOrDefault(c =>
+            c.Id == selectedChildId)
+        ?.ParentId;
+
+    newName = row.productName ?? "";
+
+    newCode = row.productCode ?? "";
+
+    newVersionName = versionName;
+
+    newVersionRasejums = "";
+    newVersionComment = "";
+
+    newVersionDate = DateOnly.FromDateTime(DateTime.Today);
+    selectedDetails = null;
+    showValidation = false;
+
+    SetMainDialog("Product");
+}
+
 private void CloseDialog()
 {
     SetMainDialog(null);
@@ -545,7 +613,13 @@ private void CloseDialog()
                 await OnRowClicked(selected);
             }
 
-            CloseDialog();
+            if (isHistoricalVersion)
+                {
+                    await JS.InvokeVoidAsync(
+                        "history.back");
+                }
+
+         CloseDialog();
         }
         catch (Exception ex)
         {
@@ -1592,5 +1666,6 @@ async Task MoveDown(WorkCenterManageDto wc)
     await RefreshWorkCentersAsync();
     StateHasChanged();
 }
+
 
 }

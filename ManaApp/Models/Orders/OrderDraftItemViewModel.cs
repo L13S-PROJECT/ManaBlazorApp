@@ -34,6 +34,8 @@ public class OrderDraftItemViewModel
     public bool VersionIsActive { get; set; }
 
     public int? CustomerCodeMapId { get; set; }
+
+    public int Id { get; set; }
     
 }
 }

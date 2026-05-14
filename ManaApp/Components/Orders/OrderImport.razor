@@ -5,6 +5,10 @@
 @using ManaApp.Models.Pdf
 @using ManaApp.DTOs.Orders
 @using ManaApp.Models.Orders
+@using ManaApp.Pages
+@using ManaApp.Components.Products
+@using static ManaApp.Pages.Products
+
 @inject HttpClient Http
 @inject IJSRuntime JS
 
@@ -131,17 +135,25 @@
                 <td class="status-cell @(i.IsMapped ? "status-ok" : "status-error")">
 
                     @if (i.IsMapped)
-                    {
-                        <span>✓</span>
-                    }
-                    else
-                    {
-                        <span class="map-action"
-                            title="Pievienot aprakstu"
-                            @onclick="() => OpenMappingPopup(i)">
-                            +
-                        </span>
-                    }
+                            {
+                                <span class="map-action mapped"
+                                    title="Labot mapping"
+                                    @onclick="() => OpenMappingPopup(i)">
+
+                                    ✓
+
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="map-action"
+                                    title="Pievienot mapping"
+                                    @onclick="() => OpenMappingPopup(i)">
+
+                                    +
+
+                                </span>
+                            }
 
                 </td>
 
@@ -174,22 +186,88 @@
 </table>
 </div>
 
+
+
 <OrderMappingPopup
     IsVisible="showMappingPopup"
     Item="selectedItem"
     MappingList="mappingList"
+    OnCreateHistoricalVersion="OpenHistoricalVersionPopup"
     OnClose="ClosePopup"
     OnSaved="ReloadDraftItems" />
+
+<NewProductDialog
+    Visible="showHistoricalVersionDialog"
+    VisibleChanged="@(v => showHistoricalVersionDialog = v)"
+    Header="Jauna arhivēta versija"
+    IsEdit="true"
+    ShowValidation="showHistoricalValidation"
+    ParentOptions="historicalParentOptions"
+    ChildOptions="historicalChildOptions"
+    SelectedParentId="historicalParentId"
+    SelectedParentIdChanged="@(v => historicalParentId = v)"
+    SelectedChildId="historicalChildId"
+    SelectedChildIdChanged="@(v => historicalChildId = v)"
+    NewName="@historicalProductName"
+    NewNameChanged="@(v => historicalProductName = v)"
+    NewCode="@historicalProductCode"
+    NewCodeChanged="@(v => historicalProductCode = v)"
+    CreateNewVersion="true"
+    CreateNewVersionChanged="@(v => {})"
+    CopyTechnologySteps="true"
+    CopyTechnologyStepsChanged="@(v => {})"
+    NewVersionName="@historicalVersionName"
+    NewVersionNameChanged="@(v => historicalVersionName = v)"
+    NewVersionRasejums="@historicalVersionRasejums"
+    NewVersionRasejumsChanged="@(v => historicalVersionRasejums = v)"
+    NewVersionDate="historicalVersionDate"
+    NewVersionComment="@historicalVersionComment"
+    NewVersionCommentChanged="@(v => historicalVersionComment = v)"
+    OnSave="SaveHistoricalVersion"
+    OnCancel="CloseHistoricalVersionDialog"
+    IsHistoricalVersion="true"
+    IsHistoricalVersionChanged="@(v => {})" />
 
 
 @code {
     List<OrderDraftItemViewModel> pdfItems = new();
     OrderHeader? header;
     List<CustomerCodeMapResult> mapResults = new();
-        
-    bool showMappingPopup = false;
-    OrderDraftItemViewModel? selectedItem;
+    
+    int historicalProductId;
 
+    bool showMappingPopup = false;
+    OrderDraftItemViewModel? selectedItem;   
+
+    bool showHistoricalVersionDialog = false;
+
+bool showHistoricalValidation = false;
+
+int? historicalParentId;
+int? historicalChildId;
+
+string historicalProductName = "";
+string historicalProductCode = "";
+
+string? historicalVersionName;
+string? historicalVersionRasejums;
+DateOnly? historicalVersionDate;
+string? historicalVersionComment;
+
+List<CategoryDto> historicalCategories = new();
+
+List<CategoryDto> historicalParentOptions =>
+    historicalCategories
+        .Where(x => x.ParentId is null && x.IsActive)
+        .ToList();
+
+List<CategoryDto> historicalChildOptions =>
+    historicalCategories
+        .Where(x =>
+            x.ParentId == historicalParentId &&
+            x.IsActive)
+        .ToList();
+       
 protected override async Task OnInitializedAsync()
 {
     var response = await Http.GetAsync(
@@ -213,6 +291,7 @@ protected override async Task OnInitializedAsync()
 
     pdfItems = result.Items.Select(x => new OrderDraftItemViewModel
     {
+        Id = x.Id,
         CustomerCodeMapId = x.CustomerCodeMapId,
         CustomerCode = x.CustomerCode,
         Name = x.Name,
@@ -305,6 +384,7 @@ if (reloadResult is null)
 
 pdfItems = reloadResult.Items.Select(x => new OrderDraftItemViewModel
 {
+    Id = x.Id,
     CustomerCodeMapId = x.CustomerCodeMapId,
     CustomerCode = x.CustomerCode,
     Name = x.Name,
@@ -327,14 +407,19 @@ pdfItems = reloadResult.Items.Select(x => new OrderDraftItemViewModel
     MappingType = x.MappingType
 }).ToList();
 
+OpenNextUnmapped();
+
 }
 
 void OpenMappingPopup(OrderDraftItemViewModel item)
 {
+    showMappingPopup = true;
+
     selectedItem = item;
 
     selectedItem = new OrderDraftItemViewModel
         {
+            Id = item.Id,
             CustomerCode = item.CustomerCode,
             Name = item.Name,
             Quantity = item.Quantity,
@@ -345,10 +430,38 @@ void OpenMappingPopup(OrderDraftItemViewModel item)
             TopPartId = item.TopPartId,
             RalColorId = item.RalColorId,
 
-            IsMapped = item.IsMapped
+            IsMapped = item.IsMapped,
+
+            IsProduct = item.IsProduct,
+            IsPart = item.IsPart,
+
+            ProductName = item.ProductName,
+            VersionName = item.VersionName,
+            RalColorName = item.RalColorName,
+            TopPartName = item.TopPartName,
+
+            MappingType = item.MappingType
         };
 
-    showMappingPopup = true;
+}
+
+void OpenNextUnmapped()
+{
+    var next = pdfItems
+        .FirstOrDefault(x => !x.IsMapped);
+
+    if (next is null)
+    {
+        showMappingPopup = false;
+        selectedItem = null;
+        return;
+    }
+
+    showMappingPopup = false;
+
+    StateHasChanged();
+
+    OpenMappingPopup(next);
 }
 
 void ClosePopup()
@@ -376,6 +489,7 @@ async Task ReloadDraftItems()
 
     pdfItems = reloadResult.Items.Select(x => new OrderDraftItemViewModel
     {
+        Id = x.Id,
         CustomerCodeMapId = x.CustomerCodeMapId,
         CustomerCode = x.CustomerCode,
         Name = x.Name,
@@ -398,6 +512,7 @@ async Task ReloadDraftItems()
         MappingType = x.MappingType
     }).ToList();
 
+    OpenNextUnmapped();
     StateHasChanged();
 }
 
@@ -465,5 +580,148 @@ pdfItems.Clear();
 
 StateHasChanged();
 }
+
+async Task OpenHistoricalVersionPopup(
+    OrderDraftItemViewModel item)
+{
+    var mapping = mappingList
+    .FirstOrDefault(x =>
+        x.VersionId == item.VersionId);
+
+            if (mapping is null)
+            {
+                mapping = mappingList
+                    .FirstOrDefault(x =>
+                        x.ProductName == item.ProductName);
+            }
+
+    if (mapping is null)
+            {
+                await JS.InvokeVoidAsync(
+                    "alert",
+                    "Neizdevās atrast saistīto produktu katalogā.");
+
+                return;
+            }
+
+    historicalProductId = mapping.ProductId;
+
+    historicalParentId = mapping.ParentCategoryId;
+
+    historicalCategories =
+    await Http.GetFromJsonAsync<List<CategoryDto>>(
+        "http://localhost:5270/api/categories")
+    ?? new();
+
+    historicalChildId = mapping.CategoryId;
+
+    historicalProductName = mapping.ProductName;
+
+    historicalProductCode = mapping.ProductName;
+
+    historicalVersionName = "";
+
+    historicalVersionRasejums = "";
+
+    historicalVersionDate = DateOnly.FromDateTime(DateTime.Today);
+
+    historicalVersionComment = "";
+
+    showHistoricalValidation = false;
+
+    showHistoricalVersionDialog = true;
+}
+
+void CloseHistoricalVersionDialog()
+{
+    showHistoricalVersionDialog = false;
+}
+
+async Task SaveHistoricalVersion()
+{
+    showHistoricalValidation = true;
+
+    if (historicalChildId is null ||
+        string.IsNullOrWhiteSpace(historicalProductName) ||
+        string.IsNullOrWhiteSpace(historicalProductCode) ||
+        string.IsNullOrWhiteSpace(historicalVersionName) ||
+        historicalVersionDate is null)
+    {
+        return;
+    }
+
+    var payload = new
+    {
+        productId = historicalProductId,
+
+        productName = historicalProductName,
+
+        productCode = historicalProductCode,
+
+        categoryId = historicalChildId.Value,
+
+        versionName = historicalVersionName,
+
+        versionRasejums = historicalVersionRasejums,
+
+        versionDate = historicalVersionDate?
+            .ToString("yyyy-MM-dd"),
+
+        versionComment = historicalVersionComment,
+
+        createNewVersion = true,
+
+        copyTechnologySteps = true,
+
+        IsHistoricalVersion = true
+    };
+
+    var response = await Http.PutAsJsonAsync(
+        "http://localhost:5270/api/products/update",
+        payload);
+
+    if (!response.IsSuccessStatusCode)
+{
+    var error = await response.Content.ReadAsStringAsync();
+
+    await JS.InvokeVoidAsync(
+        "alert",
+        error);
+
+    return;
+}
+
+    showHistoricalVersionDialog = false;
+
+    mappingList = await Http.GetFromJsonAsync<List<MappingListItem>>(
+        "http://localhost:5270/api/products/mapping-list")
+        ?? new();
+
+    if (selectedItem is not null)
+            {
+                var refreshed = mappingList
+                    .Where(x => x.ProductId == historicalProductId)
+                    .OrderByDescending(x => x.VersionId)
+                    .FirstOrDefault();
+
+                if (refreshed is not null)
+                {
+                    selectedItem.VersionId = refreshed.VersionId;
+
+                    selectedItem.VersionName = refreshed.VersionName;
+
+                    selectedItem.VersionIsActive = refreshed.VersionIsActive;
+
+                    selectedItem.ProductName = refreshed.ProductName;
+                }
+
+                showMappingPopup = true;
+
+                OpenMappingPopup(selectedItem);
+            }
+
+    StateHasChanged();
+}
+
 
 }

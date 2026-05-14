@@ -2,6 +2,7 @@ namespace ManiApi.DTOs.Orders;
 
 public class SaveCustomerCodeMapRequest
 {
+    public int OrderDraftItemId { get; set; }
     public string CustomerName { get; set; } = "";
     public string CustomerCode { get; set; } = "";
 

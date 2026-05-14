@@ -52,8 +52,15 @@ public class OrderDraftService
                 CustomerCode = item.Code,
                 Name = item.Name,
                 Quantity = item.Quantity,
+                VersionId = map?.VersionId,
+                ProductToPartId = map?.ProductToPartId,
+                RalColorId = map?.RalColorId,
+                TopPartId = map?.TopPartId,
 
-                IsMapped = map is not null,
+                IsProduct = map?.IsProduct ?? false,
+                IsPart = map?.IsPart ?? false,
+
+                IsMapped = false,
 
                 CustomerCodeMapId = map?.Id,
 
@@ -83,6 +90,11 @@ public async Task<List<OrderDraftItem>> GetDraftItems(int draftId)
 public async Task SaveCustomerMap(
     SaveCustomerCodeMapRequest dto)
 {
+    var draftItem = await _db.OrderDraftItems
+    .FirstOrDefaultAsync(x => x.Id == dto.OrderDraftItemId);
+
+        if (draftItem is null)
+            return;
     var existing = await _db.CustomerCodeMaps
         .FirstOrDefaultAsync(x =>
             x.CustomerName == dto.CustomerName &&
@@ -106,21 +118,20 @@ public async Task SaveCustomerMap(
     existing.IsProduct = dto.IsProduct;
     existing.IsPart = dto.IsPart;
 
+    draftItem.VersionId = dto.VersionId;
+    draftItem.ProductToPartId = dto.ProductToPartId;
+    draftItem.TopPartId = dto.TopPartId;
+    draftItem.RalColorId = dto.RalColorId;
+
+    draftItem.IsProduct = dto.IsProduct;
+    draftItem.IsPart = dto.IsPart;
+
+    draftItem.CustomerCodeMapId = existing.Id;
+
+    draftItem.IsMapped = true;
+
     await _db.SaveChangesAsync();
 
-    var draftItems = await _db.OrderDraftItems
-    .Where(x =>
-        x.CustomerCode == dto.CustomerCode)
-    .ToListAsync();
-
-foreach (var item in draftItems)
-{
-    item.CustomerCodeMapId = existing.Id;
-
-    item.IsMapped = true;
-}
-
-await _db.SaveChangesAsync();
 }
 
 public async Task<List<OrderDraftItemDto>> GetDraftItemDtos(int draftId)
@@ -137,19 +148,10 @@ public async Task<List<OrderDraftItemDto>> GetDraftItemDtos(int draftId)
 
     var products = await _db.Set<Product>().ToListAsync();
 
-    var customerMaps = await _db.CustomerCodeMaps
-    .ToListAsync();
-
     var result = items.Select(x =>
     {
-        var map = customerMaps
-    .FirstOrDefault(m => m.Id == x.CustomerCodeMapId);
-
-    Console.WriteLine(
-    $"{x.CustomerCode} -> mapId={x.CustomerCodeMapId}");
-
         var version = versions
-            .FirstOrDefault(v => v.Id == map?.VersionId);
+            .FirstOrDefault(v => v.Id == x.VersionId);
 
         var product = version is null
             ? null
@@ -157,20 +159,21 @@ public async Task<List<OrderDraftItemDto>> GetDraftItemDtos(int draftId)
 
         return new OrderDraftItemDto
         {
+            Id = x.Id,
             CustomerCode = x.CustomerCode,
             Name = x.Name,
             Quantity = x.Quantity,
 
-            VersionId = map?.VersionId,
-            ProductToPartId = map?.ProductToPartId,
-            RalColorId = map?.RalColorId,
-            TopPartId = map?.TopPartId,
+            VersionId = x.VersionId,
+            ProductToPartId = x.ProductToPartId,
+            RalColorId = x.RalColorId,
+            TopPartId = x.TopPartId,
 
-            CustomerCodeMapId = map?.Id,
+            CustomerCodeMapId = x.CustomerCodeMapId,
 
-            IsMapped = map is not null,
-            IsProduct = map?.IsProduct ?? false,
-            IsPart = map?.IsPart ?? false,
+            IsMapped = x.IsMapped,
+            IsProduct = x.IsProduct,
+            IsPart = x.IsPart,
 
             ProductName = product?.ProductName,
 
@@ -178,16 +181,16 @@ public async Task<List<OrderDraftItemDto>> GetDraftItemDtos(int draftId)
             VersionIsActive = version?.IsActive ?? false,
 
             RalColorName = ralColors
-                .FirstOrDefault(r => r.ID == map?.RalColorId)
+                .FirstOrDefault(r => r.ID == x.RalColorId)
                 ?.Name,
 
             TopPartName = topParts
-                .FirstOrDefault(t => t.Id == map?.TopPartId)
+                .FirstOrDefault(t => t.Id == x.TopPartId)
                 ?.TopPartName,
 
             MappingType =
-                map?.IsProduct == true ? "Product" :
-                map?.IsPart == true ? "Part" :
+                x.IsProduct == true ? "Product" :
+                x.IsPart == true ? "Part" :
                 null
         };
     }).ToList();

@@ -304,3 +304,17 @@
     color: #999;
     white-space: nowrap;
 }
+
+.map-action.mapped {
+    color: #1faa59;
+
+    font-weight: 700;
+
+    cursor: pointer;
+}
+
+.map-action.mapped:hover {
+    color: #0d8a42;
+
+    transform: scale(1.08);
+}

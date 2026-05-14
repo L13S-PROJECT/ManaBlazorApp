@@ -34,4 +34,6 @@ public class OrderDraftItemDto
 
     public string? MappingType { get; set; }
     public int? CustomerCodeMapId { get; set; }
+
+    public int Id { get; set; }
 }

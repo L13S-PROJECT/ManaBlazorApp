@@ -98,3 +98,21 @@
     };
 </script>
 
+<script>
+    window.openHistoricalVersionDialog = function (productId, versionName) {
+
+        if (!window.DotNet || !window.productsPageRef)
+            return;
+
+        window.productsPageRef.invokeMethodAsync(
+            'OpenHistoricalVersionDialogJs',
+            productId,
+            versionName);
+    };
+</script>
+
+<script>
+    window.setProductsPageRef = function (ref) {
+        window.productsPageRef = ref;
+    };
+</script>
