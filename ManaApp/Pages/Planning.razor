@@ -602,6 +602,15 @@ private async Task ReloadPlanningDataAsync()
 
     var orderRals = await PlanningDataService.LoadOrderRalsAsync();
 
+    var orders = await PlanningDataService.LoadOrdersAsync();
+
+    var orderQtyByVersion = orders
+        .GroupBy(x => x.VersionId)
+        .ToDictionary(
+            g => g.Key,
+            g => g.Sum(x => x.Qty)
+        );
+
     // 4) Aizpildām rindas
     foreach (var r in rows)
     {
@@ -655,9 +664,12 @@ groupedRows = rows
             CategoryName = cat,
             ProductCode  = code,
             ProductName  = first.productName ?? "",
-            OrderQty = orderRals
-                .Where(x => g.Any(v => v.VersionId == x.VersionId))
-                .Sum(x => x.Qty),
+            OrderQty = g
+                .Where(v => v.VersionId.HasValue)
+                .Sum(v =>
+                    orderQtyByVersion.TryGetValue(v.VersionId!.Value, out var qty)
+                        ? qty
+                        : 0),
             InStock = g
                 .Where(x => !x.IsRalRow)
                 .Sum(x => x.InStock),
@@ -693,7 +705,10 @@ groupedRows = rows
                                 Planned = v.Planned,
                                 InStock = 0,
                                 FinishingInProgress = 0,
-                                OrderQty = v.OrderQty,
+                                OrderQty = v.VersionId.HasValue &&
+                                orderQtyByVersion.TryGetValue(v.VersionId.Value, out var oq)
+                                    ? oq
+                                    : 0,
                                 IsRalRow = v.IsRalRow
                             });
                     }

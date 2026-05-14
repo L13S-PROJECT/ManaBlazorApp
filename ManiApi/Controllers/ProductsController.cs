@@ -1143,28 +1143,7 @@ JOIN categories c    ON c.ID = p.Category_ID AND c.IsActive = 1
 LEFT JOIN categories pc ON pc.ID = c.Parent_ID AND pc.IsActive = 1
 WHERE
     v.IsActive = 1
-    OR v.ID IN (
-        -- 1) WIP: versija ir partijās (aktīvas, status=1)
-        SELECT bp.Version_Id
-        FROM batches_products bp
-        JOIN batches b ON b.ID = bp.Batch_Id
-        WHERE bp.IsActive = 1
-          AND b.IsActive  = 1
-          AND b.Batches_Statuss = 1
-
-        UNION
-
-        -- 2) Noliktavas atlikums: jebkāds STOCK kustību atlikums > 0
-        SELECT bp.Version_Id
-        FROM stock_movements sm
-        JOIN batches_products bp ON bp.ID = sm.BatchProduct_ID
-        JOIN batches b ON b.ID = bp.Batch_Id
-        WHERE sm.IsActive = 1
-          AND bp.IsActive = 1
-          AND b.IsActive  = 1
-        GROUP BY bp.Version_Id
-        HAVING SUM(CASE WHEN sm.Move_Type = 'STOCK' THEN sm.Stock_Qty ELSE 0 END) > 0
-    )
+    
 ORDER BY RootName, CategoryName, ProductName, VersionDate DESC;
 ";
 
@@ -1201,7 +1180,8 @@ public async Task<IActionResult> GetPlanningListArchived()
         join pc in _db.Categories on c.ParentId equals pc.Id into parentJoin
         from pc in parentJoin.DefaultIfEmpty()
 
-        where v.IsActive == false   // !!! tikai arhivētās versijas
+        where
+            v.IsActive == false
 
         select new
         {

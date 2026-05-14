@@ -72,9 +72,8 @@
                 <!-- CHILD ROWS (TopParts) -->
                 @foreach (var part in filteredParts)
                     {
-                        var totalOrderQty =
-                            (part.Rals ?? Enumerable.Empty<PartRalItem>())
-                            .Sum(x => x.OrderQty);
+                        var totalOrderQty = part.OrderQty;
+                        
                         <div class="part-row parts-grid">
 
                                 <div class="col-name">
@@ -211,6 +210,7 @@ public class PartItem
 {
     public int Index { get; set; }
     public string TopPartName { get; set; } = "";
+    public int OrderQty { get; set; }
     public int PlannedQty { get; set; }
     public int InProduction { get; set; }
     public int OkQty { get; set; }
@@ -225,6 +225,7 @@ public class PartItem
     public bool VersionIsActive { get; set; }
     public string ProductName { get; set; } = "";
     public string VersionName { get; set; } = "";
+    
 }
 
 public class PartRalItem
@@ -240,12 +241,10 @@ protected override async Task OnInitializedAsync()
 
 private async Task LoadData()
 {
-    if (_isLoading)
-    return;
+    groupedData.Clear();
+
 
     _isLoading = true;
-
-    StateHasChanged();
 
     var url = showArchived
     ? "http://localhost:5270/api/products/planning-list-archived"
@@ -258,6 +257,13 @@ var versionIds = (products ?? new())
     .Select(p => p.VersionId)
     .Distinct()
     .ToList();
+
+Console.WriteLine("=== VERSION IDS ===");
+
+foreach (var id in versionIds)
+{
+    Console.WriteLine($"VERSION={id}");
+}
 
 // 2. viens API call VISIEM
 var allParts = await Http.GetFromJsonAsync<List<PartRow>>(
@@ -280,7 +286,34 @@ var partsByVersion = (allParts ?? new())
 var ralsByPart = (allRals ?? new())
     .Where(x => x.ProductToPartId != null)
     .GroupBy(x => x.ProductToPartId!.Value)
-    .ToDictionary(g => g.Key, g => g.ToList());
+    .ToDictionary(
+        g => g.Key,
+        g => g
+            .GroupBy(x => x.RalCode)
+            .Select(x => new PartRalDto
+            {
+                ProductToPartId = g.Key,
+                RalCode = x.Key,
+                OrderQty = x.Sum(v => v.OrderQty)
+            })
+            .ToList()
+    );
+
+var orderQtyByPart = (allRals ?? new())
+    .Where(x => x.ProductToPartId != null)
+    .GroupBy(x => x.ProductToPartId!.Value)
+    .ToDictionary(
+        g => g.Key,
+        g => g.Sum(x => x.OrderQty)
+    );
+Console.WriteLine("=== ORDERS ===");
+
+foreach (var x in orderQtyByPart)
+{
+    Console.WriteLine(
+        $"PART={x.Key} QTY={x.Value}"
+    );
+}
 
 var draftByPart = (draftItems ?? new())
     .Where(x => x.ProductToPartId != null)
@@ -288,49 +321,73 @@ var draftByPart = (draftItems ?? new())
         x => x.ProductToPartId!.Value,
         x => x
     );
-
+    
+var productList = (products ?? new()).ToList();
+var mappedParts = new List<PartItem>();
         // 4. būvējam UI datus
-        groupedData = (products ?? new()).Select(p =>
+        groupedData = productList.Select(p =>
         {
             var parts = partsByVersion.GetValueOrDefault(p.VersionId) ?? new();
 
-            return new ProductPartGroup
-            {
-                ProductName = p.ProductName,
-                VersionName = p.VersionName ?? "",
-                ParentCategoryId = p.ParentCategoryId,
-                RootName = p.RootName ?? "",
-
-                Parts = parts.Select((r, i) => new PartItem
+            var group = new ProductPartGroup
                 {
-                    Index = i + 1,
-                    TopPartName = r.TopPartName ?? "",
-                    ProductToPartId = r.ProductToPartId,
-                    VersionId = r.VersionId,
                     ProductName = p.ProductName,
                     VersionName = p.VersionName ?? "",
-                    VersionIsActive = p.VersionIsActive,
-                    PlannedQty = r.PlannedQty,
-                    InProduction = r.InProduction,
-                    OkQty = r.OkQty,
-                    ReservedQty = r.ReservedQty,
-                    StockQty = r.StockQty,
-                    FreeQty = r.FreeQty,
-                    IsInDraft = draftByPart.ContainsKey(r.ProductToPartId),
-                    DraftBatchProductId =
-                        draftByPart.TryGetValue(r.ProductToPartId, out var d)
-                            ? d.BatchProductId
-                            : null,
-                    Rals = ralsByPart.TryGetValue(r.ProductToPartId, out var ralRows)
-                        ? ralRows.Select(x => new PartRalItem
-                        {
-                            RalCode = x.RalCode,
-                            OrderQty = x.OrderQty
-                        }).ToList()
-                        : new List<PartRalItem>()
-                }).ToList()
-            };
-        }).ToList();
+                    ParentCategoryId = p.ParentCategoryId,
+                    RootName = p.RootName ?? "",
+                    Parts = new List<PartItem>()
+                };
+
+                foreach (var tuple in parts.Select((r, i) => new { r, i }))
+                {
+                    var r = tuple.r;
+                    var i = tuple.i;
+
+                    Console.WriteLine(
+                        $"ROW PART={r.ProductToPartId}"
+                    );
+
+                    group.Parts.Add(new PartItem
+                    {
+                        Index = i + 1,
+                        TopPartName = r.TopPartName ?? "",
+                        ProductToPartId = r.ProductToPartId,
+                        VersionId = r.VersionId,
+                        ProductName = p.ProductName,
+                        VersionName = p.VersionName ?? "",
+                        VersionIsActive = p.VersionIsActive,
+                        OrderQty =
+                            orderQtyByPart.TryGetValue(r.ProductToPartId, out var oq)
+                                ? oq
+                                : 0,
+                                
+                        PlannedQty = r.PlannedQty,
+                        InProduction = r.InProduction,
+                        OkQty = r.OkQty,
+                        ReservedQty = r.ReservedQty,
+                        StockQty = r.StockQty,
+                        FreeQty = r.FreeQty,
+
+                        IsInDraft = draftByPart.ContainsKey(r.ProductToPartId),
+
+                        DraftBatchProductId =
+                            draftByPart.TryGetValue(r.ProductToPartId, out var d)
+                                ? d.BatchProductId
+                                : null,
+
+                        Rals = ralsByPart.TryGetValue(r.ProductToPartId, out var ralRows)
+                            ? ralRows.Select(x => new PartRalItem
+                            {
+                                RalCode = x.RalCode,
+                                OrderQty = x.OrderQty
+                            }).ToList()
+                            : new List<PartRalItem>()
+                    });
+                }
+
+                return group;
+
+            }).ToList();
 
 _isLoading = false;
 
@@ -394,8 +451,6 @@ public class ProductSummaryDto
     public int ReservedQty { get; set; }
     public int FreeQty { get; set; }
 }
-
-
 
 
 }

@@ -88,6 +88,11 @@ public Dictionary<int, int> BuildAssemblyFinishByVersion(
         );
 }
 
-
+public async Task<List<OrderRalDto>> LoadOrdersAsync()
+{
+    return await _http.GetFromJsonAsync<List<OrderRalDto>>(
+        "http://localhost:5270/api/orders/planning-orders")
+        ?? new List<OrderRalDto>();
+}
 
 }

@@ -88,7 +88,14 @@ public async Task<IActionResult> GetOrderItems(int orderId)
 [HttpGet("planning-order-rals")]
 public async Task<IActionResult> GetPlanningRows()
 {
-    var result = await _orderService.GetPlanningOrders();
+    var result = await _orderService.GetPlanningOrdersRals();
+    return Ok(result);
+}
+
+[HttpGet("planning-orders")]
+public async Task<IActionResult> GetPlanningOrders()
+{
+    var result = await _orderService.GetPlanningOrdersRals();
     return Ok(result);
 }
 

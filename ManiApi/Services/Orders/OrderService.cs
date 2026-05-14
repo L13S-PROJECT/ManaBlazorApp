@@ -330,7 +330,9 @@ public async Task<List<object>> GetPlanningOrdersRals()
         where
             oi.IsActive &&
             o.IsActive &&
-            map.VersionId != null
+            map.VersionId != null &&
+            map.IsProduct
+            
 
         group oi by new
         {
@@ -358,32 +360,26 @@ public async Task<List<PlanningRalDto>> GetPlanningOrders()
     var result = await (
         from oi in _db.OrderItems
 
+        join o in _db.Orders
+            on oi.OrderId equals o.Id
+
         join map in _db.CustomerCodeMaps
             on oi.CustomerCodeMapId equals map.Id
 
-        join ral in _db.RalColors
-            on map.RalColorId equals ral.ID
-
         where
             oi.IsActive &&
+            o.IsActive &&
             map.VersionId != null &&
-            map.RalColorId != null
+            map.IsProduct
 
-        group oi by new
-        {
-            map.VersionId,
-            map.RalColorId,
-            ral.Name
-        }
-        into g
+        group oi by map.VersionId into g
 
         select new PlanningRalDto
         {
-            VersionId = g.Key.VersionId!.Value,
-            RalColorId = g.Key.RalColorId,
-            RalCode = g.Key.Name,
+            VersionId = g.Key!.Value,
             Qty = g.Sum(x => x.Quantity)
         }
+
     ).ToListAsync();
 
     return result;

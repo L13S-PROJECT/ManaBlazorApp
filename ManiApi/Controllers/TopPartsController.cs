@@ -714,13 +714,11 @@ public async Task<IActionResult> GetFullDataAll([FromQuery] string versionIds)
             .Where(ptp =>
                 ids.Contains(ptp.VersionId)
                 && ptp.IsActive
-                && _db.TopPartSteps
-                    .Any(ts =>
-                        ts.ProductToPartId == ptp.Id &&
-                        ts.StepType == 1)
             )
         join tp in _db.TopParts on ptp.TopPartId equals tp.Id
         where tp.IsActive
+            && tp.Stage == 1
+
         select new
         {
             ptp.VersionId,
@@ -809,6 +807,7 @@ public async Task<IActionResult> GetFullDataAll([FromQuery] string versionIds)
     return Ok(data);
 }
 
+
 [HttpGet("ral-summary-all")]
 public async Task<IActionResult> GetRalSummaryAll(
     [FromQuery] string versionIds)
@@ -821,12 +820,20 @@ public async Task<IActionResult> GetRalSummaryAll(
         .Select(int.Parse)
         .Distinct()
         .ToList();
+    
+    var partIds = await _db.ProductTopParts
+    .Where(x =>
+        ids.Contains(x.VersionId)
+        && x.IsActive)
+    .Select(x => x.Id)
+    .ToListAsync();
 
     var orderRows = await (
         from oi in _db.OrderItems
 
         join map in _db.CustomerCodeMaps
             on oi.CustomerCodeMapId equals map.Id
+        
 
         join ral in _db.RalColors
             on map.RalColorId equals ral.ID
@@ -835,7 +842,7 @@ public async Task<IActionResult> GetRalSummaryAll(
             oi.IsActive &&
             map.VersionId != null &&
             map.RalColorId != null &&
-            map.ProductToPartId != null &&
+            map.TopPartId != null &&
             ids.Contains(map.VersionId.Value)
 
         group oi by new
