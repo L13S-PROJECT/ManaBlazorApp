@@ -11,5 +11,6 @@ namespace ManiApi.Models
 
         public bool IsActive { get; set; }
         public int? CustomerCodeMapId { get; set; }
+        public int? VersionId { get; set; }
     }
 }

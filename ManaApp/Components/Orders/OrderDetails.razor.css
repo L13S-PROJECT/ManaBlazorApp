@@ -34,7 +34,7 @@
     width: 100%;
     border-collapse: collapse;
 
-    table-layout: fixed;
+    table-layout: auto;
 }
 
 .order-details-table thead {
@@ -142,4 +142,29 @@
     max-width: 42px;
 
     text-align: center;
+}
+
+.order-details-table th:nth-child(4),
+.order-details-table td:nth-child(4) {
+    width: 72px;
+}
+
+.order-details-table th:nth-child(6),
+.order-details-table td:nth-child(6) {
+    width: 64px;
+}
+
+.order-details-table th:nth-child(8),
+.order-details-table td:nth-child(8) {
+    width: 78px;
+}
+
+.order-details-table th:nth-child(7),
+.order-details-table td:nth-child(7) {
+    width: 170px;
+}
+
+.order-details-table th:nth-child(9),
+.order-details-table td:nth-child(9) {
+    width: 115px;
 }

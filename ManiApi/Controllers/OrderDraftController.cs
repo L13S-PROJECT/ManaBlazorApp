@@ -15,23 +15,41 @@ public class OrderDraftController : ControllerBase
         _draftService = draftService;
     }
 
-    [HttpPost]
+[HttpPost]
     public async Task<IActionResult> Create(CreateOrderDraftDto dto)
     {
-        var id = await _draftService.CreateDraft(dto);
+        try
+        {
+            var id = await _draftService.CreateDraft(dto);
 
-        return Ok(id);
+            return Ok(id);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpGet("latest")]
 public async Task<IActionResult> GetLatest()
 {
-    var draft = await _draftService.GetLatestDraft();
+    var drafts = await _draftService.GetDrafts();
+
+    return Ok(drafts);
+
+}
+
+[HttpGet("{draftId}")]
+public async Task<IActionResult> GetDraft(int draftId)
+{
+    var draft = await _draftService
+        .GetDraftById(draftId);
 
     if (draft is null)
         return NotFound();
 
-    var items = await _draftService.GetDraftItemDtos(draft.Id);
+    var items = await _draftService
+        .GetDraftItemDtos(draft.Id);
 
     return Ok(new
     {
@@ -44,15 +62,22 @@ public async Task<IActionResult> GetLatest()
 public async Task<IActionResult> SaveMap(
     [FromBody] SaveCustomerCodeMapRequest dto)
 {
-    await _draftService.SaveCustomerMap(dto);
+    try
+    {
+        await _draftService.SaveCustomerMap(dto);
 
-    return Ok();
+        return Ok();
+    }
+    catch (Exception ex)
+    {
+        return BadRequest(ex.Message);
+    }
 }
 
-[HttpDelete]
-public async Task<IActionResult> DeleteDraft()
+[HttpDelete("{draftId}")]
+public async Task<IActionResult> DeleteDraft(int draftId)
 {
-    await _draftService.DeleteDraft();
+    await _draftService.DeleteDraft(draftId);
 
     return Ok();
 }

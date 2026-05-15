@@ -130,6 +130,7 @@ modelBuilder.Entity<Order>()
 modelBuilder.Entity<Order>()
     .Property(e => e.IsActive)
     .HasColumnName("is_active");
+
 modelBuilder.Entity<OrderItem>()
     .Property(e => e.CustomerCode)
     .HasColumnName("customer_code");
@@ -145,6 +146,10 @@ modelBuilder.Entity<OrderItem>()
 modelBuilder.Entity<OrderItem>()
     .Property(e => e.IsActive)
     .HasColumnName("is_active");
+
+modelBuilder.Entity<OrderItem>()
+    .Property(e => e.VersionId)
+    .HasColumnName("version_id");
 
 }
   

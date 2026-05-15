@@ -5,7 +5,8 @@ public class MappingListItem
     public int ParentCategoryId { get; set; }
 
     public string ParentCategoryName { get; set; } = "";
-    
+    public string ProductCode { get; set; } = "";
+
     public int CategoryId { get; set; }
 
     public string CategoryName { get; set; } = "";

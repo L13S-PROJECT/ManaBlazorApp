@@ -355,17 +355,21 @@ public async Task<IActionResult> GetWorksByVersion([FromQuery] int versionId)
         [HttpPost("create")]
         public async Task<IActionResult> Create([FromBody] CreateProductRequest dto)
         {
-            Console.WriteLine($"[CREATE] Name={dto.ProductName}, Code={dto.ProductCode}, Cat={dto.CategoryId}, " +
-                              $"VerName={dto.VersionName}, VerRasejums={dto.VersionRasejums}, VerDate={dto.VersionDate}, VerComment={dto.VersionComment}");
-            try
-            {
+            
+                var versionExists = await _db.ProductVersions
+                        .AnyAsync(x =>
+                            x.VersionName == dto.VersionName);
+
+                    if (versionExists)
+                    {
+                        return BadRequest(
+                            "Šāds versijas numurs jau eksistē.");
+                    }
+                
                 var result = await _versionService.Create(dto);
                     return Ok(result);
-            }
-            catch (Exception ex)
-                {
-                    return StatusCode(500, ex.Message);
-                }
+            
+           
         }
 
         [HttpPut("update")]
@@ -1302,6 +1306,8 @@ JOIN toppart tp
 WHERE
     pt.Version_ID = @versionId
     AND tp.Stage = 1
+    AND pt.IsActive = 1
+    
 ORDER BY tp.TopPart_Name;
 ";
 
@@ -1343,6 +1349,7 @@ public async Task<IActionResult> GetMappingList()
 
             ProductId = p.Id,
             ProductName = p.ProductName,
+            ProductCode = p.ProductCode,
 
             VersionId = v.Id,
             VersionName = v.VersionName,

@@ -1,6 +1,7 @@
 @using ManaApp.Models.Orders
 @using System.Linq
 @inject HttpClient Http
+@inject IJSRuntime JS
 
 @if (IsVisible && Item is not null)
 {
@@ -40,7 +41,17 @@
                         Izveidot arhivētu versiju
 
                     </button>
-                @if (Item?.VersionIsActive == false)
+                @if (
+                        (selectedVersionId is not null &&
+                            Versions.Any(x =>
+                                x.VersionId == selectedVersionId &&
+                                !x.VersionIsActive))
+                        ||
+                        (selectedProductId is not null &&
+                            Products.Any(x =>
+                                x.ProductId == selectedProductId &&
+                                !x.VersionIsActive))
+                    )
                 {
                     <div class="mapping-archived-warning">
 
@@ -202,7 +213,9 @@
                         class="custom-dropdown-item"
                         @onclick="() => SelectProduct(p.ProductId, p.ProductName)">
 
-                        @p.ProductName
+                        @(p.VersionIsActive
+                            ? p.ProductName
+                            : $"{p.ProductName} [ARHIVĒTS]")
 
                     </div>
                 }
@@ -412,6 +425,15 @@
 
                             </div>
                         }
+                
+                @if (!string.IsNullOrWhiteSpace(validationMessage))
+                    {
+                        <div class="mapping-warning">
+
+                            @validationMessage
+
+                        </div>
+                    }
 
 <div class="mapping-button-row">
 
@@ -456,7 +478,9 @@
     List<RalColor> ralColors = new();
 
     [Parameter]
-public EventCallback<OrderDraftItemViewModel> OnCreateHistoricalVersion { get; set; }
+    public EventCallback<int> OnCreateHistoricalVersion { get; set; }
+    OrderDraftItemViewModel? previousItem;
+
 bool showValidationErrors;
 int? selectedRalColorId;
 bool showParentDropdown;
@@ -477,6 +501,16 @@ bool showRalDropdown;
 string SelectedRalName = "";
 
 bool showTopPartDropdown;
+
+void CloseAllDropdowns()
+{
+    showParentDropdown = false;
+    showCategoryDropdown = false;
+    showProductDropdown = false;
+    showVersionDropdown = false;
+    showRalDropdown = false;
+    showTopPartDropdown = false;
+}
 
 string SelectedTopPartName = "";
 
@@ -560,7 +594,7 @@ void ResetFromVersion()
     MappingList
         .Where(x => x.ProductId == selectedProductId)
         .OrderByDescending(x => x.VersionIsActive)
-        .ThenByDescending(x => x.VersionId);
+        .ThenByDescending(x => x.VersionName);
 
     void ToggleProduct(bool value)
         {
@@ -586,7 +620,11 @@ void TogglePart(bool value)
 
 void ToggleParentDropdown()
 {
-    showParentDropdown = !showParentDropdown;
+    var wasOpen = showParentDropdown;
+
+    CloseAllDropdowns();
+
+    showParentDropdown = !wasOpen;
 }
 
 void SelectParentCategory(int id, string name)
@@ -615,7 +653,11 @@ void SelectParentCategory(int id, string name)
 
 void ToggleCategoryDropdown()
 {
-    showCategoryDropdown = !showCategoryDropdown;
+    var wasOpen = showCategoryDropdown;
+
+CloseAllDropdowns();
+
+    showCategoryDropdown = !wasOpen;
 }
 
 void SelectCategory(int id, string name)
@@ -642,14 +684,24 @@ void SelectCategory(int id, string name)
 
 void ToggleProductDropdown()
 {
-    showProductDropdown = !showProductDropdown;
+    var wasOpen = showProductDropdown;
+
+CloseAllDropdowns();
+
+    showProductDropdown = !wasOpen;
 }
 
 void SelectProduct(int id, string name)
 {
     selectedProductId = id;
 
-    SelectedProductName = name;
+    var selected = Products
+    .FirstOrDefault(x => x.ProductId == id);
+
+        SelectedProductName =
+            selected is not null && !selected.VersionIsActive
+                ? $"{name} [ARHIVĒTS]"
+                : name;
 
     showProductDropdown = false;
 
@@ -657,7 +709,11 @@ void SelectProduct(int id, string name)
 }
 void ToggleVersionDropdown()
 {
-    showVersionDropdown = !showVersionDropdown;
+    var wasOpen = showVersionDropdown;
+
+    CloseAllDropdowns();
+
+    showVersionDropdown = !wasOpen;
 }
 
 async Task SelectVersion(int id, string name)
@@ -675,7 +731,11 @@ async Task SelectVersion(int id, string name)
 
 void ToggleRalDropdown()
 {
-    showRalDropdown = !showRalDropdown;
+    var wasOpen = showRalDropdown;
+
+    CloseAllDropdowns();
+
+    showRalDropdown = !wasOpen;
 }
 
 void SelectRal(int id, string name)
@@ -689,7 +749,11 @@ void SelectRal(int id, string name)
 
 void ToggleTopPartDropdown()
 {
-    showTopPartDropdown = !showTopPartDropdown;
+    var wasOpen = showTopPartDropdown;
+
+    CloseAllDropdowns();
+
+    showTopPartDropdown = !wasOpen;
 }
 
 void SelectTopPart(
@@ -775,47 +839,73 @@ var dto = new
     IsPart = isPart
 };
 
-await Http.PostAsJsonAsync(
+var response = await Http.PostAsJsonAsync(
     "http://localhost:5270/api/OrderDraft/save-map",
     dto);
 
-showValidationErrors = false;
-await OnSaved.InvokeAsync();
+if (!response.IsSuccessStatusCode)
+{
+    validationMessage =
+        await response.Content.ReadAsStringAsync();
 
+    return;
+}
+
+validationMessage = null;
+
+showValidationErrors = false;
+
+await OnSaved.InvokeAsync();
 
 }
 
 protected override void OnParametersSet()
 {   
-    if (Item is not null)
+    if (Item is not null && previousItem != Item)
         {
+            selectedParentCategoryId = null;
+            SelectedParentName = "";
+
+            selectedCategoryId = null;
+            SelectedCategoryName = "";
+
+            selectedProductId = null;
+            SelectedProductName = "";
+
             selectedVersionId = Item.VersionId;
             SelectedVersionName = Item.VersionName ?? "";
+
             selectedProductToPartId = Item.ProductToPartId;
             SelectedTopPartName = Item.TopPartName ?? "";
+
             selectedTopPartId = Item.TopPartId;
 
             selectedRalColorId = Item.RalColorId;
             SelectedRalName = Item.RalColorName ?? "";
-            isProduct = Item.IsProduct;
 
+            isProduct = Item.IsProduct;
             isPart = Item.IsPart;
 
-            var mapping = MappingList
-                .FirstOrDefault(x => x.VersionId == Item.VersionId);
+           if (Item.VersionId is not null)
+                {
+                    var mapping = MappingList
+                        .FirstOrDefault(x => x.VersionId == Item.VersionId);
 
-            if (mapping is not null)
-            {
-                selectedParentCategoryId = mapping.ParentCategoryId;
-                SelectedParentName = mapping.ParentCategoryName;
+                    if (mapping is not null)
+                    {
+                        selectedParentCategoryId = mapping.ParentCategoryId;
+                        SelectedParentName = mapping.ParentCategoryName;
 
-                selectedCategoryId = mapping.CategoryId;
-                SelectedCategoryName = mapping.CategoryName;
+                        selectedCategoryId = mapping.CategoryId;
+                        SelectedCategoryName = mapping.CategoryName;
 
-                selectedProductId = mapping.ProductId;
-                SelectedProductName = mapping.ProductName;
-            }
+                        selectedProductId = mapping.ProductId;
+                        SelectedProductName = mapping.ProductName;
+                    }
+                }
         }
+    
+    previousItem = Item;
 
     if (IsVisible && Item is null)
     {
@@ -869,9 +959,16 @@ async Task CreateHistoricalVersion()
     if (Item is null)
         return;
 
-    Item.ProductToPartId = selectedProductId;
+    if (selectedProductId is null)
+{
+    await JS.InvokeVoidAsync(
+        "alert",
+        "Vispirms izvēlies preci.");
+    return;
+}
 
-    await OnCreateHistoricalVersion.InvokeAsync(Item);
+await OnCreateHistoricalVersion.InvokeAsync(
+    selectedProductId.Value);
 }
 
 }

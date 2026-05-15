@@ -22,8 +22,8 @@
 
             <button
                 class="action-button add-button"
-                @onclick="() => showImportPopup = true">
-                Pievienot jaunu @(hasDraft ? "(1)" : "")
+                @onclick="OpenImportPopup">
+                Pievienot jaunu @(draftCount > 0 ? $"({draftCount})" : "")
             </button>
 
             <button
@@ -149,23 +149,65 @@
 {
     <div class="orders-popup-overlay">
 
-        <div class="orders-popup-content">
+        <div class="orders-popup-content @(showDraftList ? "draft-picker-popup" : "")">
 
-    <div class="orders-popup-header">
+            <div class="orders-popup-header">
 
-        <button
-            class="orders-popup-close"
-            @onclick="() => showImportPopup = false">
+                <button
+                    class="orders-popup-close"
+                    @onclick="() => showImportPopup = false">
 
-            ✕
+                    ✕
 
-        </button>
+                </button>
 
-    </div>
+            </div>
 
-    <OrderImport />
+            @if (!showDraftList)
+            {
+                <OrderImport
+                    DraftId="selectedDraftId"
+                    OnDraftDeleted="HandleDraftDeleted"
+                    OnDraftCreated="ReloadDrafts"
+                    OnOrderSaved="HandleOrderSaved" />
+            }
+            else
+            {
+                 <div class="draft-list-container">
 
-</div>
+                <button
+                    class="action-button add-button"
+                    @onclick="CreateNewImport">
+
+                    Jauns imports
+
+                </button>
+
+                @foreach (var draft in drafts)
+                {
+                    <div
+                        class="draft-row"
+                        @onclick="() => OpenDraft(draft.Id)">
+
+                        <div>
+                            <strong>@draft.OrderNumber</strong>
+                        </div>
+
+                        <div>
+                            @draft.CustomerName
+                        </div>
+
+                        <div>
+                            @draft.OrderDate?.ToString("yyyy-MM-dd")
+                        </div>
+
+                    </div>
+                }
+
+            </div>
+            }
+
+        </div>
 
     </div>
 }
@@ -249,6 +291,7 @@
 
 @code {
 
+    private List<DraftRow> drafts = new();
     private List<OrderRow> orders = new();
 
         [Parameter]
@@ -271,7 +314,15 @@ protected override async Task OnInitializedAsync()
     var draftResponse = await Http.GetAsync(
         "http://localhost:5270/api/OrderDraft/latest");
 
-    hasDraft = draftResponse.IsSuccessStatusCode;
+    if (draftResponse.IsSuccessStatusCode)
+        {
+            drafts =
+                await draftResponse.Content
+                    .ReadFromJsonAsync<List<DraftRow>>()
+                ?? new();
+
+            draftCount = drafts.Count;
+        }
 
     await LoadOrders();
 }
@@ -342,7 +393,7 @@ private async Task ClearFilters()
 
 private bool showImportPopup;
 
-private bool hasDraft;
+private int draftCount;
 
 private bool showDeletePopup;
 
@@ -420,6 +471,112 @@ await Http.PostAsJsonAsync(
 await LoadOrders();
 showCommentPopup = false;
 
+}
+
+public class DraftRow
+{
+    public int Id { get; set; }
+
+    public string OrderNumber { get; set; } = "";
+
+    public string CustomerName { get; set; } = "";
+
+    public DateTime? OrderDate { get; set; }
+}
+
+private async Task OpenImportPopup()
+{
+    var response = await Http.GetAsync(
+        "http://localhost:5270/api/OrderDraft/latest");
+
+    if (response.IsSuccessStatusCode)
+    {
+        drafts =
+            await response.Content
+                .ReadFromJsonAsync<List<DraftRow>>()
+            ?? new();
+
+        draftCount = drafts.Count;
+    }
+
+    showDraftList = true;
+
+    selectedDraftId = null;
+
+    showImportPopup = true;
+}
+
+private bool showDraftList = true;
+
+private int? selectedDraftId;
+
+private void OpenDraft(int draftId)
+{
+    selectedDraftId = draftId;
+
+    showDraftList = false;
+}
+
+private void CreateNewImport()
+{
+    selectedDraftId = null;
+
+    showDraftList = false;
+}
+
+private async Task HandleDraftDeleted()
+{
+    showDraftList = true;
+
+    selectedDraftId = null;
+
+    var response = await Http.GetAsync(
+        "http://localhost:5270/api/OrderDraft/latest");
+
+    if (response.IsSuccessStatusCode)
+    {
+        drafts =
+            await response.Content
+                .ReadFromJsonAsync<List<DraftRow>>()
+            ?? new();
+
+        draftCount = drafts.Count;
+    }
+
+    StateHasChanged();
+}
+
+private async Task ReloadDrafts()
+{
+    var response = await Http.GetAsync(
+        "http://localhost:5270/api/OrderDraft/latest");
+
+    if (response.IsSuccessStatusCode)
+    {
+        drafts =
+            await response.Content
+                .ReadFromJsonAsync<List<DraftRow>>()
+            ?? new();
+
+        draftCount = drafts.Count;
+    }
+
+    StateHasChanged();
+}
+
+private async Task HandleOrderSaved()
+{
+    showImportPopup = false;
+
+    showDraftList = true;
+
+    selectedDraftId = null;
+
+    await LoadOrders();
+
+    await ReloadDrafts();
+
+    StateHasChanged();
 }
 
 }

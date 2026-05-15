@@ -116,7 +116,7 @@
     NewVersionNameChanged="@(v => newVersionName = v)"
     NewVersionRasejums="@newVersionRasejums"
     NewVersionRasejumsChanged="@(v => newVersionRasejums = v)"
-    NewVersionDate="newVersionDate"
+    NewVersionDateChanged="@(v => newVersionDate = v)"
     NewVersionComment="@newVersionComment"
     NewVersionCommentChanged="@(v => newVersionComment = v)"
     OnSave="SaveAsync"
@@ -578,7 +578,16 @@ private void CloseDialog()
                 };
 
                 var resp = await Http.PostAsJsonAsync("http://localhost:5270/api/products/create", payload);
-                resp.EnsureSuccessStatusCode();
+                if (!resp.IsSuccessStatusCode)
+                    {
+                        var error = await resp.Content.ReadAsStringAsync();
+
+                        await JS.InvokeVoidAsync(
+                            "alert",
+                            error);
+
+                        return;
+                    }
             }
             else
             {
@@ -602,7 +611,16 @@ private void CloseDialog()
 
 
                 var resp = await Http.PutAsJsonAsync("http://localhost:5270/api/products/update", payload);
-                resp.EnsureSuccessStatusCode();
+                if (!resp.IsSuccessStatusCode)
+                    {
+                        var error = await resp.Content.ReadAsStringAsync();
+
+                        await JS.InvokeVoidAsync(
+                            "alert",
+                            error);
+
+                        return;
+                    }
             }
 
             allRows = await Http.GetFromJsonAsync<List<ProductRow>>("http://localhost:5270/api/products/list") ?? new();
@@ -612,12 +630,6 @@ private void CloseDialog()
             {
                 await OnRowClicked(selected);
             }
-
-            if (isHistoricalVersion)
-                {
-                    await JS.InvokeVoidAsync(
-                        "history.back");
-                }
 
          CloseDialog();
         }

@@ -128,16 +128,22 @@ public OrderHeader ParseHeaderFromCoordinates(List<WordPosition> words)
 
     if (marker != null)
     {
-        var customerWords = words
+        var firstLineY = words
             .Where(w =>
                 w.Y < marker.Y &&
                 Math.Abs(w.X - marker.X) < 200)
             .OrderByDescending(w => w.Y)
-            .ThenBy(w => w.X)
-            .Take(3) // pietiek lai dabūtu "SIT RIGHT AB"
+            .Select(w => w.Y)
+            .FirstOrDefault();
+
+        var customerWords = words
+            .Where(w =>
+                Math.Abs(w.Y - firstLineY) < 3 &&
+                Math.Abs(w.X - marker.X) < 200)
+            .OrderBy(w => w.X)
             .Select(w => w.Text);
 
-        header.Customer = string.Join(" ", customerWords);
+        header.Customer = string.Join(" ", customerWords).Trim();
     }
 
     return header;

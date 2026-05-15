@@ -230,10 +230,21 @@
 
 
 @code {
+
+    [Parameter]
+    public int? DraftId { get; set; }
     List<OrderDraftItemViewModel> pdfItems = new();
     OrderHeader? header;
     List<CustomerCodeMapResult> mapResults = new();
-    
+
+    [Parameter]
+    public EventCallback OnDraftDeleted { get; set; }
+
+    [Parameter]
+    public EventCallback OnDraftCreated { get; set; }
+
+    [Parameter]
+    public EventCallback OnOrderSaved { get; set; }
     int historicalProductId;
 
     bool showMappingPopup = false;
@@ -271,7 +282,7 @@ List<CategoryDto> historicalChildOptions =>
 protected override async Task OnInitializedAsync()
 {
     var response = await Http.GetAsync(
-        "http://localhost:5270/api/OrderDraft/latest");
+        $"http://localhost:5270/api/OrderDraft/{DraftId}");
 
     if (!response.IsSuccessStatusCode)
         return;
@@ -361,7 +372,7 @@ var draftItems = pdfItems.Select(x => new OrderItem
     Quantity = x.Quantity
 }).ToList();
 
-await Http.PostAsJsonAsync(
+var createResponse = await Http.PostAsJsonAsync(
     "http://localhost:5270/api/OrderDraft",
     new
     {
@@ -369,8 +380,33 @@ await Http.PostAsJsonAsync(
         Items = draftItems
     });
 
+int createdDraftId = 0;
+
+if (createResponse.IsSuccessStatusCode)
+{
+    createdDraftId =
+        await createResponse.Content.ReadFromJsonAsync<int>();
+}
+
+if (!createResponse.IsSuccessStatusCode)
+{
+    var error = await createResponse.Content.ReadAsStringAsync();
+
+    header = null;
+
+    pdfItems.Clear();
+
+    await JS.InvokeVoidAsync(
+        "alert",
+        error);
+
+    return;
+}
+
+await OnDraftCreated.InvokeAsync();
+
 var reloadResponse = await Http.GetAsync(
-    "http://localhost:5270/api/OrderDraft/latest");
+    $"http://localhost:5270/api/OrderDraft/{createdDraftId}");
 
 if (!reloadResponse.IsSuccessStatusCode)
     return;
@@ -407,7 +443,6 @@ pdfItems = reloadResult.Items.Select(x => new OrderDraftItemViewModel
     MappingType = x.MappingType
 }).ToList();
 
-OpenNextUnmapped();
 
 }
 
@@ -476,7 +511,7 @@ List<MappingListItem> mappingList = new();
 async Task ReloadDraftItems()
 {
     var reloadResponse = await Http.GetAsync(
-        "http://localhost:5270/api/OrderDraft/latest");
+        $"http://localhost:5270/api/OrderDraft/{DraftId}");
 
     if (!reloadResponse.IsSuccessStatusCode)
         return;
@@ -526,7 +561,7 @@ async Task DeleteDraft()
         return;
 
     var response = await Http.DeleteAsync(
-        "http://localhost:5270/api/OrderDraft");
+        $"http://localhost:5270/api/OrderDraft/{DraftId}");
 
     if (!response.IsSuccessStatusCode)
         return;
@@ -536,6 +571,7 @@ async Task DeleteDraft()
     pdfItems.Clear();
 
     StateHasChanged();
+    await OnDraftDeleted.InvokeAsync();
 }
 
 async Task SaveOrder()
@@ -579,21 +615,24 @@ header = null;
 pdfItems.Clear();
 
 StateHasChanged();
+await OnOrderSaved.InvokeAsync();
+
 }
 
 async Task OpenHistoricalVersionPopup(
-    OrderDraftItemViewModel item)
+    int productId)
 {
     var mapping = mappingList
-    .FirstOrDefault(x =>
-        x.VersionId == item.VersionId);
+        .FirstOrDefault(x =>
+            x.ProductId == productId);
 
-            if (mapping is null)
-            {
-                mapping = mappingList
-                    .FirstOrDefault(x =>
-                        x.ProductName == item.ProductName);
-            }
+            if (mapping is null &&
+                    selectedItem?.VersionId is not null)
+                {
+                    mapping = mappingList
+                        .FirstOrDefault(x =>
+                            x.ProductId == productId);
+                }
 
     if (mapping is null)
             {
@@ -604,7 +643,7 @@ async Task OpenHistoricalVersionPopup(
                 return;
             }
 
-    historicalProductId = mapping.ProductId;
+    historicalProductId = productId;
 
     historicalParentId = mapping.ParentCategoryId;
 
@@ -617,7 +656,7 @@ async Task OpenHistoricalVersionPopup(
 
     historicalProductName = mapping.ProductName;
 
-    historicalProductCode = mapping.ProductName;
+    historicalProductCode = mapping.ProductCode;
 
     historicalVersionName = "";
 
@@ -722,6 +761,8 @@ async Task SaveHistoricalVersion()
 
     StateHasChanged();
 }
+
+
 
 
 }

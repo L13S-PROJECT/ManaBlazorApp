@@ -73,7 +73,8 @@
                 @foreach (var part in filteredParts)
                     {
                         var totalOrderQty = part.OrderQty;
-                        
+                        var childRalTotal = part.Rals?.Sum(x => x.OrderQty) ?? 0;
+
                         <div class="part-row parts-grid">
 
                                 <div class="col-name">
@@ -93,7 +94,7 @@
                                 </div>
 
                                 <div class="col-num @(totalOrderQty == 0 ? "num-zero" : "num-value")">
-                                    @totalOrderQty
+                                    @(childRalTotal > 0 ? childRalTotal : totalOrderQty)
                                 </div>
 
                                 <div class="col-num @(part.PlannedQty == 0 ? "num-zero" : "num-value")">
@@ -137,10 +138,10 @@
                                                 @ral.OrderQty
                                             </div>
 
-                                            <div class="col-num"></div>
-                                            <div class="col-num"></div>
-                                            <div class="col-num"></div>
-                                            <div class="col-num"></div>
+                                            <div class="col-num num-zero">0</div>
+                                            <div class="col-num num-zero">0</div>
+                                            <div class="col-num num-zero">0</div>
+                                            <div class="col-num num-zero">0</div>
 
                                         </div>
                                     }
@@ -306,14 +307,14 @@ var orderQtyByPart = (allRals ?? new())
         g => g.Key,
         g => g.Sum(x => x.OrderQty)
     );
-Console.WriteLine("=== ORDERS ===");
 
-foreach (var x in orderQtyByPart)
-{
-    Console.WriteLine(
-        $"PART={x.Key} QTY={x.Value}"
+var orderRalByPart = (allRals ?? new())
+    .Where(x => x.ProductToPartId != null)
+    .GroupBy(x => x.ProductToPartId!.Value)
+    .ToDictionary(
+        g => g.Key,
+        g => g.ToList()
     );
-}
 
 var draftByPart = (draftItems ?? new())
     .Where(x => x.ProductToPartId != null)
@@ -356,8 +357,10 @@ var mappedParts = new List<PartItem>();
                         ProductName = p.ProductName,
                         VersionName = p.VersionName ?? "",
                         VersionIsActive = p.VersionIsActive,
-                        OrderQty =
-                            orderQtyByPart.TryGetValue(r.ProductToPartId, out var oq)
+                        OrderQty = orderQtyByPart.TryGetValue(
+                                    r.ProductToPartId,
+                                    out var oq
+                                )
                                 ? oq
                                 : 0,
                                 
@@ -375,7 +378,7 @@ var mappedParts = new List<PartItem>();
                                 ? d.BatchProductId
                                 : null,
 
-                        Rals = ralsByPart.TryGetValue(r.ProductToPartId, out var ralRows)
+                        Rals = orderRalByPart.TryGetValue(r.ProductToPartId, out var ralRows)
                             ? ralRows.Select(x => new PartRalItem
                             {
                                 RalCode = x.RalCode,

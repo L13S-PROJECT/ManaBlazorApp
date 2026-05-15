@@ -16,6 +16,26 @@ public class OrderDraftService
 
     public async Task<int> CreateDraft(CreateOrderDraftDto dto)
 {
+    var orderNumber = dto.Header.OrderNumber.Trim();
+
+    var existsInDrafts = await _db.OrderDrafts
+        .AnyAsync(x => x.OrderNumber.Trim() == orderNumber);
+
+    if (existsInDrafts)
+    {
+        throw new Exception(
+            $"Pasūtījums ar numuru '{orderNumber}' jau eksistē melnrakstos.");
+    }
+
+    var existsInOrders = await _db.Orders
+        .AnyAsync(x => x.OrderNumber.Trim() == orderNumber);
+
+    if (existsInOrders)
+    {
+        throw new Exception(
+            $"Pasūtījums ar numuru '{orderNumber}' jau ir saglabāts.");
+    }
+
     var draft = new OrderDraft
     {
         CreatedAt = DateTime.UtcNow,
@@ -73,11 +93,11 @@ public class OrderDraftService
     return draft.Id;
 }
 
-public async Task<OrderDraft?> GetLatestDraft()
+public async Task<List<OrderDraft>> GetDrafts()
 {
     return await _db.OrderDrafts
         .OrderByDescending(x => x.Id)
-        .FirstOrDefaultAsync();
+        .ToListAsync();
 }
 
 public async Task<List<OrderDraftItem>> GetDraftItems(int draftId)
@@ -95,17 +115,48 @@ public async Task SaveCustomerMap(
 
         if (draftItem is null)
             return;
+    
+    bool duplicateExists;
+
+            if (dto.IsProduct)
+            {
+                duplicateExists = await _db.CustomerCodeMaps
+                    .AnyAsync(x =>
+                        x.Id != draftItem.CustomerCodeMapId &&
+                        x.VersionId == dto.VersionId &&
+                        x.RalColorId == dto.RalColorId &&
+                        x.IsProduct);
+            }
+            else
+            {
+                duplicateExists = await _db.CustomerCodeMaps
+                    .AnyAsync(x =>
+                        x.Id != draftItem.CustomerCodeMapId &&
+                        x.VersionId == dto.VersionId &&
+                        x.ProductToPartId == dto.ProductToPartId &&
+                        x.RalColorId == dto.RalColorId &&
+                        x.IsPart);
+            }
+
+            if (duplicateExists)
+            {
+                throw new Exception(
+                    "Šādai konfigurācijai klienta kods jau eksistē.");
+            }
+
     var existing = await _db.CustomerCodeMaps
         .FirstOrDefaultAsync(x =>
             x.CustomerName == dto.CustomerName &&
             x.CustomerCode == dto.CustomerCode);
 
     if (existing is null)
-    {
-        existing = new CustomerCodeMap();
+            {
+                existing = new CustomerCodeMap();
 
-        _db.CustomerCodeMaps.Add(existing);
-    }
+                _db.CustomerCodeMaps.Add(existing);
+
+                await _db.SaveChangesAsync();
+            }
 
     existing.CustomerName = dto.CustomerName;
     existing.CustomerCode = dto.CustomerCode;
@@ -198,19 +249,29 @@ public async Task<List<OrderDraftItemDto>> GetDraftItemDtos(int draftId)
     return result;
 }
 
-public async Task DeleteDraft()
+public async Task DeleteDraft(int draftId)
 {
     var items = await _db.OrderDraftItems
+        .Where(x => x.OrderDraftId == draftId)
         .ToListAsync();
 
     _db.OrderDraftItems.RemoveRange(items);
 
-    var drafts = await _db.OrderDrafts
-        .ToListAsync();
+    var draft = await _db.OrderDrafts
+        .FirstOrDefaultAsync(x => x.Id == draftId);
 
-    _db.OrderDrafts.RemoveRange(drafts);
+    if (draft is not null)
+    {
+        _db.OrderDrafts.Remove(draft);
+    }
 
     await _db.SaveChangesAsync();
+}
+
+public async Task<OrderDraft?> GetDraftById(int draftId)
+{
+    return await _db.OrderDrafts
+        .FirstOrDefaultAsync(x => x.Id == draftId);
 }
 
 }

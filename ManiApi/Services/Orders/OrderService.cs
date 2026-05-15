@@ -122,7 +122,12 @@ foreach (var item in draftItems)
         Name = item.Name,
         Quantity = item.Quantity,
 
-        CustomerCodeMapId = item.CustomerCodeMapId,
+        CustomerCodeMapId =
+            await _db.CustomerCodeMaps
+                .AnyAsync(x => x.Id == item.CustomerCodeMapId)
+                    ? item.CustomerCodeMapId
+                    : null,
+        VersionId = item.VersionId,
 
         IsActive = true
     });
@@ -246,7 +251,7 @@ public async Task<List<object>> GetOrderItems(
         from map in mapJoin.DefaultIfEmpty()
 
         join version in _db.ProductVersions
-            on map.VersionId equals version.Id into versionJoin
+            on oi.VersionId equals version.Id into versionJoin
 
         from version in versionJoin.DefaultIfEmpty()
 
