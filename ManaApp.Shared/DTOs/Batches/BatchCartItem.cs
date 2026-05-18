@@ -1,6 +1,6 @@
-namespace ManaApp.Shared
-{
-    public class BatchCartItem
+namespace ManaApp.Shared.DTOs.Batches;
+
+public class BatchCartItem
     {
         public int ProductId { get; set; }
         public int VersionId { get; set; }
@@ -12,6 +12,7 @@ namespace ManaApp.Shared
         public int? ProductToPartId { get; set; }
         public int? ParentCategoryId { get; set; }
         public bool IsExpanded { get; set; } = true;
+        public bool IsArchivedVersion { get; set; }
         public BatchCartItem Clone() => new()
             {
                 ProductId = ProductId,
@@ -25,7 +26,7 @@ namespace ManaApp.Shared
 
                 // 👇 SVARĪGI
                 ProductToPartId = ProductToPartId,
-                IsExpanded = IsExpanded
+                IsExpanded = IsExpanded,
+                IsArchivedVersion = IsArchivedVersion
             };
     }
-}

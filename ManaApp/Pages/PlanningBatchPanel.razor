@@ -4,6 +4,7 @@
 @using ManaApp.Components
 @using ManaApp.Models
 @using ManaApp.Shared.DTOs.Planning
+@using ManaApp.Shared.DTOs.Batches
 @using ManaApp.Pages
 
 <div class="planning-batch-panel">
@@ -96,7 +97,7 @@
                                     Code = info.Code,
                                     Qty = 0,
                                     ProductToPartId = null,
-                                    IsExpanded = true
+                                    IsArchivedVersion = firstChild.IsArchivedVersion
                                 };
                             }
                     
@@ -118,17 +119,21 @@
                     <div class="col-nr">@($"{pair.index}.")</div>
 
                     <div class="col-name" style="display:flex; align-items:center; gap:6px;">
-                        @if (children.Any())
-                        {
-                            <button type="button"
-                                    class="icon-btn"
-                                    title="Atvērt / aizvērt detaļas"
-                                    @onclick="() => ToggleExpand(parent)">
-                                @(parent.IsExpanded ? "▼" : "▶")
-                            </button>
-                        }
-
-                        <span>@parent.Name</span>
+                    
+                        <span>
+                                @parent.Name
+                                
+                                @if (parent.IsArchivedVersion)
+                                {
+                                    <span style="
+                                        font-size:10px;
+                                        color:#6b7280;
+                                        margin-left:4px;
+                                        font-weight:500;">
+                                        [ARHĪVĒTS]
+                                    </span>
+                                }
+                            </span>
                     </div>
 
                     <div class="col-code">@parent.Code</div>
@@ -146,7 +151,7 @@
                     </div>
                 </div>
 
-                @if (parent.IsExpanded && children.Any())
+                @if (children.Any())
                 {
                     @foreach (var child in children)
                     {
@@ -200,7 +205,7 @@
                                 Code = info.Code,
                                 Qty = 0,
                                 ProductToPartId = null,
-                                IsExpanded = true
+                                IsArchivedVersion = firstChild.IsArchivedVersion
                             };
                         }
 
@@ -222,17 +227,21 @@
                     <div class="col-nr">@($"{pair.index}.")</div>
 
                     <div class="col-name" style="display:flex; align-items:center; gap:6px;">
-                        @if (children.Any())
-                        {
-                            <button type="button"
-                                    class="icon-btn"
-                                    title="Atvērt / aizvērt detaļas"
-                                    @onclick="() => ToggleExpand(parent)">
-                                @(parent.IsExpanded ? "▼" : "▶")
-                            </button>
-                        }
+                        
+                        <span>
+                            @parent.Name
 
-                        <span>@parent.Name</span>
+                            @if (parent.IsArchivedVersion)
+                            {
+                                <span style="
+                                    font-size:10px;
+                                    color:#6b7280;
+                                    margin-left:4px;
+                                    font-weight:500;">
+                                    [ARHĪVĒTS]
+                                </span>
+                            }
+                        </span>
                     </div>
 
                     <div class="col-code">@parent.Code</div>
@@ -250,7 +259,7 @@
                     </div>
                 </div>
 
-                @if (parent.IsExpanded && children.Any())
+                @if (children.Any())
                 {
                     @foreach (var child in children)
                     {
@@ -320,7 +329,7 @@ private string? createPlanError;
 private int editQty;
 private string? editComment;
 
-public void StartEdit(ManaApp.Shared.BatchCartItem item)
+public void StartEdit(BatchCartItem item)
 {
     editQty = item.Qty;
     editComment = item.Comment;
@@ -333,7 +342,7 @@ private string DraftTitle =>
         : $"Melnraksts no {DateTime.Now:dd.MM.yyyy}";
 
 
-private async Task OnEditSaved(ProductionTasks.BatchLine line)
+private async Task OnEditSaved(BatchLine line)
 {
     // 1️⃣ atrodam rindu panelī
     var item = Items.FirstOrDefault(x => x.VersionId == line.VersionId);
@@ -366,7 +375,7 @@ private async Task OnEditSaved(ProductionTasks.BatchLine line)
 }
 
 
-private ProductionTasks.BatchLine? editLine;
+private BatchLine? editLine;
 
 private BatchCartModel Model = new();
 
@@ -375,7 +384,7 @@ public class BatchCartModel
     public int? BatchId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Comment { get; set; }
-    public List<ManaApp.Shared.BatchCartItem> Items { get; set; } = new();
+    public List<BatchCartItem> Items { get; set; } = new();
 }
 
 private async Task<bool> SaveDraftAsync()
@@ -421,9 +430,9 @@ var resp = await Http.PostAsJsonAsync(url, Model);
 }
 
 private int? editingIndex = null;
-private ManaApp.Shared.BatchCartItem itemDraft = new();
+private BatchCartItem itemDraft = new();
 
-private void AddItem(ManaApp.Shared.BatchCartItem item)
+private void AddItem(BatchCartItem item)
 {
     // dublikātu aizliegums (pēc VersionId vai ProductId)
     var dupe = Model.Items.Any(x =>
@@ -806,11 +815,6 @@ private BatchCartItem? GetParentItem(IGrouping<int, BatchCartItem> group) =>
 
 private IEnumerable<BatchCartItem> GetChildItems(IGrouping<int, BatchCartItem> group) =>
     group.Where(x => x.ProductToPartId != null);
-
-private void ToggleExpand(BatchCartItem item)
-{
-    item.IsExpanded = !item.IsExpanded;
-}
 
 private Dictionary<int, (string Name, string Code)> _productCache = new();
 

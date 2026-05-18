@@ -99,6 +99,24 @@
     height: 24px;
 
     border-bottom: 1px solid #e5e7eb;
+
+    background: #f1f5f9;          /* viegli pelēks */
+    font-weight: 600;             /* BOLD tikai parent rindām */
+
+    transition: background 0.15s ease;
+}
+
+.batch-row:hover {
+    background: #dbe4ee;          /* tumšāks hover */
+}
+
+.child-row {
+    background: transparent !important;
+    font-weight: 400;
+}
+
+.child-row:hover {
+    background: #eef2f7 !important;
 }
 
 .batch-row div {

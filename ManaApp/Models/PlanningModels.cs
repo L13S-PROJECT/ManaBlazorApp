@@ -16,6 +16,7 @@ public sealed class ProductRow
     public string versionDate { get; set; } = "";
    public int? VersionId { get; set; }
     public bool IsActive { get; set; }
+    public bool IsActiveVersion { get; set; }
     public bool IsRalRow { get; set; }
     public int FinishingStatus { get; set; }
 

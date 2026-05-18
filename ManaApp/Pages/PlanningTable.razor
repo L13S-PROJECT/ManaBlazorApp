@@ -61,7 +61,7 @@
                     <button type="button"
                             class="planned-btn"
                             @onclick:stopPropagation="true"
-                            @onclick="() => OnPlannedPlus(grp)">
+                            @onclick="() => OnPlusClicked(grp)">
                         +
                     </button>
                 </td>
@@ -164,6 +164,9 @@
     public EventCallback<PlanningGroupDto> PlannedPlus { get; set; }
 
     [Parameter]
+    public EventCallback<PlanningGroupDto> EditDraft { get; set; }
+
+    [Parameter]
     public List<int> DraftVersionIds { get; set; } = new();
     private async Task OnPlannedPlus(PlanningGroupDto row)
     {
@@ -187,6 +190,19 @@ private bool IsInDraft(PlanningGroupDto grp)
         return false;
 
     return DraftVersionIds.Contains(v);
+}
+
+private async Task OnPlusClicked(PlanningGroupDto row)
+{
+    if (IsInDraft(row))
+    {
+        if (EditDraft.HasDelegate)
+            await EditDraft.InvokeAsync(row);
+
+        return;
+    }
+
+    await OnPlannedPlus(row);
 }
 
 }

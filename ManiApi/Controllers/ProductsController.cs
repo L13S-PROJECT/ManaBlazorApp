@@ -1157,7 +1157,7 @@ JOIN products p      ON p.ID = v.Product_ID AND p.IsActive = 1
 JOIN categories c    ON c.ID = p.Category_ID AND c.IsActive = 1
 LEFT JOIN categories pc ON pc.ID = c.Parent_ID AND pc.IsActive = 1
 WHERE
-    v.IsActive = 1
+    p.IsActive = 1
     
 ORDER BY RootName, CategoryName, ProductName, VersionDate DESC;
 ";
@@ -1307,7 +1307,7 @@ WHERE
     pt.Version_ID = @versionId
     AND tp.Stage = 1
     AND pt.IsActive = 1
-    
+
 ORDER BY tp.TopPart_Name;
 ";
 

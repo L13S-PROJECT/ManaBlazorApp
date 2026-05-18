@@ -121,7 +121,7 @@ public async Task<IActionResult> GetByVersion(int versionId)
                 select (int?)oi.Quantity
             ).Sum() ?? 0,
 
-    ProductOrderQty =
+ProductOrderQty =
 
 (
     from oi in _db.OrderItems
@@ -133,47 +133,14 @@ public async Task<IActionResult> GetByVersion(int versionId)
         oi.IsActive &&
         map.VersionId == ptp.VersionId &&
         map.ProductToPartId == null
-
-    select (int?)oi.Quantity
-).Sum() > 0
-
-?
-
-(
-    from oi in _db.OrderItems
-
-    join map in _db.CustomerCodeMaps
-        on oi.CustomerCodeMapId equals map.Id
-
-    where
-        oi.IsActive &&
-        map.VersionId == ptp.VersionId &&
-        map.ProductToPartId == null
-
-    select (int?)oi.Quantity
-).Sum() ?? 0
-
-:
-
-(
-    from oi in _db.OrderItems
-
-    join map in _db.CustomerCodeMaps
-        on oi.CustomerCodeMapId equals map.Id
-
-    where
-        oi.IsActive &&
-        map.VersionId == ptp.VersionId &&
-        map.ProductToPartId != null
 
     select (int?)oi.Quantity
 ).Sum() ?? 0,
+
 })
     .OrderBy(x => x.TopPart_Name)
     .ToListAsync();
 
-    foreach (var row in rows)
-{
     var productRalRows = await (
     from oi in _db.OrderItems
 
@@ -189,43 +156,24 @@ public async Task<IActionResult> GetByVersion(int versionId)
         map.ProductToPartId == null &&
         map.RalColorId != null
 
-    group oi by ral.Name into g
+    group oi by new
+            {
+                ral.Name
+            }
+            into g
 
-    select new RalRowDto
-    {
-        RalCode = g.Key,
-        Qty = g.Sum(x => x.Quantity)
-    }
+            select new RalRowDto
+            {
+                RalCode = g.Key.Name,
+                RalName = g.Key.Name,
+                Qty = g.Sum(x => x.Quantity)
+            }
+
 ).ToListAsync();
 
-row.ProductRalRows = productRalRows.Any()
-
-    ? productRalRows
-
-    : await (
-        from oi in _db.OrderItems
-
-        join map in _db.CustomerCodeMaps
-            on oi.CustomerCodeMapId equals map.Id
-
-        join ral in _db.RalColors
-            on map.RalColorId equals ral.ID
-
-        where
-            oi.IsActive &&
-            map.VersionId == versionId &&
-            map.ProductToPartId != null &&
-            map.RalColorId != null
-
-        group oi by ral.Name into g
-
-        select new RalRowDto
-        {
-            RalCode = g.Key,
-            Qty = g.Sum(x => x.Quantity)
-        }
-    ).ToListAsync();
-
+    foreach (var row in rows)
+{
+    
     row.PartRalRows = await (
         from oi in _db.OrderItems
 
@@ -248,6 +196,8 @@ row.ProductRalRows = productRalRows.Any()
             Qty = g.Sum(x => x.Quantity)
         }
     ).ToListAsync();
+
+    row.ProductRalRows = productRalRows;
 }
 
     return Ok(rows);

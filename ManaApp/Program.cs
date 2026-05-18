@@ -30,6 +30,7 @@ builder.Services.AddScoped<ManaApp.Services.AppState>();
 builder.Services.AddScoped<GanttChartService>();
 builder.Services.AddScoped<PlanningLookupService>();
 builder.Services.AddScoped<PlanningDataService>();
+builder.Services.AddScoped<PlanningDraftService>();
 
 
 var culture = new System.Globalization.CultureInfo("lv-LV");

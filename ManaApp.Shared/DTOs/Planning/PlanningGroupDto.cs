@@ -24,6 +24,8 @@ public sealed class PlanningGroupDto
 
     public List<ProductRowDto> Versions { get; set; } = new();
     public bool IsExpanded { get; set; }
+
+    
 }
 
 public sealed class ProductRowDto

@@ -1,6 +1,7 @@
 @using ManaApp.Shared
 @using ManaApp.Components
 @using ManaApp.Models
+@using ManaApp.Shared.DTOs.Batches
 @inject NavigationManager Nav
 
 
@@ -111,7 +112,7 @@ private string? createPlanError;
 private int editQty;
 private string? editComment;
 
-public void StartEdit(ManaApp.Shared.BatchCartItem item)
+public void StartEdit(BatchCartItem item)
 {
     editQty = item.Qty;
     editComment = item.Comment;
@@ -124,14 +125,14 @@ private string DraftTitle =>
         : $"Melnraksts no {DateTime.Now:dd.MM.yyyy}";
 
 
-private void OnEditSaved(ProductionTasks.BatchLine line)
+private void OnEditSaved(BatchLine line)
 {
     // te vēlāk ieliksim precīzu piesaisti pie Items
     isEditOpen = false;
     StateHasChanged();
 }
 
-private ProductionTasks.BatchLine? editLine;
+private BatchLine? editLine;
 
 private BatchCartModel Model = new();
 
@@ -140,7 +141,7 @@ public class BatchCartModel
     public int? BatchId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Comment { get; set; }
-    public List<ManaApp.Shared.BatchCartItem> Items { get; set; } = new();
+    public List<BatchCartItem> Items { get; set; } = new();
 }
 
 private async Task<bool> SaveDraftAsync()
@@ -186,9 +187,9 @@ var resp = await Http.PostAsJsonAsync(url, Model);
 }
 
 private int? editingIndex = null;
-private ManaApp.Shared.BatchCartItem itemDraft = new();
+private BatchCartItem itemDraft = new();
 
-private void AddItem(ManaApp.Shared.BatchCartItem item)
+private void AddItem(BatchCartItem item)
 {
     // dublikātu aizliegums (pēc VersionId vai ProductId)
     var dupe = Model.Items.Any(x =>
@@ -281,7 +282,7 @@ private int editIndex = -1;
 private void OpenEdit(BatchCartItem it)
 {
     // izveidojam rindu dialogam
-    editLine = new ProductionTasks.BatchLine
+    editLine = new BatchLine
     {
         BatchCode = it.Code,      // ja nav īstā lauka, nav kritiski – tikai virsrakstam
         Planned   = it.Qty,

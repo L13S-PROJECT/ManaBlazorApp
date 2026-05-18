@@ -26,47 +26,6 @@
     padding: 10px;
 }
 
-.part-group-header,
-.part-row {
-    display: grid;
-    grid-template-columns: 2.2fr 1fr 44px repeat(5, 0.8fr);
-    align-items: center;
-}
-
-.part-group-header {
-    display: grid;
-    grid-template-columns: 2.2fr 1fr 44px repeat(5, 0.8fr);
-    font-weight: 600;
-    padding: 4px 8px;   /* bija lielāks */
-    font-size: 13px;    /* mazāks teksts */
-    white-space: nowrap;
-    align-items: center;
-    position: sticky;
-    top: 0;
-    z-index: 5;
-
-    background: #a4bff4;
-    color: #fff;
-
-    border-bottom: 1px solid #1E4FCC;
-    min-height: 24px;
-}
-
-.part-row {
-    background: #ffffff;
-    display: grid;
-    grid-template-columns: 2.2fr 1fr 44px repeat(5, 0.8fr);
-    padding: 0px 5px;
-    border-bottom: 1px solid #eee;
-    white-space: nowrap;
-    align-items: center;
-    min-height: 18px;
-    background: #ffffff;
-
-    border-bottom: 1px solid #E5E7EB;
-
-    transition: background 0.15s ease;
-}
 
 /* visi cipari centrā (izņemot 1. un 2. kolonu) */
 .part-row > div:not(:nth-child(1)):not(:nth-child(2)) {
@@ -95,6 +54,15 @@
 .col-index {
     text-align: center;
     color: #666;
+}
+
+.part-group-header {
+    background: #D9F0FF;
+
+    border-top: 1px solid #B7D7F5;
+    border-bottom: 1px solid #B7D7F5;
+
+    font-weight: 600;
 }
 
 .part-group-header > div {
@@ -142,6 +110,8 @@
 
     background: #ffffff;
     border-bottom: 1px solid #D6E0F5;
+
+    padding-right: 17px;
 }
 
 
@@ -186,11 +156,11 @@
     width: 22px;
     height: 22px;
 
-    border: 1px solid #1E3A8A;
+    border: 1px solid #1E40AF;
     border-radius: 4px;
 
-    background: #C2EAF9;
-    color: #1E3A8A;
+    background: #ffffff;
+    color: #1E40AF;
 
     font-weight: 700;
     cursor: pointer;
@@ -216,18 +186,39 @@
 
 .parts-grid {
     display: grid;
+
     grid-template-columns:
-        minmax(220px, 2fr)
-        minmax(120px, 1fr)
-        42px
-        repeat(5, minmax(70px, 0.7fr));
+        minmax(220px, 2.4fr)   /* nosaukums */
+        70px                   /* versija */
+        50px                   /* plus */
+        repeat(6, 78px);       /* ciparu kolonnas */
 
     align-items: center;
-    width: 100%;
+    width: max-content;
+    min-width: 100%;
 }
 
 .part-add-active {
-    background: #111;
-    color: white;
-    border-color: #111;
+    background: #2563EB;
+    color: #ffffff;
+    border-color: #1D4ED8;
+}
+
+.ral-child-row {
+    background: #F5F7FA;
+}
+
+.ral-child-row .col-name,
+.ral-child-row .col-num {
+    color: #7B8794;
+    font-size: 11px;
+}
+
+.ral-child-name {
+    padding-left: 18px;
+}
+
+.ral-dot {
+    color: #9AA5B1;
+    margin-right: 4px;
 }

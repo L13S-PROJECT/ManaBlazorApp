@@ -885,8 +885,13 @@ SELECT
     NULL,
     1
 FROM batches_products bp
+
 JOIN producttopparts ptp
-     ON ptp.IsActive = 1
+     ON (
+        (bp.ProductToPart_ID IS NULL AND ptp.IsActive = 1)
+        OR
+        (bp.ProductToPart_ID IS NOT NULL)
+     )
     AND (
         (bp.ProductToPart_ID IS NULL AND ptp.Version_ID = bp.Version_Id)
         OR
@@ -1247,10 +1252,20 @@ LIMIT 1;
     await using (var cmd = conn.CreateCommand())
     {
         cmd.CommandText = @"
-SELECT Version_Id, Planned_Qty, BatchProduct_Comments, ProductToPart_ID
-FROM batches_products
-WHERE Batch_Id = @bid
-  AND IsActive = 1;
+SELECT 
+    bp.Version_Id,
+    bp.Planned_Qty,
+    bp.BatchProduct_Comments,
+    bp.ProductToPart_ID,
+    v.IsActive AS VersionIsActive
+
+FROM batches_products bp
+
+JOIN versions v
+    ON v.ID = bp.Version_Id
+
+WHERE bp.Batch_Id = @bid
+  AND bp.IsActive = 1;
 ";
         var p = cmd.CreateParameter();
         p.ParameterName = "@bid";
@@ -1261,12 +1276,19 @@ WHERE Batch_Id = @bid
         while (await reader.ReadAsync())
         {
             items.Add(new
-            {
-                VersionId = reader.GetInt32(0),
-                Qty       = reader.GetInt32(1),
-                Comment   = reader.IsDBNull(2) ? null : reader.GetString(2),
-                ProductToPartId = reader.IsDBNull(3) ? (int?)null : reader.GetInt32(3)
-            });
+                {
+                    VersionId = reader.GetInt32(0),
+                    Qty = reader.GetInt32(1),
+                    Comment = reader.IsDBNull(2)
+                        ? null
+                        : reader.GetString(2),
+
+                    ProductToPartId = reader.IsDBNull(3)
+                        ? (int?)null
+                        : reader.GetInt32(3),
+
+                    VersionIsActive = reader.GetBoolean(4)
+                });
         }
     }
 
@@ -2339,7 +2361,9 @@ SELECT
     bp.ID,
     bp.Version_Id,
     bp.ProductToPart_ID,
+    bp.ParentBatchProduct_ID,
     bp.Planned_Qty
+
 FROM batches_products bp
 JOIN batches b
     ON b.ID = bp.Batch_Id
@@ -2355,15 +2379,21 @@ WHERE b.Batches_Statuss = 4
     while (await r.ReadAsync())
     {
         list.Add(new
-        {
-            BatchProductId = r.GetInt32(0),
-            VersionId = r.GetInt32(1),
-            ProductToPartId = r.IsDBNull(2)
-                ? (int?)null
-                : r.GetInt32(2),
+            {
+                BatchProductId = r.GetInt32(0),
 
-            PlannedQty = r.GetInt32(3)
-        });
+                VersionId = r.GetInt32(1),
+
+                ProductToPartId = r.IsDBNull(2)
+                    ? (int?)null
+                    : r.GetInt32(2),
+
+                ParentBatchProductId = r.IsDBNull(3)
+                    ? (int?)null
+                    : r.GetInt32(3),
+
+                PlannedQty = r.GetInt32(4)
+            });
     }
 
     return Ok(list);

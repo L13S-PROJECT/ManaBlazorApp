@@ -20,6 +20,7 @@
             @bind-InProductionOnly="inProductionOnly"
             @bind-OkOnly="okOnly"
             @bind-ReservedOnly="reservedOnly"
+            @bind-OrderedOnly="orderedOnly"
             @bind-FreeOnly="freeOnly"/>
         @foreach (
                 
@@ -46,6 +47,7 @@
                         && (!inProductionOnly || p.InProduction > 0)
                         && (!okOnly || p.OkQty > 0)
                         && (!reservedOnly || p.ReservedQty > 0)
+                        && (!orderedOnly || p.OrderQty > 0)
                         && (!freeOnly || p.FreeQty > 0)
                     )
                     .ToList();
@@ -86,15 +88,14 @@
                                 <div class="col-plus">
                                     <button
                                         type="button"
-                                        disabled="@part.IsInDraft"
                                         class="part-add-btn @(part.IsInDraft ? "part-add-active" : "")"
                                         @onclick="() => OpenPartPlanning(part)">
                                         +
                                     </button>
                                 </div>
 
-                                <div class="col-num @(totalOrderQty == 0 ? "num-zero" : "num-value")">
-                                    @(childRalTotal > 0 ? childRalTotal : totalOrderQty)
+                                <div class="col-num @(part.OrderQty == 0 ? "num-zero" : "num-value")">
+                                    @part.OrderQty
                                 </div>
 
                                 <div class="col-num @(part.PlannedQty == 0 ? "num-zero" : "num-value")">
@@ -171,6 +172,7 @@ private bool plannedOnly;
 private bool inProductionOnly;
 private bool okOnly;
 private bool reservedOnly;
+private bool orderedOnly;
 private bool freeOnly;
 
 private bool _showArchived;
@@ -242,9 +244,6 @@ protected override async Task OnInitializedAsync()
 
 private async Task LoadData()
 {
-    groupedData.Clear();
-
-
     _isLoading = true;
 
     var url = showArchived
@@ -324,6 +323,14 @@ var draftByPart = (draftItems ?? new())
     );
     
 var productList = (products ?? new()).ToList();
+
+if (!showArchived)
+{
+    productList = productList
+        .Where(x => x.VersionIsActive)
+        .ToList();
+}
+
 var mappedParts = new List<PartItem>();
         // 4. būvējam UI datus
         groupedData = productList.Select(p =>
@@ -400,9 +407,6 @@ StateHasChanged();
 
 private async Task OpenPartPlanning(PartItem part)
 {
-    if (part.IsInDraft)
-        return;
-
     if (PlannedPlus.HasDelegate)
         await PlannedPlus.InvokeAsync(part);
 }

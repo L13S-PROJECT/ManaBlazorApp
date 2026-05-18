@@ -22,6 +22,10 @@
 
         <div class="col-plus"></div>
 
+        <div class="col-num">
+    <label><input type="checkbox" checked="@OrderedOnly" @onchange="e => OrderedOnlyChanged.InvokeAsync((bool)e.Value!)" /> Pasūtīts</label>
+</div>
+
             <div class="col-num">
     <label><input type="checkbox" checked="@PlannedOnly" @onchange="e => PlannedOnlyChanged.InvokeAsync((bool)e.Value!)" /> Plānots</label>
 </div>
@@ -64,6 +68,9 @@
 
 [Parameter] public bool ReservedOnly { get; set; }
 [Parameter] public EventCallback<bool> ReservedOnlyChanged { get; set; }
+
+[Parameter] public bool OrderedOnly { get; set; }
+[Parameter] public EventCallback<bool> OrderedOnlyChanged { get; set; }
 
 [Parameter] public bool FreeOnly { get; set; }
 [Parameter] public EventCallback<bool> FreeOnlyChanged { get; set; }

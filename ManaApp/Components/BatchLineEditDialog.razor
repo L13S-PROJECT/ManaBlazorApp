@@ -26,20 +26,7 @@ else
 @if (_parts.Any())
 {
     
-    var productQty = _parts.FirstOrDefault()?.ProductOrderQty ?? 0;
-
-    var productRals = _parts
-    .FirstOrDefault()?
-    .ProductRalRows?
-    .OrderBy(x => x.RalCode)
-    .Select(x => new
-    {
-        Ral = x.RalCode,
-        Qty = x.Qty
-    })
-    .ToList()
-
-    ?? new();
+    var productQty = ProductOrderQty;
 
     <div class="dialog-card">
 
@@ -58,14 +45,14 @@ else
                 </span>
             </div>
 
-            @foreach (var r in productRals)
-            {
-                <div class="ral-row">
+            @foreach (var r in ProductRalRows)
+                    {
+                        <div class="ral-row">
 
-                    <span>• @r.Ral</span>
-                    <span>@r.Qty gab.</span>
-                </div>
-            }
+                            <span>• @r.RalCode</span>
+                            <span>@r.OrderQty gab.</span>
+                        </div>
+                    }
         </div>
 
         <div class="parts-title">
@@ -181,14 +168,16 @@ else
     [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
 
     // Rinda, ko labo (no ProductionTasks BatchLine)
-    [Parameter] public ProductionTasks.BatchLine? Line { get; set; }
+    [Parameter] public BatchLine? Line { get; set; }
     [Parameter] public List<ProductToPartDto>? Parts { get; set; }
     private List<ProductToPartDto> _parts = new();
     [Parameter] public string? ProductName { get; set; }
+    [Parameter] public int ProductOrderQty { get; set; }
+    [Parameter] public List<ProductRowDto> ProductRalRows { get; set; } = new();
     [Parameter] public bool IsArchivedVersion { get; set; }
 
     // Notikums, kad saglabāts
-    [Parameter] public EventCallback<ProductionTasks.BatchLine> OnSaved { get; set; }
+    [Parameter] public EventCallback<BatchLine> OnSaved { get; set; }
 
     // Lokālie lauki editēšanai
     private int _planned;
@@ -197,15 +186,15 @@ else
 
     protected override void OnParametersSet()
     {
+        
+
         if (Line is not null)
         {
+            _parts = Parts?.ToList() ?? new();
             _planned = Line.Planned;
-            _comment = Line.Comment;
+            _comment = Line.Comment;         
 
-            // nodrošina ka Parts tiek pārzīmēts edit režīmā
-                _parts = Parts?.ToList() ?? new();
-
-            // Loģika:
+           // Loģika:
             // - ja statuss = 5 (VISIS) → var mainīt qty
             // - citādi qty nedrīkst mainīt, ja ir StartedAt
             if (Line.BatchStatus == 5)
@@ -274,7 +263,7 @@ private async Task SaveClicked()
     }
 Console.WriteLine($"Selected parts count: {(_parts).Count(x => x.IsSelected)}");
     
-    var updated = new ProductionTasks.BatchLine
+    var updated = new BatchLine
     {
         BatchId        = Line.BatchId,
         BatchCode      = Line.BatchCode,

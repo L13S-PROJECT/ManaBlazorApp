@@ -49,22 +49,17 @@
 
 .filters-wrapper {
     display: grid;
-    grid-template-columns:
-        minmax(220px, 2fr)
-        minmax(120px, 1fr)
-        42px
-        repeat(5, minmax(70px, 0.7fr));
-
     align-items: center;
     width: 100%;
 }
 
 .filters-wrapper .col-num label {
-    width: 100%;
-    display: flex;
+    display: inline-flex;
     justify-content: center;
     align-items: center;
     gap: 4px;
+
+    white-space: nowrap;
 }
 
 /* search */
@@ -83,10 +78,13 @@
 }
 
 .archived-switch{
-    position:relative;
-    display:inline-block;
-    width:48px;   /* mazliet platāks */
-    height:24px;
+    position: relative;
+    display: inline-block;
+
+    width: 42px;
+    height: 24px;
+
+    flex-shrink: 0;
 }
 
 .archived-switch input{
@@ -124,11 +122,6 @@
 
 .archived-switch input:checked + .slider::before{
     background:#3b82f6;
-    transform:translateX(22px);
-}
-
-
-.archived-switch input:checked + .slider::before{
     transform:translateX(20px);
 }
 
@@ -167,14 +160,17 @@
 
 .parts-grid {
     display: grid;
+
     grid-template-columns:
-        minmax(220px, 2fr)
-        minmax(120px, 1fr)
-        42px
-        repeat(5, minmax(70px, 0.7fr));
+        minmax(220px, 2.4fr)
+        70px
+        50px
+        repeat(6, 78px);
 
     align-items: center;
-    width: 100%;
+
+    width: max-content;
+    min-width: 100%;
 }
 
 .archived-col {

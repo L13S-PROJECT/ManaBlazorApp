@@ -6,6 +6,7 @@
 @using System.Linq
 @using System.Text.Json.Serialization
 @using Syncfusion.Blazor.Grids
+@inject PlanningDraftService PlanningDraftService
 @inject IJSRuntime JS
 @using ManaApp.Shared
 @using ManaApp.Components.Parts
@@ -46,14 +47,15 @@
     <PlanningTable
         Groups="@FilteredRows"
         PlannedPlus="@(async (row) => await OnPlannedPlus(row))"
-        DraftVersionIds="batchItems.Select(x => x.VersionId).ToList()" />
+        EditDraft="@(async (row) => await OpenDraftEdit(row))"
+        DraftVersionIds="DraftVersionIds" />
 }
 else
 {
     <PlanningPartsPanel
-    SelectedRoot="@(selectedView == ProductViewType.Kauss ? 1 : 2)"
-    PlannedPlus="OnPartPlannedPlus"
-    SearchText="@searchText" />
+        SelectedRoot="@(selectedView == ProductViewType.Kauss ? 1 : 2)"
+        PlannedPlus="OnPartPlusClicked"
+        SearchText="@searchText" />
 }
 
            @if (selected is not null && Summary is not null)
@@ -121,8 +123,10 @@ else
 
 <BatchLineEditDialog
     @bind-IsOpen="isAddOpen"
+    ProductRalRows="addProductRalRows"
     Line="addLine"
     Parts="addParts"
+    ProductOrderQty="@addProductOrderQty"
     IsAddMode="true"
     IsArchivedVersion="isPartOnlyMode"
     IsPartOnlyMode="isPartOnlyMode"
@@ -134,6 +138,7 @@ else
     IsOpenChanged="v => isEditOpen = v"
     IsPartOnlyMode="isEditPartOnlyMode"
     IsArchivedVersion="isPartOnlyMode"
+    ProductRalRows="addProductRalRows"
     Line="editLine"
     Parts="editParts"
     ProductName="@editProductName"
@@ -185,21 +190,24 @@ private List<SalesAllocateDialog.BatchRow> sellBatches = new();
 private List<ProductToPartDto> editParts = new();  
 private string? addProductName;
 private string? editProductName;
+private int addProductOrderQty;
 private int? selectedPartsRoot = null;
 private List<ProductToPartDto> addParts = new();
+private List<ProductRowDto> addProductRalRows = new();
 private bool isPartOnlyMode;
 private bool isEditPartOnlyMode;
 // EDIT dialoga stāvoklis
 private bool isEditOpen = false;
+private bool addIsArchivedVersion;
 
 // rinda, ko labo
-private ProductionTasks.BatchLine? editLine;
+private BatchLine? editLine;
 
 private string planningView = "products";
 
 // nosaukums edit dialogam
 
-private async Task OnEditSaved(ProductionTasks.BatchLine line)
+private async Task OnEditSaved(BatchLine line)
 {
     if (line is null)
     return;
@@ -263,12 +271,12 @@ if (ShouldDeleteLine(line, selectedParts))
     }
 }
 
-private bool ShouldDeleteLine(ProductionTasks.BatchLine line, List<ProductToPartDto> selectedParts)
+private bool ShouldDeleteLine(BatchLine line, List<ProductToPartDto> selectedParts)
 {
     return !selectedParts.Any() && line.Planned <= 0;
 }
 
-private async Task HandleDeleteLine(ProductionTasks.BatchLine line)
+private async Task HandleDeleteLine(BatchLine line)
 {
     if (draftBatchId == null)
     {
@@ -288,7 +296,7 @@ private async Task HandleDeleteLine(ProductionTasks.BatchLine line)
 }
 
 private (List<ProductToPartDto> SelectedParts, int? CategoryId, int? ParentCategoryId)
-    BuildEditContext(ProductionTasks.BatchLine line)
+    BuildEditContext(BatchLine line)
 {
     var rowData = rows.FirstOrDefault(r => r.VersionId == line.VersionId);
 
@@ -306,7 +314,7 @@ private (List<ProductToPartDto> SelectedParts, int? CategoryId, int? ParentCateg
     return (selectedParts, categoryId, parentCategoryId);
 }
 
-private bool HasEditChanges(ProductionTasks.BatchLine line, BatchCartItem? oldItem)
+private bool HasEditChanges(BatchLine line, BatchCartItem? oldItem)
 {
     if (line.Planned != (oldItem?.Qty ?? 0))
         return true;
@@ -358,7 +366,7 @@ private DraftUpdateRequestDto BuildDraftUpdateDto()
 }
 
 private DraftUpdateRequestDto BuildEditDraftUpdateDto(
-    ProductionTasks.BatchLine line,
+    BatchLine line,
     List<ProductToPartDto> selectedParts)
 {
     var dto = new DraftUpdateRequestDto
@@ -686,6 +694,7 @@ groupedRows = rows
                 .Where(x => !x.IsRalRow)
                 .Sum(x => x.FinishingInProgress),
             Versions = g
+                .Where(x => x.VersionIsActive)
                 .OrderByDescending(x => x.VersionId ?? 0)
                 .SelectMany(v =>
                 {
@@ -852,282 +861,99 @@ private PlanningBatchPanel? batchPanelRef;
 
 private async Task OnPlannedPlus(PlanningGroupDto row)
 {
-    var version = row.Versions?
-    .FirstOrDefault(v => IsLatestVersion(v));
+    var result = await PlanningDraftService.BuildAddDialogAsync(
+        row,
+        batchItems,
+        draftBatchId,
+        versionId => PlanningLookupService.LoadProductParts(versionId),
+        async versionId =>
+        {
+            return await Http.GetFromJsonAsync<ValidateResult>(
+                $"http://localhost:5270/api/batches/validate-for-planning?versionId={versionId}");
+        });
 
-    if (version is null)
-        return;
-    if (batchItems.Any(x => x.VersionId == version.VersionId))
-        return;
-    // ✅ VALIDĀCIJA PIRMS popup
-   var result = await Http.GetFromJsonAsync<ValidateResult>(
-    $"http://localhost:5270/api/batches/validate-for-planning?versionId={version.VersionId}");
-    
-    if (result is null || !result.isValid)
+    if (!result.Success)
     {
-        await JS.InvokeVoidAsync("alert", result?.message ?? "Kļūda validācijā");
+        if (!string.IsNullOrWhiteSpace(result.ErrorMessage))
+        {
+            await JS.InvokeVoidAsync(
+                "alert",
+                result.ErrorMessage
+            );
+        }
+
         return;
     }
-    
-    if (row.Versions == null || row.Versions.Count == 0)
-        return;
 
-    var ver = row.Versions
-        .FirstOrDefault(v => IsLatestVersion(v));
+    addProductName = result.ProductName;
+    addProductOrderQty = row.OrderQty;
+    addProductId = result.ProductId;
+    addIsArchivedVersion =
+        rows.FirstOrDefault(x => x.VersionId == result.ProductId)
+            ?.VersionIsActive == false;
+    addParts = result.Parts;
+    addProductRalRows = result.ProductRalRows;
+    addLine = result.Line;
 
-    if (ver is null)
-        return;
-
-    // ✅ ŠEIT ieliekam pareizo produkta nosaukumu dialogam
-    addProductName = row.ProductName;
-
-    addProductId = ver.VersionId ?? 0;
-    addParts = await PlanningLookupService.LoadProductParts(ver.VersionId!.Value);
-
-            // ⬇️ reset stāvokli katrai atvēršanai
-            foreach (var p in addParts)
-            {
-                p.IsSelected = false;
-                p.Qty = 0;
-            }
-
-    addLine = new ProductionTasks.BatchLine
-    {
-        BatchId     = draftBatchId ?? 0,
-        VersionId   = ver.VersionId!.Value,
-        BatchCode = ver.productCode ?? "",
-        Planned     = 1,
-        Comment     = "",
-        BatchStatus = 5
-    };
+    isPartOnlyMode = result.IsPartOnlyMode;
 
     isAddOpen = true;
 }
 
-private async Task OnAddSaved(ProductionTasks.BatchLine line)
+private async Task OnAddSaved(BatchLine line)
 {
-    ProductContentDto? product = null;
+    if (line is null)
+        return;
 
-if (addProductId.HasValue)
-{
-    product = await Http.GetFromJsonAsync<ProductContentDto>(
-    $"http://localhost:5270/api/products/content?versionId={addProductId.Value}");
-};
+    DraftProductInfo? productInfo = null;
 
-var hasChildren = addParts != null && addParts.Any(p => p.IsSelected && p.Qty > 0);
-
-if (line.Planned <= 0 && !hasChildren)
-    return;
-// neļaujam bērniem ietekmēt parent
-if (line.Planned < 0)
-    line.Planned = 0;
-
-var rowData = rows.FirstOrDefault(r => r.VersionId == line.VersionId);
-
-    // 1) JA NAV draftBatchId -> izveidojam batch (status 4) + ieliekam 1. produktu
-if (!draftBatchId.HasValue || forceNewDraft)
-{
-
-    var selectedParts = line.SelectedParts?
-    .Where(p => p.Qty > 0)
-    .ToList() ?? new List<ProductToPartDto>();
-
-    var items = new List<CreateDraftItemDto>();
-
-// PARENT
-if (line.Planned > 0)
-{
-    items.Add(new CreateDraftItemDto
-    {
-        VersionId = line.VersionId,
-        ProductToPartId = (int?)null,
-        Qty = line.Planned,
-        Comment = line.Comment
-    });
-}
-
-// CHILDREN
-foreach (var part in selectedParts)
-{
-    items.Add(new CreateDraftItemDto
-    {
-        VersionId = line.VersionId,
-        ProductToPartId = part.Id,
-        Qty = part.Qty,
-        Comment = line.Comment
-    });
-}
-    
-
-    var createDto = new CreateDraftRequestDto
-            {
-                BatchId = null,
-                Title = "",
-                Comment = "Melnraksts",
-                Items = items
-            };
-
-    var batchId = await PlanningLookupService.CreateDraftAsync(createDto);
-
-        if (batchId == null)
+        if (addProductId.HasValue)
         {
-            await HandleSaveError();
-            return;
+            var product = await Http.GetFromJsonAsync<ProductContentDto>(
+                $"http://localhost:5270/api/products/content?versionId={addProductId.Value}");
+
+            if (product != null)
+            {
+                productInfo = new DraftProductInfo
+                    {
+                        ProductName = product.ProductName ?? "",
+                        ProductCode = product.ProductCode ?? "",
+                        IsArchivedVersion =
+                            rows.FirstOrDefault(x =>
+                                x.VersionId == addProductId.Value &&
+                                !x.IsRalRow)
+                            ?.VersionIsActive == false
+                    };
+            }
         }
 
-        draftBatchId = batchId.Value;
+    var result = await PlanningDraftService.AddOrUpdateAsync(
+        line: line,
+        currentItems: batchItems,
+        rows: rows,
+        addParts: addParts,
+        draftBatchId: draftBatchId,
+        forceNewDraft: forceNewDraft,
+        productInfo: productInfo
+    );
+
+    if (!result.Success)
+    {
+        await HandleSaveError();
+        return;
+    }
+
+    draftBatchId = result.BatchId;
+
+    batchItems = result.Items;
 
     forceNewDraft = false;
 
-    // 🔥 UI – dzēš tikai parent (child atstājam)
-        batchItems = batchItems
-            .Where(x => !(x.VersionId == line.VersionId && x.ProductToPartId == null))
-            .ToList();
+    isAddOpen = false;
 
-    // parent
-    if (line.Planned > 0)
-    {
-        batchItems.Add(new BatchCartItem
-        {
-            VersionId = line.VersionId,
-            Name = product?.ProductName ?? "",
-            Code = product?.ProductCode ?? line.BatchCode,
-            Qty = line.Planned,
-            Comment = line.Comment,
-            ProductToPartId = null,
-            CategoryId = rowData?.CategoryId,
-            ParentCategoryId = rowData?.ParentCategoryId
-        });
-    }
+    addLine = null;
 
-    // children
-
-
-foreach (var part in selectedParts)
-{
-    batchItems.Add(new BatchCartItem
-    {
-        VersionId = line.VersionId,
-        Name = part.TopPart_Name,
-        Code = "",
-        Qty = part.Qty,
-        Comment = line.Comment,
-        ProductToPartId = part.Id,
-        CategoryId = rowData?.CategoryId,
-        ParentCategoryId = rowData?.ParentCategoryId
-    });
-}
-
-isAddOpen = false;
-addLine = null;
-StateHasChanged();
-return;
-}
-
-
-// 2) JA draftBatchId jau ir -> update
-var dto = new DraftUpdateRequestDto
-{
-    BatchId = draftBatchId.Value
-};
-
-var newItems = new List<DraftUpdateItemDto>();
-
-// esošie (no UI)
-foreach (var it in batchItems
-    .Where(x => x.VersionId != line.VersionId))
-{
-    newItems.Add(new DraftUpdateItemDto
-    {
-        VersionId = it.VersionId,
-        ProductToPartId = it.ProductToPartId,
-        Qty = it.Qty,
-        Comment = it.Comment
-    });
-}
-
-// parent tikai ja ir > 0
-if (line.Planned > 0)
-{
-    newItems.Add(new DraftUpdateItemDto
-    {
-        VersionId = line.VersionId,
-        ProductToPartId = null,
-        Qty = line.Planned,
-        Comment = line.Comment
-    });
-}
-
-dto.Items = newItems;
-
-// 3️⃣ jaunās detaļas
-if (line.SelectedParts != null)
-{
-    var selectedParts = (addParts ?? new())
-    .Where(p => p.IsSelected && p.Qty > 0)
-    .ToList();
-
-foreach (var part in selectedParts)
-    {
-        dto.Items.Add(new DraftUpdateItemDto
-        {
-            VersionId = line.VersionId,
-            ProductToPartId = part.Id,
-            Qty = part.Qty,
-            Comment = line.Comment
-        });
-    }
-}
-
-var ok = await PlanningLookupService.SaveDraftAsync(dto);
-
-if (!ok)
-    return;
-
-// UI atjauninām TIKAI PĒC veiksmīga API
-batchItems = batchItems
-    .Where(x => x.VersionId != line.VersionId)
-    .ToList();
-
-// 1️⃣ PARENT
-if (line.Planned > 0)
-{
-    batchItems.Add(new BatchCartItem
-    {
-        VersionId = line.VersionId,
-        Name = product?.ProductName ?? "",
-        Code = product?.ProductCode ?? line.BatchCode,
-        Qty = line.Planned,
-        Comment = line.Comment,
-        ProductToPartId = null,
-        CategoryId = rowData?.CategoryId,
-        ParentCategoryId = rowData?.ParentCategoryId
-    });
-}
-
-// 2️⃣ CHILDREN
-if (line.SelectedParts != null)
-{
-    foreach (var part in line.SelectedParts.Where(p => p.Qty > 0))
-    {
-        batchItems.Add(new BatchCartItem
-        {
-            VersionId = line.VersionId,
-            Name = part.TopPart_Name,
-            Code = "", // ja nav — OK
-            Qty = part.Qty,
-            Comment = line.Comment,
-            ProductToPartId = part.Id,
-            CategoryId = rowData?.CategoryId,
-            ParentCategoryId = rowData?.ParentCategoryId
-        });
-    }
-}
-
-
-isAddOpen = false;
-addLine = null;
-StateHasChanged();
+    StateHasChanged();
 }
 
 private bool MatchRoot(PlanningGroupDto g)
@@ -1147,11 +973,17 @@ private bool MatchRoot(PlanningGroupDto g)
 
 private List<BatchCartItem> batchItems = new();
 
+private List<int> DraftVersionIds =>
+    batchItems
+        .Select(x => x.VersionId)
+        .Distinct()
+        .ToList();
+
 // popup stāvoklis
 private bool isAddOpen = false;
 
 // rinda, no kuras tiek spiests +
-private ProductionTasks.BatchLine? addLine;
+private BatchLine? addLine;
 
 
 private sealed class DraftCreateDto
@@ -1172,72 +1004,19 @@ private async Task LoadDraftAsync()
 {
     Console.WriteLine("LOAD DRAFT: start");
 
-    try
-    {
-        var resp = await Http.GetAsync(
-    "http://localhost:5270/api/Batches/draft/last"
-);
-
-if (!resp.IsSuccessStatusCode || resp.Content.Headers.ContentLength == 0)
+try
 {
+        var result = await PlanningDraftService.LoadDraftAsync(rows);
 
-    return;
-}
+                if (result == null)
+                {
+                    return;
+                }
 
-var draft = await resp.Content.ReadFromJsonAsync<DraftDto>();
-if (draft == null)
-    return;
+                draftBatchId = result.BatchId;
+                draftComment = result.Comment;
+                batchItems = result.Items;
 
-
-        if (draft == null)
-        {
-            Console.WriteLine("LOAD DRAFT: draft == null");
-            return;
-        }
-
-        
-        // ✅ 1) saglabājam melnraksta ID
-        draftBatchId = draft.BatchId;
-draftComment = draft.Comment;
-
-batchItems.Clear();
-
-foreach (var it in draft.Items)
-{
-    var row = rows.FirstOrDefault(r => r.VersionId == it.VersionId);
-
-    if (it.ProductToPartId == null && it.Qty > 0)
-        {
-            // PARENT
-            batchItems.Add(new BatchCartItem
-            {
-                VersionId = it.VersionId,
-                Code      = row?.productCode ?? "",
-                Name      = row?.productName ?? "",
-                Qty       = it.Qty,
-                Comment   = it.Comment,
-                ProductToPartId = null,
-                CategoryId = row?.CategoryId,
-                ParentCategoryId = row?.ParentCategoryId
-            });
-        }
-else
-    {
-        // CHILD
-        batchItems.Add(new BatchCartItem
-        {
-            VersionId = it.VersionId,
-            Code      = "", // detaļai nav koda
-            Name      = $"Detaļa #{it.ProductToPartId}", // pagaidām
-            Qty       = it.Qty,
-            Comment   = it.Comment,
-            ProductToPartId = it.ProductToPartId,
-            CategoryId = row?.CategoryId,
-            ParentCategoryId = row?.ParentCategoryId
-        });
-    }
-
-}
 
 // pievieno detaļām nosaukumu 
 var versionIds = batchItems
@@ -1260,7 +1039,7 @@ foreach (var vid in versionIds)
     }
 }
 
-        batchPanelRef?.SetComment(draft.Comment);
+        batchPanelRef?.SetComment(result.Comment);
         StateHasChanged();
     }
     catch (Exception ex)
@@ -1362,48 +1141,21 @@ private bool isSaving = false;
 
 private int? addProductId;
 
-private class ValidateResult
-{
-    public bool isValid { get; set; }
-    public string? message { get; set; }
-}
-
 private async Task OnBatchItemDeleted(BatchCartItem it)
 {
-    if (it.ProductToPartId == null)
-    {
-        batchItems = batchItems
-            .Where(x => x.VersionId != it.VersionId)
-            .ToList();
-    }
-    else
-    {
-        batchItems = batchItems
-            .Where(x =>
-                !(x.VersionId == it.VersionId &&
-                  x.ProductToPartId == it.ProductToPartId))
-            .ToList();
-    }
+    var result = await PlanningDraftService.DeleteBatchItemAsync(
+        it,
+        batchItems,
+        draftBatchId
+    );
 
-    var dto = new DraftUpdateRequestDto
-    {
-        BatchId = draftBatchId,
-        Items = batchItems.Select(x => new DraftUpdateItemDto
-        {
-            VersionId = x.VersionId,
-            ProductToPartId = x.ProductToPartId,
-            Qty = x.Qty,
-            Comment = x.Comment
-        }).ToList()
-    };
-
-    var ok = await PlanningLookupService.SaveDraftAsync(dto);
-
-    if (!ok)
+    if (!result.Success)
     {
         await HandleSaveError();
         return;
     }
+
+    batchItems = result.Items;
 
     StateHasChanged();
 }
@@ -1419,7 +1171,7 @@ private async Task OpenEdit(BatchCartItem it)
     x.VersionId == it.VersionId &&
     x.ProductToPartId == null);
 
-    editLine = new ProductionTasks.BatchLine
+    editLine = new BatchLine
     {
         BatchCode   = it.Code,
         VersionId   = it.VersionId,
@@ -1430,6 +1182,14 @@ private async Task OpenEdit(BatchCartItem it)
 
     editParts = await PlanningLookupService.LoadProductParts(it.VersionId);
     
+    addProductRalRows = groupedRows
+            .FirstOrDefault(g =>
+                g.Versions.Any(v => v.VersionId == it.VersionId))
+            ?.Versions
+            .Where(x => x.IsRalRow)
+            .OrderBy(x => x.RalCode)
+            .ToList()
+            ?? new();
 
     foreach (var p in editParts)
     {
@@ -1485,7 +1245,7 @@ foreach (var p in addParts)
     }
 }
 
-addLine = new ProductionTasks.BatchLine
+addLine = new BatchLine
 
 {
     BatchId = draftBatchId ?? 0,
@@ -1497,6 +1257,36 @@ addLine = new ProductionTasks.BatchLine
 
 isPartOnlyMode = true;
 isAddOpen = true;
+}
+
+private async Task OpenDraftEdit(PlanningGroupDto row)
+{
+    var item = batchItems.FirstOrDefault(x =>
+        x.VersionId == row.Versions
+            .FirstOrDefault(v => v.VersionId.HasValue)?
+            .VersionId);
+
+    if (item is null)
+        return;
+
+    await OpenEdit(item);
+}
+
+private async Task OnPartPlusClicked(PlanningPartsPanel.PartItem part)
+{
+    if (part.IsInDraft)
+    {
+        var item = batchItems.FirstOrDefault(x =>
+            x.VersionId == part.VersionId);
+
+        if (item != null)
+        {
+            await OpenEdit(item);
+            return;
+        }
+    }
+
+    await OnPartPlannedPlus(part);
 }
 
 }
