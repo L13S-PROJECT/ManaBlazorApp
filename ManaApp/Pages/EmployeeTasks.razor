@@ -300,10 +300,10 @@ private async Task LoadTasks()
     tasks = tasks.ToList();
 
     _activeTask = tasks
-    .Where(t => t.Status == 2)
-    .OrderBy(t => t.StepOrder)
-    .ThenBy(t => t.TaskId)
-    .FirstOrDefault();
+            .Where(t => t.Status == 2)
+            .OrderBy(t => t.StepOrder)
+            .ThenBy(t => t.TaskId)
+            .FirstOrDefault();
 }
 
 private TaskRow? FirstAvailableTask =>
@@ -317,6 +317,8 @@ private TaskRow? FirstAvailableTask =>
 
 private async Task FinishTask(TaskRow task)
 {
+    Console.WriteLine($"UI FINISH CLICK -> taskId={task.TaskId}");
+
     if (task is null) return;
 
     // cik vēl nav padarīts šim uzdevumam
@@ -329,9 +331,16 @@ private async Task FinishTask(TaskRow task)
         qtyDoneAdd = remaining > 0 ? remaining : (int?)null
     };
 
+    Console.WriteLine("API CALL START");
+
     // pabeidzam tasku API pusē
     var resp = await Http.PostAsJsonAsync(
     "api/tasks/finish", body);
+
+    
+    Console.WriteLine($"API RESPONSE = {resp.StatusCode}");
+    var txt = await resp.Content.ReadAsStringAsync();
+Console.WriteLine($"API ERROR = {txt}");
 
     if (!resp.IsSuccessStatusCode)
     {

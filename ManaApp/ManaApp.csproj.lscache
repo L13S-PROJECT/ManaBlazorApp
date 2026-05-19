@@ -390,6 +390,7 @@ Components/
   PriorityImpactSummary.razor
   PriorityToolbar.razor
   StepDetailsPopup.razor
+ Production/ProductionTasksToolbar.razor
  ProductionTasksBatchDetail.razor
  ProductionTasksDetailPanel.razor
  Products/
@@ -477,6 +478,7 @@ Components/
   PriorityImpactSummary.razor
   PriorityToolbar.razor
   StepDetailsPopup.razor
+ Production/ProductionTasksToolbar.razor
  ProductionTasksBatchDetail.razor
  ProductionTasksDetailPanel.razor
  Products/

@@ -628,6 +628,18 @@ public async Task<IActionResult> GetFinishingWaves([FromQuery] int batchProductI
         return Ok(list);
 }
 
+[HttpGet("finishing-waves-child")]
+public async Task<IActionResult> GetFinishingWavesChild(
+    int batchProductId,
+    int productToPartId)
+{
+    var result = await _taskQueryService.GetFinishingWavesChild(
+    batchProductId,
+    productToPartId);
+
+    return Ok(result);
+}
+
 
 // GET: /api/tasks/detailed-summary-by-batchproduct?batchProductId=123
 [HttpGet("detailed-summary-by-batchproduct")]

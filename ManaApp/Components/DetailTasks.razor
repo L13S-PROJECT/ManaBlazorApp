@@ -311,7 +311,8 @@ if (dto is not null)
             QtyDisplay = x.QtyDisplay,  
             StartDate = x.StartDate,
             EndDate = x.EndDate,
-            Steps = x.Steps.Select(s => new TopPartStepRow
+            Steps = x.Steps
+            .Select(s => new TopPartStepRow
             {
                 Id = s.StepId,
                 StepName = s.StepName ?? "",

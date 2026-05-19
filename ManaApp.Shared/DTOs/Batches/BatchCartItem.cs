@@ -5,6 +5,7 @@ public class BatchCartItem
         public int ProductId { get; set; }
         public int VersionId { get; set; }
         public string Name { get; set; } = string.Empty;
+        public string? VersionName { get; set; }
         public string Code { get; set; } = string.Empty;
         public int Qty { get; set; }
         public string? Comment { get; set; }
@@ -18,6 +19,7 @@ public class BatchCartItem
                 ProductId = ProductId,
                 VersionId = VersionId,
                 Name = Name,
+                VersionName = VersionName,
                 Code = Code,
                 Qty = Qty,
                 Comment = Comment,

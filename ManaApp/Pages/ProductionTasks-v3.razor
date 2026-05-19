@@ -1,8 +1,10 @@
-@*Production Tasks v3*@ 
+<!-- ProductionTasks-v3.razor -->
+
 @page "/productiontasks-v3"
 
 @using ManaApp.Components
 @using ManaApp.Models
+@using ManaApp.Components.Production
 @inject HttpClient Http
 @inject NavigationManager Nav
 
@@ -11,12 +13,16 @@
 <div class="ptv3-root">
 
     <!-- TOOLBAR -->
-    <div class="ptv3-toolbar">
-        <input class="ptv3-search"
-            placeholder="Meklēt: batch, kods, nosaukums..."
-            @bind="SearchText"
-            @bind:event="oninput" />
-    </div>
+    <ProductionTasksToolbar
+        BatchList="GetBatchList()"
+        ParentCategoryId="@ParentCategoryIdFilter"
+        ParentCategoryIdChanged="@(v => ParentCategoryIdFilter = v)"
+        ItemTypeFilter="@ItemTypeFilter"
+        ItemTypeFilterChanged="@(v => ItemTypeFilter = v)"
+        @bind-SelectedBatch="SelectedBatchFilter"
+        @bind-DetailFilter="DetailFilter"
+        @bind-AssemblyFilter="AssemblyFilter"
+        @bind-ShowCompleted="ShowCompleted" />
 
     <!-- MAIN CONTENT -->
 <div class="ptv3-main">
@@ -29,6 +35,7 @@
     <th class="ptv3-batch-flag"></th>
     <th>Kategorija</th>
     <th>Nosaukums</th>
+    <th>Detaļa</th>
     <th>Kods</th>
     <th>Versija</th>
     <th>Plānots</th>
@@ -50,12 +57,46 @@
 
 @foreach (var b in ProductBatches
     .Where(x =>
-        string.IsNullOrWhiteSpace(SearchText)
-        || (x.BatchCode ?? "").Contains(SearchText, StringComparison.OrdinalIgnoreCase)
-        || (x.ProductCode ?? "").Contains(SearchText, StringComparison.OrdinalIgnoreCase)
-        || (AllProducts.FirstOrDefault(p => p.productCode == x.ProductCode)?.productName ?? "")
-            .Contains(SearchText, StringComparison.OrdinalIgnoreCase)
-    )
+            (string.IsNullOrWhiteSpace(SelectedBatchFilter)
+                || x.BatchCode == SelectedBatchFilter)
+           &&
+                (
+                    (ShowCompleted && x.IsCompleted)
+
+                    || (!ShowCompleted && !x.IsCompleted)
+                )
+            &&
+                (
+                    ParentCategoryIdFilter == null
+                    || x.ParentCategoryId == ParentCategoryIdFilter
+                )
+            &&
+                (
+                    string.IsNullOrWhiteSpace(ItemTypeFilter)
+
+                    || (ItemTypeFilter == "product" && x.IsProduct)
+
+                    || (ItemTypeFilter == "detail" && !x.IsProduct)
+                )
+            &&
+                (
+                    string.IsNullOrWhiteSpace(DetailFilter)
+                    || x.DetailStatus == DetailFilter
+                )
+            &&
+                    (
+                        string.IsNullOrWhiteSpace(AssemblyFilter)
+                        || x.AssemblyStatus == AssemblyFilter
+                    )
+            &&
+            (
+                string.IsNullOrWhiteSpace(SearchText)
+                || (x.BatchCode ?? "").Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+                || (x.ProductCode ?? "").Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+                || (AllProducts.FirstOrDefault(p => p.productCode == x.ProductCode)?.productName ?? "")
+                    .Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+            )
+        )
     .ToList())
 {
 <tr class="@(SelectedBatch?.BatchProductId == b.BatchProductId ? "ptv3-active" : "")"
@@ -67,6 +108,7 @@
     </td>
     <td>@b.CategoryName</td>
     <td>@AllProducts.FirstOrDefault(x => x.productCode == b.ProductCode)?.productName</td>
+    <td>@b.DetailName</td>
     <td>@b.ProductCode</td>
     <td>@b.VersionName</td>
     <td>@b.Planned</td>
@@ -167,9 +209,9 @@ var childList = ParseChildFinish(b);
         <td class="ptv3-batch-flag">✔</td>
         <td>@b.CategoryName</td>
         <td>@AllProducts.FirstOrDefault(x => x.productCode == b.ProductCode)?.productName</td>
+        <td>@GetChildDetailName(ch.partId)</td>
         <td>@b.ProductCode</td>
         <td>@b.VersionName</td>
-
         <td>@ch.qty</td>
         <td>-</td>
         <td>0</td>
@@ -220,6 +262,9 @@ public int? BatchProductId { get; set; }
 [Parameter] public bool IsReadOnly { get; set; }
     private ProductBatchRow? SelectedBatch;
     private string SearchText = "";
+    private string SelectedBatchFilter = "";
+    private string DetailFilter = "";
+
 private void SelectRow(int batchProductId)
 {
     SelectedBatch = ProductBatches
@@ -480,5 +525,28 @@ private void OnRowClick(ProductBatchRow b)
 private int? SelectedChildPartId;
 private int? SelectedChildParentBatchProductId;
 private bool IsChildRowSelected = false;
+
+private List<string> GetBatchList()
+{
+    return ProductBatches
+        .Select(x => x.BatchCode ?? "")
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Distinct()
+        .OrderBy(x => x)
+        .ToList();
+}
+
+private int? ParentCategoryIdFilter;
+
+private string ItemTypeFilter = "";
+private bool ShowCompleted;
+private string AssemblyFilter = "";
+
+private string GetChildDetailName(int partId)
+{
+    return ProductBatches
+        .FirstOrDefault(x => x.ProductToPartId == partId)
+        ?.DetailName ?? "-";
+}
 
 }

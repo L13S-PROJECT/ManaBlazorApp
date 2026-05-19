@@ -92,7 +92,11 @@ namespace ManiApi.Services.Detail
 
             var stepRows = await _db.Set<TopPartStep>()
     .AsNoTracking()
-    .Where(x => x.IsActive && parts.Select(p => p.ProductToPartId).Contains(x.ProductToPartId) && x.StepType == 1)
+    .Where(x =>
+            x.IsActive &&
+            parts.Select(p => p.ProductToPartId).Contains(x.ProductToPartId) &&
+            x.StepType == 1 &&
+            !x.IsPainting)
     .OrderBy(x => x.ProductToPartId)
     .ThenBy(x => x.StepOrder)
     .Select(x => new

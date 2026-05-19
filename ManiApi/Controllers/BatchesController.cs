@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Data;
 using MySqlConnector;
 using ManaApp.Shared.DTOs.Batches;
+using ManiApi.Services.Production;
 namespace ManiApi.Controllers
 
 {
@@ -14,7 +15,13 @@ namespace ManiApi.Controllers
     public class BatchesController : ControllerBase
     {
         private readonly AppDbContext _db;
-        public BatchesController(AppDbContext db) => _db = db;
+        private readonly ProductionTasksQueryService _productionTasksQueryService;
+
+public BatchesController(AppDbContext db, ProductionTasksQueryService productionTasksQueryService)
+        {
+            _db = db;
+            _productionTasksQueryService = productionTasksQueryService;
+        }
 
 // POST: /api/batches/draft/create
 [HttpPost("draft/create")]
@@ -121,7 +128,7 @@ WHERE ptp.Version_ID = @vid
                 cmd.Transaction = tx;
                 cmd.CommandText = @"
 INSERT INTO batches (Batches_Code, Batches_Statuss, Batches_StartDate, Batches_EndDate, Comments, IsActive)
-VALUES (@code, 4, NULL, NULL, @comment, 1);
+VALUES (@code, 4, UTC_TIMESTAMP(), NULL, @comment, 1);
 SELECT LAST_INSERT_ID();";
                 var p1 = cmd.CreateParameter(); p1.ParameterName = "@code"; p1.Value = code; cmd.Parameters.Add(p1);
                 var p2 = cmd.CreateParameter(); p2.ParameterName = "@comment"; p2.Value = (object?)dto.Comment ?? DBNull.Value; cmd.Parameters.Add(p2);
@@ -1225,11 +1232,13 @@ public async Task<IActionResult> GetLastDraft()
     // 1) atrodam vienīgo aktīvo melnrakstu
     int? batchId = null;
     string? comment = null;
+    DateTime? createdAt = null;
+    int batchStatus = 4;
 
     await using (var cmd = conn.CreateCommand())
     {
         cmd.CommandText = @"
-SELECT ID, Comments
+SELECT ID, Comments, Batches_StartDate, Batches_Statuss
 FROM batches
 WHERE Batches_Statuss = 4
   AND IsActive = 1
@@ -1237,10 +1246,18 @@ LIMIT 1;
 ";
         await using var reader = await cmd.ExecuteReaderAsync();
         if (await reader.ReadAsync())
-        {
-            batchId = reader.GetInt32(0);
-            comment = reader.IsDBNull(1) ? null : reader.GetString(1);
-        }
+            {
+                batchId = reader.GetInt32(0);
+
+                comment = reader.IsDBNull(1)
+                    ? null
+                    : reader.GetString(1);
+
+                createdAt = reader.IsDBNull(2)
+                    ? (DateTime?)null
+                    : reader.GetDateTime(2);
+                batchStatus = reader.GetInt32(3);
+            }
     }
 
     if (!batchId.HasValue)
@@ -1292,13 +1309,16 @@ WHERE bp.Batch_Id = @bid
         }
     }
 
+
     // 3) atgriežam rezultātu
     return Ok(new
-    {
-        BatchId = batchId.Value,
-        Comment = comment,
-        Items   = items
-    });
+        {
+            BatchId = batchId.Value,
+            BatchStatus = batchStatus,
+            CreatedAt = createdAt,
+            Comment = comment,
+            Items = items
+        });
 }
 
 
@@ -1857,402 +1877,12 @@ GROUP BY Batch_Id, Version_Id;
 [HttpGet("list-production-v2")]
 public async Task<IActionResult> GetProductionBatchesRowsV2()
 {
-    var conn = _db.Database.GetDbConnection();
-await conn.OpenAsync();
+    var list = await _productionTasksQueryService
+        .GetProductionBatchesRowsV2();
 
-await using var cmd = conn.CreateCommand();
-cmd.CommandText = @"
-SELECT
-    b.ID AS BatchId,
-    b.Batches_Code AS BatchCode,    
-    bp.RootId,
-
-    MIN(bp.ID) AS BatchProductId,
-
-    bp.Version_Id AS VersionId,
-    p.Product_Name AS ProductName,
-    p.Product_Code AS ProductCode,
-    c.Category_Name AS CategoryName,
-    v.Version_Name AS VersionName,
-
-    MAX(bp.is_priority) AS IsPriority,
-    MAX(CASE WHEN bp.ProductToPart_ID IS NULL THEN 1 ELSE 0 END) AS HasParent,
-
-    SUM(
-        CASE 
-            WHEN bp.ProductToPart_ID IS NULL 
-            THEN bp.Planned_Qty 
-            ELSE 0 
-        END
-    ) AS Planned,
-
-    MAX(bp.BatchProduct_Comments) AS Comment
-
-, SUM(
-    CASE 
-        WHEN bp.ProductToPart_ID IS NULL 
-        THEN COALESCE(sm.Sold, 0)
-        ELSE 0
-    END
-) AS Sold
-
-, SUM(
-    CASE 
-        WHEN bp.ProductToPart_ID IS NULL 
-        THEN COALESCE(sm.AssemblyDone, 0)
-        ELSE 0
-    END
-) AS Done
-
-, CASE 
-    WHEN MAX(CASE WHEN bp.ProductToPart_ID IS NULL THEN 1 ELSE 0 END) = 1
-    THEN MAX(dt.DetailsTotal)
-    ELSE 0
-END AS DetailsTotal
-
-, MAX(COALESCE(ch.ChildCount, 0)) AS DetailsChildTotal
-, CASE 
-    WHEN MAX(CASE WHEN bp.ProductToPart_ID IS NULL THEN 1 ELSE 0 END) = 1
-    THEN MAX(dstat.DetailsChildDone)
-    ELSE 0
-END AS DetailsDone
-, COALESCE(dstat.DetailsChildDone,0) AS DetailsChildDone
-, dtask.DetailStart
-, dtask.DetailFinish
-, dtask.DetailFinishChildList
-
-, CASE 
-    WHEN MAX(CASE WHEN bp.ProductToPart_ID IS NULL THEN 1 ELSE 0 END) = 0
-         AND MAX(COALESCE(ch.ChildCount, 0)) > 0
-    THEN 1 ELSE 0
-END AS IsReadOnlyChild
-
-FROM (
-    SELECT
-        bp.*,
-        CASE 
-    WHEN EXISTS (
-        SELECT 1
-        FROM batches_products bp2
-        WHERE bp2.Batch_Id = bp.Batch_Id
-          AND bp2.Version_Id = bp.Version_Id
-          AND bp2.ProductToPart_ID IS NULL
-          AND bp2.IsActive = 1
-    )
-    THEN (
-        SELECT bp2.ID
-        FROM batches_products bp2
-        WHERE bp2.Batch_Id = bp.Batch_Id
-          AND bp2.Version_Id = bp.Version_Id
-          AND bp2.ProductToPart_ID IS NULL
-          AND bp2.IsActive = 1
-        LIMIT 1
-    )
-    ELSE bp.ID
-END AS RootId
-
-    FROM batches_products bp
-    WHERE bp.IsActive = 1
-) bp
-JOIN batches b ON b.ID = bp.Batch_Id
-JOIN versions v ON v.ID = bp.Version_Id
-JOIN products p ON p.ID = v.Product_ID
-JOIN categories c ON c.ID = p.Category_ID
-
-LEFT JOIN (
-    SELECT
-        BatchProduct_ID,
-        SUM(CASE WHEN Move_Type = 'SOLD' THEN ABS(Stock_Qty) ELSE 0 END) AS Sold,
-        SUM(CASE WHEN Move_Type = 'ASSEMBLY' THEN Stock_Qty ELSE 0 END)
-        -
-        SUM(CASE WHEN Move_Type = 'SOLD' THEN ABS(Stock_Qty) ELSE 0 END) AS AssemblyDone
-    FROM stock_movements
-    WHERE IsActive = 1
-    GROUP BY BatchProduct_ID
-) sm ON sm.BatchProduct_ID = bp.ID
-AND bp.ProductToPart_ID IS NULL
-
-LEFT JOIN (
-    SELECT
-        v.ID AS VersionId,
-        COUNT(DISTINCT ptp.ID) AS DetailsTotal
-    FROM versions v
-    JOIN producttopparts ptp 
-        ON ptp.Version_ID = v.ID
-        AND ptp.IsActive = 1
-    JOIN toppartsteps ts
-        ON ts.ProductToPart_ID = ptp.ID
-        AND ts.IsActive = 1
-    JOIN stage_step_type_map m
-        ON m.Step_Type_ID = ts.Step_Type
-        AND m.Stage = 1
-        AND m.IsActive = 1
-    WHERE ptp.IsActive = 1
-    GROUP BY v.ID
-) dt ON dt.VersionId = bp.Version_Id
-
-LEFT JOIN (
-    SELECT
-        bp.Batch_Id,
-        bp.Version_Id,
-        COUNT(DISTINCT bp.ProductToPart_ID) AS ChildCount
-    FROM batches_products bp
-    WHERE bp.ProductToPart_ID IS NOT NULL
-      AND bp.IsActive = 1
-    GROUP BY bp.Batch_Id, bp.Version_Id
-) ch 
-ON ch.Batch_Id = bp.Batch_Id 
-AND ch.Version_Id = bp.Version_Id
-
-LEFT JOIN (
-    SELECT
-        bp.RootId,
-
-        MIN(CASE 
-            WHEN t.Tasks_Status IN (2,3) AND t.Started_At IS NOT NULL
-            THEN t.Started_At 
-        END) AS DetailStart,
-
-CASE
-    WHEN NOT EXISTS (
-        SELECT 1
-        FROM tasks t2
-        JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
-        WHERE t2.BatchProduct_ID IN (
-            SELECT bp2.ID
-            FROM batches_products bp2
-            WHERE bp2.Batch_Id = bp.Batch_Id
-              AND bp2.Version_Id = bp.Version_Id
-              AND bp2.IsActive = 1
-        )
-          AND t2.IsActive = 1
-          AND ts2.Step_Type = 1
-          AND t2.Tasks_Status <> 3
-    )
-    THEN MAX(
-        CASE
-            WHEN EXISTS (
-                SELECT 1
-                FROM toppartsteps ts
-                WHERE ts.ID = t.TopPartStep_ID
-                  AND ts.Step_Type = 1
-            )
-            THEN t.Finished_At
-        END
-    )
-    ELSE NULL
-END AS DetailFinish,
-
- GROUP_CONCAT(
-    DISTINCT CASE
-        WHEN bp.ProductToPart_ID IS NOT NULL
-            AND EXISTS (
-                SELECT 1
-                FROM batches_products bp2
-                WHERE bp2.Batch_Id = bp.Batch_Id
-                AND bp2.Version_Id = bp.Version_Id
-                AND bp2.ProductToPart_ID IS NULL
-                AND bp2.IsActive = 1
-            )
-            AND NOT EXISTS (
-                SELECT 1
-                FROM tasks t2
-                WHERE t2.BatchProduct_ID = bp.ID
-                AND t2.IsActive = 1
-                AND t2.Tasks_Status <> 3
-            )
-        THEN CONCAT(
-                    bp.ProductToPart_ID, ':',
-                    DATE_FORMAT((
-                        SELECT MAX(t3.Finished_At)
-                        FROM tasks t3
-                        JOIN toppartsteps ts3 ON ts3.ID = t3.TopPartStep_ID
-                        WHERE t3.BatchProduct_ID = bp.ID
-                        AND t3.IsActive = 1
-                        AND ts3.Step_Type = 1
-                        AND ts3.IsPainting = 0
-                        AND ts3.IsFinal = 1
-                    ), '%Y-%m-%d'),
-                    ':',
-                    bp.Planned_Qty
-                )
-        ELSE NULL
-    END
-) AS DetailFinishChildList,
-
-MAX(
-    CASE
-        WHEN bp.ProductToPart_ID IS NOT NULL
-         AND NOT EXISTS (
-            SELECT 1
-            FROM tasks t2
-            WHERE t2.BatchProduct_ID = bp.ID
-              AND t2.IsActive = 1
-              AND t2.Tasks_Status <> 3
-         )
-        THEN (
-            SELECT MAX(t3.Finished_At)
-            FROM tasks t3
-            JOIN toppartsteps ts3 ON ts3.ID = t3.TopPartStep_ID
-            WHERE t3.BatchProduct_ID = bp.ID
-              AND t3.IsActive = 1
-              AND ts3.Step_Type = 1
-              AND ts3.IsPainting = 0
-              AND ts3.IsFinal = 1
-        )
-        ELSE NULL
-    END
-) AS DetailFinishChild
-
-    FROM (
-        SELECT
-            bp.*,
-            CASE 
-                WHEN EXISTS (
-                    SELECT 1
-                    FROM batches_products bp2
-                    WHERE bp2.Batch_Id = bp.Batch_Id
-                      AND bp2.Version_Id = bp.Version_Id
-                      AND bp2.ProductToPart_ID IS NULL
-                      AND bp2.IsActive = 1
-                )
-                THEN (
-                    SELECT bp2.ID
-                    FROM batches_products bp2
-                    WHERE bp2.Batch_Id = bp.Batch_Id
-                      AND bp2.Version_Id = bp.Version_Id
-                      AND bp2.ProductToPart_ID IS NULL
-                      AND bp2.IsActive = 1
-                    LIMIT 1
-                )
-                ELSE bp.ID
-            END AS RootId
-        FROM batches_products bp
-        WHERE bp.IsActive = 1
-    ) bp
-
-    LEFT JOIN tasks t 
-            ON t.BatchProduct_ID IN (
-                SELECT bp2.ID
-                FROM batches_products bp2
-                WHERE bp2.Batch_Id = bp.Batch_Id
-                AND bp2.Version_Id = bp.Version_Id
-                AND bp2.IsActive = 1
-            )
-            AND t.IsActive = 1
-
-    GROUP BY bp.RootId
-) dtask ON dtask.RootId = bp.RootId
-
-LEFT JOIN (
-    SELECT
-        bp.Batch_Id,
-        bp.Version_Id,
-
-        -- Parent gatavie (visi step=3)
-SUM(
-    CASE 
-        WHEN bp.ProductToPart_ID IS NULL
-         AND EXISTS (
-             SELECT 1
-             FROM batches_products bp2
-             WHERE bp2.Batch_Id = bp.Batch_Id
-               AND bp2.Version_Id = bp.Version_Id
-               AND bp2.IsActive = 1
-         )
-         AND NOT EXISTS (
-             SELECT 1
-             FROM tasks t
-             WHERE t.BatchProduct_ID IN (
-                 SELECT bp2.ID
-                 FROM batches_products bp2
-                 WHERE bp2.Batch_Id = bp.Batch_Id
-                   AND bp2.Version_Id = bp.Version_Id
-                   AND bp2.IsActive = 1
-             )
-             AND t.IsActive = 1
-             AND t.Tasks_Status <> 3
-         )
-        THEN 1 ELSE 0
-    END
-) AS DetailsDone,
-
-        -- Child gatavie
-        SUM(
-            CASE 
-                WHEN bp.ProductToPart_ID IS NOT NULL
-                 AND CASE 
-    WHEN EXISTS (
-        SELECT 1
-        FROM tasks t
-        WHERE t.BatchProduct_ID = bp.ID
-          AND t.IsActive = 1
-    )
-    AND NOT EXISTS (
-        SELECT 1
-        FROM tasks t
-        WHERE t.BatchProduct_ID = bp.ID
-          AND t.IsActive = 1
-          AND t.Tasks_Status <> 3
-    )
-    THEN 1 ELSE 0
-END
-                THEN 1 ELSE 0
-            END
-        ) AS DetailsChildDone
-
-    FROM batches_products bp
-    WHERE bp.IsActive = 1
-    GROUP BY bp.Batch_Id, bp.Version_Id
-) dstat
-ON dstat.Batch_Id = bp.Batch_Id
-AND dstat.Version_Id = bp.Version_Id
-
-WHERE bp.IsActive = 1
-  AND b.IsActive = 1
-  AND b.Batches_Statuss = 1
-
-GROUP BY
-    bp.Batch_Id,
-    bp.Version_Id
-
-ORDER BY b.ID DESC;
-";
-
-var list = new List<object>();
-
-await using var r = await cmd.ExecuteReaderAsync();
-while (await r.ReadAsync())
-{
-    list.Add(new
-    {
-        BatchId        = r.GetInt32(0),
-        BatchCode      = r.GetString(1),
-        BatchProductId = r.GetInt32(3), // MIN(bp.ID)
-        VersionId      = r.GetInt32(4),
-        ProductName    = r.GetString(5),
-        ProductCode    = r.GetString(6),
-        CategoryName   = r.GetString(7),
-        VersionName    = r.GetString(8),
-        IsPriority     = r.GetBoolean(9),
-        
-        Planned        = r.GetInt32(11),
-        Comment        = r.IsDBNull(12) ? null : r.GetString(12),
-        Sold   = r.GetInt32(13),
-        Done   = r.GetInt32(14),
-        DetailsTotal = r.GetInt32(15),
-        DetailsChildTotal = r.GetInt32(16),
-        DetailsDone = r.GetInt32(17),
-        DetailsChildDone = r.GetInt32(18),
-        DetailStart  = r.IsDBNull(19) ? (DateTime?)null : r.GetDateTime(19),
-        DetailFinish = r.IsDBNull(20) ? (DateTime?)null : r.GetDateTime(20),
-        DetailFinishChildList = r.IsDBNull(21) ? null : r.GetString(21),
-        IsReadOnlyChild = r.GetInt32(22) == 1
-    });
+    return Ok(list);
 }
 
-return Ok(list);
-}
 
 [HttpGet("detail-qty")]
 public async Task<IActionResult> GetDetailQty([FromQuery] int batchProductId)

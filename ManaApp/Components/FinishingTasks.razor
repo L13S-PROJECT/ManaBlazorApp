@@ -208,11 +208,19 @@ FinishingState = indicators.FirstOrDefault()?.State ?? "gray";
 
 var productToPartId = FinishingIndicators.FirstOrDefault()?.ProductToPartId ?? 0;
 
+var isChildBatch =
+    SelectedBatch.ProductToPartId.HasValue;
+
 if (productToPartId > 0)
-{
+{    
+    var wavesUrl =
+    isChildBatch
+        ? $"api/tasks/finishing-waves-child?batchProductId={bpId}&productToPartId={productToPartId}"
+        : $"api/tasks/finishing-waves?batchProductId={bpId}&productToPartId={productToPartId}";
+
     var waves =
         await Http.GetFromJsonAsync<List<FinishingTaskRow>>(
-            $"api/tasks/finishing-waves?batchProductId={bpId}&productToPartId={productToPartId}"
+            wavesUrl
         ) ?? new();
 
     Waves = waves;

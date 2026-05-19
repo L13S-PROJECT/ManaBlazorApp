@@ -38,5 +38,16 @@ public sealed class ProductBatchRow
     public int DetailsDone { get; set; }
     public int DetailsChildDone { get; set; }
 
+    public int? ProductToPartId { get; set; }
+
+    public int CategoryId { get; set; }
+
+    public int? ParentCategoryId { get; set; }
+    public bool IsProduct => ProductToPartId == null;
+    public bool IsCompleted { get; set; }
+    public string DetailStatus { get; set; } = "";
+    public string AssemblyStatus { get; set; } = "";
+    public string? DetailName { get; set; }
+
 }
 

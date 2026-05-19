@@ -147,9 +147,13 @@ public async Task<(bool Success, string? Error)> FinishTask(int taskId, int? qty
 
 taskId = await _queryService.ResolveRootTaskId(conn, tx, taskId);
 
+Console.WriteLine($"FINISH -> resolved taskId = {taskId}");
+
 // 1️⃣ Pārbaude: vai task eksistē un ir "Procesā"
 
 var statusCheck = await _queryService.ValidateTaskIsInProgress(conn, tx, taskId);
+
+Console.WriteLine($"FINISH STATUS -> success={statusCheck.Success} error={statusCheck.Error}");
 
 if (!statusCheck.Success)
 {
@@ -197,6 +201,13 @@ if (scenario == TaskScenario.B_Root)
         qtyPerProduct,
         currentStepOrder,
         rootId);
+    // auto-create painting tasks root child detaļām
+await CreateRootPaintingTasksIfNeeded(
+    conn,
+    tx,
+    rootId
+);
+
 }
 
 else if (scenario == TaskScenario.A_Parent)
@@ -230,6 +241,13 @@ else if (scenario == TaskScenario.C_Child)
         batchProductId,
         versionId,
         plannedQty);
+    // auto-create painting task child scenārijam
+await CreateChildPaintingTasksIfNeeded(
+    conn,
+    tx,
+    batchProductId
+);
+    
 }
 else
 {
@@ -476,6 +494,8 @@ private async Task HandleRootScenario(
         ? plannedQty * qtyPerProduct
         : plannedQty;
 
+Console.WriteLine($"ROOT SCENARIO UPDATE -> rootId={rootId} stepOrder={currentStepOrder}");
+
     await using (var upd = conn.CreateCommand())
     {
         upd.Transaction = tx;
@@ -496,6 +516,8 @@ private async Task HandleRootScenario(
         upd.Parameters.Add(new MySqlParameter("@curStepOrder", currentStepOrder));
 
         await upd.ExecuteNonQueryAsync();
+
+        Console.WriteLine($"ROOT UPDATE AFFECTED -> done");
     }
 
     bool detailFinished = await CheckDetailFinished(conn, tx, rootId);
@@ -587,6 +609,7 @@ private async Task HandleParentAssemblyStep(
 
     await using (var upd = conn.CreateCommand())
     {
+        Console.WriteLine($"UPDATING TASK -> {taskId} TO STATUS=3");
         upd.Transaction = tx;
         upd.CommandText = @"
         UPDATE tasks
@@ -675,6 +698,7 @@ private async Task HandleChildScenario(
     // 1) Task -> Finished
     await using (var upd = conn.CreateCommand())
     {
+        Console.WriteLine($"UPDATING TASK -> {taskId} TO STATUS=3");
         upd.Transaction = tx;
         upd.CommandText = @"
         UPDATE tasks
@@ -752,6 +776,137 @@ WHERE Task_ID = @taskId
   AND EndTime IS NULL;";
 
     cmd.Parameters.Add(new MySqlParameter("@taskId", taskId));
+
+    await cmd.ExecuteNonQueryAsync();
+}
+
+private async Task CreateChildPaintingTasksIfNeeded(
+    DbConnection conn,
+    DbTransaction tx,
+    int batchProductId)
+{
+    await using var cmd = conn.CreateCommand();
+    cmd.Transaction = tx;
+
+    cmd.CommandText = @"
+INSERT INTO tasks
+(
+    BatchProduct_ID,
+    TopPartStep_ID,
+    Tasks_Status,
+    Qty_Done,
+    IsActive
+)
+SELECT
+    bp.ID,
+    ts.ID,
+    5,
+    0,
+    1
+FROM batches_products bp
+
+JOIN tasks t0
+    ON t0.BatchProduct_ID = bp.ID
+
+JOIN toppartsteps ts0
+    ON ts0.ID = t0.TopPartStep_ID
+
+JOIN toppartsteps ts
+    ON ts.ProductToPart_ID = ts0.ProductToPart_ID
+   AND ts.IsPainting = 1
+
+WHERE bp.ID = @bpId
+AND bp.ProductToPart_ID IS NOT NULL
+
+AND EXISTS (
+    SELECT 1
+    FROM tasks tf
+    JOIN toppartsteps tsf
+        ON tsf.ID = tf.TopPartStep_ID
+    WHERE tf.BatchProduct_ID = bp.ID
+      AND tf.Tasks_Status = 3
+      AND tsf.IsFinal = 1
+      AND tsf.IsPainting = 0
+)
+
+AND NOT EXISTS (
+    SELECT 1
+    FROM tasks t
+    WHERE t.BatchProduct_ID = bp.ID
+      AND t.TopPartStep_ID = ts.ID
+      AND t.IsActive = 1
+);";
+
+    cmd.Parameters.Add(
+        new MySqlParameter("@bpId", batchProductId));
+
+    await cmd.ExecuteNonQueryAsync();
+}
+
+private async Task CreateRootPaintingTasksIfNeeded(
+    DbConnection conn,
+    DbTransaction tx,
+    int rootId)
+{
+    await using var cmd = conn.CreateCommand();
+    cmd.Transaction = tx;
+
+    cmd.CommandText = @"
+INSERT INTO tasks
+(
+    BatchProduct_ID,
+    TopPartStep_ID,
+    Tasks_Status,
+    Qty_Done,
+    IsActive
+)
+SELECT DISTINCT
+    bp.ID,
+    ts.ID,
+    5,
+    0,
+    1
+FROM batches_products bp
+
+JOIN tasks t0
+    ON t0.BatchProduct_ID = bp.ID
+
+JOIN toppartsteps ts0
+    ON ts0.ID = t0.TopPartStep_ID
+
+JOIN toppartsteps ts
+    ON ts.ProductToPart_ID = ts0.ProductToPart_ID
+   AND ts.IsPainting = 1
+
+WHERE
+(
+    bp.ID = @rootId
+    OR bp.ParentBatchProduct_ID = @rootId
+)
+
+AND bp.ProductToPart_ID IS NOT NULL
+
+AND EXISTS (
+    SELECT 1
+    FROM tasks tf
+    JOIN toppartsteps tsf
+        ON tsf.ID = tf.TopPartStep_ID
+    WHERE tf.BatchProduct_ID = bp.ID
+      AND tf.Tasks_Status = 3
+      AND tsf.IsFinal = 1
+      AND tsf.IsPainting = 0
+)
+
+AND NOT EXISTS (
+    SELECT 1
+    FROM tasks t
+    WHERE t.BatchProduct_ID = bp.ID
+      AND t.TopPartStep_ID = ts.ID
+      AND t.IsActive = 1
+);";
+
+    cmd.Parameters.Add(
+        new MySqlParameter("@rootId", rootId));
 
     await cmd.ExecuteNonQueryAsync();
 }

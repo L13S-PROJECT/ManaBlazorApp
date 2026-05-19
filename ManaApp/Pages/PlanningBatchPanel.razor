@@ -95,6 +95,7 @@
                                     VersionId = firstChild.VersionId,
                                     Name = info.Name,
                                     Code = info.Code,
+                                    VersionName = firstChild.VersionName,
                                     Qty = 0,
                                     ProductToPartId = null,
                                     IsArchivedVersion = firstChild.IsArchivedVersion
@@ -122,7 +123,9 @@
                     
                         <span>
                                 @parent.Name
-                                
+                                <small style="color:#666;">
+                                    @parent.VersionName
+                                </small>
                                 @if (parent.IsArchivedVersion)
                                 {
                                     <span style="
@@ -203,6 +206,7 @@
                                 VersionId = firstChild.VersionId,
                                 Name = info.Name,
                                 Code = info.Code,
+                                VersionName = firstChild.VersionName,
                                 Qty = 0,
                                 ProductToPartId = null,
                                 IsArchivedVersion = firstChild.IsArchivedVersion
@@ -229,7 +233,7 @@
                     <div class="col-name" style="display:flex; align-items:center; gap:6px;">
                         
                         <span>
-                            @parent.Name
+                           @parent.Name
 
                             @if (parent.IsArchivedVersion)
                             {
@@ -336,10 +340,16 @@ public void StartEdit(BatchCartItem item)
     StateHasChanged();
 }
 
+[Parameter]
+public DateTime? DraftCreatedAt { get; set; }
+
+[Parameter]
+public int? BatchStatus { get; set; }
+
 private string DraftTitle =>
-    Items.Count == 0
-        ? ""
-        : $"Melnraksts no {DateTime.Now:dd.MM.yyyy}";
+    BatchStatus == 4 && DraftCreatedAt != null
+        ? $"Melnraksts no {DraftCreatedAt:dd.MM.yyyy}"
+        : "Ražošanas plāns";
 
 
 private async Task OnEditSaved(BatchLine line)
@@ -833,6 +843,8 @@ private async Task<(string Name, string Code)> GetProductInfo(int versionId)
 
     return (name, code);
 }
+
+
 
 protected override async Task OnParametersSetAsync()
 {

@@ -18,7 +18,15 @@ else
 
 <h3 class="dialog-title">
     @(IsAddMode ? "Pievienot preci" : "Labot preci")
-    <strong> @ProductName </strong>
+    <strong>
+        @ProductName
+        @if (!string.IsNullOrWhiteSpace(VersionName))
+        {
+            <span style="font-weight:400;">
+                • @VersionName
+            </span>
+        }
+    </strong>
 </h3>
 
 <div class="parts-layout">
@@ -163,6 +171,8 @@ else
 @code {
     // Vai dialogs ir atvērts
     [Parameter] public bool IsOpen { get; set; }
+
+    [Parameter] public string? VersionName { get; set; }
 
     // Lai vecāks var sinhronizēt IsOpen
     [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }

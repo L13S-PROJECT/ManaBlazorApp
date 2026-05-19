@@ -114,7 +114,7 @@ public async Task<List<TaskRowDto>> GetForEmployee(int empId)
 
         FROM tasks t
         JOIN batches_products bp   ON bp.ID  = t.BatchProduct_ID AND bp.IsActive = 1
-        JOIN versions v   ON v.ID   = bp.Version_Id AND v.IsActive = 1
+        LEFT JOIN versions v ON v.ID = bp.Version_Id
         JOIN products p   ON p.ID   = v.Product_ID AND p.IsActive = 1
         JOIN batches          b    ON b.ID   = bp.Batch_Id       AND b.IsActive  = 1
         JOIN toppartsteps     ts   ON ts.ID  = t.TopPartStep_ID
@@ -170,6 +170,9 @@ public async Task<List<TaskRowDto>> GetForEmployee(int empId)
             await using var r = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess).ConfigureAwait(false);
             while (await r.ReadAsync().ConfigureAwait(false))
             {
+                Console.WriteLine(
+    $"RAW TASK -> id={r.GetInt32(0)} status={r.GetInt32(6)} assigned={(r.IsDBNull(22) ? "NULL" : r.GetInt32(22).ToString())}"
+);                
                 rawTasks.Add(new TaskRowDto
                 {
                     TaskId = r.GetInt32(0),
@@ -276,12 +279,21 @@ public async Task<List<TaskRowDto>> GetForEmployee(int empId)
 
             // 1. Procesā
             var inProgress = g.FirstOrDefault(x => x.Status == 2);
+
+Console.WriteLine($"GROUP {g.Key.DisplayGroupId} -> inProgress={inProgress?.TaskId} status={inProgress?.Status}");
+
             if (inProgress != null)
             {
                 row = inProgress;
             }
             else
             {
+                foreach (var x in g)
+                    {
+                        Console.WriteLine(
+                            $"GROUP ITEM -> task={x.TaskId} assigned={x.Assigned_To} status={x.Status} step={x.TopPartStepId}"
+                        );
+                    }
                 // 2. Assigned
                 var assigned = g
                     .Where(x => x.Assigned_To == empId)
@@ -746,26 +758,9 @@ SELECT
         )
         THEN 1 ELSE 0
     END,
-    CASE 
-        WHEN EXISTS (
-            SELECT 1
-            FROM batches_products bp2
-            WHERE bp2.Batch_Id = bp.Batch_Id
-              AND bp2.Version_Id = bp.Version_Id
-              AND bp2.ProductToPart_ID IS NULL
-              AND bp2.IsActive = 1
-        )
-        THEN (
-            SELECT bp2.ID
-            FROM batches_products bp2
-            WHERE bp2.Batch_Id = bp.Batch_Id
-              AND bp2.Version_Id = bp.Version_Id
-              AND bp2.ProductToPart_ID IS NULL
-              AND bp2.IsActive = 1
-            LIMIT 1
-        )
-        ELSE bp.ID
-    END
+
+    COALESCE(bp.ParentBatchProduct_ID, bp.ID)
+
 FROM tasks t
 JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
 WHERE t.ID = @taskId;";
@@ -801,7 +796,9 @@ JOIN tasks t2 ON (
         )
 )
 WHERE t.ID = @taskId
-ORDER BY (t2.Tasks_Status = 2) DESC
+ORDER BY
+    (t2.ID = t.ID) DESC,
+    (t2.Tasks_Status = 2) DESC
 LIMIT 1;";
 
     cmd.Parameters.Add(new MySqlParameter("@taskId", taskId));
@@ -1120,6 +1117,7 @@ WHERE t.IsActive      = 1
   AND bp.IsActive     = 1
   AND bp.ID           = @bpId          -- KONKRĒTAIS BatchProduct
   AND ts.Step_Type    IN (1,2,3)       -- ← PIEVIENOTS 3 (Finishing)
+  AND (ts.IsPainting = 0 OR ts.IsPainting IS NULL)  
 GROUP BY 
     ts.ProductToPart_ID,
     ts.Step_Type;
@@ -1164,11 +1162,11 @@ public async Task<List<object>> GetFinishingWaves(int batchProductId, int produc
             x => x.rc.DefaultIfEmpty(),
             (x, rc) => new { x.t, x.ts, rc })
             .Where(x =>
-    x.t.IsActive &&
-    x.t.BatchProduct_ID == batchProductId &&
-    x.ts.ProductToPartId == productToPartId &&
-    x.ts.StepType == 3 &&
-    x.t.Tasks_Status != 5          // ✅ ŠIS
+                x.t.IsActive &&
+                x.t.BatchProduct_ID == batchProductId &&
+                x.ts.ProductToPartId == productToPartId &&
+                x.ts.StepType == 3
+                    
 )
 
         .OrderByDescending(x => x.t.ID)
@@ -1188,6 +1186,55 @@ public async Task<List<object>> GetFinishingWaves(int batchProductId, int produc
         .ToListAsync();
 
 Console.WriteLine("[finishing-waves] " + string.Join(" | ", list.Select(x => $"{x.TaskId}:{x.RalName}:{(x.Comment ?? "NULL")}")));
+
+    return list.Cast<object>().ToList();
+}
+
+public async Task<List<object>> GetFinishingWavesChild(
+    int batchProductId,
+    int productToPartId)
+{
+    if (batchProductId <= 0 || productToPartId <= 0)
+        throw new ArgumentException("batchProductId and productToPartId are required.");
+
+    var list = await _db.Tasks
+        .Join(_db.TopPartSteps,
+            t => t.TopPartStep_ID,
+            ts => ts.Id,
+            (t, ts) => new { t, ts })
+
+        .GroupJoin(_db.Set<RalColor>(),
+            x => x.t.RAL_Color_ID,
+            rc => rc.ID,
+            (x, rc) => new { x.t, x.ts, rc })
+
+        .SelectMany(
+            x => x.rc.DefaultIfEmpty(),
+            (x, rc) => new { x.t, x.ts, rc })
+
+        .Where(x =>
+            x.t.IsActive &&
+            x.t.BatchProduct_ID == batchProductId &&
+            x.ts.ProductToPartId == productToPartId &&
+            x.ts.IsPainting
+        )
+
+        .OrderByDescending(x => x.t.ID)
+
+        .Select(x => new
+        {
+            TaskId = x.t.ID,
+            Status = x.t.Tasks_Status,
+            Qty = x.t.Qty_Done,
+            Assigned_To = x.t.Assigned_To,
+            Claimed_By = x.t.Claimed_By,
+            StartedAt = x.t.Started_At,
+            FinishedAt = x.t.Finished_At,
+            Comment = x.t.Tasks_Comment,
+            RalName = x.rc != null ? x.rc.Name : null
+        })
+
+        .ToListAsync();
 
     return list.Cast<object>().ToList();
 }
@@ -1265,6 +1312,7 @@ JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
 
 WHERE t.IsActive = 1
   AND ts.Step_Type = 1
+  AND (ts.IsPainting = 0 OR ts.IsPainting IS NULL)
   AND t.BatchProduct_ID IN (
       SELECT bp2.ID
       FROM batches_products bp2
@@ -1399,6 +1447,24 @@ FROM tasks t
 JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
 WHERE t.IsActive = 1
   AND t.BatchProduct_ID = @bp
+
+AND (
+    (
+        EXISTS (
+            SELECT 1
+            FROM batches_products bp0
+            WHERE bp0.ID = @bp
+              AND bp0.ProductToPart_ID IS NULL
+        )
+    )
+
+    OR
+
+    (
+        t.BatchProduct_ID = @bp
+    )
+)
+
   AND ts.Step_Type = 3
 GROUP BY ts.ProductToPart_ID;
 ";

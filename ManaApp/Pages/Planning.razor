@@ -110,6 +110,8 @@ else
             OnCreateConfirmed="CreatePlanAsync"
             OnDeleteDraft="DeleteDraftAsync"
             OnDelete="OnBatchItemDeleted"
+            DraftCreatedAt="@draftCreatedAt"
+            BatchStatus="draftBatchStatus"
             OnEdit="OpenEdit" />
     </div>
 
@@ -131,6 +133,7 @@ else
     IsArchivedVersion="isPartOnlyMode"
     IsPartOnlyMode="isPartOnlyMode"
     ProductName="@addProductName"
+    VersionName="@addVersionName"
     OnSaved="OnAddSaved" />
 
 <BatchLineEditDialog
@@ -183,9 +186,10 @@ else
 private List<ProductRow> rows = new();
 private List<ProductRow> allRows = new();
 private List<CategoryRow> categories = new();
-
+private string? addVersionName;
 private List<CategoryRow> categoriesFiltered = new();
-
+private DateTime? draftCreatedAt;
+private int? draftBatchStatus;
 private List<SalesAllocateDialog.BatchRow> sellBatches = new();
 private List<ProductToPartDto> editParts = new();  
 private string? addProductName;
@@ -886,6 +890,11 @@ private async Task OnPlannedPlus(PlanningGroupDto row)
     }
 
     addProductName = result.ProductName;
+    addVersionName = rows
+        .FirstOrDefault(x =>
+            x.VersionId == result.ProductId &&
+            !x.IsRalRow)
+        ?.versionName;
     addProductOrderQty = row.OrderQty;
     addProductId = result.ProductId;
     addIsArchivedVersion =
@@ -917,6 +926,7 @@ private async Task OnAddSaved(BatchLine line)
                 productInfo = new DraftProductInfo
                     {
                         ProductName = product.ProductName ?? "",
+                        VersionName = product.VersionName,
                         ProductCode = product.ProductCode ?? "",
                         IsArchivedVersion =
                             rows.FirstOrDefault(x =>
@@ -1015,6 +1025,8 @@ try
 
                 draftBatchId = result.BatchId;
                 draftComment = result.Comment;
+                draftCreatedAt = result.CreatedAt;
+                draftBatchStatus = result.BatchStatus;
                 batchItems = result.Items;
 
 
@@ -1032,10 +1044,10 @@ foreach (var vid in versionIds)
     foreach (var item in batchItems.Where(x => x.VersionId == vid && x.ProductToPartId != null))
     {
         var part = parts.FirstOrDefault(p => p.Id == item.ProductToPartId);
-        if (part != null)
-        {
-            item.Name = part.TopPart_Name;
-        }
+       if (part != null)
+            {
+                item.Name = part.TopPart_Name;
+            }
     }
 }
 
@@ -1162,10 +1174,15 @@ private async Task OnBatchItemDeleted(BatchCartItem it)
 
 private async Task OpenEdit(BatchCartItem it)
 {
-    editProductName = rows
-        .FirstOrDefault(x => x.VersionId == it.VersionId)
-        ?.productName
-        ?? it.Name;
+    var row = rows
+        .FirstOrDefault(x => x.VersionId == it.VersionId);
+
+    editProductName =
+        row is null
+            ? it.Name
+            : string.IsNullOrWhiteSpace(row.versionName)
+                ? row.productName
+                : $"{row.productName} • {row.versionName}";
 
     var parent = batchItems.FirstOrDefault(x =>
     x.VersionId == it.VersionId &&
@@ -1217,13 +1234,11 @@ private async Task OnPartPlannedPlus(PlanningPartsPanel.PartItem part)
 
 addProductName =
     !part.VersionIsActive
-
-    ? $"{part.ProductName} ({part.VersionName}) • {part.TopPartName} [ARHĪVĒTS]"
-
-    : $"{part.ProductName} • {part.TopPartName}";
+        ? $"{part.ProductName} • {part.TopPartName} [ARHĪVĒTS]"
+        : $"{part.ProductName} • {part.TopPartName}";
 
 addProductId = part.VersionId;
-
+addVersionName = part.VersionName;
 addParts = await PlanningLookupService.LoadProductParts(part.VersionId);
 
 var isArchivedVersion =

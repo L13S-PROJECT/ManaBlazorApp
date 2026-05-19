@@ -1,0 +1,168 @@
+<div class="ptv3-toolbar-wrap">
+
+    <select class="ptv3-toolbar-select-small"
+        @bind="SelectedBatch">
+        
+        <option value="">Visi</option>
+
+        @foreach (var batch in BatchList)
+            {
+                <option value="@batch">@batch</option>
+            }
+    </select>
+
+    <button class="ptv3-toolbar-clear">
+        ✕
+    </button>
+
+    <div class="ptv3-toolbar-toggle">
+
+    <button class="ptv3-toolbar-button @(ParentCategoryId == 1 ? "active" : "")"
+        @onclick="() => ParentCategoryIdChanged.InvokeAsync(1)">
+        Kauss
+    </button>
+
+        <button class="ptv3-toolbar-button @(ParentCategoryId == 2 ? "active" : "")"
+                @onclick="() => ParentCategoryIdChanged.InvokeAsync(2)">
+            Adapteris
+        </button>
+
+    </div>
+
+    <div class="ptv3-toolbar-toggle">
+
+        <button class="ptv3-toolbar-button @(ItemTypeFilter == "product" ? "active" : "")"
+        @onclick='() => ItemTypeFilterChanged.InvokeAsync("product")'>
+            Preces
+        </button>
+
+        <button class="ptv3-toolbar-button @(ItemTypeFilter == "detail" ? "active" : "")"
+                @onclick='() => ItemTypeFilterChanged.InvokeAsync("detail")'>
+            Detaļas
+        </button>
+
+    </div>
+
+
+    <input class="ptv3-toolbar-search"
+           placeholder="Meklēt..." />
+
+    
+    <select class="ptv3-toolbar-select"
+        value="@DetailFilter"
+        @onchange="OnDetailFilterChanged">
+
+        <option value="">Detail</option>
+
+        <option value="NotStarted">
+            Nav iesākts
+        </option>
+
+        <option value="CanStart">
+            Var sākt
+        </option>
+
+        <option value="InProgress">
+            Procesā
+        </option>
+
+        <option value="Done">
+            Pabeigts
+        </option>
+
+    </select>
+    
+    <select class="ptv3-toolbar-select"
+        value="@AssemblyFilter"
+        @onchange="OnAssemblyFilterChanged">
+
+    <option value="">Assembly</option>
+
+    <option value="NotStarted">
+        Nav iesākts
+    </option>
+
+</select>
+
+    <select class="ptv3-toolbar-select">
+        <option>Finishing</option>
+    </select>
+
+    <label class="ptv3-switch-wrap">
+
+    <span>Izpildītie</span>
+
+    <label class="ptv3-switch">
+            <input type="checkbox"
+                checked="@ShowCompleted"
+                @onchange="OnShowCompletedChanged">
+            <span class="ptv3-slider"></span>
+        </label>
+
+    </label>
+
+</div>
+
+@code {
+
+    [Parameter]
+    public List<string> BatchList { get; set; } = new();
+
+    [Parameter]
+    public string SelectedBatch { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> SelectedBatchChanged { get; set; }
+
+    [Parameter]
+    public string DetailFilter { get; set; } = "";
+
+    [Parameter]
+    public int? ParentCategoryId { get; set; }
+
+    [Parameter]
+    public EventCallback<int?> ParentCategoryIdChanged { get; set; }
+
+    [Parameter]
+    public string ItemTypeFilter { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> ItemTypeFilterChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<string> DetailFilterChanged { get; set; }
+
+    [Parameter]
+    public bool ShowCompleted { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> ShowCompletedChanged { get; set; }
+
+    private async Task OnShowCompletedChanged(ChangeEventArgs e)
+        {
+            ShowCompleted = (bool)e.Value!;
+
+            await ShowCompletedChanged.InvokeAsync(ShowCompleted);
+        }
+    
+    private async Task OnDetailFilterChanged(ChangeEventArgs e)
+{
+    DetailFilter = e.Value?.ToString() ?? "";
+
+    await DetailFilterChanged.InvokeAsync(DetailFilter);
+}
+
+[Parameter]
+public string AssemblyFilter { get; set; } = "";
+
+[Parameter]
+public EventCallback<string> AssemblyFilterChanged { get; set; }
+
+private async Task OnAssemblyFilterChanged(ChangeEventArgs e)
+{
+    AssemblyFilter = e.Value?.ToString() ?? "";
+
+    await AssemblyFilterChanged.InvokeAsync(AssemblyFilter);
+}
+
+}

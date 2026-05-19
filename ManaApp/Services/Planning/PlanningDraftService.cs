@@ -153,10 +153,12 @@ private List<BatchCartItem> BuildBatchItems(
 
 if (line.Planned > 0)
 {
+    
     items.Add(new BatchCartItem
     {
         VersionId = line.VersionId,
         Name = productInfo?.ProductName ?? "",
+        VersionName = productInfo?.VersionName,
         Code = productInfo?.ProductCode ?? line.BatchCode,
         IsArchivedVersion = productInfo?.IsArchivedVersion == true,
         Qty = line.Planned,
@@ -172,6 +174,7 @@ foreach (var part in selectedParts)
     items.Add(new BatchCartItem
     {
         VersionId = line.VersionId,
+        VersionName = productInfo?.VersionName,
         Name = part.TopPart_Name,
         Code = "",
         IsArchivedVersion = productInfo?.IsArchivedVersion == true,
@@ -286,6 +289,7 @@ foreach (var it in draft.Items)
                 VersionId = it.VersionId,
                 Code = row?.productCode ?? "",
                 Name = row?.productName ?? "",
+                VersionName = row?.versionName,
                 IsArchivedVersion = isArchivedVersion,
                 Qty = it.Qty,
                 Comment = it.Comment,
@@ -299,6 +303,7 @@ foreach (var it in draft.Items)
             items.Add(new BatchCartItem
             {
                 VersionId = it.VersionId,
+                VersionName = row?.versionName,
                 Code = "",
                 Name = $"Detaļa #{it.ProductToPartId}",
                 IsArchivedVersion = isArchivedVersion,
@@ -314,6 +319,8 @@ foreach (var it in draft.Items)
 return new DraftLoadResult
 {
     BatchId = draft.BatchId,
+    BatchStatus = draft.BatchStatus,
+    CreatedAt = draft.CreatedAt,
     Comment = draft.Comment,
     Items = items
 };
@@ -451,6 +458,7 @@ public class AddOrUpdateResult
 public class DraftProductInfo
 {
     public string ProductName { get; set; } = "";
+    public string? VersionName { get; set; }
     public string ProductCode { get; set; } = "";
     public bool IsArchivedVersion { get; set; }
 }
@@ -458,7 +466,8 @@ public class DraftProductInfo
 public class DraftLoadResult
 {
     public int? BatchId { get; set; }
-
+    public DateTime? CreatedAt { get; set; }
+    public int BatchStatus { get; set; }
     public string? Comment { get; set; }
 
     public List<BatchCartItem> Items { get; set; } = new();
@@ -469,6 +478,9 @@ public sealed class DraftDto
     public int BatchId { get; set; }
 
     public string? Comment { get; set; }
+    public int BatchStatus { get; set; }
+
+    public DateTime? CreatedAt { get; set; }
 
     public List<DraftUpdateItemDto> Items { get; set; } = new();
 }
