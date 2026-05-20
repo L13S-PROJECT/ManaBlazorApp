@@ -11,6 +11,7 @@ public sealed class ProductBatchRow
     public string ProductCode { get; set; } = "";
     public string CategoryName { get; set; } = "";
     public int VersionId { get; set; }
+    public bool VersionIsActive { get; set; }
     public string? VersionName { get; set; }
     public bool IsReadOnlyChild { get; set; }
     public int Planned { get; set; }

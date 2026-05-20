@@ -15,6 +15,12 @@
         ✕
     </button>
 
+    <button class="ptv3-toolbar-button @(ShowRelatedRows ? "active" : "")"
+            disabled="@(!CanShowRelated)"
+            @onclick="ToggleRelatedRows">
+        Saistītie
+    </button>
+
     <div class="ptv3-toolbar-toggle">
 
     <button class="ptv3-toolbar-button @(ParentCategoryId == 1 ? "active" : "")"
@@ -163,6 +169,20 @@ private async Task OnAssemblyFilterChanged(ChangeEventArgs e)
     AssemblyFilter = e.Value?.ToString() ?? "";
 
     await AssemblyFilterChanged.InvokeAsync(AssemblyFilter);
+}
+
+[Parameter]
+public bool ShowRelatedRows { get; set; }
+
+[Parameter]
+public bool CanShowRelated { get; set; }
+
+[Parameter]
+public EventCallback ToggleRelatedRowsClicked { get; set; }
+
+private async Task ToggleRelatedRows()
+{
+    await ToggleRelatedRowsClicked.InvokeAsync();
 }
 
 }

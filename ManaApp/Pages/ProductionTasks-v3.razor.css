@@ -196,7 +196,7 @@
 }
 
 .ptv3-batch-main {
-    width: 80px;
+    width: 50px;
     max-width: 100px;
 }
 
@@ -207,7 +207,7 @@
 }
 
 .ptv3-details-plus {
-    width: 70px;
+    width: 50px;
     text-align: center;
     color: #6b7280; /* pelēks – default */
 }
@@ -230,4 +230,148 @@
 .ptv3-assembly-disabled {
     background: #e5e7eb;   /* pelēks */
     color: #9ca3af;
+}
+
+.ptv3-disabled-cell{
+    background:#dcdcdc;
+    color:#7b7b7b;
+    text-align:center;
+}
+
+.ptv3-comment-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:6px;
+}
+
+.ptv3-comment-btn{
+    border:none;
+    background:transparent;
+
+    color:#7a8ca8;
+
+    cursor:pointer;
+
+    font-size:13px;
+
+    padding:0;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    transition:all 0.15s ease;
+}
+
+.ptv3-comment-btn:hover{
+    color:#4f6485;
+
+    transform:scale(1.08);
+}
+
+.ptv3-comment-btn:hover{
+    transform:scale(1.1);
+}
+
+.orders-popup-overlay {
+    position: fixed;
+    inset: 0;
+
+    background: rgba(0, 0, 0, 0.45);
+
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    z-index: 2000;
+}
+
+.delete-popup {
+    width: 420px;
+
+    background: white;
+
+    border-radius: 10px;
+
+    overflow: hidden;
+
+    box-shadow: 0 12px 34px rgba(0,0,0,0.28);
+}
+
+.delete-popup h3 {
+    margin: 0;
+
+    padding: 14px 18px;
+
+    background: linear-gradient(
+        180deg,
+        #5d46ff 0%,
+        #4b35f0 100%
+    );
+
+    color: white;
+
+    font-size: 18px;
+    font-weight: 600;
+}
+.ptv3-popup-text{
+    width: calc(100% - 36px);
+    height: 120px;
+
+    margin: 18px;
+
+    padding: 12px;
+
+    resize: none;
+
+    border: 1px solid #cfd8e3;
+    border-radius: 6px;
+
+    outline: none;
+
+    font-size: 14px;
+
+    box-sizing: border-box;
+}
+
+.ptv3-popup-text:focus{
+    border-color: #4b35f0;
+
+    box-shadow: 0 0 0 2px rgba(75,53,240,0.12);
+}
+
+.ptv3-popup-buttons{
+    display:flex;
+    justify-content:flex-end;
+
+    gap:10px;
+
+    padding:0 18px 18px 18px;
+}
+
+.ptv3-popup-buttons button{
+    height:36px;
+    min-width:110px;
+
+    border-radius:6px;
+    border:1px solid #4b35f0;
+
+    cursor:pointer;
+
+    font-size:13px;
+    font-weight:600;
+}
+
+.ptv3-popup-buttons button:first-child{
+    background:#4b35f0;
+    color:white;
+}
+
+.ptv3-popup-buttons button:last-child{
+    background:white;
+    color:#4b35f0;
 }

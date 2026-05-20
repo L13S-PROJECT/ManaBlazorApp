@@ -151,3 +151,8 @@
 .ptv3-switch input:checked + .ptv3-slider::before{
     transform:translateX(22px);
 }
+
+.ptv3-toolbar-button:disabled{
+    opacity:0.45;
+    cursor:not-allowed;
+}

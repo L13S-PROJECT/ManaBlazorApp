@@ -35,6 +35,7 @@ SELECT
     p.Category_ID AS CategoryId,
     c.Parent_ID AS ParentCategoryId,
     v.Version_Name AS VersionName,
+    v.IsActive AS VersionIsActive,
 
     CASE
     WHEN bp.ProductToPart_ID IS NULL
@@ -56,13 +57,11 @@ END AS DetailName,
     MAX(bp.is_priority) AS IsPriority,
     MAX(CASE WHEN bp.ProductToPart_ID IS NULL THEN 1 ELSE 0 END) AS HasParent,
 
-    SUM(
-        CASE 
-            WHEN bp.ProductToPart_ID IS NULL 
-            THEN bp.Planned_Qty 
-            ELSE 0 
-        END
-    ) AS Planned,
+    CASE
+        WHEN bp.ProductToPart_ID IS NULL
+        THEN SUM(bp.Planned_Qty)
+        ELSE MAX(bp.Planned_Qty)
+    END AS Planned,
 
     MAX(bp.BatchProduct_Comments) AS Comment
 
@@ -88,15 +87,37 @@ END AS DetailName,
     ELSE 0
 END AS DetailsTotal
 
-, MAX(COALESCE(ch.ChildCount, 0)) AS DetailsChildTotal
+, CASE
+    WHEN bp.ProductToPart_ID IS NOT NULL
+    THEN 1
+    ELSE MAX(COALESCE(ch.ChildCount, 0))
+END AS DetailsChildTotal
 , CASE 
     WHEN MAX(CASE WHEN bp.ProductToPart_ID IS NULL THEN 1 ELSE 0 END) = 1
     THEN MAX(dstat.DetailsChildDone)
     ELSE 0
 END AS DetailsDone
-, COALESCE(dstat.DetailsChildDone,0) AS DetailsChildDone
-, dtask.DetailStart
-, dtask.DetailFinish
+, CASE
+    WHEN bp.ProductToPart_ID IS NOT NULL
+    THEN
+        CASE
+            WHEN dtask.DetailFinishChild IS NOT NULL
+            THEN 1
+            ELSE 0
+        END
+    ELSE COALESCE(dstat.DetailsChildDone,0)
+END AS DetailsChildDone
+, CASE
+    WHEN bp.ProductToPart_ID IS NOT NULL
+    THEN dtask.DetailStartChild
+    ELSE dtask.DetailStart
+END AS DetailStart
+
+, CASE
+    WHEN bp.ProductToPart_ID IS NOT NULL
+    THEN dtask.DetailFinishChild
+    ELSE dtask.DetailFinish
+END AS DetailFinish
 , dtask.DetailFinishChildList
 
 , CASE 
@@ -380,8 +401,9 @@ END AS DetailFinish,
       AND t2.Tasks_Status <> 3
 )
         THEN CONCAT(
-                    bp.ProductToPart_ID, ':',
-                    DATE_FORMAT((
+                bp.ProductToPart_ID, ':',
+                bp.ID, ':',
+                DATE_FORMAT((
                         SELECT MAX(t3.Finished_At)
                         FROM tasks t3
                         JOIN toppartsteps ts3 ON ts3.ID = t3.TopPartStep_ID
@@ -402,30 +424,30 @@ MAX(
     CASE
         WHEN bp.ProductToPart_ID IS NOT NULL
          AND NOT EXISTS (
-    SELECT 1
-    FROM tasks t2
-    JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+            SELECT 1
+            FROM tasks t2
+            JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
 
-    WHERE t2.BatchProduct_ID = bp.ID
-      AND t2.IsActive = 1
+            WHERE t2.BatchProduct_ID = bp.ID
+              AND t2.IsActive = 1
+              AND ts2.Step_Type = 1
+              AND (ts2.IsPainting = 0 OR ts2.IsPainting IS NULL)
 
-      AND ts2.Step_Type = 1
-      AND (ts2.IsPainting = 0 OR ts2.IsPainting IS NULL)
+              AND ts2.Step_Order <= (
+                    SELECT MIN(ts3.Step_Order)
+                    FROM toppartsteps ts3
+                    WHERE ts3.ProductToPart_ID = ts2.ProductToPart_ID
+                      AND ts3.IsFinal = 1
+                      AND (ts3.IsPainting = 0 OR ts3.IsPainting IS NULL)
+              )
 
-      AND ts2.Step_Order <= (
-            SELECT MIN(ts3.Step_Order)
-            FROM toppartsteps ts3
-            WHERE ts3.ProductToPart_ID = ts2.ProductToPart_ID
-              AND ts3.IsFinal = 1
-              AND (ts3.IsPainting = 0 OR ts3.IsPainting IS NULL)
-      )
-
-      AND t2.Tasks_Status <> 3
-)
+              AND t2.Tasks_Status <> 3
+        )
         THEN (
             SELECT MAX(t3.Finished_At)
             FROM tasks t3
             JOIN toppartsteps ts3 ON ts3.ID = t3.TopPartStep_ID
+
             WHERE t3.BatchProduct_ID = bp.ID
               AND t3.IsActive = 1
               AND ts3.Step_Type = 1
@@ -434,7 +456,34 @@ MAX(
         )
         ELSE NULL
     END
-) AS DetailFinishChild
+) AS DetailFinishChild,
+
+MIN(
+    CASE
+        WHEN bp.ProductToPart_ID IS NOT NULL
+         AND EXISTS (
+            SELECT 1
+            FROM tasks t2
+            JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
+
+            WHERE t2.BatchProduct_ID = bp.ID
+              AND t2.IsActive = 1
+              AND ts2.Step_Type = 1
+              AND (ts2.IsPainting = 0 OR ts2.IsPainting IS NULL)
+         )
+        THEN (
+            SELECT MIN(t3.Started_At)
+            FROM tasks t3
+            JOIN toppartsteps ts3 ON ts3.ID = t3.TopPartStep_ID
+
+            WHERE t3.BatchProduct_ID = bp.ID
+              AND t3.IsActive = 1
+              AND ts3.Step_Type = 1
+              AND ts3.IsPainting = 0
+        )
+        ELSE NULL
+    END
+) AS DetailStartChild
 
     FROM (
         SELECT
@@ -564,9 +613,59 @@ WHERE bp.IsActive = 1
   AND b.IsActive = 1
   AND b.Batches_Statuss = 1
 
+  AND (
+        bp.ProductToPart_ID IS NULL
+
+        OR NOT EXISTS (
+            SELECT 1
+            FROM batches_products bp2
+            WHERE bp2.Batch_Id = bp.Batch_Id
+              AND bp2.Version_Id = bp.Version_Id
+              AND bp2.ProductToPart_ID IS NULL
+              AND bp2.IsActive = 1
+        )
+
+        OR (
+    bp.ProductToPart_ID IS NOT NULL
+
+    AND EXISTS (
+        SELECT 1
+        FROM tasks t
+        JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+
+        WHERE t.BatchProduct_ID = bp.ID
+          AND t.IsActive = 1
+          AND ts.Step_Type = 1
+          AND (ts.IsPainting = 0 OR ts.IsPainting IS NULL)
+    )
+
+    AND NOT EXISTS (
+        SELECT 1
+        FROM tasks t
+        JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+
+        WHERE t.BatchProduct_ID = bp.ID
+          AND t.IsActive = 1
+          AND ts.Step_Type = 1
+          AND (ts.IsPainting = 0 OR ts.IsPainting IS NULL)
+
+          AND ts.Step_Order <= (
+                SELECT MIN(ts2.Step_Order)
+                FROM toppartsteps ts2
+                WHERE ts2.ProductToPart_ID = ts.ProductToPart_ID
+                  AND ts2.IsFinal = 1
+                  AND (ts2.IsPainting = 0 OR ts2.IsPainting IS NULL)
+          )
+
+          AND t.Tasks_Status <> 3
+    )
+)
+      )
+
 GROUP BY
     bp.Batch_Id,
-    bp.Version_Id
+    bp.Version_Id,
+    bp.ProductToPart_ID
 
 ORDER BY b.ID DESC;
 ";
@@ -590,26 +689,27 @@ while (await r.ReadAsync())
         CategoryId = r.GetInt32(9),
         ParentCategoryId = r.IsDBNull(10) ? (int?)null : r.GetInt32(10),
         VersionName    = r.GetString(11),
-        DetailName = r.IsDBNull(12)
+        VersionIsActive = r.GetBoolean(12),
+        DetailName = r.IsDBNull(13)
             ? null
-            : r.GetValue(12).ToString(),
-        IsPriority     = r.GetBoolean(13),
+            : r.GetValue(13).ToString(),
+        IsPriority     = r.GetBoolean(14),
 
-        Planned = r.GetInt32(15),
-        Comment = r.IsDBNull(16) ? null : r.GetString(16),
-        Sold = r.GetInt32(17),
-        Done = r.GetInt32(18),
-        DetailsTotal = r.GetInt32(19),
-        DetailsChildTotal = r.GetInt32(20),
-        DetailsDone = r.GetInt32(21),
-        DetailsChildDone = r.GetInt32(22),
-        DetailStart = r.IsDBNull(23) ? (DateTime?)null : r.GetDateTime(23),
-        DetailFinish = r.IsDBNull(24) ? (DateTime?)null : r.GetDateTime(24),
-        DetailFinishChildList = r.IsDBNull(25) ? null : r.GetString(25),
-        IsReadOnlyChild = r.GetInt32(26) == 1,
-        IsCompleted = r.GetInt32(27) == 1,
-        DetailStatus = r.GetString(28),
-        AssemblyStatus = r.GetString(29)
+        Planned = r.GetInt32(16),
+        Comment = r.IsDBNull(17) ? null : r.GetString(17),
+        Sold = r.GetInt32(18),
+        Done = r.GetInt32(19),
+        DetailsTotal = r.GetInt32(20),
+        DetailsChildTotal = r.GetInt32(21),
+        DetailsDone = r.GetInt32(22),
+        DetailsChildDone = r.GetInt32(23),
+        DetailStart = r.IsDBNull(24) ? (DateTime?)null : r.GetDateTime(24),
+        DetailFinish = r.IsDBNull(25) ? (DateTime?)null : r.GetDateTime(25),
+        DetailFinishChildList = r.IsDBNull(26) ? null : r.GetString(26),
+        IsReadOnlyChild = r.GetInt32(27) == 1,
+        IsCompleted = r.GetInt32(28) == 1,
+        DetailStatus = r.GetString(29),
+        AssemblyStatus = r.GetString(30)
     });
 }
 

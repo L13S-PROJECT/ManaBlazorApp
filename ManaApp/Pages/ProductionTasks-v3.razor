@@ -22,7 +22,10 @@
         @bind-SelectedBatch="SelectedBatchFilter"
         @bind-DetailFilter="DetailFilter"
         @bind-AssemblyFilter="AssemblyFilter"
-        @bind-ShowCompleted="ShowCompleted" />
+        @bind-ShowCompleted="ShowCompleted"
+        ShowRelatedRows="ShowRelatedRows"
+        CanShowRelated="CanShowRelatedRows"
+        ToggleRelatedRowsClicked="ToggleRelatedRows" />
 
     <!-- MAIN CONTENT -->
 <div class="ptv3-main">
@@ -57,6 +60,19 @@
 
 @foreach (var b in ProductBatches
     .Where(x =>
+
+            (
+                !ShowRelatedRows
+
+                || SelectedBatch == null
+
+                || (
+                    x.BatchId == SelectedBatch.BatchId
+                    && x.VersionId == SelectedBatch.VersionId
+                )
+            )
+
+            &&
             (string.IsNullOrWhiteSpace(SelectedBatchFilter)
                 || x.BatchCode == SelectedBatchFilter)
            &&
@@ -104,20 +120,29 @@
 
     <td class="ptv3-batch-main">@b.BatchCode</td>
     <td class="ptv3-batch-flag">
-        @GetBatchFlag(b)
+        @(b.ProductToPartId != null ? "!" : GetBatchFlag(b))
     </td>
     <td>@b.CategoryName</td>
     <td>@AllProducts.FirstOrDefault(x => x.productCode == b.ProductCode)?.productName</td>
     <td>@b.DetailName</td>
     <td>@b.ProductCode</td>
-    <td>@b.VersionName</td>
+    <td>
+        @b.VersionName
+
+        @if (!b.VersionIsActive)
+        {
+            <span style="color:red;font-weight:700;">*</span>
+        }
+    </td>
     <td>@b.Planned</td>
     <td>@(b.Planned > 0 ? b.Sold : 0)</td>
     <td>@(b.Planned > 0 ? b.Done : 0)</td>
     <td>
-        @(b.DetailsTotal > 0 
-            ? $"{b.DetailsDone}/{b.DetailsTotal}" 
-            : "0/0")
+        @(b.ProductToPartId != null
+            ? "-"
+            : b.DetailsTotal > 0
+                ? $"{b.DetailsDone}/{b.DetailsTotal}"
+                : "0/0")
     </td>
 
     <td class="ptv3-details-plus">
@@ -138,18 +163,26 @@
                 }
 
     </td>
-    <td class="ptv3-col-small @(b.AssemblyFinishDate != null ? "ptv3-detail-finish" 
-        : b.AssemblyStart != null ? "ptv3-detail-start" 
-        : "")">
+    <td class="ptv3-col-small @(b.ProductToPartId != null
+        ? "ptv3-disabled-cell"
+        : b.AssemblyFinishDate != null
+            ? "ptv3-detail-finish"
+            : b.AssemblyStart != null
+                ? "ptv3-detail-start"
+                : "")">
 
-                @if (b.AssemblyFinishDate != null)
-                {
-                    @b.AssemblyFinishDate?.ToString("dd.MM.yyyy")
-                }
+                @if (b.ProductToPartId != null)
+                    {
+                        <span>-</span>
+                    }
+                else if (b.AssemblyFinishDate != null)
+                    {
+                        @b.AssemblyFinishDate?.ToString("dd.MM.yyyy")
+                    }
                 else if (b.AssemblyStart != null)
-                {
-                    @b.AssemblyStart?.ToString("dd.MM.yyyy")
-                }
+                    {
+                        @b.AssemblyStart?.ToString("dd.MM.yyyy")
+                    }
 
     </td>
 
@@ -170,68 +203,25 @@
     </div>
 </td>
 <td class="ptv3-fin-plus"></td>
-<td class="ptv3-comment"
-    title="@b.Comment">
+<td class="ptv3-comment" title="@b.Comment">
 
-@if (EditingRow?.BatchProductId == b.BatchProductId)
-{
-    <textarea class="ptv3-comment-edit"
-              @bind="EditingComment"
-              @bind:event="onchange"
-              @onkeydown="@(e => HandleCommentKey(e))">
-    </textarea>
-}
-else
-{
-    <div @ondblclick="() => EditComment(b)">
-        @(string.IsNullOrWhiteSpace(b.Comment) ? "-" : b.Comment)
+    <div class="ptv3-comment-row">
+
+        <span>
+            @(string.IsNullOrWhiteSpace(b.Comment) ? "-" : b.Comment)
+        </span>
+
+        <button class="ptv3-comment-btn"
+                @onclick="() => EditComment(b)">
+            ✎
+        </button>
+
     </div>
-}
 
 </td>
 
 </tr>
 
-var childList = ParseChildFinish(b);
-
-@if (b.DetailsChildTotal > 0 && childList.Any())
-{
-    @foreach (var ch in childList)
-    {
-    <tr class="ptv3-child-ready @(IsChildRowSelected 
-    && SelectedChildPartId == ch.partId 
-    && SelectedChildParentBatchProductId == b.BatchProductId 
-        ? "ptv3-active" : "")"
-    @onclick:stopPropagation="true"
-    @onclick="() => SelectChildRow(b.BatchProductId, ch.partId)">
-
-        <td class="ptv3-batch-main">@b.BatchCode</td>
-        <td class="ptv3-batch-flag">✔</td>
-        <td>@b.CategoryName</td>
-        <td>@AllProducts.FirstOrDefault(x => x.productCode == b.ProductCode)?.productName</td>
-        <td>@GetChildDetailName(ch.partId)</td>
-        <td>@b.ProductCode</td>
-        <td>@b.VersionName</td>
-        <td>@ch.qty</td>
-        <td>-</td>
-        <td>0</td>
-
-        <!-- DETAIL -->
-        <td class="ptv3-batch-flag">✔</td>
-
-        <td></td>
-        <td class="ptv3-col-small ptv3-detail-finish">
-            @ch.Item2.ToString("dd.MM.yyyy")
-        </td>
-
-        <td class="ptv3-col-small ptv3-assembly-disabled">-</td>
-        <td>0/0</td>
-        <td></td>
-
-        <td></td>
-    </tr>
-}
-}
 }
 
 </tbody>
@@ -246,13 +236,44 @@ var childList = ParseChildFinish(b);
 <ProductionTasksDetailPanel
     SelectedBatch="SelectedBatch"
     IsReadOnly="false"
-    IsChildRowSelected="IsChildRowSelected"
-    SelectedChildPartId="SelectedChildPartId"
+    IsChildRowSelected="false"
+    SelectedChildPartId="null"
     OnDataChanged="HandleDetailChanged" />
 
 </div>
 
 </div>
+
+@if (ShowCommentPopup && EditingRow != null)
+{
+    <div class="orders-popup-overlay">
+
+    <div class="delete-popup">
+
+        <h3>
+            Komentārs
+        </h3>
+
+            <textarea class="ptv3-popup-text"
+                      @bind="EditingComment">
+            </textarea>
+
+            <div class="ptv3-popup-buttons">
+
+                <button @onclick="SaveComment">
+                    Saglabāt
+                </button>
+
+                <button @onclick="CloseCommentPopup">
+                    Atcelt
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+}
 
 @code {
 
@@ -389,11 +410,43 @@ private string GetFinHover(ProductBatchRow b)
 
 private ProductBatchRow? EditingRow;
 private string EditingComment = "";
+private bool ShowCommentPopup = false;
 
 private void EditComment(ProductBatchRow b)
 {
     EditingRow = b;
     EditingComment = b.Comment ?? "";
+    ShowCommentPopup = true;
+}
+
+private void CloseCommentPopup()
+{
+    ShowCommentPopup = false;
+    EditingRow = null;
+    EditingComment = "";
+}
+
+private async Task SaveComment()
+{
+    if (EditingRow == null)
+        return;
+
+    var dto = new
+    {
+        BatchProductId = EditingRow.BatchProductId,
+        PlannedQty = EditingRow.Planned,
+        Comment = EditingComment
+    };
+
+    await Http.PostAsJsonAsync(
+        "http://localhost:5270/api/batches/update-line",
+        dto);
+
+    EditingRow.Comment = EditingComment;
+
+    CloseCommentPopup();
+
+    await InvokeAsync(StateHasChanged);
 }
 
 private async Task HandleCommentKey(KeyboardEventArgs e)
@@ -464,9 +517,9 @@ private async Task HandleDetailChanged()
 
 private Dictionary<string, string> BatchFlags = new();
 
-private List<(int partId, DateTime date, int qty)> ParseChildFinish(ProductBatchRow b)
+private List<(int partId, int batchProductId, DateTime date, int qty)> ParseChildFinish(ProductBatchRow b)
 {
-    var result = new List<(int partId, DateTime date, int qty)>();
+    var result = new List<(int partId, int batchProductId, DateTime date, int qty)>();
 
     if (string.IsNullOrWhiteSpace(b.DetailFinishChildList))
         return result;
@@ -476,15 +529,16 @@ private List<(int partId, DateTime date, int qty)> ParseChildFinish(ProductBatch
     foreach (var item in items)
     {
         var parts = item.Split(':');
-        if (parts.Length != 3)
+        if (parts.Length != 4)
             continue;
 
         if (int.TryParse(parts[0], out var id)
-            && DateTime.TryParse(parts[1], out var dt)
-            && int.TryParse(parts[2], out var qty))
-                {
-                    result.Add((id, dt, qty));
-                }
+                && int.TryParse(parts[1], out var batchProductId)
+                && DateTime.TryParse(parts[2], out var dt)
+                && int.TryParse(parts[3], out var qty))
+            {
+                result.Add((id, batchProductId, dt, qty));
+            }
     }
 
     return result;
@@ -495,21 +549,15 @@ private ProductBatchRow? GetEffectiveBatch()
     return SelectedBatch;
 }
 
-private void SelectChildRow(int parentBatchProductId, int partId)
+private void SelectChildRow(int batchProductId)
 {
-    var parent = ProductBatches
-        .FirstOrDefault(x => x.BatchProductId == parentBatchProductId);
+    var child = ProductBatches
+        .FirstOrDefault(x => x.BatchProductId == batchProductId);
 
-    if (parent is null)
+    if (child is null)
         return;
 
-    //  saglabājam, ka izvēlēta child rinda
-    SelectedChildPartId = partId;
-    SelectedChildParentBatchProductId = parentBatchProductId;
-    IsChildRowSelected = true;
-
-    //  panelim joprojām dodam parent (datu avots)
-    SelectedBatch = parent;
+    SelectedBatch = child;
 }
 
 private void OnRowClick(ProductBatchRow b)
@@ -548,5 +596,18 @@ private string GetChildDetailName(int partId)
         .FirstOrDefault(x => x.ProductToPartId == partId)
         ?.DetailName ?? "-";
 }
+
+private bool ShowRelatedRows = false;
+
+private void ToggleRelatedRows()
+{
+    ShowRelatedRows = !ShowRelatedRows;
+}
+
+private bool CanShowRelatedRows =>
+    SelectedBatch != null
+    && ProductBatches.Count(x =>
+        x.BatchId == SelectedBatch.BatchId
+        && x.VersionId == SelectedBatch.VersionId) > 1;
 
 }
