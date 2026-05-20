@@ -23,9 +23,11 @@
         @bind-DetailFilter="DetailFilter"
         @bind-AssemblyFilter="AssemblyFilter"
         @bind-ShowCompleted="ShowCompleted"
+        @bind-SearchText="SearchText"
         ShowRelatedRows="ShowRelatedRows"
         CanShowRelated="CanShowRelatedRows"
-        ToggleRelatedRowsClicked="ToggleRelatedRows" />
+        ToggleRelatedRowsClicked="ToggleRelatedRows"
+        OnFiltersChanged="ResetSelection" />
 
     <!-- MAIN CONTENT -->
 <div class="ptv3-main">
@@ -107,9 +109,20 @@
             &&
             (
                 string.IsNullOrWhiteSpace(SearchText)
-                || (x.BatchCode ?? "").Contains(SearchText, StringComparison.OrdinalIgnoreCase)
-                || (x.ProductCode ?? "").Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+
+                || (x.BatchCode ?? "")
+                    .Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+
+                || (x.ProductCode ?? "")
+                    .Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+
                 || (AllProducts.FirstOrDefault(p => p.productCode == x.ProductCode)?.productName ?? "")
+                    .Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+
+                || (x.DetailName ?? "")
+                    .Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+
+                || (x.HiddenDetailNames ?? "")
                     .Contains(SearchText, StringComparison.OrdinalIgnoreCase)
             )
         )
@@ -231,16 +244,19 @@
 </div>
 
     <!-- DETAIL PANEL -->
-<div class="ptv3-detail">
+@if (SelectedBatch != null)
+{
+    <div class="ptv3-detail">
 
-<ProductionTasksDetailPanel
-    SelectedBatch="SelectedBatch"
-    IsReadOnly="false"
-    IsChildRowSelected="false"
-    SelectedChildPartId="null"
-    OnDataChanged="HandleDetailChanged" />
+        <ProductionTasksDetailPanel
+            SelectedBatch="SelectedBatch"
+            IsReadOnly="false"
+            IsChildRowSelected="false"
+            SelectedChildPartId="null"
+            OnDataChanged="HandleDetailChanged" />
 
-</div>
+    </div>
+}
 
 </div>
 
@@ -602,6 +618,17 @@ private bool ShowRelatedRows = false;
 private void ToggleRelatedRows()
 {
     ShowRelatedRows = !ShowRelatedRows;
+}
+
+private void ResetSelection()
+{
+    SelectedBatch = null;
+
+    IsChildRowSelected = false;
+    SelectedChildPartId = null;
+    SelectedChildParentBatchProductId = null;
+
+    ShowRelatedRows = false;
 }
 
 private bool CanShowRelatedRows =>

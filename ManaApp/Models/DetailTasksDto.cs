@@ -20,6 +20,7 @@ public sealed class DetailTasksPartDto
     public DateTime? EndDate { get; set; }
 
     public List<DetailTasksStepDto> Steps { get; set; } = new();
+    public bool IsEditable { get; set; }
 }
 
 public sealed class DetailTasksStepDto

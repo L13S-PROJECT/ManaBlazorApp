@@ -21,6 +21,8 @@ namespace ManiApi.Models
         public DateTime? EndDate { get; set; }
 
         public List<DetailStepDto> Steps { get; set; } = new();
+
+        public bool IsEditable { get; set; }
     }
 
     public class DetailStepDto

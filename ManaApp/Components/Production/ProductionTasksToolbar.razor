@@ -1,7 +1,8 @@
 <div class="ptv3-toolbar-wrap">
 
     <select class="ptv3-toolbar-select-small"
-        @bind="SelectedBatch">
+    value="@SelectedBatch"
+    @onchange="OnBatchChanged">
         
         <option value="">Visi</option>
 
@@ -11,7 +12,9 @@
             }
     </select>
 
-    <button class="ptv3-toolbar-clear">
+    <button class="ptv3-toolbar-clear"
+        title="Notīrīt visus filtrus"
+        @onclick="ClearFilters">
         ✕
     </button>
 
@@ -24,12 +27,12 @@
     <div class="ptv3-toolbar-toggle">
 
     <button class="ptv3-toolbar-button @(ParentCategoryId == 1 ? "active" : "")"
-        @onclick="() => ParentCategoryIdChanged.InvokeAsync(1)">
+        @onclick="ToggleKauss">
         Kauss
     </button>
 
         <button class="ptv3-toolbar-button @(ParentCategoryId == 2 ? "active" : "")"
-                @onclick="() => ParentCategoryIdChanged.InvokeAsync(2)">
+        @onclick="ToggleAdapteris">
             Adapteris
         </button>
 
@@ -38,20 +41,34 @@
     <div class="ptv3-toolbar-toggle">
 
         <button class="ptv3-toolbar-button @(ItemTypeFilter == "product" ? "active" : "")"
-        @onclick='() => ItemTypeFilterChanged.InvokeAsync("product")'>
+        @onclick="ToggleProducts">
             Preces
         </button>
 
         <button class="ptv3-toolbar-button @(ItemTypeFilter == "detail" ? "active" : "")"
-                @onclick='() => ItemTypeFilterChanged.InvokeAsync("detail")'>
+        @onclick="ToggleDetails">
             Detaļas
         </button>
 
     </div>
 
 
-    <input class="ptv3-toolbar-search"
-           placeholder="Meklēt..." />
+    <div class="ptv3-search-wrap">
+
+        <input class="ptv3-toolbar-search"
+            placeholder="Meklēt..."
+            value="@SearchText"
+            @oninput="OnSearchInput" />
+
+        @if (!string.IsNullOrWhiteSpace(SearchText))
+            {
+                <span class="ptv3-search-clear"
+                    @onclick="ClearSearch">
+                    ✕
+                </span>
+            }
+
+    </div>
 
     
     <select class="ptv3-toolbar-select"
@@ -143,12 +160,15 @@
 
     [Parameter]
     public EventCallback<bool> ShowCompletedChanged { get; set; }
-
+        
+    [Parameter]
+    public EventCallback OnFiltersChanged { get; set; }
     private async Task OnShowCompletedChanged(ChangeEventArgs e)
         {
             ShowCompleted = (bool)e.Value!;
 
             await ShowCompletedChanged.InvokeAsync(ShowCompleted);
+            await OnFiltersChanged.InvokeAsync();
         }
     
     private async Task OnDetailFilterChanged(ChangeEventArgs e)
@@ -156,6 +176,7 @@
     DetailFilter = e.Value?.ToString() ?? "";
 
     await DetailFilterChanged.InvokeAsync(DetailFilter);
+        await OnFiltersChanged.InvokeAsync();
 }
 
 [Parameter]
@@ -169,6 +190,7 @@ private async Task OnAssemblyFilterChanged(ChangeEventArgs e)
     AssemblyFilter = e.Value?.ToString() ?? "";
 
     await AssemblyFilterChanged.InvokeAsync(AssemblyFilter);
+    await OnFiltersChanged.InvokeAsync();
 }
 
 [Parameter]
@@ -183,6 +205,102 @@ public EventCallback ToggleRelatedRowsClicked { get; set; }
 private async Task ToggleRelatedRows()
 {
     await ToggleRelatedRowsClicked.InvokeAsync();
+}
+
+private async Task ClearFilters()
+{
+    SearchText = "";
+
+    await SelectedBatchChanged.InvokeAsync("");
+    await DetailFilterChanged.InvokeAsync("");
+    await AssemblyFilterChanged.InvokeAsync("");
+    await ParentCategoryIdChanged.InvokeAsync(null);
+    await ItemTypeFilterChanged.InvokeAsync("");
+    await SearchTextChanged.InvokeAsync("");
+    await ShowCompletedChanged.InvokeAsync(false);
+
+    await OnFiltersChanged.InvokeAsync();
+}
+
+private async Task ToggleKauss()
+{
+    if (ParentCategoryId == 1)
+        await ParentCategoryIdChanged.InvokeAsync(null);
+    else
+        await ParentCategoryIdChanged.InvokeAsync(1);
+    await OnFiltersChanged.InvokeAsync();
+}
+
+private async Task ToggleAdapteris()
+{
+    if (ParentCategoryId == 2)
+        await ParentCategoryIdChanged.InvokeAsync(null);
+    else
+        await ParentCategoryIdChanged.InvokeAsync(2);
+    await OnFiltersChanged.InvokeAsync();
+}
+
+private async Task ToggleProducts()
+{
+    if (ItemTypeFilter == "product")
+        await ItemTypeFilterChanged.InvokeAsync("");
+    else
+        await ItemTypeFilterChanged.InvokeAsync("product");
+    await OnFiltersChanged.InvokeAsync();
+}
+
+private async Task ToggleDetails()
+{
+    if (ItemTypeFilter == "detail")
+        await ItemTypeFilterChanged.InvokeAsync("");
+    else
+        await ItemTypeFilterChanged.InvokeAsync("detail");
+    await OnFiltersChanged.InvokeAsync();
+}
+
+[Parameter]
+public string SearchText { get; set; } = "";
+
+[Parameter]
+public EventCallback<string> SearchTextChanged { get; set; }
+
+private CancellationTokenSource? _searchCts;
+
+private async Task OnSearchInput(ChangeEventArgs e)
+{
+    SearchText = e.Value?.ToString() ?? "";
+
+    _searchCts?.Cancel();
+
+    _searchCts = new CancellationTokenSource();
+
+    try
+    {
+        await Task.Delay(350, _searchCts.Token);
+
+        await SearchTextChanged.InvokeAsync(SearchText);
+        await OnFiltersChanged.InvokeAsync();
+    }
+    catch (TaskCanceledException)
+    {
+    }
+}
+
+private async Task ClearSearch()
+{
+    SearchText = "";
+
+    await SearchTextChanged.InvokeAsync("");
+    await OnFiltersChanged.InvokeAsync();
+}
+
+private async Task OnBatchChanged(ChangeEventArgs e)
+{
+    SelectedBatch = e.Value?.ToString() ?? "";
+
+    await SelectedBatchChanged.InvokeAsync(SelectedBatch);
+
+    await OnFiltersChanged.InvokeAsync();
 }
 
 }

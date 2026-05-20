@@ -369,8 +369,14 @@
 
 /* ===== ASSEMBLY PART ===== */
 .ptv2-tasks-row.assembly:not(.sub) {
-    background: #eaf1ff;   /* ļoti viegls zilgans */
-    color: #1e293b;
+    background: #dbeafe;
+    color: #1d4ed8;
+
+    font-size: 14px;
+    font-weight: 700;
+
+    border-top: 1px solid #93c5fd;
+    border-bottom: 1px solid #93c5fd;
 }
 
 .ptv2-tasks-row.assembly.sub.step {
@@ -408,9 +414,14 @@
 }
 
 .ptv2-tasks-row.assembly.sub {
-    font-size: 11px;
+    font-size: 12px;
     background: #f8fbff;
     color: #1e293b;
+
+    min-height: 34px;
+
+    padding-top: 4px;
+    padding-bottom: 4px;
 }
 
 .ptv2-tasks-row.assembly.sub > div:first-child {
@@ -420,4 +431,167 @@
 
 .ptv2-tasks-row.assembly.sub > div:nth-child(8) {
     text-align: left; /* lai teksts nelien centrā */
+}
+
+.ptv2-detail-block {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ptv2-detail-item {
+    width: 100%;
+
+    display: grid;
+    grid-template-columns: 1fr 70px 70px 140px;
+
+    align-items: center;
+
+    min-height: 34px;
+    max-height: 34px;
+
+    padding: 0 10px;
+
+    border: 1px solid #dbe3f0;
+    background: #f8fbff;
+
+    font-size: 13px;
+}
+
+.ptv2-detail-item > div:nth-child(2),
+.ptv2-detail-item > div:nth-child(3) {
+    text-align: center;
+    font-weight: 600;
+}
+
+.ptv2-detail-item > div:nth-child(4) {
+    text-align: right;
+    font-weight: 600;
+}
+
+.assembly-status {
+    text-align: right;
+    font-weight: 600;
+}
+
+.assembly-status.gray {
+    color: #9ca3af;
+}
+
+.assembly-status.orange {
+    color: #f59e0b;
+}
+
+.assembly-status.yellow {
+    color: #f6fa15;
+}
+
+.assembly-status.green {
+    color: #22c55e;
+    font-size: 20px;
+}
+
+.ptv2-summary-table {
+    width: 100%;
+    border: 1px solid #d7dee8;
+    background: #ffffff;
+    margin-bottom: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.ptv2-summary-header,
+.ptv2-summary-row {
+    display: grid;
+    grid-template-columns:
+        46px
+        1fr
+        160px
+        160px
+        170px
+        170px;
+
+    align-items: center;
+}
+
+.ptv2-summary-header {
+    background: #f3f6fa;
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+
+    border-bottom: 1px solid #d7dee8;
+}
+
+.ptv2-summary-header > div,
+.ptv2-summary-row > div {
+    min-height: 30px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-right: 1px solid #d7dee8;
+
+    padding: 0 6px;
+}
+
+.ptv2-summary-header > div:last-child,
+.ptv2-summary-row > div:last-child {
+    border-right: none;
+}
+
+.ptv2-summary-row {
+    font-size: 13px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.ptv2-summary-row:last-child {
+    border-bottom: none;
+}
+
+.ptv2-summary-name {
+    justify-content: flex-start !important;
+    gap: 10px;
+}
+
+.ptv2-summary-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.ptv2-summary-dot.gray {
+    background: #9ca3af;
+}
+
+.ptv2-summary-dot.orange {
+    background: #f59e0b;
+}
+
+.ptv2-summary-dot.yellow {
+    background: #facc15;
+}
+
+.ptv2-summary-dot.green {
+    background: #22c55e;
+}
+
+.ptv2-summary-check {
+    font-size: 14px;
+    line-height: 1;
+
+    width: 18px;
+    height: 18px;
+
+    border-radius: 50%;
+
+    background: #22c55e;
+    color: white;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }

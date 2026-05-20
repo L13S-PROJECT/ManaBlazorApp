@@ -10,6 +10,7 @@ using ManiApi.Services;
 using ManiApi.DTOs.Tasks;
 using ManiApi.Services.Detail;
 using ManiApi.Services.Finishing;
+using ManiApi.Services.Assembly;
 using TaskRowDto = ManiApi.DTOs.Tasks.TaskRowDto;
 using ManiApi.Services.Tasks;
 
@@ -23,6 +24,7 @@ namespace ManiApi.Controllers
     private readonly AppDbContext _db;
     private readonly TaskService _taskService;
     private readonly DetailTasksService _detailService;
+    private readonly AssemblyTasksService _assemblyTasksService;
     private readonly TaskManagementService _taskManagementService;
     private readonly FinishingFlowService _finishingFlowService;
     private readonly FinishingTasksService _finishingTasksService;
@@ -32,6 +34,7 @@ namespace ManiApi.Controllers
         AppDbContext db,
         TaskService taskService,
         DetailTasksService detailService,
+        AssemblyTasksService assemblyTasksService,
         TaskManagementService taskManagementService,
         FinishingFlowService finishingFlowService,
         FinishingTasksService finishingTasksService,
@@ -40,6 +43,7 @@ namespace ManiApi.Controllers
         _db = db;
         _taskService = taskService;
         _detailService = detailService;
+        _assemblyTasksService = assemblyTasksService;
         _taskManagementService = taskManagementService;
         _taskQueryService = taskQueryService;
         _finishingFlowService = finishingFlowService;
@@ -1430,6 +1434,17 @@ public async Task<IActionResult> GetReadyDetailParts([FromQuery] int batchProduc
     var list = await _taskQueryService.GetReadyDetailParts(batchProductId);
 
     return Ok(list);
+}
+
+[HttpGet("assembly-summary")]
+public async Task<IActionResult> GetAssemblySummary([FromQuery] int batchProductId)
+{
+    if (batchProductId <= 0)
+        return BadRequest("batchProductId is required.");
+
+    var result = await _assemblyTasksService.GetAssemblySummary(batchProductId);
+
+    return Ok(result);
 }
 
     }

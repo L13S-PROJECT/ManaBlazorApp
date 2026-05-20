@@ -15,7 +15,7 @@ public sealed class ProductBatchRow
     public string? VersionName { get; set; }
     public bool IsReadOnlyChild { get; set; }
     public int Planned { get; set; }
-
+    public string? HiddenDetailNames { get; set; }
     public int Sold { get; set; }
 
     public int Done { get; set; }

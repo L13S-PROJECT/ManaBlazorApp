@@ -20,6 +20,7 @@ public sealed class DetailPartRow
     public string? Comment { get; set; }
 
     public List<TopPartStepRow> Steps { get; set; } = new();
+    public bool IsEditable { get; set; }
     
 }
 

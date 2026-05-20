@@ -1,3 +1,5 @@
+/*DetailTasksService.cs*/
+
 using ManiApi.Data;
 using ManiApi.Models;
 using Microsoft.EntityFrameworkCore;
@@ -79,7 +81,17 @@ namespace ManiApi.Services.Detail
                                 .Where(tp => tp.Id == x.TopPartId)
                                 .Select(tp => tp.TopPartName)
                                 .FirstOrDefault(),
+                            IsEditable =
+                                scenario == "A"
 
+                                || (
+                                    scenario == "B"
+                                    && bp.ProductToPart_ID == null
+                                )
+
+                                || (
+                                    x.Id == bp.ProductToPart_ID
+                                ),
                             Qty = 0,
                             QtyDisplay = "",
                             Indicator = "gray",
@@ -134,6 +146,7 @@ var indicatorRows = await _db.Tasks
             x.t.IsActive &&
             x.ts.IsActive &&
             x.ts.StepType == 1 &&
+            !x.ts.IsPainting &&
             relatedBatchProductIds.Contains(x.t.BatchProduct_ID)
         )
     .GroupBy(x => x.ts.ProductToPartId)

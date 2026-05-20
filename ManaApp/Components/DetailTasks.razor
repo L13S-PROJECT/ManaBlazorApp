@@ -49,9 +49,18 @@
 
 @foreach (var p in Parts)
 {
-<div class="ptv2-tasks-row @(IsReadOnly ? "ptv2-row-disabled" : "")">
+
+var isDisabledChild =
+    SelectedBatch?.ProductToPartId != null
+    && !p.IsEditable;
+
+<div class="ptv2-tasks-row @(
+    (IsReadOnly || isDisabledChild)
+        ? "ptv2-row-disabled"
+        : "")">
     <!-- 1. Nosaukums -->
-            <div class="ptv2-part-name" title="@p.TopPartName">
+            <div class="ptv2-part-name @(isDisabledChild ? "ptv2-row-disabled" : "")"
+                    title="@p.TopPartName">
                 <span class="ptv2-part-indicator
                     @(DetailedIndicators.TryGetValue(p.ProductToPartId, out var st)
                         ? $"state-{st}"
@@ -135,7 +144,10 @@ if (AggregatedByStep.TryGetValue((step.Id, p.ProductToPartId), out var aggList))
         5
 };
 
-    <div class="ptv2-tasks-row sub task @(IsReadOnly ? "ptv2-row-disabled" : "")">
+    <div class="ptv2-tasks-row sub task @(
+                    (IsReadOnly || isDisabledChild)
+                        ? "ptv2-row-disabled"
+                        : "")">
                 <!-- 1. Nosaukums (tukšs – step jau ir augstāk) -->
                     <div title="@step.StepName">
                         @step.StepName
@@ -158,7 +170,7 @@ if (AggregatedByStep.TryGetValue((step.Id, p.ProductToPartId), out var aggList))
                                 else
                                 {
                                     <select value="@(agg?.Assigned_To)"
-                                        disabled="@(IsReadOnly || t.Status == 2 || t.Status == 3)"
+                                         disabled="@(IsReadOnly || isDisabledChild || t.Status == 2 || t.Status == 3)"
                                             @onchange="async e => {
                                                 var val = int.TryParse(e.Value?.ToString(), out var v) ? v : (int?)null;
                                                 agg!.Assigned_To = val;
@@ -203,6 +215,7 @@ if (AggregatedByStep.TryGetValue((step.Id, p.ProductToPartId), out var aggList))
                         <button
                             type="button"
                             class="ptv2-comment-edit"
+                            disabled="@isDisabledChild"
                             title="Labot komentāru"
                             @onclick="() => OpenCommentEditor(t)">
                             ✎
@@ -215,7 +228,7 @@ if (AggregatedByStep.TryGetValue((step.Id, p.ProductToPartId), out var aggList))
                 <div class="ptv2-done-cell">
                 <div class="ptv2-done-cell" style="position:relative; z-index:5;">
                     <input type="checkbox"
-                        disabled="@IsReadOnly"
+                        disabled="@(IsReadOnly || isDisabledChild)"
                         class="ptv2-done-checkbox"
                         style="position:relative; z-index:6;"
                         title="Redzams darbiniekam"
@@ -309,6 +322,7 @@ if (dto is not null)
             TopPartName = x.TopPartName ?? "",
             Qty = x.Qty,
             QtyDisplay = x.QtyDisplay,  
+            IsEditable = x.IsEditable,
             StartDate = x.StartDate,
             EndDate = x.EndDate,
             Steps = x.Steps

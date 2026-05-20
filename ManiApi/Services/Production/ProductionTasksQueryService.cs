@@ -1,3 +1,5 @@
+/*ProductionTasksQueryService.cs*/
+
 using ManiApi.Data;
 using System.Data;
 using Microsoft.EntityFrameworkCore;
@@ -53,6 +55,25 @@ SELECT
         LIMIT 1
     )
 END AS DetailName,
+
+CASE
+    WHEN bp.ProductToPart_ID IS NULL
+    THEN (
+        SELECT GROUP_CONCAT(DISTINCT tp.TopPart_Name SEPARATOR ' | ')
+        FROM batches_products bp2
+        JOIN producttopparts ptp 
+            ON ptp.ID = bp2.ProductToPart_ID
+        JOIN toppart tp 
+            ON tp.ID = ptp.TopPart_ID
+        WHERE bp2.Batch_Id = bp.Batch_Id
+          AND bp2.Version_Id = bp.Version_Id
+          AND bp2.ProductToPart_ID IS NOT NULL
+          AND bp2.IsActive = 1
+          AND tp.Stage = 1
+          AND tp.IsActive = 1
+    )
+    ELSE NULL
+END AS HiddenDetailNames,
 
     MAX(bp.is_priority) AS IsPriority,
     MAX(CASE WHEN bp.ProductToPart_ID IS NULL THEN 1 ELSE 0 END) AS HasParent,
@@ -552,6 +573,15 @@ SUM(
                    AND bp2.IsActive = 1
              )
              AND t.IsActive = 1
+
+            AND EXISTS (
+                    SELECT 1
+                    FROM toppartsteps ts
+                    WHERE ts.ID = t.TopPartStep_ID
+                    AND ts.Step_Type = 1
+                    AND (ts.IsPainting = 0 OR ts.IsPainting IS NULL)
+                )
+
              AND t.Tasks_Status <> 3
          )
         THEN 1 ELSE 0
@@ -584,6 +614,14 @@ AND CASE
 
           AND ts.Step_Type = 1
           AND (ts.IsPainting = 0 OR ts.IsPainting IS NULL)
+
+          AND ts.Step_Order <= (
+                SELECT MIN(ts2.Step_Order)
+                FROM toppartsteps ts2
+                WHERE ts2.ProductToPart_ID = ts.ProductToPart_ID
+                AND ts2.IsFinal = 1
+                AND (ts2.IsPainting = 0 OR ts2.IsPainting IS NULL)
+            )
 
           AND ts.Step_Order <= (
                 SELECT MIN(ts2.Step_Order)
@@ -693,23 +731,26 @@ while (await r.ReadAsync())
         DetailName = r.IsDBNull(13)
             ? null
             : r.GetValue(13).ToString(),
-        IsPriority     = r.GetBoolean(14),
+        HiddenDetailNames = r.IsDBNull(14)
+            ? null
+            : r.GetString(14),
+        IsPriority     = r.GetBoolean(15),
 
-        Planned = r.GetInt32(16),
-        Comment = r.IsDBNull(17) ? null : r.GetString(17),
-        Sold = r.GetInt32(18),
-        Done = r.GetInt32(19),
-        DetailsTotal = r.GetInt32(20),
-        DetailsChildTotal = r.GetInt32(21),
-        DetailsDone = r.GetInt32(22),
-        DetailsChildDone = r.GetInt32(23),
-        DetailStart = r.IsDBNull(24) ? (DateTime?)null : r.GetDateTime(24),
-        DetailFinish = r.IsDBNull(25) ? (DateTime?)null : r.GetDateTime(25),
-        DetailFinishChildList = r.IsDBNull(26) ? null : r.GetString(26),
-        IsReadOnlyChild = r.GetInt32(27) == 1,
-        IsCompleted = r.GetInt32(28) == 1,
-        DetailStatus = r.GetString(29),
-        AssemblyStatus = r.GetString(30)
+        Planned = r.GetInt32(17),
+        Comment = r.IsDBNull(18) ? null : r.GetString(18),
+        Sold = r.GetInt32(19),
+        Done = r.GetInt32(20),
+        DetailsTotal = r.GetInt32(21),
+        DetailsChildTotal = r.GetInt32(22),
+        DetailsDone = r.GetInt32(23),
+        DetailsChildDone = r.GetInt32(24),
+        DetailStart = r.IsDBNull(25) ? (DateTime?)null : r.GetDateTime(25),
+        DetailFinish = r.IsDBNull(26) ? (DateTime?)null : r.GetDateTime(26),
+        DetailFinishChildList = r.IsDBNull(27) ? null : r.GetString(27),
+        IsReadOnlyChild = r.GetInt32(28) == 1,
+        IsCompleted = r.GetInt32(29) == 1,
+        DetailStatus = r.GetString(30),
+        AssemblyStatus = r.GetString(31)
     });
 }
 

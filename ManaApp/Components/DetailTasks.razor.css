@@ -436,3 +436,16 @@
     color: #6b7280;
     margin-left: 6px;
 }
+
+.ptv2-row-disabled {
+    opacity: 0.45;
+    filter: grayscale(100%);
+}
+
+.ptv2-row-disabled input,
+.ptv2-row-disabled select,
+.ptv2-row-disabled button,
+.ptv2-row-disabled textarea {
+    pointer-events: none;
+    cursor: not-allowed;
+}

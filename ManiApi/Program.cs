@@ -4,6 +4,7 @@ using Microsoft.OpenApi.Models;
 using System.Text.Json.Serialization; // <- pie using augšā
 using ManiApi.Services.Products;
 using ManiApi.Services.Detail;
+using ManiApi.Services.Assembly;
 using ManiApi.Services.Finishing;
 using ManiApi.Services.Tasks; 
 using ManiApi.Services.Stock;  
@@ -37,6 +38,7 @@ builder.Services.AddHttpClient();
 
 builder.Services.AddScoped<TaskService>();
 builder.Services.AddScoped<DetailTasksService>();
+builder.Services.AddScoped<AssemblyTasksService>();
 builder.Services.AddScoped<FinishingTasksService>();
 builder.Services.AddScoped<VersionService>();
 builder.Services.AddScoped<TaskManagementService>();

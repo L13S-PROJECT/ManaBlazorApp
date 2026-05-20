@@ -17,14 +17,33 @@
 
 .ptv3-toolbar-search{
     width:220px;
-    height: 28px;
+    height:28px;
 
-    padding:0 8px;
+    padding:0 10px;
+    padding-right:28px;
+    border:1px solid #9ec5ff;
+    border-radius:8px;
 
-    border:2px solid #cfcfcf;
-    border-radius:6px;
+    background:#ffffff;
 
     font-size:14px;
+
+    outline:none;
+
+    transition:
+        border-color .18s ease,
+        box-shadow .18s ease,
+        background .18s ease;
+}
+
+.ptv3-toolbar-search:focus{
+    border-color:#4d8dff;
+
+    box-shadow:
+        0 0 0 3px rgba(77,141,255,.18),
+        0 2px 8px rgba(77,141,255,.22);
+
+    background:#fdfefe;
 }
 
 .ptv3-toolbar-toggle{
@@ -40,7 +59,7 @@
     min-width:58px;
 
     border:none;
-    background:#efefef;
+    background:#ffffff;
 
     font-size:13px;
     font-weight:600;
@@ -81,15 +100,35 @@
     width:36px;
     height:28px;
 
-    border:1px solid #d0d0d0;
-    border-radius:6px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
 
-    background:white;
+    border:1px solid #d7ddea;
+    border-radius:10px;
 
-    font-size:24px;
-    color:#2345c5;
+    background:#ffffff;
+
+    font-size:20px;
+    font-weight:700;
+    color:#2f6fe4;
 
     cursor:pointer;
+
+    transition:
+        background .18s ease,
+        color .18s ease,
+        transform .18s ease,
+        box-shadow .18s ease;
+}
+
+.ptv3-toolbar-clear:hover{
+    background:#2345c5;
+    color:white;
+
+    transform:translateY(-2px);
+
+    box-shadow:0 4px 10px rgba(35,69,197,.28);
 }
 
 .ptv3-switch-wrap{
@@ -155,4 +194,36 @@
 .ptv3-toolbar-button:disabled{
     opacity:0.45;
     cursor:not-allowed;
+}
+
+.ptv3-search-wrap{
+    position:relative;
+    display:flex;
+    align-items:center;
+}
+
+.ptv3-search-clear{
+    position:absolute;
+
+    right:10px;
+    top:50%;
+
+    transform:translateY(-50%);
+
+    font-size:16px;
+    font-weight:600;
+
+    color:#9fc2f7;
+
+    cursor:pointer;
+    user-select:none;
+
+    transition:
+        color .15s ease,
+        transform .15s ease;
+}
+
+.ptv3-search-clear:hover{
+    color:#2f6fe4;
+    transform:translateY(-50%) scale(1.08);
 }

@@ -1,5 +1,6 @@
 @using ManaApp.Models
 @using ManaApp.Components
+@using ManaApp.DTOs.Assembly
 @inject HttpClient Http
 
 @if (SelectedBatch is null)
@@ -19,20 +20,81 @@
     return;
 }
 
-@if (DetailIndicatorsFromApi.Any())
+@if (AssemblySummary.Any())
 {
-    <div class="ptv2-detail-block" style="margin-bottom:8px;">
+    <div class="ptv2-summary-table">
 
-        @foreach (var d in DetailIndicatorsFromApi)
+        <div class="ptv2-summary-header">
+            <div>#</div>
+            <div>TopPart</div>
+            <div>Parent apjoms</div>
+            <div>Child apjoms</div>
+            <div>Kopējais apjoms</div>
+            <div>Statuss</div>
+        </div>
+
+        @{
+            var idx = 1;
+        }
+
+        @foreach (var s in AssemblySummary)
         {
-            <div class="ptv2-detail-item @(d.Value == "green" ? "active" : "inactive")"
-     style="font-size:11px; padding:2px 6px;">
-                @DetailParts.FirstOrDefault(p => p.ProductToPartId == d.Key)?.TopPartName
+            var qtyParts = s.QtyDisplay.Split('+');
+
+            var parentQty =
+                qtyParts.Length > 0
+                    ? qtyParts[0]
+                    : "-";
+
+            var childQty =
+                qtyParts.Length > 1
+                    ? $"+{qtyParts[1]}"
+                    : "-";
+
+            <div class="ptv2-summary-row @s.Indicator">
+
+                <div>
+                    @(idx++).
+                </div>
+
+                <div class="ptv2-summary-name">
+
+                    <span class="ptv2-summary-dot @s.Indicator"></span>
+
+                    @s.TopPartName
+                </div>
+
+                <div>
+                    @parentQty
+                </div>
+
+                <div>
+                    @childQty
+                </div>
+
+                <div>
+                    @s.Qty
+                </div>
+
+                <div class="assembly-status @s.Indicator">
+
+                    @if (s.Indicator == "green")
+                    {
+                        <span class="ptv2-summary-check">✔</span>
+                    }
+                    else
+                    {
+                        @s.StatusText
+                    }
+
+                </div>
+
             </div>
         }
 
     </div>
 }
+
 
 @foreach (var p in Parts)
 {
@@ -243,6 +305,7 @@ private Dictionary<int, List<DetailTaskRow>> TasksByStep = new();
 private Dictionary<int, List<(string name, int qty, string state)>> ReadyDetailParts = new();
 // key = TopPartStepId
 private List<DetailPartRow> DetailParts = new();
+private List<AssemblySummaryDto> AssemblySummary = new();
 protected override async Task OnParametersSetAsync()
 {
     Parts.Clear();
@@ -254,6 +317,11 @@ protected override async Task OnParametersSetAsync()
 
     if (SelectedBatch?.BatchProductId is not int bpId || bpId <= 0)
         return;
+
+    AssemblySummary =
+    await Http.GetFromJsonAsync<List<AssemblySummaryDto>>(
+        $"http://localhost:5270/api/tasks/assembly-summary?batchProductId={bpId}"
+    ) ?? new();
 
     // 1) Parts (Assembly)
     var partsUrl =
@@ -300,7 +368,14 @@ protected override async Task OnParametersSetAsync()
 
         hasParent = qtyList.Any(x => x.ParentQty > 0);
         hasChild  = qtyList.Any(x => x.ChildQty > 0);
-        isChildOnly = !hasParent && hasChild;
+        isChildOnly =
+            (!hasParent && hasChild)
+            ||
+            (
+                SelectedBatch?.ProductToPartId != null
+                && hasParent
+                && hasChild
+            );
         
     var detailIndicatorsApi =
     await Http.GetFromJsonAsync<List<AssemblyIndicatorRow>>(
