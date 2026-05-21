@@ -43,5 +43,7 @@ namespace ManiApi.Models
         public int? Claimed_By { get; set; }
         [Column("IsActive")]
         public bool IsActive { get; set; }
+        [Column("Source_ProductToPart_ID")]
+        public int? Source_ProductToPart_ID { get; set; }
     }
 }

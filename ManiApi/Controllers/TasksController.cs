@@ -1197,6 +1197,25 @@ public async Task<IActionResult> GetAssemblyAvailableUi([FromQuery] int batchPro
     
 }
 
+[HttpGet("child-finishing-data")]
+public async Task<IActionResult> GetChildFinishingData(
+    [FromQuery] int batchProductId,
+    [FromQuery] int productToPartId)
+{
+    if (batchProductId <= 0 || productToPartId <= 0)
+        return BadRequest();
+
+    var result = await _finishingTasksService.GetChildFinishingData(
+        batchProductId,
+        productToPartId);
+
+    return Ok(new
+    {
+        IsPainting = result.isPainting,
+        AvailableQty = result.availableQty
+    });
+}
+
 
 [HttpPost("set-task-push")]
 public async Task<IActionResult> SetTaskPush([FromBody] SetTaskPushDto dto)

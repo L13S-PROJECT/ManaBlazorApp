@@ -9,6 +9,7 @@ using System.Data;
 using MySqlConnector;
 using System.Data.Common;
 using ManiApi.Services.Tasks;
+using ManiApi.Services.Finishing;
 using TaskRowDto = ManiApi.Models.TaskRowDto;
 
 
@@ -17,10 +18,14 @@ namespace ManiApi.Services.Tasks
     public class TaskQueryService
     {
         private readonly AppDbContext _db;
+        private readonly FinishingTasksService _finishingTasksService;
 
-        public TaskQueryService(AppDbContext db)
+        public TaskQueryService(
+            AppDbContext db,
+            FinishingTasksService finishingTasksService)
         {
             _db = db;
+            _finishingTasksService = finishingTasksService;
         }
 
 public async Task<List<TaskRowDto>> GetForEmployee(int empId)
@@ -1023,6 +1028,7 @@ LIMIT 1;";
     return await cmd.ExecuteScalarAsync() != null;
 }
 
+
 // GET: /api/tasks/detailed-summary-by-batch?batchId=123
 public async Task<List<object>> GetDetailedSummaryByBatch(int batchId)
 {
@@ -1465,7 +1471,14 @@ AND (
     )
 )
 
-  AND ts.Step_Type = 3
+  AND (
+            ts.Step_Type = 3
+            OR
+            (
+                ts.Step_Type = 1
+                AND ts.IsPainting = 1
+            )
+        )
 GROUP BY ts.ProductToPart_ID;
 ";
 
@@ -1497,6 +1510,39 @@ GROUP BY ts.ProductToPart_ID;
             State = state
         });
     }
+
+    await r.DisposeAsync();
+
+    var childParts = await _db.BatchProducts
+            .Where(x =>
+                x.IsActive &&
+                x.ID == batchProductId &&
+                x.ProductToPart_ID != null)
+            .Select(x => x.ProductToPart_ID!.Value)
+            .ToListAsync();
+
+        foreach (var ptpId in childParts)
+        {
+            var exists = list.Any(x =>
+                (int)x.GetType().GetProperty("ProductToPartId")!.GetValue(x)! == ptpId);
+
+            if (exists)
+                continue;
+
+            var child = await _finishingTasksService
+                .GetChildFinishingData(batchProductId, ptpId);
+
+Console.WriteLine($"CHILD TEST -> bp={batchProductId} ptp={ptpId} paint={child.isPainting} avail={child.availableQty}");
+
+            if (!child.isPainting || child.availableQty <= 0)
+                continue;
+
+            list.Add(new
+            {
+                ProductToPartId = ptpId,
+                State = "blue"
+            });
+        }
 
     return list;
 }
@@ -2667,6 +2713,33 @@ HAVING
     }
 
     return result;
+}
+
+public async Task<bool> HasPlannedMovement(
+    DbConnection conn,
+    DbTransaction tx,
+    int batchProductId)
+{
+    await using var cmd = conn.CreateCommand();
+
+    cmd.Transaction = tx;
+
+    cmd.CommandText = @"
+SELECT COALESCE(SUM(sm.Stock_Qty), 0)
+FROM stock_movements sm
+WHERE sm.BatchProduct_ID = @bpId
+  AND sm.Move_Type = 'PLANNED'
+  AND sm.IsActive = 1;";
+
+    cmd.Parameters.Add(
+        new MySqlParameter("@bpId", batchProductId)
+    );
+
+    var result = Convert.ToInt32(
+        await cmd.ExecuteScalarAsync()
+    );
+
+    return result > 0;
 }
 
     }

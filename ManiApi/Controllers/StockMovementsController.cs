@@ -1,3 +1,5 @@
+/*stock_movements kontrolleris, kurš apstrādā visu saistībā ar krājumu kustībām:*/
+
 using Microsoft.AspNetCore.Mvc;
 using ManiApi.Data;
 using ManiApi.Models;
@@ -53,38 +55,8 @@ public async Task<IActionResult> Move([FromBody] MoveRequest dto)
     // 1) Mēģinām paņemt BatchProduct_ID – vai nu no DTO, vai atrodam pēc Batch_Id + Version_ID
     int? batchProductId = dto.BatchProduct_ID;
 
-    if ((batchProductId is null || batchProductId <= 0) &&
-        dto.Batch_Id is int batchId && batchId > 0)
-    {
-        var conn = _db.Database.GetDbConnection();
-        await conn.OpenAsync();
-
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText = @"
-            SELECT ID
-            FROM batches_products
-            WHERE Batch_Id  = @batch
-              AND Version_Id = @ver
-              AND IsActive   = 1
-            LIMIT 1;";
-
-        var pBatch = cmd.CreateParameter();
-        pBatch.ParameterName = "@batch";
-        pBatch.Value = batchId;
-        cmd.Parameters.Add(pBatch);
-
-        var pVer = cmd.CreateParameter();
-        pVer.ParameterName = "@ver";
-        pVer.Value = dto.Version_ID;
-        cmd.Parameters.Add(pVer);
-
-        var obj = await cmd.ExecuteScalarAsync();
-        if (obj != null && obj != DBNull.Value)
-            batchProductId = Convert.ToInt32(obj);
-    }
-
-    if (batchProductId is null or <= 0)
-        return BadRequest("Either BatchProduct_ID or valid Batch_Id + Version_ID is required.");
+    if (batchProductId is null || batchProductId <= 0)
+    return BadRequest("BatchProduct_ID is required.");
 
     int bpId = batchProductId.Value;
 
@@ -502,6 +474,7 @@ public async Task<IActionResult> GetTotalsByVersion([FromQuery] int versionId)
     int detailed = 0;
     int assembly = 0;
     int finishing = 0;
+    int finishingTopPart = 0;
     int stock = 0;
     int scrap = 0;
     int @out = 0;
@@ -518,6 +491,9 @@ public async Task<IActionResult> GetTotalsByVersion([FromQuery] int versionId)
                 break;
             case MoveType.FINISHING:
                 finishing = row.Qty;
+                break;
+            case MoveType.FINISHING_TOPPART:
+                finishingTopPart = row.Qty;
                 break;
             case MoveType.STOCK:
                 stock = row.Qty;
@@ -538,6 +514,7 @@ public async Task<IActionResult> GetTotalsByVersion([FromQuery] int versionId)
         Detailed  = detailed,
         Assembly  = assembly,
         Finishing = finishing,
+        FinishingTopPart = finishingTopPart,
         Stock     = stock,
         Scrap     = scrap,
         Out       = @out
@@ -837,6 +814,38 @@ public async Task<IActionResult> GetAssemblyAvailableReal([FromQuery] int batchP
     return Ok(Math.Max(available, 0));
 }
 
+[HttpGet("detail-available-real")]
+public async Task<IActionResult> GetDetailAvailableReal([FromQuery] int batchProductId)
+{
+    if (batchProductId <= 0)
+        return BadRequest("batchProductId is required.");
+
+    // DETAIL stock
+    var detail = await _db.StockMovements
+        .Where(x =>
+            x.BatchProduct_ID == batchProductId &&
+            x.IsActive &&
+            x.Move_Type == MoveType.DETAILED)
+        .Select(x => (int?)x.Stock_Qty)
+        .SumAsync() ?? 0;
+
+    // rezervēts Child Painting wave
+    var reserved = await _db.Tasks
+        .Join(_db.TopPartSteps,
+            t => t.TopPartStep_ID,
+            ts => ts.Id,
+            (t, ts) => new { t, ts })
+        .Where(x =>
+            x.t.IsActive &&
+            x.t.BatchProduct_ID == batchProductId &&
+            x.ts.StepType == 1 &&
+            x.ts.IsPainting == true &&
+            (x.t.Tasks_Status == 1 || x.t.Tasks_Status == 2))
+        .SumAsync(x => (int?)x.t.Qty_Done) ?? 0;
+
+    return Ok(Math.Max(detail - reserved, 0));
+}
+
 [HttpPost("sync-detailed")]
 public async Task<IActionResult> SyncDetailed([FromQuery] int versionId)
 {
@@ -858,7 +867,8 @@ public async Task<IActionResult> SyncDetailed([FromQuery] int versionId)
             .Where(x =>
                 x.t.BatchProduct_ID == bp.ID &&
                 x.t.IsActive &&
-                x.ts.StepType == 1)
+                x.ts.StepType == 1 &&
+                x.ts.IsPainting != true)
             .GroupBy(x => x.ts.ProductToPartId)
             .AnyAsync(g =>
                 g.Where(x => x.ts.IsFinal)

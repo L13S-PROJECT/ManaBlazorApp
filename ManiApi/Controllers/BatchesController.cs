@@ -555,10 +555,25 @@ SELECT
     bp.is_priority                     AS IsPriority,
 
    -- Planned: tikai 1/5, nav 2/3
+-- Planned:
+-- vēl nav uzsākts neviens DETAIL task
 SUM(
     CASE
         WHEN bp.ProductToPart_ID IS NULL
-        THEN bp.Planned_Qty
+
+         AND NOT EXISTS (
+             SELECT 1
+             FROM tasks t2
+             JOIN toppartsteps ts2
+                  ON ts2.ID = t2.TopPartStep_ID
+             WHERE t2.BatchProduct_ID = bp.ID
+               AND ts2.Step_Type = 1
+               AND (ts2.IsPainting = 0 OR ts2.IsPainting IS NULL)
+               AND t2.Tasks_Status IN (2,3)
+         )
+
+        THEN COALESCE(sp.PlannedQty, 0)
+
         ELSE 0
     END
 ) AS Planned,
@@ -698,6 +713,16 @@ JOIN batches  b ON b.ID = bp.Batch_Id
 JOIN versions v ON v.ID = bp.Version_Id
 JOIN products p   ON p.ID = v.Product_ID
 JOIN categories c ON c.ID = p.Category_ID AND c.IsActive = 1
+
+LEFT JOIN (
+    SELECT
+        BatchProduct_ID,
+        SUM(Stock_Qty) AS PlannedQty
+    FROM stock_movements
+    WHERE Move_Type = 'PLANNED'
+      AND IsActive = 1
+    GROUP BY BatchProduct_ID
+) sp ON sp.BatchProduct_ID = bp.ID
 
 LEFT JOIN (
     SELECT
@@ -954,7 +979,7 @@ SELECT
     bp.Version_Id,
     bp.ID,
     'PLANNED',
-    -bp.Planned_Qty,
+    bp.Planned_Qty,
     UTC_TIMESTAMP(),
     1
 FROM batches_products bp

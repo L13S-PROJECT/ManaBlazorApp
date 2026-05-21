@@ -135,6 +135,8 @@ public async Task<(bool Success, string? Error)> ClaimTask(int taskId, int empId
 public async Task<(bool Success, string? Error)> FinishTask(int taskId, int? qtyDoneAdd)
 {
     
+    Console.WriteLine($"FINISH TASK CALLED -> taskId={taskId}");
+
 // 🔹 DB connection + transaction sākums
         var conn = _db.Database.GetDbConnection();
 
@@ -165,6 +167,8 @@ if (!statusCheck.Success)
 
 var taskInfo = await _queryService.GetTaskDetails(conn, tx, taskId);
 
+Console.WriteLine($"TASK INFO -> stepType={taskInfo.StepType} batchProductId={taskInfo.BatchProductId}");
+
 int stepType = taskInfo.StepType;
 int productToPartId = taskInfo.ProductToPartId;
 int currentStepOrder = taskInfo.StepOrder;
@@ -194,6 +198,28 @@ var scenario =
 // Detailed (StepType = 1) → pabeidzam visu
 if (scenario == TaskScenario.B_Root)
 {
+    if (stepType == 2)
+{
+    await HandleParentAssemblyStep(
+        conn, tx,
+        taskId,
+        rootId,
+        plannedQty,
+        qtyPerProduct,
+        batchProductId,
+        versionId,
+        currentDone,
+        ralColorId
+    );
+
+    await CloseWorkSession(conn, tx, taskId);
+
+    await tx.CommitAsync();
+
+    return (true, null);
+}
+    
+    Console.WriteLine($"SCENARIO -> {scenario} stepType={stepType} taskId={taskId}");
     await HandleRootScenario(
         conn, tx,
         stepType,
@@ -209,6 +235,7 @@ await CreateRootPaintingTasksIfNeeded(
 );
 
 }
+
 
 else if (scenario == TaskScenario.A_Parent)
 {   
@@ -520,10 +547,82 @@ Console.WriteLine($"ROOT SCENARIO UPDATE -> rootId={rootId} stepOrder={currentSt
         Console.WriteLine($"ROOT UPDATE AFFECTED -> done");
     }
 
-    bool detailFinished = await CheckDetailFinished(conn, tx, rootId);
+    bool detailFinished =
+    await _queryService.IsDetailPhaseFinishedAll(conn, tx, rootId);
 
-    if (detailFinished)
+    if (detailFinished && stepType == 1)
     {
+        // DETAIL finished -> PLANNED => DETAILED
+            await using (var moveCmd = conn.CreateCommand())
+            {
+                moveCmd.Transaction = tx;
+
+                moveCmd.CommandText = @"
+                INSERT INTO stock_movements
+                    (
+                        Version_ID,
+                        BatchProduct_ID,
+                        Move_Type,
+                        Stock_Qty,
+                        Created_At,
+                        IsActive
+                    )
+
+                SELECT
+                    bp.Version_Id,
+                    bp.ID,
+                    'PLANNED',
+                    -bp.Planned_Qty,
+                    CURRENT_TIMESTAMP,
+                    1
+                FROM batches_products bp
+                WHERE COALESCE(bp.ParentBatchProduct_ID, bp.ID) = @rootId
+                AND bp.IsActive = 1
+                AND EXISTS
+                    (
+                        SELECT 1
+                        FROM stock_movements sm
+                        WHERE sm.BatchProduct_ID = bp.ID
+                            AND sm.Move_Type = 'PLANNED'
+                            AND sm.IsActive = 1
+                            AND sm.Stock_Qty > 0
+                    );
+
+                INSERT INTO stock_movements
+                    (
+                        Version_ID,
+                        BatchProduct_ID,
+                        Move_Type,
+                        Stock_Qty,
+                        Created_At,
+                        IsActive
+                    )
+
+                SELECT
+                    bp.Version_Id,
+                    bp.ID,
+                    'DETAILED',
+                    bp.Planned_Qty,
+                    CURRENT_TIMESTAMP,
+                    1
+                FROM batches_products bp
+                WHERE COALESCE(bp.ParentBatchProduct_ID, bp.ID) = @rootId
+                AND bp.IsActive = 1
+                AND EXISTS
+                    (
+                        SELECT 1
+                        FROM stock_movements sm
+                        WHERE sm.BatchProduct_ID = bp.ID
+                            AND sm.Move_Type = 'PLANNED'
+                            AND sm.IsActive = 1
+                            AND sm.Stock_Qty > 0
+                    );";
+
+                moveCmd.Parameters.Add(new MySqlParameter("@rootId", rootId));
+
+                await moveCmd.ExecuteNonQueryAsync();
+            }
+        
         await using (var openAssembly = conn.CreateCommand())
         {
             openAssembly.Transaction = tx;
@@ -569,6 +668,51 @@ private async Task HandleParentDetailStep(
         await upd.ExecuteNonQueryAsync();
         detailFinished = await CheckDetailFinished(conn, tx, rootId);
     }
+
+    if (detailFinished)
+{
+    bool alreadyDone = await _queryService.HasDetailedMovement(
+        conn, tx, batchProductId);
+
+    if (!alreadyDone)
+    {
+        var versionId = await _db.BatchProducts
+            .Where(x => x.ID == batchProductId)
+            .Select(x => x.Version_Id)
+            .FirstAsync();
+
+        var plannedQty = await _db.BatchProducts
+            .Where(x => x.ID == batchProductId)
+            .Select(x => x.Planned_Qty)
+            .FirstAsync();
+
+        await using var move = conn.CreateCommand();
+
+        move.Transaction = tx;
+
+        move.CommandText = @"
+INSERT INTO stock_movements
+(
+    Version_ID,
+    BatchProduct_ID,
+    Move_Type,
+    Stock_Qty,
+    Created_At,
+    Task_ID,
+    IsActive
+)
+VALUES
+(@ver, @bpId, 'PLANNED',  -@qty, CURRENT_TIMESTAMP, @taskId, 1),
+(@ver, @bpId, 'DETAILED',  @qty, CURRENT_TIMESTAMP, @taskId, 1);";
+
+        move.Parameters.Add(new MySqlParameter("@ver", versionId));
+        move.Parameters.Add(new MySqlParameter("@bpId", batchProductId));
+        move.Parameters.Add(new MySqlParameter("@qty", plannedQty));
+        move.Parameters.Add(new MySqlParameter("@taskId", taskId));
+
+        await move.ExecuteNonQueryAsync();
+    }
+}
 
     if (detailFinished)
     {
@@ -623,13 +767,15 @@ private async Task HandleParentAssemblyStep(
 
     bool notFinishedAssembly = await _queryService.HasNotFinishedAssembly(conn, tx, rootId);
 
+Console.WriteLine($"ASSEMBLY CHECK -> notFinishedAssembly={notFinishedAssembly}");
+
     if (!notFinishedAssembly)
     {
     bool existingAsm = await _queryService.HasAssemblyStockMovement(conn, tx, rootId);
 
         if (!existingAsm)
         {
-            var totalQty = plannedQty * qtyPerProduct;
+            var totalQty = plannedQty;
 
             await using (var cmdMove = conn.CreateCommand())
             {
@@ -714,31 +860,34 @@ private async Task HandleChildScenario(
 
     bool isFinalStep = await _queryService.IsFinalStep(conn, tx, taskId);
 
+Console.WriteLine(
+    $"DETAIL DEBUG -> detailFinished={detailFinished} versionId={versionId} isFinal={isFinalStep}");
+
     if (detailFinished && versionId > 0 && isFinalStep)
     {
-        bool alreadyDone = await _queryService.HasDetailedMovement(conn, tx, batchProductId);
+        bool hasPlanned = await _queryService.HasPlannedMovement(conn, tx, batchProductId);
 
-        if (!alreadyDone)
-        {
-            var totalQty = plannedQty;
+    if (hasPlanned)
+{
+    await using (var cmdMove = conn.CreateCommand())
+    {
+        cmdMove.Transaction = tx;
 
-            await using (var m2 = conn.CreateCommand())
-            {
-                m2.Transaction = tx;
-                m2.CommandText = @"
+        cmdMove.CommandText = @"
 INSERT INTO stock_movements
     (Version_ID, BatchProduct_ID, Move_Type, Stock_Qty, Created_At, Task_ID, IsActive)
 VALUES
-    (@ver, @bpId, 'DETAILED', @qty, CURRENT_TIMESTAMP, @taskId, 1);";
+    (@ver, @bpId, 'PLANNED',  -@qty, CURRENT_TIMESTAMP, @taskId, 1),
+    (@ver, @bpId, 'DETAILED',  @qty, CURRENT_TIMESTAMP, @taskId, 1);";
 
-                m2.Parameters.Add(new MySqlParameter("@ver", versionId));
-                m2.Parameters.Add(new MySqlParameter("@bpId", batchProductId));
-                m2.Parameters.Add(new MySqlParameter("@qty", totalQty));
-                m2.Parameters.Add(new MySqlParameter("@taskId", taskId));
+        cmdMove.Parameters.Add(new MySqlParameter("@ver", versionId));
+        cmdMove.Parameters.Add(new MySqlParameter("@bpId", batchProductId));
+        cmdMove.Parameters.Add(new MySqlParameter("@qty", plannedQty));
+        cmdMove.Parameters.Add(new MySqlParameter("@taskId", taskId));
 
-                await m2.ExecuteNonQueryAsync();
-            }
-        }
+        await cmdMove.ExecuteNonQueryAsync();
+    }
+}
 
         await using (var openFinishing = conn.CreateCommand())
         {
@@ -749,7 +898,8 @@ VALUES
             SET t.Tasks_Status = 1
             WHERE t.BatchProduct_ID = @bpId
             AND t.IsActive = 1
-            AND ts.Step_Type = 3
+            AND ts.Step_Type = 1
+            AND ts.IsPainting = 1
             AND t.Tasks_Status = 5;";
 
             openFinishing.Parameters.Add(new MySqlParameter("@bpId", batchProductId));

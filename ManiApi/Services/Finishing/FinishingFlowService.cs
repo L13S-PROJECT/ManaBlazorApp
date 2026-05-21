@@ -43,7 +43,10 @@ namespace ManiApi.Services.Finishing
 // 5) GET WAITING FINISHING TASKS (status=5) ->
 // Atlasām visus gaidošos (status=5) Finishing uzdevumus šai partijai un detaļai
 
-                    var waitingTasks = await GetWaitingTasks(batchProductId, finishingStep.Id);
+                    var waitingTasks = await GetWaitingTasks(
+                            batchProductId,
+                            finishingStep.Id,
+                            dto.ProductToPartId);
 
 // 6) CREATE OR SPLIT FINISHING WAVE -> 
 // Nosakām – vai veidojam jaunu Finishing vilni vai izmantojam/sadalām esošo
@@ -105,14 +108,18 @@ private async Task<TopPartStep> GetFinishingStep(int productToPartId)
     return finishingStep;
 }
 
-private async Task<List<ManiApi.Models.Tasks>> GetWaitingTasks(int batchProductId, int finishingStepId)
+private async Task<List<ManiApi.Models.Tasks>> GetWaitingTasks(
+    int batchProductId,
+    int finishingStepId,
+    int? sourceProductToPartId)
 {
     return await _db.Tasks
         .Where(t =>
             t.IsActive &&
             t.BatchProduct_ID == batchProductId &&
             t.TopPartStep_ID == finishingStepId &&
-            t.Tasks_Status == 5)
+            t.Tasks_Status == 5 &&
+            t.Source_ProductToPart_ID == sourceProductToPartId)
         .OrderBy(t => t.ID)
         .ToListAsync();
 }
@@ -135,6 +142,8 @@ private async Task<ManiApi.Models.Tasks> CreateOrSplitFinishingTask(
             dto.RalColorId,
             dto.Comment);
 
+        activeTask.Source_ProductToPart_ID = dto.ProductToPartId;
+
         _db.Tasks.Add(activeTask);
         // SaveChanges tiks izsaukts augstāk (OpenFinishing)
     }
@@ -150,6 +159,7 @@ private async Task<ManiApi.Models.Tasks> CreateOrSplitFinishingTask(
             parent.Qty_Done      = requestQty > 0 ? requestQty : plannedQty;
             parent.Tasks_Comment = dto.Comment;
             parent.RAL_Color_ID  = dto.RalColorId;
+            parent.Source_ProductToPart_ID = dto.ProductToPartId;
 
             foreach (var extra in waitingTasks.Skip(1))
                 extra.IsActive = false;
@@ -171,12 +181,15 @@ private async Task<ManiApi.Models.Tasks> CreateOrSplitFinishingTask(
                 dto.RalColorId,
                 dto.Comment);
 
+            activeTask.Source_ProductToPart_ID = dto.ProductToPartId;
+
             _db.Tasks.Add(activeTask);
 
             var waitingRemainder = new ManiApi.Models.Tasks
             {
                 BatchProduct_ID = parent.BatchProduct_ID,
                 TopPartStep_ID  = parent.TopPartStep_ID,
+                Source_ProductToPart_ID = dto.ProductToPartId,
                 Tasks_Status    = 5,
                 IsActive        = true,
                 Qty_Done        = remaining,

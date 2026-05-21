@@ -16,12 +16,15 @@
 
 @if (SelectedBatch != null)
 {
+    var isChildPainting =
+    SelectedBatch.ProductToPartId.HasValue;
+
         <div class="ptv2-tasks-row ptv2-finishing-main">
 
                     <!-- NOSAUKUMS -->
                     <div class="ptv2-part-name">
                         <span class="ptv2-part-indicator state-@FinishingState"></span>
-                        FINISHING
+                        @(isChildPainting ? "CHILD FINISHING" : "FINISHING")
                     </div>
 
                     <!-- SWITCH -->
@@ -36,7 +39,18 @@
 
                     <!-- APJOMS -->
                     <div class="@(FinAvailable <= 0 ? "qty-gray" : "qty-normal")">
-                        @FinAvailable
+
+                        @if (isChildPainting)
+                        {
+                            <span title="Child painting available qty">
+                                @FinAvailable
+                            </span>
+                        }
+                        else
+                        {
+                            @FinAvailable
+                        }
+
                     </div>
 
                     <div></div>
@@ -203,6 +217,30 @@ var indicators =
         $"http://localhost:5270/api/tasks/finishing-indicators?batchProductId={bpId}"
     ) ?? new();
 
+if (SelectedBatch.ProductToPartId.HasValue)
+{
+    var childData =
+        await Http.GetFromJsonAsync<ChildFinishingVm>(
+            $"http://localhost:5270/api/tasks/child-finishing-data?batchProductId={bpId}&productToPartId={SelectedBatch.ProductToPartId.Value}"
+        );
+
+    if (childData is not null)
+    {
+        FinAvailable = childData.AvailableQty;
+
+        if (!childData.IsPainting)
+            {
+                Waves = new();
+                Parts.Clear();
+
+                FinishingState = "gray";
+                FinAvailable = 0;
+
+                return;
+            }
+    }
+}
+
 FinishingIndicators = indicators;
 FinishingState = indicators.FirstOrDefault()?.State ?? "gray";
 
@@ -233,27 +271,45 @@ else
 
     Parts.Add(new FinishingPartVm
         {
-            PartName = "FINISHING",
+            PartName = isChildBatch
+            ? "CHILD FINISHING"
+            : "FINISHING",
             Tasks = Waves
         });
 
+    if (!SelectedBatch.ProductToPartId.HasValue)
+{
     var summary =
     await Http.GetFromJsonAsync<List<FinishingSummaryVm>>(
         $"http://localhost:5270/api/stockmovements/finishing-summary-by-batch?batchId={SelectedBatch.BatchId}"
     );
 
-var s = summary?.FirstOrDefault(x => x.BatchProductId == bpId);
+    var s = summary?.FirstOrDefault(x => x.BatchProductId == bpId);
 
-FinPlanned = s?.Planned ?? 0;
-FinAvailable =
-    await Http.GetFromJsonAsync<int>(
-        $"http://localhost:5270/api/tasks/assembly-available-ui?batchProductId={bpId}"
-    );
+    FinPlanned = s?.Planned ?? 0;
 
-FinSold =
-    await Http.GetFromJsonAsync<int>(
-        $"http://localhost:5270/api/stockmovements/sold-before-finishing?batchProductId={bpId}"
-    );
+    if (isChildBatch)
+        {
+            FinAvailable =
+                await Http.GetFromJsonAsync<int>(
+                    $"http://localhost:5270/api/stockmovements/detail-available-real?batchProductId={bpId}"
+                );
+        }
+        else
+        {
+            
+            FinAvailable =
+                await Http.GetFromJsonAsync<int>(
+                    $"http://localhost:5270/api/tasks/assembly-available-ui?batchProductId={bpId}"
+                );
+        }
+
+    FinSold =
+        await Http.GetFromJsonAsync<int>(
+            $"http://localhost:5270/api/stockmovements/sold-before-finishing?batchProductId={bpId}"
+        );
+}
+
 }
 
 private List<EmployeeRow> Employees = new();
@@ -462,5 +518,11 @@ async Task OnCommentVisibilityChanged(FinishingTaskRow task, ChangeEventArgs e)
 }
 
 private List<RalColor> RalColors = new();
+
+private sealed class ChildFinishingVm
+{
+    public bool IsPainting { get; set; }
+    public int AvailableQty { get; set; }
+}
 
 }

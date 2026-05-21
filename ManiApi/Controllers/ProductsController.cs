@@ -497,6 +497,7 @@ var map = oldParts
             IsMandatory = os.IsMandatory,
             IsFinal = os.IsFinal,
             Comments = os.Comments,
+            IsPainting = os.IsPainting,
             IsActive = true
         });
     }
@@ -667,6 +668,19 @@ if (dto.StepType <= 0)
                     .Select(s => (int?)s.StepOrder)
                     .MaxAsync() ?? 0;
                 dto.StepOrder = maxOrder + 10;
+            }
+
+            var existingSteps = await _db.TopPartSteps
+                .Where(s =>
+                    s.ProductToPartId == dto.ProductToPartId &&
+                    s.IsActive)
+                .OrderBy(s => s.StepOrder)
+                .ToListAsync();
+
+            if (dto.IsFinal && existingSteps.Any(s => s.IsPainting))
+            {
+                return BadRequest(
+                    "Final solim jābūt pirms Krāsošanas.");
             }
 
             // 3) ParallelGroup default 1
@@ -924,6 +938,47 @@ public async Task<IActionResult> UpdateStepsBulk([FromBody] List<UpdateStepReque
 {
     if (stepsDto == null || stepsDto.Count == 0)
         return BadRequest("Nav soļu.");
+    
+    var orderedSteps = stepsDto
+    .OrderBy(x => x.StepOrder)
+    .ToList();
+
+        for (int i = 0; i < orderedSteps.Count; i++)
+        {
+            orderedSteps[i].StepOrder = (i + 1) * 10;
+        }
+
+    var ordered = orderedSteps;
+
+    var finals = ordered
+        .Where(x => x.IsFinal)
+        .ToList();
+
+    if (finals.Count != 1)
+        return BadRequest("Jābūt tieši vienam Final solim.");
+
+    var final = finals.First();
+
+    var paintingSteps = ordered
+        .Where(x => x.IsPainting)
+        .ToList();
+
+    if (paintingSteps.Any())
+    {
+        var firstPainting = paintingSteps
+            .OrderBy(x => x.StepOrder)
+            .First();
+
+        if (final.StepOrder >= firstPainting.StepOrder)
+            return BadRequest("Final solim jābūt pirms Krāsošanas.");
+    }
+    else
+    {
+        var last = ordered.Last();
+
+        if (final.Id != last.Id)
+            return BadRequest("Final solim jābūt pēdējam.");
+    }
 
     var ids = stepsDto.Select(x => x.Id).ToList();
 
@@ -931,9 +986,25 @@ public async Task<IActionResult> UpdateStepsBulk([FromBody] List<UpdateStepReque
         .Where(s => ids.Contains(s.Id) && s.IsActive)
         .ToListAsync();
 
+    if (steps.Count != stepsDto.Count)
+    return BadRequest("Daži tehnoloģijas soļi nav atrasti vai ir neaktīvi.");
+
+    var partIds = steps
+    .Select(x => x.ProductToPartId)
+    .Distinct()
+    .ToList();
+
+    var inactivePartsExist = await _db.ProductTopParts
+        .AnyAsync(x =>
+            partIds.Contains(x.Id) &&
+            !x.IsActive);
+
+    if (inactivePartsExist)
+        return BadRequest("Nevar saglabāt soļus neaktīvai detaļai.");
+
     foreach (var step in steps)
     {
-        var dto = stepsDto.First(x => x.Id == step.Id);
+        var dto = orderedSteps.First(x => x.Id == step.Id);
 
         step.StepOrder = dto.StepOrder;
         step.StepName = dto.StepName;
