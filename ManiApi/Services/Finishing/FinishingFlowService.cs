@@ -11,14 +11,18 @@ namespace ManiApi.Services.Finishing
     {
         private readonly AppDbContext _db;
         private readonly StockService _stockService;
-
-        public FinishingFlowService(AppDbContext db, StockService stockService)
+        private readonly FinishingTasksService _finishingTasksService;
+        public FinishingFlowService(
+                AppDbContext db,
+                StockService stockService,
+                FinishingTasksService finishingTasksService)
         {
             _db = db;
             _stockService = stockService;
+            _finishingTasksService = finishingTasksService;
         }
 
-        public async Task<OpenFinishingResultDto> OpenFinishing(OpenFinishingDto dto)
+public async Task<OpenFinishingResultDto> OpenFinishing(OpenFinishingDto dto)
         {
             try
                 {
@@ -38,7 +42,22 @@ namespace ManiApi.Services.Finishing
 // 4) CALCULATE ASSEMBLY AVAILABLE QTY ->
 //Aprēķinām pieejamo Assembly daudzumu, atņemot jau rezervēto Finishing apjomu
 
-                    var assemblyAvailable = await _stockService.CalculateAssemblyAvailable(batchProductId);
+      int availableQty;
+
+            if (dto.ProductToPartId > 0)
+            {
+                var childData = await _finishingTasksService
+                    .GetChildFinishingData(
+                        batchProductId,
+                        dto.ProductToPartId);
+
+                availableQty = childData.availableQty;
+            }
+            else
+            {
+                availableQty = await _stockService
+                    .CalculateAssemblyAvailable(batchProductId);
+            }
 
 // 5) GET WAITING FINISHING TASKS (status=5) ->
 // Atlasām visus gaidošos (status=5) Finishing uzdevumus šai partijai un detaļai
@@ -55,7 +74,7 @@ namespace ManiApi.Services.Finishing
                         waitingTasks,
                         batchProductId,
                         finishingStep.Id,
-                        assemblyAvailable,
+                        availableQty,
                         dto);
 
         // 7) CREATE STOCK MOVEMENTS (ASSEMBLY -> FINISHING) -> 

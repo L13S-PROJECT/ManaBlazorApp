@@ -56,7 +56,7 @@ public sealed class ProductSimpleRow
 public sealed class ProductContentDto
 {
     public int VersionId { get; set; }
-
+    public int ProductionModel { get; set; }
     public string? CategoryName { get; set; }   // ← PIEVIENO
 
     public string ProductName { get; set; } = string.Empty;

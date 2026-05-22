@@ -188,10 +188,24 @@ bool hasRoot = rootInfo.HasRoot;
 
 // 4️⃣ Nosakām scenāriju (A / B / C)
 
+var productionModel = await _db.BatchProducts
+    .Where(x => x.ID == batchProductId)
+    .Join(
+        _db.ProductVersions,
+        bp => bp.Version_Id,
+        v => v.Id,
+        (bp, v) => v.ProductionModel
+    )
+    .FirstOrDefaultAsync();
+
 var scenario =
-    hasRoot ? TaskScenario.B_Root :
-    stepType == 1 ? TaskScenario.C_Child :
-    TaskScenario.A_Parent;
+    productionModel == 1 && hasRoot
+        ? TaskScenario.D_InlinePainting
+    : hasRoot
+        ? TaskScenario.B_Root
+    : stepType == 1
+        ? TaskScenario.C_Child
+    : TaskScenario.A_Parent;
 
 // 5️⃣ Izpilde pēc B/A/C scenārija
 
@@ -296,7 +310,8 @@ private enum TaskScenario
 {
     A_Parent,      // Parasts (nav root)
     B_Root,        // Parent + Child kopā
-    C_Child        // Tikai child
+    C_Child,       // Tikai child
+    D_InlinePainting
 }
 
 public async Task<(bool Success, string? Error)> StartByGroup(int empId, long displayGroupId)

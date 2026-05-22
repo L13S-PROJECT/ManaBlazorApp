@@ -10,7 +10,7 @@ namespace ManiApi.DTOs.Products
 
     public bool CreateNewVersion { get; set; }  // true → izveido jaunu versiju
     public int? VersionId { get; set; }         // vajadzīgs, ja labo esošo (CreateNewVersion=false)
-
+    public int ProductionModel { get; set; } = 0;
     public string? VersionName { get; set; }
     public string? VersionRasejums { get; set; }
     public string? VersionDate { get; set; }    // "yyyy-MM-dd"

@@ -26,9 +26,11 @@ namespace ManiApi.Models
         [Column("IsActive")]
         public bool IsActive { get; set; }
 
-[Column("is_priority", TypeName = "tinyint(1)")]
-public bool IsPriority { get; set; }
+        [Column("is_priority", TypeName = "tinyint(1)")]
+        public bool IsPriority { get; set; }
 
+        [Column("production_model")]
+        public int ProductionModel { get; set; } = 0;
 
     }
 }

@@ -26,7 +26,8 @@ public class VersionService
             v.VersionRasejums,
             v.VersionDate,
             v.VersionComment,
-            v.ProductId
+            v.ProductId,
+            v.ProductionModel
         })
         .FirstOrDefaultAsync();
 
@@ -56,6 +57,7 @@ public class VersionService
     return new
     {
         VersionId = version.Id,
+        ProductionModel = version.ProductionModel,
         CategoryName = categoryName,
         ProductName = product.ProductName,
         ProductCode = product.ProductCode,
@@ -156,7 +158,9 @@ public async Task<object> Create(CreateProductRequest dto)
                         VersionRasejums = dto.VersionRasejums ?? "",
                         VersionDate = parsedDate,
                         VersionComment = dto.VersionComment ?? "",
-                        IsActive = true
+                        IsActive = true,
+
+                        ProductionModel = dto.ProductionModel
                     };
 
                     _db.ProductVersions.Add(ver);

@@ -355,21 +355,10 @@ public async Task<IActionResult> GetWorksByVersion([FromQuery] int versionId)
         [HttpPost("create")]
         public async Task<IActionResult> Create([FromBody] CreateProductRequest dto)
         {
-            
-                var versionExists = await _db.ProductVersions
-                        .AnyAsync(x =>
-                            x.VersionName == dto.VersionName);
-
-                    if (versionExists)
-                    {
-                        return BadRequest(
-                            "Šāds versijas numurs jau eksistē.");
-                    }
-                
+                            
                 var result = await _versionService.Create(dto);
                     return Ok(result);
             
-           
         }
 
         [HttpPut("update")]
@@ -443,7 +432,9 @@ public async Task<IActionResult> GetWorksByVersion([FromQuery] int versionId)
                         VersionRasejums = dto.VersionRasejums ?? "",
                         VersionDate = parsedDate,
                         VersionComment = dto.VersionComment ?? "",
-                        IsActive = !dto.IsHistoricalVersion
+                        IsActive = !dto.IsHistoricalVersion,
+
+                        ProductionModel = dto.ProductionModel
                     };
                     _db.ProductVersions.Add(newVer);
                     await _db.SaveChangesAsync();
@@ -522,6 +513,7 @@ var map = oldParts
 
                     if (dto.VersionRasejums is not null) ver.VersionRasejums = dto.VersionRasejums;
                     ver.VersionComment = dto.VersionComment ?? "";
+                    ver.ProductionModel = dto.ProductionModel;
 
                     await _db.SaveChangesAsync();
                     return Ok(new { product.Id, VersionId = ver.Id });

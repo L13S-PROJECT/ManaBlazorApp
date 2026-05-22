@@ -110,6 +110,8 @@
     NewCodeChanged="@(v => newCode = v)"
     CreateNewVersion="createNewVersion"
     CreateNewVersionChanged="@(v => createNewVersion = v)"
+    ProductionModel="productionModel"
+    ProductionModelChanged="@(v => productionModel = v)"
     CopyTechnologySteps="copyTechnologySteps"
     CopyTechnologyStepsChanged="@(v => SetCopyTechnologySteps(v))"
     NewVersionName="@newVersionName"
@@ -245,6 +247,7 @@ private bool createNewVersion
     private string? newVersionRasejums;
     private DateOnly? newVersionDate;
     private string? newVersionComment;
+    private int productionModel = 0;
 
     private List<ProductDetailDto>? selectedPartDetails;
     private bool loadingPartDetails = false;
@@ -446,7 +449,7 @@ public async Task OpenHistoricalVersionDialogJs(
         newName = "";
         newCode = "";
         showValidation = false;
-
+        productionModel = 0;
         newVersionName = null;
         newVersionRasejums = null;
         newVersionDate = null;
@@ -478,6 +481,7 @@ public async Task OpenHistoricalVersionDialogJs(
     newVersionName     = selectedDetails.VersionName ?? "";
     newVersionRasejums = selectedDetails.VersionRasejums ?? "";
     newVersionComment  = selectedDetails.VersionComment ?? "";
+    productionModel = selectedDetails.ProductionModel;
     newVersionDate     = selectedDetails.VersionDate;
 
     showValidation = false;
@@ -522,7 +526,7 @@ public void OpenHistoricalVersionDialog(
 
     newVersionRasejums = "";
     newVersionComment = "";
-
+    productionModel = 0;
     newVersionDate = DateOnly.FromDateTime(DateTime.Today);
     selectedDetails = null;
     showValidation = false;
@@ -574,7 +578,8 @@ private void CloseDialog()
                     versionName     = newVersionName,
                     versionRasejums = newVersionRasejums,
                     versionDate     = newVersionDate?.ToString("yyyy-MM-dd"),
-                    versionComment  = newVersionComment
+                    versionComment  = newVersionComment,
+                    productionModel = productionModel
                 };
 
                 var resp = await Http.PostAsJsonAsync("http://localhost:5270/api/products/create", payload);
@@ -606,7 +611,8 @@ private void CloseDialog()
 
     createNewVersion = createNewVersion,
     copyTechnologySteps = createNewVersion && copyTechnologySteps,
-    IsHistoricalVersion = createNewVersion && isHistoricalVersion
+    IsHistoricalVersion = createNewVersion && isHistoricalVersion,
+    ProductionModel = productionModel
 };
 
 
