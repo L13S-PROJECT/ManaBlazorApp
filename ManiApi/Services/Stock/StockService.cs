@@ -13,27 +13,81 @@ namespace ManiApi.Services.Stock
             _db = db;
         }
 
-        public async Task MoveAssemblyToFinishing(
+        public async Task MoveToFinishing(
             int batchProductId,
             int taskId,
             int qty,
             int? ralColorId)
         {
+           Console.WriteLine(
+                    $"MOVE TO FINISHING -> bp={batchProductId} qty={qty} ral={ralColorId}"
+                );
+
             var versionId = await _db.Set<BatchProduct>()
                 .Where(x => x.ID == batchProductId)
                 .Select(x => x.Version_Id)
                 .FirstOrDefaultAsync();
 
+            var productionModel = await _db.Set<BatchProduct>()
+                .Where(x => x.ID == batchProductId)
+                .Join(
+                    _db.ProductVersions,
+                    bp => bp.Version_Id,
+                    v => v.Id,
+                    (bp, v) => v.ProductionModel
+                )
+                .FirstOrDefaultAsync();
+
+            var productToPartId = await _db.Set<BatchProduct>()
+                .Where(x => x.ID == batchProductId)
+                .Select(x => x.ProductToPart_ID)
+                .FirstOrDefaultAsync();
+
+            var isInlinePainting = productionModel == 1;
+            var isChild = productToPartId != null;
+
+            Console.WriteLine(
+                $"MOVE FLOW -> inline={isInlinePainting} child={isChild}"
+            );
+
             if (versionId == 0)
                 throw new ArgumentException($"BatchProduct ar ID {batchProductId} nav atrasts.");
 
+            var sourceMoveType =
+                isChild || isInlinePainting
+                    ? "DETAILED"
+                    : "ASSEMBLY";
+
+            Console.WriteLine(
+                $"MOVE SOURCE -> {sourceMoveType} -> FINISHING"
+            );
+
+            Console.WriteLine("ADDING SOURCE MOVEMENT");
+
             _db.StockMovements.Add(
-                StockMovementFactory.CreateAssemblyMovement(
-                    versionId,
-                    batchProductId,
-                    taskId,
-                    qty,
-                    ralColorId));
+
+
+                sourceMoveType == "ASSEMBLY"
+
+                    ? StockMovementFactory.CreateMovement(
+                        versionId,
+                        batchProductId,
+                        taskId,
+                        MoveType.ASSEMBLY,
+                        -qty,
+                        ralColorId)
+
+                    : StockMovementFactory.CreateMovement(
+                        versionId,
+                        batchProductId,
+                        taskId,
+                        MoveType.DETAILED,
+                        -qty,
+                        ralColorId)
+
+            );
+
+            Console.WriteLine("ADDING FINISHING MOVEMENT");
 
             _db.StockMovements.Add(
                 StockMovementFactory.CreateFinishingMovement(
@@ -42,6 +96,9 @@ namespace ManiApi.Services.Stock
                     taskId,
                     qty,
                     ralColorId));
+
+    Console.WriteLine("MOVE TO FINISHING DONE");
+
         }
 
 public async Task<int> CalculateAssemblyAvailable(int batchProductId)

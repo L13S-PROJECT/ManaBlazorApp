@@ -6,6 +6,7 @@ using ManiApi.Models;
 using System.Data;
 using MySqlConnector;
 using System.Data.Common;
+using ManiApi.Services.ProductionFlows.ParentSeparate;
 using ManiApi.Services.Tasks;
 
 
@@ -15,10 +16,20 @@ namespace ManiApi.Services.Tasks
     {
         private readonly AppDbContext _db;
         private readonly TaskQueryService _queryService;
-        public TaskService(AppDbContext db, TaskQueryService queryService)
+        private readonly ParentSeparateDetailService _parentSeparateDetailService;
+        private readonly ParentSeparateAssemblyService _parentSeparateAssemblyService;
+        private readonly ParentSeparateFinishingService _parentSeparateFinishingService;
+        public TaskService(AppDbContext db, 
+        TaskQueryService queryService, 
+        ParentSeparateDetailService parentSeparateDetailService,
+        ParentSeparateAssemblyService parentSeparateAssemblyService,
+        ParentSeparateFinishingService parentSeparateFinishingService)
         {
             _db = db;
             _queryService = queryService;
+            _parentSeparateDetailService = parentSeparateDetailService;
+            _parentSeparateAssemblyService = parentSeparateAssemblyService;
+            _parentSeparateFinishingService = parentSeparateFinishingService;
         }
        
 
@@ -146,6 +157,10 @@ public async Task<(bool Success, string? Error)> FinishTask(int taskId, int? qty
         }
 
         await using var tx = await conn.BeginTransactionAsync();
+    
+Console.WriteLine("=================================");
+Console.WriteLine($"FINISH FLOW START -> taskId={taskId}");
+Console.WriteLine("=================================");
 
 taskId = await _queryService.ResolveRootTaskId(conn, tx, taskId);
 
@@ -188,33 +203,58 @@ bool hasRoot = rootInfo.HasRoot;
 
 // 4️⃣ Nosakām scenāriju (A / B / C)
 
-var productionModel = await _db.BatchProducts
-    .Where(x => x.ID == batchProductId)
-    .Join(
-        _db.ProductVersions,
-        bp => bp.Version_Id,
-        v => v.Id,
-        (bp, v) => v.ProductionModel
-    )
-    .FirstOrDefaultAsync();
+int productionModel = 0;
+
+await using (var cmd = conn.CreateCommand())
+{
+    cmd.Transaction = tx;
+
+    cmd.CommandText = @"
+SELECT v.Production_Model
+FROM batches_products bp
+JOIN versions v ON v.ID = bp.Version_Id
+WHERE bp.ID = @bpId
+LIMIT 1;";
+
+    cmd.Parameters.Add(new MySqlParameter("@bpId", batchProductId));
+
+    var obj = await cmd.ExecuteScalarAsync();
+
+    productionModel = obj == null || obj == DBNull.Value
+        ? 0
+        : Convert.ToInt32(obj);
+}
 
 var scenario =
-    productionModel == 1 && hasRoot
-        ? TaskScenario.D_InlinePainting
-    : hasRoot
+    hasRoot
         ? TaskScenario.B_Root
-    : stepType == 1
-        ? TaskScenario.C_Child
-    : TaskScenario.A_Parent;
+        : productToPartId > 0
+            ? TaskScenario.C_Child
+            : TaskScenario.A_Parent;
 
+Console.WriteLine(
+    $"FLOW INFO -> scenario={scenario} " +
+    $"stepType={stepType} " +
+    $"batchProductId={batchProductId} " +
+    $"productToPartId={productToPartId} " +
+    $"productionModel={productionModel} " +
+    $"plannedQty={plannedQty} " +
+    $"currentDone={currentDone} " +
+    $"ralColorId={ralColorId}"
+);
+var isInlinePainting = productionModel == 1;
 // 5️⃣ Izpilde pēc B/A/C scenārija
 
 // Detailed (StepType = 1) → pabeidzam visu
 if (scenario == TaskScenario.B_Root)
 {
+    
+    Console.WriteLine(
+    $"ROOT FLOW -> isInlinePainting={isInlinePainting} stepType={stepType}"
+);
     if (stepType == 2)
 {
-    await HandleParentAssemblyStep(
+    await _parentSeparateAssemblyService.HandleParentAssemblyStep(
         conn, tx,
         taskId,
         rootId,
@@ -254,9 +294,23 @@ await CreateRootPaintingTasksIfNeeded(
 else if (scenario == TaskScenario.A_Parent)
 {   
     if (stepType == 1)
-    {
-        await HandleParentDetailStep(conn, tx, taskId, batchProductId, rootId);
-    }
+{
+    Console.WriteLine(
+        $"DETAIL FINISHED -> Inline={isInlinePainting} scenario={scenario}"
+    );
+
+    await _parentSeparateDetailService.HandleParentDetailStep(
+        conn,
+        tx,
+        taskId,
+        batchProductId,
+        rootId
+    );
+
+    Console.WriteLine(
+        $"DETAIL FLOW COMPLETED -> batchProductId={batchProductId}"
+    );
+}
     else if (stepType == 2)
 {
     await HandleParentAssemblyStep(
@@ -270,6 +324,24 @@ else if (scenario == TaskScenario.A_Parent)
         currentDone,
         ralColorId);
 }
+
+else if (stepType == 3)
+{
+    await using var upd = conn.CreateCommand();
+
+    upd.Transaction = tx;
+
+    upd.CommandText = @"
+UPDATE tasks
+SET Tasks_Status = 3,
+    Finished_At = CURRENT_TIMESTAMP
+WHERE ID = @id;";
+
+    upd.Parameters.Add(new MySqlParameter("@id", taskId));
+
+    await upd.ExecuteNonQueryAsync();
+}
+
 }
 
 
@@ -310,8 +382,37 @@ private enum TaskScenario
 {
     A_Parent,      // Parasts (nav root)
     B_Root,        // Parent + Child kopā
-    C_Child,       // Tikai child
-    D_InlinePainting
+    C_Child       // Tikai child
+
+}
+
+private async Task<int> GetNextStepTypeAfterDetail(
+    DbConnection conn,
+    DbTransaction tx,
+    int batchProductId)
+{
+    await using var cmd = conn.CreateCommand();
+
+    cmd.Transaction = tx;
+
+    cmd.CommandText = @"
+SELECT v.Production_Model
+FROM batches_products bp
+JOIN versions v ON v.ID = bp.Version_Id
+WHERE bp.ID = @bpId
+LIMIT 1;";
+
+    cmd.Parameters.Add(
+        new MySqlParameter("@bpId", batchProductId));
+
+    var obj = await cmd.ExecuteScalarAsync();
+
+    int productionModel =
+        obj == null || obj == DBNull.Value
+            ? 0
+            : Convert.ToInt32(obj);
+
+    return productionModel == 1 ? 3 : 2;
 }
 
 public async Task<(bool Success, string? Error)> StartByGroup(int empId, long displayGroupId)
@@ -532,6 +633,16 @@ private async Task HandleRootScenario(
     int currentStepOrder,
     int rootId)
 {
+    Console.WriteLine("===== HANDLE ROOT SCENARIO START =====");
+
+    Console.WriteLine(
+        $"stepType={stepType} " +
+        $"plannedQty={plannedQty} " +
+        $"qtyPerProduct={qtyPerProduct} " +
+        $"currentStepOrder={currentStepOrder} " +
+        $"rootId={rootId}"
+    );
+    
     var qtyDone = stepType == 1
         ? plannedQty * qtyPerProduct
         : plannedQty;
@@ -637,26 +748,66 @@ Console.WriteLine($"ROOT SCENARIO UPDATE -> rootId={rootId} stepOrder={currentSt
 
                 await moveCmd.ExecuteNonQueryAsync();
             }
+
+        int productionModel = 0;
+
+await using (var cmd = conn.CreateCommand())
+{
+    cmd.Transaction = tx;
+
+    cmd.CommandText = @"
+SELECT v.Production_Model
+FROM batches_products bp
+JOIN versions v ON v.ID = bp.Version_Id
+WHERE bp.ID = @rootId
+LIMIT 1;";
+
+    cmd.Parameters.Add(new MySqlParameter("@rootId", rootId));
+
+    var obj = await cmd.ExecuteScalarAsync();
+
+    productionModel = obj == null || obj == DBNull.Value
+        ? 0
+        : Convert.ToInt32(obj);
+}
+
+            var isInlinePainting = productionModel == 1;
+
+            var nextStepType =
+                isInlinePainting
+                    ? 3   // Finishing
+                    : 2;  // Assembly
+
+
+Console.WriteLine(
+    $"ROOT OPEN NEXT -> nextStepType={nextStepType} " +
+    $"inline={isInlinePainting}"
+);
+            await using (var openAssembly = conn.CreateCommand())
+            {
+                openAssembly.Transaction = tx;
+                openAssembly.CommandText = @"
+                UPDATE tasks t
+                JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+                JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+                SET t.Tasks_Status = 1
+                WHERE t.IsActive = 1
+                AND (
+                        ts.Step_Type = @nextStepType
+                    )
+                AND t.Tasks_Status = 5
+                AND bp.ProductToPart_ID IS NULL
+                AND COALESCE(bp.ParentBatchProduct_ID, bp.ID) = @rootId;";
+
+                openAssembly.Parameters.Add(new MySqlParameter("@rootId", rootId));
+                openAssembly.Parameters.Add(new MySqlParameter("@nextStepType", nextStepType));
+                await openAssembly.ExecuteNonQueryAsync();
+            }
         
-        await using (var openAssembly = conn.CreateCommand())
-        {
-            openAssembly.Transaction = tx;
-            openAssembly.CommandText = @"
-            UPDATE tasks t
-            JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
-            JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-            SET t.Tasks_Status = 1
-            WHERE t.IsActive = 1
-            AND ts.Step_Type = 2
-            AND t.Tasks_Status = 5
-            AND bp.ProductToPart_ID IS NULL
-            AND COALESCE(bp.ParentBatchProduct_ID, bp.ID) = @rootId;";
-
-            openAssembly.Parameters.Add(new MySqlParameter("@rootId", rootId));
-
-            await openAssembly.ExecuteNonQueryAsync();
-        }
     }
+
+Console.WriteLine("===== HANDLE ROOT SCENARIO END =====");
+
 }
 
 private async Task HandleParentDetailStep(
@@ -666,6 +817,11 @@ private async Task HandleParentDetailStep(
     int batchProductId,
     int rootId)
 {
+    Console.WriteLine("----- HANDLE PARENT DETAIL START -----");
+    Console.WriteLine(
+        $"taskId={taskId} batchProductId={batchProductId} rootId={rootId}"
+    );
+    
     bool detailFinished = false;
 
     await using (var upd = conn.CreateCommand())
@@ -729,27 +885,57 @@ VALUES
     }
 }
 
-    if (detailFinished)
+    int productionModel = await _db.BatchProducts
+        .Where(x => x.ID == batchProductId)
+        .Join(
+            _db.ProductVersions,
+            bp => bp.Version_Id,
+            v => v.Id,
+            (bp, v) => v.ProductionModel
+        )
+        .FirstOrDefaultAsync();
+
+if (detailFinished)
+{
+    var isInlinePainting = productionModel == 1;
+
+        var nextStepType =
+            isInlinePainting
+                ? 3   // Finishing
+                : 2;  // Assembly
+
+Console.WriteLine(
+    $"OPEN NEXT STAGE -> nextStepType={nextStepType} " +
+    $"inline={isInlinePainting}"
+);
+
+    await using (var openNext = conn.CreateCommand())
     {
-        await using (var openAssembly = conn.CreateCommand())
-        {
-            openAssembly.Transaction = tx;
-            openAssembly.CommandText = @"
-            UPDATE tasks t
-            JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
-            JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-            SET t.Tasks_Status = 1
-            WHERE t.IsActive = 1
-            AND ts.Step_Type = 2
-            AND t.Tasks_Status = 5
-            AND bp.ProductToPart_ID IS NULL
-            AND COALESCE(bp.ParentBatchProduct_ID, bp.ID) = @rootId;";
+        openNext.Transaction = tx;
 
-            openAssembly.Parameters.Add(new MySqlParameter("@rootId", rootId));
+        openNext.CommandText = @"
+        UPDATE tasks t
+        JOIN batches_products bp ON bp.ID = t.BatchProduct_ID
+        JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
+        SET t.Tasks_Status = 1
+        WHERE t.IsActive = 1
+        AND ts.Step_Type = @stepType
+        AND t.Tasks_Status = 5
+        AND bp.ProductToPart_ID IS NULL
+        AND COALESCE(bp.ParentBatchProduct_ID, bp.ID) = @rootId;";
 
-            await openAssembly.ExecuteNonQueryAsync();
-        }
+        openNext.Parameters.Add(
+            new MySqlParameter("@rootId", rootId));
+
+        openNext.Parameters.Add(
+            new MySqlParameter("@stepType", nextStepType));
+
+        await openNext.ExecuteNonQueryAsync();
     }
+}
+
+Console.WriteLine("----- HANDLE PARENT DETAIL END -----");
+
 }
 
 private async Task HandleParentAssemblyStep(

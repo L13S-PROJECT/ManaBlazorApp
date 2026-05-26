@@ -39,7 +39,7 @@
 
                     <!-- APJOMS -->
                     <div class="@(FinAvailable <= 0 ? "qty-gray" : "qty-normal")">
-
+                    
                         @if (isChildPainting)
                         {
                             <span title="Child painting available qty">
@@ -62,7 +62,9 @@
 
         </div>
 
-    @foreach (var w in Waves.Where(x => x.Qty > 0))
+    @foreach (var w in Waves.Where(x =>
+            x.Qty > 0 &&
+            x.Status != 5))
     {
         <div class="ptv2-tasks-row sub task">
             <!-- 1. Nosaukums -->
@@ -174,6 +176,12 @@
 }
 
 <!-- Finishing popup 29.01.2026 -->
+@{
+    var selectedRalIds = Waves
+        .Where(x => x.Status == 1)
+        .Select(x => x.RalColorId)
+        .ToHashSet();
+}
 
 <FinishingOpenPopup
     IsOpen="ShowFinishingPopup"
@@ -298,10 +306,20 @@ else
         else
         {
             
-            FinAvailable =
-                await Http.GetFromJsonAsync<int>(
-                    $"http://localhost:5270/api/tasks/assembly-available-ui?batchProductId={bpId}"
-                );
+            if (SelectedBatch.ProductionModel == 1)
+                    {
+                        FinAvailable =
+                            await Http.GetFromJsonAsync<int>(
+                                $"http://localhost:5270/api/stockmovements/detail-available-real?batchProductId={bpId}"
+                            );
+                    }
+                else
+                {
+                    FinAvailable =
+                        await Http.GetFromJsonAsync<int>(
+                            $"http://localhost:5270/api/tasks/assembly-available-ui?batchProductId={bpId}"
+                        );
+                }
         }
 
     FinSold =
@@ -442,26 +460,39 @@ private async Task OnFinishingOk((int Qty, string? Comment, int? RalColorId) dat
         if (data.Qty <= 0 || SelectedBatch is null)
             return;
 
+    var existingWave = Waves.FirstOrDefault(x =>
+    x.Status == 1 &&
+    x.RalColorId == data.RalColorId);
+
+    var confirmText =
+        existingWave != null
+            ? $"Vai pievienot {data.Qty} GB esošajam RAL vilnim?"
+            : $"Vai nosūtīt {data.Qty} GB uz krāsošanu?";
 
     var ok = await JS.InvokeAsync<bool>(
         "confirm",
-        $"Vai nosūtīt {data.Qty} GB uz krāsošanu?"
-    );
+        confirmText);
 
     if (!ok)
         return;
 
-    await Http.PostAsJsonAsync(
+    var resp = await Http.PostAsJsonAsync(
         "http://localhost:5270/api/tasks/open-finishing",
             new
             {
                 BatchProductId = SelectedBatch.BatchProductId,
-                ProductToPartId = FinishingIndicators.First().ProductToPartId,
+                ProductToPartId =
+                        SelectedBatch.ProductToPartId ?? 0,
                 Qty = data.Qty,
                 Comment = data.Comment,
                 RalColorId = data.RalColorId
             });
 
+Console.WriteLine($"OPEN FINISH STATUS = {resp.StatusCode}");
+
+var txt = await resp.Content.ReadAsStringAsync();
+
+Console.WriteLine(txt);
 
     ShowFinishingPopup = false;
   
@@ -485,7 +516,10 @@ private sealed class FinishingIndicatorVm
 
 private string FinishingState = "gray";
 
-private bool AssemblyNotFinished => FinAvailable <= 0;
+private bool AssemblyNotFinished =>
+    SelectedBatch?.ProductionModel == 1
+        ? false
+        : FinAvailable <= 0;
 
 private bool IsFinishingSwitchDisabled =>
     !AssemblyNotFinished && FinishingState == "green";

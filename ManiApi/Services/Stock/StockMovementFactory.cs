@@ -4,6 +4,27 @@ namespace ManiApi.Services.Stock
 {
     public static class StockMovementFactory
     {
+        
+        public static StockMovement CreateMovement(
+                int versionId,
+                int batchProductId,
+                int taskId,
+                MoveType moveType,
+                int qty,
+                int? ralColorId)
+            {
+                return new StockMovement
+                {
+                    Version_ID = versionId,
+                    BatchProduct_ID = batchProductId,
+                    RAL_Color_ID = ralColorId,
+                    Move_Type = moveType,
+                    Stock_Qty = qty,
+                    Created_At = DateTime.UtcNow,
+                    Task_ID = taskId,
+                    IsActive = true
+                };
+            }
         public static StockMovement CreateAssemblyMovement(
             int versionId,
             int batchProductId,

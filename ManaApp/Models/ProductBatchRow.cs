@@ -50,5 +50,10 @@ public sealed class ProductBatchRow
     public string AssemblyStatus { get; set; } = "";
     public string? DetailName { get; set; }
 
+    public int ProductionModel { get; set; }
+
+    public string AssemblyCssClass { get; set; } = "";
+    public DateTime? AssemblyDisplayDate { get; set; }
+
 }
 

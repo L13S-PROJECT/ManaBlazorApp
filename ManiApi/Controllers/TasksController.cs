@@ -11,8 +11,10 @@ using ManiApi.DTOs.Tasks;
 using ManiApi.Services.Detail;
 using ManiApi.Services.Finishing;
 using ManiApi.Services.Assembly;
+using ManiApi.Services.Inline;
 using TaskRowDto = ManiApi.DTOs.Tasks.TaskRowDto;
 using ManiApi.Services.Tasks;
+using ManiApi.Services.ProductionFlows.ParentSeparate;
 
 
 namespace ManiApi.Controllers
@@ -25,10 +27,14 @@ namespace ManiApi.Controllers
     private readonly TaskService _taskService;
     private readonly DetailTasksService _detailService;
     private readonly AssemblyTasksService _assemblyTasksService;
+    private readonly ManiApi.Services.ProductionFlows.ParentSeparate.ParentSeparateAssemblyService _parentSeparateAssemblyService;
     private readonly TaskManagementService _taskManagementService;
     private readonly FinishingFlowService _finishingFlowService;
     private readonly FinishingTasksService _finishingTasksService;
     private readonly TaskQueryService _taskQueryService;
+    private readonly InlineFinishingTasksService _inlineFinishingTasksService;
+    private readonly InlineAssemblyTasksService _inlineAssemblyTasksService;
+    private readonly ParentSeparateFinishingService _parentSeparateFinishingService;
     
     public TasksController(
         AppDbContext db,
@@ -38,7 +44,12 @@ namespace ManiApi.Controllers
         TaskManagementService taskManagementService,
         FinishingFlowService finishingFlowService,
         FinishingTasksService finishingTasksService,
-        TaskQueryService taskQueryService)
+        TaskQueryService taskQueryService,
+        InlineFinishingTasksService inlineFinishingTasksService,
+        InlineAssemblyTasksService inlineAssemblyTasksService,
+        ManiApi.Services.ProductionFlows.ParentSeparate.ParentSeparateAssemblyService parentSeparateAssemblyService,
+        ManiApi.Services.ProductionFlows.ParentSeparate.ParentSeparateFinishingService parentSeparateFinishingService
+)
     {
         _db = db;
         _taskService = taskService;
@@ -49,6 +60,10 @@ namespace ManiApi.Controllers
         _finishingFlowService = finishingFlowService;
         _finishingTasksService = finishingTasksService;
         _finishingFlowService = finishingFlowService;
+        _inlineFinishingTasksService = inlineFinishingTasksService;
+        _inlineAssemblyTasksService = inlineAssemblyTasksService;
+        _parentSeparateAssemblyService = parentSeparateAssemblyService;
+        _parentSeparateFinishingService = parentSeparateFinishingService;
     }
 
         // GET: /api/tasks/for-employee?empId=101
@@ -91,475 +106,17 @@ public async Task<IActionResult> Finish([FromBody] FinishDto dto)
 
     var result = await _taskService.FinishTask(dto.TaskId, dto.QtyDoneAdd);
 
+    if (result.Success)
+        {
+            // te vēlāk pieslēgsim ProductionFlow
+
+        }
+
     if (!result.Success)
         return Conflict(result.Error);
 
     return Ok(new { finished = true });
 
- /*   if (dto is null || dto.TaskId <= 0)
-        return BadRequest("TaskId is required.");
-
-    var conn = _db.Database.GetDbConnection();
-    await conn.OpenAsync();
-    await using var tx = await conn.BeginTransactionAsync();
-
-    int currentStatus;
-
-    // 1) Nolasām statusu un nolockojam rindu
-    await using (var cmd = conn.CreateCommand())
-    {
-        cmd.Transaction = tx;
-        cmd.CommandText = @"
-SELECT Tasks_Status
-FROM tasks
-WHERE ID = @id AND IsActive = 1
-FOR UPDATE;";
-        var p = cmd.CreateParameter();
-        p.ParameterName = "@id";
-        p.Value = dto.TaskId;
-        cmd.Parameters.Add(p);
-
-        var obj = await cmd.ExecuteScalarAsync();
-        if (obj == null || obj == DBNull.Value)
-        {
-            await tx.RollbackAsync();
-            return NotFound("Uzdevums nav atrasts vai ir neaktīvs.");
-        }
-
-        currentStatus = Convert.ToInt32(obj);
-    }
-
-    // 2) Atļaujam pabeigt tikai, ja ir 'Procesā' (2)
-    if (currentStatus != 2)
-    {
-        await tx.RollbackAsync();
-        return BadRequest("Pabeigt drīkst tikai uzdevumu ar statusu 'Procesā'.");
-    }
-
-    // 3) Nolasām Step_Type, Qty_Per_product, PlannedQty, CurrentDone, BatchProductId, VersionId
-    int stepType;
-    int qtyPerProduct;
-    int plannedQty;
-    int currentDone;
-    int batchProductId;
-    int versionId;
-    int? ralColorId;
-
-    await using (var info = conn.CreateCommand())
-    {
-        info.Transaction = tx;
-        info.CommandText = @"
-SELECT 
-    ts.Step_Type,
-    ptp.Qty_Per_product,
-    COALESCE(SUM(bp.Planned_Qty), 0) AS PlannedQty,
-    COALESCE(t.Qty_Done, 0)          AS CurrentDone,
-    t.BatchProduct_ID,
-    bp.Version_Id,
-    COALESCE(t.Qty_Scrap, 0)         AS FinishingPlannedQty,
-    t.RAL_Color_ID
-FROM tasks t
-JOIN toppartsteps ts     ON ts.ID = t.TopPartStep_ID
-JOIN producttopparts ptp ON ptp.ID = ts.ProductToPart_ID
-LEFT JOIN batches_products bp ON bp.ID = t.BatchProduct_ID AND bp.IsActive = 1
-LEFT JOIN batches b ON b.ID = bp.Batch_Id AND b.IsActive = 1 AND b.Batches_Statuss = 1
-WHERE t.ID = @id AND t.IsActive = 1
-GROUP BY 
-    ts.Step_Type,
-    ptp.Qty_Per_product,
-    t.Qty_Done,
-    t.BatchProduct_ID,
-    bp.Version_Id,
-    t.Qty_Scrap;";
-
-        var p = info.CreateParameter();
-        p.ParameterName = "@id";
-        p.Value = dto.TaskId;
-        info.Parameters.Add(p);
-
-        await using var rr = await info.ExecuteReaderAsync();
-        if (!await rr.ReadAsync())
-        {
-            await tx.RollbackAsync();
-            return NotFound("Uzdevuma dati nav atrasti.");
-        }
-
-        stepType       = rr.GetInt32(0);
-        qtyPerProduct  = rr.GetInt32(1);
-        plannedQty     = rr.GetInt32(2);
-        currentDone    = rr.GetInt32(3);
-        batchProductId = rr.GetInt32(4);
-        versionId      = rr.IsDBNull(5) ? 0 : rr.GetInt32(5);
-        var finishingPlannedQty = rr.IsDBNull(6) ? 0 : rr.GetInt32(6);
-        ralColorId = rr.IsDBNull(7) ? null : rr.GetInt32(7);
-
-        // Ja Finishing solis – pārrakstām plannedQty ar to, ko iedeva Finishing popup
-        if (stepType == 3 && finishingPlannedQty > 0)
-        {
-            plannedQty = finishingPlannedQty;
-        }
-    }
-
-    int newStatus  = 2;
-    int newDoneOut = currentDone;
-
-    // 4) Detailed / Assembly – pabeidzam VISU uzreiz
-    if (stepType == 1)
-
-    {
-        var qtyDone = plannedQty * qtyPerProduct;
-        newDoneOut = qtyDone;
-        await using (var upd = conn.CreateCommand())
-        {
-            upd.Transaction = tx;
-            upd.CommandText = @"
-UPDATE tasks t
-JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-SET t.Tasks_Status = 3,
-    t.Finished_At  = CURRENT_TIMESTAMP,
-    t.Qty_Done     = @qtyDone
-WHERE t.IsActive = 1
-  AND t.Tasks_Status = 2
-  AND ts.ProductToPart_ID = (
-      SELECT ts2.ProductToPart_ID
-      FROM tasks t2
-      JOIN toppartsteps ts2 ON ts2.ID = t2.TopPartStep_ID
-      WHERE t2.ID = @id
-  )
-  AND t.BatchProduct_ID IN (
-      SELECT bp.ID
-      FROM batches_products bp
-      WHERE bp.IsActive = 1
-        AND bp.Batch_Id = (
-            SELECT bp0.Batch_Id FROM batches_products bp0
-            WHERE bp0.ID = (
-                SELECT BatchProduct_ID FROM tasks WHERE ID = @id
-            )
-        )
-        AND bp.Version_Id = (
-            SELECT bp0.Version_Id FROM batches_products bp0
-            WHERE bp0.ID = (
-                SELECT BatchProduct_ID FROM tasks WHERE ID = @id
-            )
-        )
-  );";
-            var p1 = upd.CreateParameter(); p1.ParameterName = "@qtyDone"; p1.Value = qtyDone;    upd.Parameters.Add(p1);
-            var p2 = upd.CreateParameter(); p2.ParameterName = "@id";      p2.Value = dto.TaskId; upd.Parameters.Add(p2);
-            await upd.ExecuteNonQueryAsync();
-        }
-
-        newStatus  = 3;
-        newDoneOut = qtyDone;
-
-        // 4.1) Detailed īpašais gadījums – kad VISI Detailed soļi pabeigti -> PLANNED -> DETAILED + atvērt Assembly
-        if (stepType == 1 && batchProductId > 0)
-        {
-            int notFinishedDetailed = 0;
-            await using (var cmdCheck = conn.CreateCommand())
-            {
-                cmdCheck.Transaction = tx;
-                cmdCheck.CommandText = @"
-SELECT COUNT(*)
-FROM tasks t
-JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-WHERE t.BatchProduct_ID IN (
-    SELECT bp.ID
-    FROM batches_products bp
-    WHERE bp.IsActive = 1
-      AND bp.Batch_Id = (
-          SELECT bp0.Batch_Id FROM batches_products bp0
-          WHERE bp0.ID = @bpId
-      )
-      AND bp.Version_Id = (
-          SELECT bp0.Version_Id FROM batches_products bp0
-          WHERE bp0.ID = @bpId
-      )
-)
-  AND t.IsActive = 1
-  AND ts.Step_Type = 1
-  AND t.Tasks_Status <> 3;";
-
-                var pBp = cmdCheck.CreateParameter();
-                pBp.ParameterName = "@bpId";
-                pBp.Value = batchProductId;
-                cmdCheck.Parameters.Add(pBp);
-
-                var objCnt = await cmdCheck.ExecuteScalarAsync();
-                notFinishedDetailed = (objCnt == null || objCnt == DBNull.Value)
-                    ? 0
-                    : Convert.ToInt32(objCnt);
-            }
-
-            if (notFinishedDetailed == 0)
-            {
-                // atveram Assembly (5 -> 1)
-                await using (var cmdOpenAsm = conn.CreateCommand())
-                {
-                    cmdOpenAsm.Transaction = tx;
-                    cmdOpenAsm.CommandText = @"
-UPDATE tasks t
-JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-SET t.Tasks_Status = 1
-WHERE t.BatchProduct_ID = @bpId
-  AND t.IsActive = 1
-  AND ts.Step_Type = 2
-  AND t.Tasks_Status = 5;";
-
-                    var pBp2 = cmdOpenAsm.CreateParameter();
-                    pBp2.ParameterName = "@bpId";
-                    pBp2.Value = batchProductId;
-                    cmdOpenAsm.Parameters.Add(pBp2);
-
-                    await cmdOpenAsm.ExecuteNonQueryAsync();
-                }
-
-                // PLANNED -> DETAILED (vienreiz per BatchProduct)
-                if (versionId > 0)
-                {
-                    int existingDetailed = 0;
-                    await using (var cmdCheckMove = conn.CreateCommand())
-                    {
-                        cmdCheckMove.Transaction = tx;
-                        cmdCheckMove.CommandText = @"
-SELECT COUNT(*)
-FROM stock_movements
-WHERE BatchProduct_ID = @bpId
-  AND Move_Type = 'DETAILED'
-  AND IsActive = 1;";
-
-                        var pM = cmdCheckMove.CreateParameter();
-                        pM.ParameterName = "@bpId";
-                        pM.Value = batchProductId;
-                        cmdCheckMove.Parameters.Add(pM);
-
-                        var objM = await cmdCheckMove.ExecuteScalarAsync();
-                        existingDetailed = (objM == null || objM == DBNull.Value)
-                            ? 0
-                            : Convert.ToInt32(objM);
-                    }
-
-                    if (existingDetailed == 0)
-                    {
-                        var totalQty = plannedQty * qtyPerProduct;
-
-                        // PLANNED -
-                        await using (var m1 = conn.CreateCommand())
-                        {
-                            m1.Transaction = tx;
-                            m1.CommandText = @"
-INSERT INTO stock_movements
-    (Version_ID, BatchProduct_ID, Move_Type, Stock_Qty, Created_At, IsActive)
-VALUES
-    (@ver, @bpId, 'PLANNED', -@qty, CURRENT_TIMESTAMP, 1);";
-
-                            m1.Parameters.Add(new MySqlParameter("@ver",  versionId));
-                            m1.Parameters.Add(new MySqlParameter("@bpId", batchProductId));
-                            m1.Parameters.Add(new MySqlParameter("@qty",  totalQty));
-
-                            await m1.ExecuteNonQueryAsync();
-                        }
-
-                        // DETAILED +
-                        await using (var m2 = conn.CreateCommand())
-                        {
-                            m2.Transaction = tx;
-                            m2.CommandText = @"
-INSERT INTO stock_movements
-    (Version_ID, BatchProduct_ID, Move_Type, Stock_Qty, Created_At, Task_ID, IsActive)
-VALUES
-    (@ver, @bpId, 'DETAILED', @qty, CURRENT_TIMESTAMP, @taskId, 1);";
-
-                            m2.Parameters.Add(new MySqlParameter("@ver",    versionId));
-                            m2.Parameters.Add(new MySqlParameter("@bpId",   batchProductId));
-                            m2.Parameters.Add(new MySqlParameter("@qty",    totalQty));
-                            m2.Parameters.Add(new MySqlParameter("@taskId", dto.TaskId));
-
-                            await m2.ExecuteNonQueryAsync();
-                        }
-                    }
-                }
-            }
-        }
-
-    }
-    
-    // 4.2) Assembly īpašais gadījums – kad VISI Assembly soļi pabeigti -> DETAILED -> ASSEMBLY
-    else if (stepType == 2 && batchProductId > 0 && versionId > 0)
-        {
-            int notFinishedAssembly = 0;
-            await using (var cmdCheckAsm = conn.CreateCommand())
-            {
-                cmdCheckAsm.Transaction = tx;
-                cmdCheckAsm.CommandText = @"
-SELECT COUNT(*)
-FROM tasks t
-JOIN toppartsteps ts ON ts.ID = t.TopPartStep_ID
-WHERE t.BatchProduct_ID = @bpId
-  AND t.IsActive = 1
-  AND ts.Step_Type = 2
-  AND t.Tasks_Status <> 3;";
-
-                var pBp = cmdCheckAsm.CreateParameter();
-                pBp.ParameterName = "@bpId";
-                pBp.Value = batchProductId;
-                cmdCheckAsm.Parameters.Add(pBp);
-
-                var objCnt = await cmdCheckAsm.ExecuteScalarAsync();
-                notFinishedAssembly = (objCnt == null || objCnt == DBNull.Value)
-                    ? 0
-                    : Convert.ToInt32(objCnt);
-            }
-
-            if (notFinishedAssembly == 0)
-            {
-                int existingAsm = 0;
-                await using (var cmdCheckMove = conn.CreateCommand())
-                {
-                    cmdCheckMove.Transaction = tx;
-                    cmdCheckMove.CommandText = @"
-SELECT COUNT(*)
-FROM stock_movements
-WHERE BatchProduct_ID = @bpId
-  AND Move_Type = 'ASSEMBLY'
-  AND IsActive = 1;";
-
-                    var pM = cmdCheckMove.CreateParameter();
-                    pM.ParameterName = "@bpId";
-                    pM.Value = batchProductId;
-                    cmdCheckMove.Parameters.Add(pM);
-
-                    var objM = await cmdCheckMove.ExecuteScalarAsync();
-                    existingAsm = (objM == null || objM == DBNull.Value)
-                        ? 0
-                        : Convert.ToInt32(objM);
-                }
-
-                if (existingAsm == 0)
-                {
-                    var totalQty = plannedQty * qtyPerProduct;
-
-                    await using (var cmdMove = conn.CreateCommand())
-                    {
-                        cmdMove.Transaction = tx;
-                        cmdMove.CommandText = @"
-INSERT INTO stock_movements 
-    (Version_ID, BatchProduct_ID, Move_Type, Stock_Qty, Created_At, Task_ID, IsActive)
-VALUES
-    (@ver, @bpId, 'DETAILED', -@qty, CURRENT_TIMESTAMP, @taskId, 1),
-    (@ver, @bpId, 'ASSEMBLY',  @qty, CURRENT_TIMESTAMP, @taskId, 1);";
-
-                        var pVer = cmdMove.CreateParameter();
-                        pVer.ParameterName = "@ver";
-                        pVer.Value = versionId;
-                        cmdMove.Parameters.Add(pVer);
-
-                        var pBp3 = cmdMove.CreateParameter();
-                        pBp3.ParameterName = "@bpId";
-                        pBp3.Value = batchProductId;
-                        cmdMove.Parameters.Add(pBp3);
-
-                        var pQty = cmdMove.CreateParameter();
-                        pQty.ParameterName = "@qty";
-                        pQty.Value = totalQty;
-                        cmdMove.Parameters.Add(pQty);
-
-                        var pTask = cmdMove.CreateParameter();
-                        pTask.ParameterName = "@taskId";
-                        pTask.Value = dto.TaskId;
-                        cmdMove.Parameters.Add(pTask);
-
-                        await cmdMove.ExecuteNonQueryAsync();
-                    }
-                }
-            }
-        }
-    
-    else
-    {
-        // 5) Finishing — apjoms jau ir Qty_Done (no popup), šeit tikai statusu pabeidzam + kustību uz STOCK.
-
-        // 5.0) Task -> Finished
-        await using (var upd = conn.CreateCommand())
-        {
-            upd.Transaction = tx;
-            upd.CommandText = @"
-UPDATE tasks
-   SET Tasks_Status = 3,
-       Finished_At  = CURRENT_TIMESTAMP
- WHERE ID = @id;";
-            upd.Parameters.Add(new MySqlParameter("@id", dto.TaskId));
-            await upd.ExecuteNonQueryAsync();
-        }
-
-// 5.1) FINISHING -> STOCK kustība (idempotenta)
-var qtyMove = currentDone;
-if (qtyMove > 0 && batchProductId > 0 && versionId > 0)
-{
-    // ja STOCK jau ir ielikts šim taskam -> neko nedaram (idempotence)
-    int alreadyDone = 0;
-    await using (var chk = conn.CreateCommand())
-    {
-        chk.Transaction = tx;
-        chk.CommandText = @"
-SELECT COUNT(*)
-FROM stock_movements
-WHERE IsActive = 1
-  AND Task_ID = @taskId
-  AND BatchProduct_ID = @bpId
-  AND Version_ID = @ver
-  AND Move_Type = 'STOCK';";
-        chk.Parameters.Add(new MySqlParameter("@taskId", dto.TaskId));
-        chk.Parameters.Add(new MySqlParameter("@bpId", batchProductId));
-        chk.Parameters.Add(new MySqlParameter("@ver", versionId));
-
-        alreadyDone = Convert.ToInt32(await chk.ExecuteScalarAsync());
-    }
-
-    if (alreadyDone == 0)
-    {
-        await using (var mv = conn.CreateCommand())
-        {
-            mv.Transaction = tx;
-            mv.CommandText = @"
-INSERT INTO stock_movements
-    (Version_ID, BatchProduct_ID, Move_Type, RAL_Color_ID, Stock_Qty, Created_At, Task_ID, IsActive)
-VALUES
-    (@ver, @bpId, 'FINISHING', @ral, -@qty, CURRENT_TIMESTAMP, @taskId, 1),
-    (@ver, @bpId, 'STOCK',     @ral,  @qty, CURRENT_TIMESTAMP, @taskId, 1);";
-
-            mv.Parameters.Add(new MySqlParameter("@ver", versionId));
-            mv.Parameters.Add(new MySqlParameter("@bpId", batchProductId));
-            mv.Parameters.Add(new MySqlParameter("@qty", qtyMove));
-            mv.Parameters.Add(new MySqlParameter("@taskId", dto.TaskId));
-            mv.Parameters.Add(new MySqlParameter("@ral", (object?)ralColorId ?? DBNull.Value));
-            await mv.ExecuteNonQueryAsync();
-        }
-    }
-}
-
-        newStatus  = 3;
-        newDoneOut = currentDone;
-    }
-
-// aizveram aktīvo darba sesiju
-await using (var closeSession = conn.CreateCommand())
-{
-    closeSession.Transaction = tx;
-    closeSession.CommandText = @"
-UPDATE tasks_work_sessions
-SET 
-    EndTime = CURRENT_TIMESTAMP,
-    DurationMinutes = TIMESTAMPDIFF(MINUTE, StartTime, CURRENT_TIMESTAMP)
-WHERE Task_ID = @taskId
-  AND EndTime IS NULL;";
-
-    closeSession.Parameters.Add(new MySqlParameter("@taskId", dto.TaskId));
-
-    await closeSession.ExecuteNonQueryAsync();
-}
-
-    await tx.CommitAsync();
-    return Ok(new { taskId = dto.TaskId, status = newStatus, done = newDoneOut });*/
 }
      
 
@@ -1192,7 +749,7 @@ public async Task<IActionResult> GetFinishingByVersionRal([FromQuery] int versio
 [HttpGet("assembly-available-ui")]
 public async Task<IActionResult> GetAssemblyAvailableUi([FromQuery] int batchProductId)
 {
-    var val = await _taskQueryService.GetAssemblyAvailableUi(batchProductId);
+    var val = await _parentSeparateFinishingService.GetAvailableAssemblyQty(batchProductId);
     return Ok(val);
     
 }
@@ -1464,6 +1021,67 @@ public async Task<IActionResult> GetAssemblySummary([FromQuery] int batchProduct
     var result = await _assemblyTasksService.GetAssemblySummary(batchProductId);
 
     return Ok(result);
+}
+
+[HttpGet("inline-finishing-data")]
+public async Task<IActionResult> GetInlineFinishingData(
+    [FromQuery] int batchProductId)
+{
+    if (batchProductId <= 0)
+        return BadRequest();
+
+    var isInline = await _inlineFinishingTasksService
+        .IsInlinePainting(batchProductId);
+
+    if (!isInline)
+    {
+        return Ok(new
+        {
+            IsInline = false,
+            DetailFinished = false,
+            AvailableQty = 0
+        });
+    }
+
+    var detailFinished = await _inlineFinishingTasksService
+        .IsDetailFinished(batchProductId);
+
+    var availableQty = await _inlineFinishingTasksService
+        .GetAvailableInlineQty(batchProductId);
+
+    return Ok(new
+    {
+        IsInline = true,
+        DetailFinished = detailFinished,
+        AvailableQty = availableQty
+    });
+}
+
+[HttpGet("inline-assembly-data")]
+public async Task<IActionResult> GetInlineAssemblyData(
+    [FromQuery] int batchProductId)
+{
+    if (batchProductId <= 0)
+        return BadRequest();
+
+    var availableQty = await _inlineAssemblyTasksService
+        .GetAvailableAssemblyQty(batchProductId);
+
+    return Ok(new
+    {
+        AvailableQty = availableQty
+    });
+}
+
+[HttpGet("inline-finishing-available")]
+public async Task<ActionResult<int>> GetInlineFinishingAvailable(
+    int batchProductId)
+{
+    var qty =
+        await _inlineAssemblyTasksService
+            .GetAvailableAssemblyQty(batchProductId);
+
+    return Ok(qty);
 }
 
     }

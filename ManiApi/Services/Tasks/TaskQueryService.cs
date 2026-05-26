@@ -79,9 +79,11 @@ public async Task<List<TaskRowDto>> GetForEmployee(int empId)
 
         (
             CASE 
-                WHEN ts.Step_Type IN (1,2) THEN 
-            bp.Planned_Qty * ts.Estimated_Minutes
-                WHEN ts.Step_Type = 3 THEN t.Qty_Done * ts.Estimated_Minutes
+                WHEN ts.Step_Type = 1 THEN 
+                    bp.Planned_Qty * ts.Estimated_Minutes
+
+                WHEN ts.Step_Type IN (2,3) THEN 
+                    t.Qty_Done * ts.Estimated_Minutes
                 ELSE bp.Planned_Qty * ts.Estimated_Minutes
             END
         ) AS EstimatedTotalMinutes,
@@ -105,7 +107,7 @@ public async Task<List<TaskRowDto>> GetForEmployee(int empId)
                 THEN bp.Planned_Qty  
                 ELSE bp.Planned_Qty * ptp.Qty_Per_product
             END
-            WHEN ts.Step_Type = 3 THEN t.Qty_Done
+            WHEN ts.Step_Type IN (2,3) THEN t.Qty_Done
             ELSE bp.Planned_Qty
         END AS PlannedQty,
         COALESCE(ts.Step_Order, 0) AS StepOrder, -- 11 soļa secība    
@@ -1180,6 +1182,7 @@ public async Task<List<object>> GetFinishingWaves(int batchProductId, int produc
             {
                 TaskId = x.t.ID,
                 Status = x.t.Tasks_Status,
+                RalColorId = x.t.RAL_Color_ID,
                 Qty = x.t.Qty_Done,
                 Assigned_To = x.t.Assigned_To,
                 Claimed_By = x.t.Claimed_By,

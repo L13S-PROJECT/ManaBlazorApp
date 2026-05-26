@@ -11,6 +11,9 @@ using ManiApi.Services.Stock;
 using ManiApi.Services.Orders;
 using ManiApi.Services.Pdf;
 using ManiApi.Services.Production;
+using ManiApi.Services.Inline;
+using ManiApi.Services.ProductionFlows.ParentSeparate;
+
 
 
 
@@ -49,6 +52,11 @@ builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<PdfService>();
 builder.Services.AddScoped<OrderDraftService>();
 builder.Services.AddScoped<ProductionTasksQueryService>();
+builder.Services.AddScoped<InlineFinishingTasksService>();
+builder.Services.AddScoped<InlineAssemblyTasksService>();
+builder.Services.AddScoped<ParentSeparateAssemblyService>();
+builder.Services.AddScoped<ParentSeparateDetailService>();
+builder.Services.AddScoped<ParentSeparateFinishingService>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();

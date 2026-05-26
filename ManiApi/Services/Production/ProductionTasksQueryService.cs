@@ -38,6 +38,7 @@ SELECT
     c.Parent_ID AS ParentCategoryId,
     v.Version_Name AS VersionName,
     v.IsActive AS VersionIsActive,
+    v.Production_Model AS ProductionModel,
 
     CASE
     WHEN bp.ProductToPart_ID IS NULL
@@ -728,29 +729,30 @@ while (await r.ReadAsync())
         ParentCategoryId = r.IsDBNull(10) ? (int?)null : r.GetInt32(10),
         VersionName    = r.GetString(11),
         VersionIsActive = r.GetBoolean(12),
-        DetailName = r.IsDBNull(13)
+        ProductionModel = r.GetInt32(13),
+        DetailName = r.IsDBNull(14)
             ? null
-            : r.GetValue(13).ToString(),
-        HiddenDetailNames = r.IsDBNull(14)
+            : r.GetValue(14).ToString(),
+        HiddenDetailNames = r.IsDBNull(15)
             ? null
-            : r.GetString(14),
-        IsPriority     = r.GetBoolean(15),
+            : r.GetString(15),
+        IsPriority     = r.GetBoolean(16),
 
-        Planned = r.GetInt32(17),
-        Comment = r.IsDBNull(18) ? null : r.GetString(18),
-        Sold = r.GetInt32(19),
-        Done = r.GetInt32(20),
-        DetailsTotal = r.GetInt32(21),
-        DetailsChildTotal = r.GetInt32(22),
-        DetailsDone = r.GetInt32(23),
-        DetailsChildDone = r.GetInt32(24),
-        DetailStart = r.IsDBNull(25) ? (DateTime?)null : r.GetDateTime(25),
-        DetailFinish = r.IsDBNull(26) ? (DateTime?)null : r.GetDateTime(26),
-        DetailFinishChildList = r.IsDBNull(27) ? null : r.GetString(27),
-        IsReadOnlyChild = r.GetInt32(28) == 1,
-        IsCompleted = r.GetInt32(29) == 1,
-        DetailStatus = r.GetString(30),
-        AssemblyStatus = r.GetString(31)
+        Planned = r.GetInt32(18),
+        Comment = r.IsDBNull(19) ? null : r.GetString(19),
+        Sold = r.GetInt32(20),
+        Done = r.GetInt32(21),
+        DetailsTotal = r.GetInt32(22),
+        DetailsChildTotal = r.GetInt32(23),
+        DetailsDone = r.GetInt32(24),
+        DetailsChildDone = r.GetInt32(25),
+        DetailStart = r.IsDBNull(26) ? (DateTime?)null : r.GetDateTime(26),
+        DetailFinish = r.IsDBNull(27) ? (DateTime?)null : r.GetDateTime(27),
+        DetailFinishChildList = r.IsDBNull(28) ? null : r.GetString(28),
+        IsReadOnlyChild = r.GetInt32(29) == 1,
+        IsCompleted = r.GetInt32(30) == 1,
+        DetailStatus = r.GetString(31),
+        AssemblyStatus = r.GetString(32)
     });
 }
 
