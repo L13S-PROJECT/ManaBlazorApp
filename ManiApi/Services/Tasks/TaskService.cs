@@ -7,6 +7,7 @@ using System.Data;
 using MySqlConnector;
 using System.Data.Common;
 using ManiApi.Services.ProductionFlows.ParentSeparate;
+using ManiApi.Services.ProductionFlows.ParentInline;
 using ManiApi.Services.Tasks;
 
 
@@ -19,18 +20,28 @@ namespace ManiApi.Services.Tasks
         private readonly ParentSeparateDetailService _parentSeparateDetailService;
         private readonly ParentSeparateAssemblyService _parentSeparateAssemblyService;
         private readonly ParentSeparateFinishingService _parentSeparateFinishingService;
+        private readonly InlineParentDetailService _inlineParentDetailService;
+        private readonly InlineParentFinishingService _inlineParentFinishingService;
+        private readonly InlineParentAssemblyService _inlineParentAssemblyService;
+
         public TaskService(AppDbContext db, 
         TaskQueryService queryService, 
         ParentSeparateDetailService parentSeparateDetailService,
         ParentSeparateAssemblyService parentSeparateAssemblyService,
-        ParentSeparateFinishingService parentSeparateFinishingService)
-        {
-            _db = db;
-            _queryService = queryService;
-            _parentSeparateDetailService = parentSeparateDetailService;
-            _parentSeparateAssemblyService = parentSeparateAssemblyService;
-            _parentSeparateFinishingService = parentSeparateFinishingService;
-        }
+        ParentSeparateFinishingService parentSeparateFinishingService,
+        InlineParentDetailService inlineParentDetailService,
+        InlineParentFinishingService inlineParentFinishingService,
+        InlineParentAssemblyService inlineParentAssemblyService)
+            {
+                _db = db;
+                _queryService = queryService;
+                _parentSeparateDetailService = parentSeparateDetailService;
+                _parentSeparateAssemblyService = parentSeparateAssemblyService;
+                _parentSeparateFinishingService = parentSeparateFinishingService;
+                _inlineParentDetailService = inlineParentDetailService;
+                _inlineParentFinishingService = inlineParentFinishingService;
+                _inlineParentAssemblyService = inlineParentAssemblyService;
+            }
        
 
 public Task<List<TaskRowDto>> GetForEmployee(int empId)
@@ -299,13 +310,26 @@ else if (scenario == TaskScenario.A_Parent)
         $"DETAIL FINISHED -> Inline={isInlinePainting} scenario={scenario}"
     );
 
-    await _parentSeparateDetailService.HandleParentDetailStep(
-        conn,
-        tx,
-        taskId,
-        batchProductId,
-        rootId
-    );
+    if (!isInlinePainting)
+        {
+            await _parentSeparateDetailService.HandleParentDetailStep(
+                conn,
+                tx,
+                taskId,
+                batchProductId,
+                rootId
+            );
+        }
+    else
+        {
+            await _inlineParentDetailService.HandleParentDetailStep(
+                conn,
+                tx,
+                taskId,
+                batchProductId,
+                rootId
+            );
+        }
 
     Console.WriteLine(
         $"DETAIL FLOW COMPLETED -> batchProductId={batchProductId}"
@@ -313,19 +337,29 @@ else if (scenario == TaskScenario.A_Parent)
 }
     else if (stepType == 2)
 {
-    await HandleParentAssemblyStep(
-        conn, tx,
-        taskId,
-        rootId,
-        plannedQty,
-        qtyPerProduct,
-        batchProductId,
-        versionId,
-        currentDone,
-        ralColorId);
+    if (!isInlinePainting)
+        {
+            await HandleParentAssemblyStep(
+                conn, tx,
+                taskId,
+                rootId,
+                plannedQty,
+                qtyPerProduct,
+                batchProductId,
+                versionId,
+                currentDone,
+                ralColorId);
+        }
+    else
+        {
+            await _inlineParentAssemblyService
+                .FinishAssemblyTask(taskId);
+        }
 }
 
 else if (stepType == 3)
+{
+    if (!isInlinePainting)
 {
     await using var upd = conn.CreateCommand();
 
@@ -340,6 +374,13 @@ WHERE ID = @id;";
     upd.Parameters.Add(new MySqlParameter("@id", taskId));
 
     await upd.ExecuteNonQueryAsync();
+}
+else
+{
+    await _inlineParentFinishingService
+        .OpenAssemblyWave(taskId);
+}
+
 }
 
 }

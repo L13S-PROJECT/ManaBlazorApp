@@ -24,8 +24,9 @@ else
             @foreach (var t in Tasks)
             {
 <tr class="@GetRowClass(t)"
-    style="cursor: @(AvailableTaskId == t.TaskId ? "pointer" : "not-allowed"); opacity:@(AvailableTaskId == t.TaskId ? "1" : "0.5")"
-@onclick="() => { if (AvailableTaskId == t.TaskId) OnSelect.InvokeAsync(t); }">
+    style="cursor:pointer; opacity:@(CanSelectTask(t) ? "1" : "0.5")"
+    @onclick="() => { if (CanSelectTask(t)) OnSelect.InvokeAsync(t); }">
+
                     <td>@t.BatchCode</td>
                     <td>
                             @if (t.Assigned_To == null || t.Assigned_To == 0)
@@ -62,8 +63,13 @@ else
     [Parameter] public EventCallback<TaskRow> OnOpen { get; set; }
     [Parameter] public EventCallback<TaskRow> OnSelect { get; set; }
     [Parameter] public int? AvailableTaskId { get; set; }
+    [Parameter] public int? SelectedTaskId { get; set; }
+
     private string GetRowClass(TaskRow t)
 {
+    if (SelectedTaskId == t.TaskId)
+    return "table-primary";
+
     if (t.Tasks_Push && t.Status == 1)
         return "task-push";
 
@@ -73,8 +79,12 @@ else
     if (t.Status == 3)
         return "table-success";
 
-    if (AvailableTaskId.HasValue && t.TaskId == AvailableTaskId.Value)
-        return "task-available"; // vienīgais aktīvais
+    if (t.WorkCenterId != 4 &&
+            AvailableTaskId.HasValue &&
+            t.TaskId == AvailableTaskId.Value)
+        {
+            return "task-available";
+        }
 
     if (t.CanStart)
     return "task-canstart";
@@ -84,6 +94,18 @@ else
 
     return "task-disabled";
 }
+
+private bool CanSelectTask(TaskRow t)
+{
+    // Krāsošana
+    if (t.WorkCenterId == 4)
+        return true;
+
+    // Pārējie
+    return AvailableTaskId == t.TaskId;
+}
+
+
 
 }
 

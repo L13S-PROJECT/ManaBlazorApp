@@ -1084,5 +1084,73 @@ public async Task<ActionResult<int>> GetInlineFinishingAvailable(
     return Ok(qty);
 }
 
+[HttpPost("start-painting-session")]
+public async Task<IActionResult> StartPaintingSession(
+    [FromBody] StartPaintingSessionRequest dto)
+{
+    Console.WriteLine(
+        $"PAINT SESSION -> emp={dto.EmployeeId} tasks={string.Join(",", dto.TaskIds)}"
+    );
+
+    var hasActivePaintingSession = await (
+            from t in _db.Tasks
+            join ts in _db.TopPartSteps
+                on t.TopPartStep_ID equals ts.Id
+            where t.Tasks_Status == 2
+                && t.IsActive
+                && ts.WorkCentrId == 4
+            select t.ID
+        ).AnyAsync();
+
+            if (hasActivePaintingSession)
+            {
+                return Conflict("Krāsošanas sesija jau ir aktīva.");
+            }
+
+    var now = DateTime.UtcNow;
+
+var tasks = await _db.Tasks
+    .Where(t =>
+        dto.TaskIds.Contains(t.ID) &&
+        t.Tasks_Status == 1 &&
+        t.IsActive)
+    .ToListAsync();
+
+foreach (var t in tasks)
+{
+    t.Tasks_Status = 2;
+    t.Claimed_By = dto.EmployeeId;
+    t.Started_At = now;
+}
+
+await _db.SaveChangesAsync();
+
+    return Ok(new { updated = tasks.Count });
+}
+
+[HttpPost("finish-painting-session")]
+public async Task<IActionResult> FinishPaintingSession(
+    [FromBody] StartPaintingSessionRequest dto)
+{
+    var now = DateTime.UtcNow;
+
+    var tasks = await _db.Tasks
+        .Where(t =>
+            dto.TaskIds.Contains(t.ID) &&
+            t.Tasks_Status == 2 &&
+            t.IsActive)
+        .ToListAsync();
+
+    foreach (var t in tasks)
+    {
+        t.Tasks_Status = 3;
+        t.Finished_At = now;
+    }
+
+    await _db.SaveChangesAsync();
+
+    return Ok(new { updated = tasks.Count });
+}
+
     }
 }

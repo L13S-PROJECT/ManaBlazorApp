@@ -36,5 +36,10 @@ namespace ManiApi.DTOs.Tasks
     public int BatchId { get; set; }
     public int VersionId { get; set; }
     public int BatchProductId { get; set; }
+
+    public int? RalColorId { get; set; }
+    public string? RalColorCode { get; set; }
+
+    public int? WorkCenterId { get; set; }
 }
 }

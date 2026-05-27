@@ -1,0 +1,145 @@
+@using ManaApp.Models
+
+@if (ActiveTask is null)
+{
+    <div class="no-active-task">
+        Nav izvēlēts krāsošanas uzdevums.
+    </div>
+}
+else
+{
+    var activeSessionTasks = Tasks
+        .Where(t =>
+            t.WorkCenterId == 4 &&
+            t.StepType == 3 &&
+            t.RalColorId == ActiveTask.RalColorId &&
+            t.Status == 2)
+        .OrderBy(t => t.TaskId)
+        .ToList();
+
+    var hasActiveSession = activeSessionTasks.Any();
+
+    var sameRalTasks = hasActiveSession
+        ? activeSessionTasks
+        : Tasks
+            .Where(t =>
+                t.WorkCenterId == 4 &&
+                t.StepType == 3 &&
+                t.RalColorId == ActiveTask.RalColorId &&
+                t.Status == 1)
+            .OrderByDescending(t => t.PriorityLevel)
+            .ThenBy(t => t.TaskId)
+            .ToList();
+
+
+    <div class="active-task">
+
+        <h4>Krāsošanas sesija</h4>
+
+        <div>
+            <b>RAL:</b> @ActiveTask.RalColorCode
+        </div>
+
+        <div>
+            <b>Produkts:</b> @ActiveTask.ProductName
+        </div>
+
+        <div>
+            <b>Apjoms:</b> @ActiveTask.Planned
+        </div>
+
+        <hr />
+
+    <h5>Šī RAL uzdevumi</h5>
+
+    @if (sameRalTasks.Any(t => t.Status == 2))
+        {
+            <div class="alert alert-warning">
+                Aktīva krāsošanas sesija
+            </div>
+        }
+
+        @foreach (var t in sameRalTasks)
+            {
+                <div class="painting-task-row">
+
+                    <input type="checkbox"
+                        checked="@SelectedTaskIds.Contains(t.TaskId)"
+                        disabled="@hasActiveSession"
+                        @onchange="e => ToggleTask(t.TaskId, (bool)e.Value!)" />
+
+                    <span>
+                        @t.BatchCode
+                        |
+                        @t.ProductName
+                        |
+                        @t.Planned gab.
+                    </span>
+
+                </div>
+            }
+        
+        <hr />
+
+        <div class="actions">
+
+            <button class="btn btn-primary"
+                disabled="@(SelectedTaskIds.Count == 0 || hasActiveSession)"
+                @onclick="StartPaintingSession">
+                SĀKT KRĀSOŠANAS SESIJU
+            </button>
+
+            @if (hasActiveSession)
+                {
+                    <button class="btn btn-success"
+                            @onclick="FinishPaintingSession">
+                        PABEIGT KRĀSOŠANAS SESIJU
+                    </button>
+                }
+
+        </div>
+
+    </div>
+}
+
+@code {
+
+    [Parameter] public TaskRow? ActiveTask { get; set; }
+    [Parameter] public List<TaskRow> Tasks { get; set; } = new();
+    [Parameter] public EventCallback<List<int>> OnStartPaintingSession { get; set; }
+    [Parameter] public EventCallback<List<int>> OnFinishPaintingSession { get; set; }
+    private HashSet<int> SelectedTaskIds = new();
+    
+    private void ToggleTask(int taskId, bool isChecked)
+        {
+            if (isChecked)
+            {
+                SelectedTaskIds.Add(taskId);
+            }
+            else
+            {
+                SelectedTaskIds.Remove(taskId);
+            }
+        }
+    
+    private async Task StartPaintingSession()
+        {
+            await OnStartPaintingSession.InvokeAsync(
+                SelectedTaskIds.ToList()
+            );
+        }
+    
+    private async Task FinishPaintingSession()
+        {
+            var activeTaskIds = Tasks
+                .Where(t =>
+                    t.WorkCenterId == 4 &&
+                    t.RalColorId == ActiveTask?.RalColorId &&
+                    t.Status == 2)
+                .Select(t => t.TaskId)
+                .ToList();
+
+            await OnFinishPaintingSession.InvokeAsync(activeTaskIds);
+        }
+
+}

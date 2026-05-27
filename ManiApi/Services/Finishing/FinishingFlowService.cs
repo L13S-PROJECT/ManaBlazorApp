@@ -69,8 +69,21 @@ Console.WriteLine(
             }
             else
             {
-                availableQty = await _stockService
-                    .CalculateAssemblyAvailable(batchProductId);
+                availableQty = await _db.StockMovements
+                    .Where(x =>
+                        x.BatchProduct_ID == batchProductId &&
+                        x.IsActive &&
+                        x.Move_Type == MoveType.DETAILED)
+                    .SumAsync(x => (int?)x.Stock_Qty) ?? 0;
+
+                var finishingQty = await _db.StockMovements
+                    .Where(x =>
+                        x.BatchProduct_ID == batchProductId &&
+                        x.IsActive &&
+                        x.Move_Type == MoveType.FINISHING)
+                    .SumAsync(x => (int?)x.Stock_Qty) ?? 0;
+
+                availableQty = Math.Max(availableQty - finishingQty, 0);
             }
 
 // 5) GET WAITING FINISHING TASKS (status=5) ->
@@ -171,33 +184,68 @@ private async Task<ManiApi.Models.Tasks> CreateOrSplitFinishingTask(
 {
     ManiApi.Models.Tasks activeTask;
 
-    var existingWave = await _db.Tasks
+ var existingWave = await _db.Tasks
     .FirstOrDefaultAsync(x =>
         x.IsActive &&
         x.BatchProduct_ID == batchProductId &&
+        x.TopPartStep_ID == finishingStepId &&
         x.RAL_Color_ID == dto.RalColorId &&
-        x.Tasks_Status == 1);
+        x.Tasks_Status == 1 &&
+        x.Qty_Done > 0);
 
     bool isMerge = existingWave != null;
     
     if (existingWave != null)
         {
+            var zeroQtyTasks = await _db.Tasks
+                .Where(x =>
+                    x.IsActive &&
+                    x.BatchProduct_ID == batchProductId &&
+                    x.Tasks_Status == 1 &&
+                    x.Qty_Done <= 0)
+                .ToListAsync();
+
+            foreach (var row in zeroQtyTasks)
+            {
+                row.IsActive = false;
+            }
+            
             existingWave.Qty_Done += dto.Qty;
 
-            foreach (var waiting in waitingTasks)
-                    {
-                        waiting.Qty_Done -= dto.Qty;
+            var remainingToTake = dto.Qty;
 
-                        if (waiting.Qty_Done <= 0)
-                            waiting.IsActive = false;
+                foreach (var waiting in waitingTasks.OrderBy(x => x.ID))
+                {
+                    if (remainingToTake <= 0)
+                        break;
+
+                    var takeQty = Math.Min(waiting.Qty_Done, remainingToTake);
+
+                    waiting.Qty_Done -= takeQty;
+
+                    if (waiting.Qty_Done <= 0)
+                    {
+                        waiting.Qty_Done = 0;
+                        waiting.IsActive = false;
                     }
+
+                    remainingToTake -= takeQty;
+                }
 
             return existingWave;
         }
 
     if (waitingTasks.Count == 0)
     {
-        var remaining = assemblyAvailable - dto.Qty;
+        var placeholderTask = await _db.Tasks
+            .FirstOrDefaultAsync(x =>
+                x.IsActive &&
+                x.BatchProduct_ID == batchProductId &&
+                x.TopPartStep_ID == finishingStepId &&
+                x.Tasks_Status == 1 &&
+                x.Qty_Done <= 0);
+
+        var remaining = Math.Max(assemblyAvailable - dto.Qty, 0);
 
         activeTask = ManiApi.Services.Tasks.TaskFactory.CreateFinishingTask(
             batchProductId,
@@ -210,6 +258,12 @@ private async Task<ManiApi.Models.Tasks> CreateOrSplitFinishingTask(
 
         _db.Tasks.Add(activeTask);
         // SaveChanges tiks izsaukts augstāk (OpenFinishing)
+
+
+        if (placeholderTask != null)
+            {
+                placeholderTask.IsActive = false;
+            }
 
         if (remaining > 0)
             {
@@ -235,6 +289,19 @@ private async Task<ManiApi.Models.Tasks> CreateOrSplitFinishingTask(
 
         if (plannedQty <= 0 || requestQty >= plannedQty)
         {
+            var zeroQtyTasks = await _db.Tasks
+                .Where(x =>
+                    x.IsActive &&
+                    x.BatchProduct_ID == batchProductId &&
+                    x.Tasks_Status == 1 &&
+                    x.Qty_Done <= 0)
+                .ToListAsync();
+
+            foreach (var row in zeroQtyTasks)
+            {
+                row.IsActive = false;
+            }
+            
             parent.Tasks_Status  = 1;
             parent.Qty_Done      = requestQty > 0 ? requestQty : plannedQty;
             parent.Tasks_Comment = dto.Comment;

@@ -49,7 +49,10 @@
                     <TasksTable Tasks="InProgress"
                                 StatusText="StatusText"            
                                 OnSelect="SelectTask"                                
-                                AvailableTaskId="FirstAvailableTask?.TaskId" />
+                                AvailableTaskId="FirstAvailableTask?.TaskId" 
+                                SelectedTaskId="_activeTask?.WorkCenterId == 4
+                                ? _activeTask?.TaskId
+                                : null"/>
                     </div>
                 }
 
@@ -60,7 +63,10 @@
                             <TasksTable Tasks="PushTasks"
                                         StatusText="StatusText"                                        
                                         OnSelect="SelectTask"                                        
-                                        AvailableTaskId="FirstAvailableTask?.TaskId" />
+                                        AvailableTaskId="FirstAvailableTask?.TaskId"
+                                        SelectedTaskId="_activeTask?.WorkCenterId == 4
+                                            ? _activeTask?.TaskId
+                                            : null" />
                         </div>
                     }
 
@@ -71,7 +77,10 @@
                     <TasksTable Tasks="SuperPriorityCanStart"
                                 StatusText="StatusText"                                
                                 OnSelect="SelectTask"                                
-                                AvailableTaskId="FirstAvailableTask?.TaskId" />
+                                AvailableTaskId="FirstAvailableTask?.TaskId" 
+                                SelectedTaskId="_activeTask?.WorkCenterId == 4
+                                    ? _activeTask?.TaskId
+                                    : null"/>
                     </div>
                 }
 
@@ -82,7 +91,10 @@
                         <TasksTable Tasks="SuperPriorityWaiting"
                                     StatusText="StatusText"
                                     OnSelect="SelectTask"
-                                    AvailableTaskId="FirstAvailableTask?.TaskId" />
+                                    AvailableTaskId="FirstAvailableTask?.TaskId"
+                                    SelectedTaskId="_activeTask?.WorkCenterId == 4
+                                        ? _activeTask?.TaskId
+                                        : null" />
                     </div>
                 }
 
@@ -93,7 +105,10 @@
                             <TasksTable Tasks="BatchPriorityCanStart"
                                         StatusText="StatusText"                                        
                                         OnSelect="SelectTask"                                        
-                                        AvailableTaskId="FirstAvailableTask?.TaskId" />
+                                        AvailableTaskId="FirstAvailableTask?.TaskId"
+                                        SelectedTaskId="_activeTask?.WorkCenterId == 4
+                                            ? _activeTask?.TaskId
+                                            : null"/>
                         </div>
                     }
                 @if (BatchPriorityWaiting.Any())
@@ -103,7 +118,10 @@
                             <TasksTable Tasks="BatchPriorityWaiting"
                                         StatusText="StatusText"
                                         OnSelect="SelectTask"
-                                        AvailableTaskId="FirstAvailableTask?.TaskId" />
+                                        AvailableTaskId="FirstAvailableTask?.TaskId"
+                                        SelectedTaskId="_activeTask?.WorkCenterId == 4
+                                            ? _activeTask?.TaskId
+                                            : null"/>
                         </div>
                     }
                     
@@ -115,7 +133,10 @@
                         <TasksTable Tasks="NormalSuperCanStart"
                                     StatusText="StatusText"                                
                                     OnSelect="SelectTask"                                
-                                    AvailableTaskId="FirstAvailableTask?.TaskId" />
+                                    AvailableTaskId="FirstAvailableTask?.TaskId"
+                                    SelectedTaskId="_activeTask?.WorkCenterId == 4
+                                        ? _activeTask?.TaskId
+                                        : null"/>
                         </div>
                     }
 
@@ -126,7 +147,10 @@
                             <TasksTable Tasks="NormalSuperWaiting"
                                         StatusText="StatusText"
                                         OnSelect="SelectTask"
-                                        AvailableTaskId="FirstAvailableTask?.TaskId" />
+                                        AvailableTaskId="FirstAvailableTask?.TaskId"
+                                        SelectedTaskId="_activeTask?.WorkCenterId == 4
+                                            ? _activeTask?.TaskId
+                                            : null"/>
                         </div>
                     }
                 
@@ -137,7 +161,10 @@
                     <TasksTable Tasks="NormalCanStart"
                                 StatusText="StatusText"                    
                                 OnSelect="SelectTask"                    
-                                AvailableTaskId="FirstAvailableTask?.TaskId" />
+                                AvailableTaskId="FirstAvailableTask?.TaskId" 
+                                SelectedTaskId="_activeTask?.WorkCenterId == 4
+                                    ? _activeTask?.TaskId
+                                    : null"/>
                 </div>
             }
 
@@ -148,7 +175,10 @@
                     <TasksTable Tasks="NormalWaiting"
                                 StatusText="StatusText"
                                 OnSelect="SelectTask"
-                                AvailableTaskId="FirstAvailableTask?.TaskId" />
+                                AvailableTaskId="FirstAvailableTask?.TaskId"
+                                SelectedTaskId="_activeTask?.WorkCenterId == 4
+                                    ? _activeTask?.TaskId
+                                    : null" />
                 </div>
             }
 
@@ -159,14 +189,25 @@
 
 
     <div class="right-panel">
-        <ActiveTaskPanel ActiveTask="_activeTask"
-                 OnFinish="FinishTask"
-                 StatusText="StatusText"
-                 OnStart="OpenTaskDialog"
-                 OnFinishConfirm="OpenFinishDialog"
-                 AvailableTaskId="FirstAvailableTask?.TaskId"
-                 HasActiveTask="_activeTask?.Status == 2"
-                 DisplayGroupId="_activeTask?.DisplayGroupId" />
+    @if (_activeTask?.WorkCenterId == 4)
+        {
+            <PaintingTaskPanel
+                ActiveTask="_activeTask"
+                Tasks="tasks"
+                OnStartPaintingSession="StartPaintingSession"
+                OnFinishPaintingSession="FinishPaintingSession" />
+        }
+        else
+        {
+                <ActiveTaskPanel ActiveTask="_activeTask"
+                        OnFinish="FinishTask"
+                        StatusText="StatusText"
+                        OnStart="OpenTaskDialog"
+                        OnFinishConfirm="OpenFinishDialog"
+                        AvailableTaskId="FirstAvailableTask?.TaskId"
+                        HasActiveTask="_activeTask?.Status == 2"
+                        DisplayGroupId="_activeTask?.DisplayGroupId" />
+        }
     </div>
 </div>
     </div>
@@ -382,12 +423,28 @@ private TaskRow? _activeTask;
 
 private void SelectTask(TaskRow task)
 {
-    _activeTask = tasks
-    .Where(t => t.DisplayGroupId == task.DisplayGroupId)
-    .OrderByDescending(t => t.Status == 2)
-    .ThenByDescending(t => t.TaskId == FirstAvailableTask?.TaskId) 
-    .ThenByDescending(t => t.Assigned_To == selectedEmployeeId)
-    .First();
+    // Krāsošana
+    if (task.WorkCenterId == 4)
+    {
+        // toggle off
+        if (_activeTask?.TaskId == task.TaskId)
+        {
+            _activeTask = null;
+            return;
+        }
+
+        // izvēlas tieši klikšķināto tasku
+        _activeTask = task;
+    }
+    else
+    {
+        _activeTask = tasks
+            .Where(t => t.DisplayGroupId == task.DisplayGroupId)
+            .OrderByDescending(t => t.Status == 2)
+            .ThenByDescending(t => t.TaskId == FirstAvailableTask?.TaskId)
+            .ThenByDescending(t => t.Assigned_To == selectedEmployeeId)
+            .First();
+    }
 
     _dialogMode = TaskDialogMode.None;
 }
@@ -492,6 +549,54 @@ private async Task StartTask(int? displayGroupId)
     {
         var error = await resp.Content.ReadAsStringAsync();
         Console.WriteLine($"START ERROR: {error}");
+    }
+}
+
+private async Task StartPaintingSession(List<int> taskIds)
+{
+    var body = new
+    {
+        employeeId = selectedEmployeeId,
+        taskIds = taskIds
+    };
+
+    var resp = await Http.PostAsJsonAsync(
+        "api/tasks/start-painting-session",
+        body
+    );
+
+    if (resp.IsSuccessStatusCode)
+    {
+        await LoadTasks();
+    }
+    else
+    {
+        var err = await resp.Content.ReadAsStringAsync();
+        Console.WriteLine(err);
+    }
+}
+
+private async Task FinishPaintingSession(List<int> taskIds)
+{
+    var body = new
+    {
+        employeeId = selectedEmployeeId,
+        taskIds = taskIds
+    };
+
+    var resp = await Http.PostAsJsonAsync(
+        "api/tasks/finish-painting-session",
+        body
+    );
+
+    if (resp.IsSuccessStatusCode)
+    {
+        await LoadTasks();
+    }
+    else
+    {
+        var err = await resp.Content.ReadAsStringAsync();
+        Console.WriteLine(err);
     }
 }
 

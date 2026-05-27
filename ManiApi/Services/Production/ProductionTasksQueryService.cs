@@ -2,7 +2,9 @@
 
 using ManiApi.Data;
 using System.Data;
+using ManiApi.DTOs.Production;
 using Microsoft.EntityFrameworkCore;
+using System.Data.Common;
 
 namespace ManiApi.Services.Production;
 
@@ -15,13 +17,14 @@ public sealed class ProductionTasksQueryService
         _db = db;
     }
 
-public async Task<List<object>> GetProductionBatchesRowsV2()
+public async Task<List<ProductionBatchRowDto>> GetProductionBatchesRowsV2()
 {
     var conn = _db.Database.GetDbConnection();
 await conn.OpenAsync();
 
 await using var cmd = conn.CreateCommand();
-cmd.CommandText = @"
+
+var sql = @"
 SELECT
     b.ID AS BatchId,
     b.Batches_Code AS BatchCode,    
@@ -293,6 +296,8 @@ JOIN versions v ON v.ID = bp.Version_Id
 JOIN products p ON p.ID = v.Product_ID
 JOIN categories c ON c.ID = p.Category_ID
 
+-- STOCK MOVEMENTS
+
 LEFT JOIN (
     SELECT
         BatchProduct_ID,
@@ -305,6 +310,8 @@ LEFT JOIN (
     GROUP BY BatchProduct_ID
 ) sm ON sm.BatchProduct_ID = bp.ID
 AND bp.ProductToPart_ID IS NULL
+
+-- DETAILS TOTALS
 
 LEFT JOIN (
     SELECT
@@ -325,6 +332,8 @@ LEFT JOIN (
     GROUP BY v.ID
 ) dt ON dt.VersionId = bp.Version_Id
 
+-- CHILD COUNTS
+
 LEFT JOIN (
     SELECT
         bp.Batch_Id,
@@ -337,6 +346,9 @@ LEFT JOIN (
 ) ch 
 ON ch.Batch_Id = bp.Batch_Id 
 AND ch.Version_Id = bp.Version_Id
+
+
+-- DETAIL TASK STATUS / DATES
 
 LEFT JOIN (
     SELECT
@@ -547,6 +559,9 @@ MIN(
     GROUP BY bp.RootId
 ) dtask ON dtask.RootId = bp.RootId
 
+
+-- DETAIL DONE STATISTICS
+
 LEFT JOIN (
     SELECT
         bp.Batch_Id,
@@ -709,54 +724,118 @@ GROUP BY
 ORDER BY b.ID DESC;
 ";
 
-var list = new List<object>();
+cmd.CommandText = sql;
+
+var list = new List<ProductionBatchRowDto>();
 
 await using var r = await cmd.ExecuteReaderAsync();
 
+var ordBatchId = r.GetOrdinal("BatchId");
+var ordBatchCode = r.GetOrdinal("BatchCode");
+var ordBatchProductId = r.GetOrdinal("BatchProductId");
+var ordVersionId = r.GetOrdinal("VersionId");
+var ordProductName = r.GetOrdinal("ProductName");
+var ordProductCode = r.GetOrdinal("ProductCode");
+var ordCategoryName = r.GetOrdinal("CategoryName");
+var ordProductToPartId = r.GetOrdinal("ProductToPartId");
+var ordPlanned = r.GetOrdinal("Planned");
+var ordSold = r.GetOrdinal("Sold");
+var ordDone = r.GetOrdinal("Done");
+var ordIsCompleted = r.GetOrdinal("IsCompleted");
+var ordDetailStatus = r.GetOrdinal("DetailStatus");
+var ordAssemblyStatus = r.GetOrdinal("AssemblyStatus");
+var ordDetailStart = r.GetOrdinal("DetailStart");
+var ordDetailFinish = r.GetOrdinal("DetailFinish");
+var ordComment = r.GetOrdinal("Comment");
+var ordHiddenDetailNames = r.GetOrdinal("HiddenDetailNames");
+var ordDetailFinishChildList = r.GetOrdinal("DetailFinishChildList");
+var ordDetailName = r.GetOrdinal("DetailName");
+var ordCategoryId = r.GetOrdinal("CategoryId");
+var ordParentCategoryId = r.GetOrdinal("ParentCategoryId");
+var ordVersionName = r.GetOrdinal("VersionName");
+var ordVersionIsActive = r.GetOrdinal("VersionIsActive");
+var ordProductionModel = r.GetOrdinal("ProductionModel");
+
+var ordIsPriority = r.GetOrdinal("IsPriority");
+
+var ordDetailsTotal = r.GetOrdinal("DetailsTotal");
+var ordDetailsChildTotal = r.GetOrdinal("DetailsChildTotal");
+var ordDetailsDone = r.GetOrdinal("DetailsDone");
+var ordDetailsChildDone = r.GetOrdinal("DetailsChildDone");
+
+var ordIsReadOnlyChild = r.GetOrdinal("IsReadOnlyChild");
+
 while (await r.ReadAsync())
 {
-    list.Add(new
-    {
-        BatchId        = r.GetInt32(0),
-        BatchCode      = r.GetString(1),
-        BatchProductId = r.GetInt32(3), // MIN(bp.ID)
-        VersionId      = r.GetInt32(4),
-        ProductName    = r.GetString(5),
-        ProductCode    = r.GetString(6),
-        CategoryName   = r.GetString(7),
-        ProductToPartId = r.IsDBNull(8) ? (int?)null : r.GetInt32(8),
-        CategoryId = r.GetInt32(9),
-        ParentCategoryId = r.IsDBNull(10) ? (int?)null : r.GetInt32(10),
-        VersionName    = r.GetString(11),
-        VersionIsActive = r.GetBoolean(12),
-        ProductionModel = r.GetInt32(13),
-        DetailName = r.IsDBNull(14)
-            ? null
-            : r.GetValue(14).ToString(),
-        HiddenDetailNames = r.IsDBNull(15)
-            ? null
-            : r.GetString(15),
-        IsPriority     = r.GetBoolean(16),
+    var row = new ProductionBatchRowDto
+{
+        // BASIC INFO
+        BatchId = r.GetInt32(ordBatchId),
+        BatchCode = r.GetString(ordBatchCode),
+        BatchProductId = r.GetInt32(ordBatchProductId),
+        VersionId = r.GetInt32(ordVersionId),
 
-        Planned = r.GetInt32(18),
-        Comment = r.IsDBNull(19) ? null : r.GetString(19),
-        Sold = r.GetInt32(20),
-        Done = r.GetInt32(21),
-        DetailsTotal = r.GetInt32(22),
-        DetailsChildTotal = r.GetInt32(23),
-        DetailsDone = r.GetInt32(24),
-        DetailsChildDone = r.GetInt32(25),
-        DetailStart = r.IsDBNull(26) ? (DateTime?)null : r.GetDateTime(26),
-        DetailFinish = r.IsDBNull(27) ? (DateTime?)null : r.GetDateTime(27),
-        DetailFinishChildList = r.IsDBNull(28) ? null : r.GetString(28),
-        IsReadOnlyChild = r.GetInt32(29) == 1,
-        IsCompleted = r.GetInt32(30) == 1,
-        DetailStatus = r.GetString(31),
-        AssemblyStatus = r.GetString(32)
-    });
+        // PRODUCT INFO
+        ProductName = r.GetString(ordProductName),
+        ProductCode = r.GetString(ordProductCode),
+        CategoryName = r.GetString(ordCategoryName),
+        ProductToPartId = r.IsDBNull(ordProductToPartId)
+            ? (int?)null
+            : r.GetInt32(ordProductToPartId),
+        CategoryId = r.GetInt32(ordCategoryId),
+
+        ParentCategoryId = r.IsDBNull(ordParentCategoryId)
+            ? (int?)null
+            : r.GetInt32(ordParentCategoryId),
+
+        VersionName = r.GetString(ordVersionName),
+        VersionIsActive = r.GetBoolean(ordVersionIsActive),
+        ProductionModel = r.GetInt32(ordProductionModel),
+        DetailName = r.IsDBNull(ordDetailName)
+            ? null
+            : r.GetValue(ordDetailName).ToString(),
+        HiddenDetailNames = GetNullableString(r, ordHiddenDetailNames),
+        IsPriority = r.GetBoolean(ordIsPriority),
+
+        // PRODUCTION STATUS
+        Planned = r.GetInt32(ordPlanned),
+        Comment = GetNullableString(r, ordComment),
+        Sold = r.GetInt32(ordSold),
+        Done = r.GetInt32(ordDone),
+        DetailsTotal = r.GetInt32(ordDetailsTotal),
+        DetailsChildTotal = r.GetInt32(ordDetailsChildTotal),
+        DetailsDone = r.GetInt32(ordDetailsDone),
+        DetailsChildDone = r.GetInt32(ordDetailsChildDone),
+
+        // DETAIL STATUS
+        DetailStart = GetNullableDateTime(r, ordDetailStart),
+        DetailFinish = GetNullableDateTime(r, ordDetailFinish),
+
+        DetailFinishChildList = GetNullableString(r, ordDetailFinishChildList),
+        IsReadOnlyChild = r.GetInt32(ordIsReadOnlyChild) == 1,
+        IsCompleted = r.GetInt32(ordIsCompleted) == 1,
+        DetailStatus = r.GetString(ordDetailStatus),
+        AssemblyStatus = r.GetString(ordAssemblyStatus)
+        };
+
+    list.Add(row);
 }
 
 return list;
+}
+
+private static DateTime? GetNullableDateTime(DbDataReader r, int ordinal)
+{
+    return r.IsDBNull(ordinal)
+        ? null
+        : r.GetDateTime(ordinal);
+}
+
+private static string? GetNullableString(DbDataReader r, int ordinal)
+{
+    return r.IsDBNull(ordinal)
+        ? null
+        : r.GetString(ordinal);
 }
 
 }

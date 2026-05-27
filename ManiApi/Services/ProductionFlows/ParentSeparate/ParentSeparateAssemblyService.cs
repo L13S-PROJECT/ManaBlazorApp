@@ -160,33 +160,5 @@ private async Task<bool> CheckDetailFinished(DbConnection conn, DbTransaction tx
    return await _queryService.IsDetailPhaseFinishedAll(conn, tx, rootId);
 }
 
-public TaskDisplayStateDto GetAssemblyDisplayState(
-    int status,
-    DateTime? startedAt,
-    DateTime? finishedAt)
-{
-    return status switch
-    {
-        1 => new TaskDisplayStateDto
-        {
-            CssClass = "ptv3-waiting",
-            DisplayDate = null
-        },
-
-        2 => new TaskDisplayStateDto
-        {
-            CssClass = "ptv3-detail-start",
-            DisplayDate = startedAt
-        },
-
-        3 => new TaskDisplayStateDto
-        {
-            CssClass = "ptv3-detail-finish",
-            DisplayDate = finishedAt
-        },
-
-        _ => new TaskDisplayStateDto()
-    };
-}
 
 }

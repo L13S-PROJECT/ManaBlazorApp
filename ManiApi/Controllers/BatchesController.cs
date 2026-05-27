@@ -932,32 +932,21 @@ JOIN producttopparts ptp
 JOIN toppartsteps ts
      ON ts.ProductToPart_ID = ptp.ID
     AND ts.IsActive = 1
-AND (
+    AND (
     (
         bp.ProductToPart_ID IS NULL
         AND (
             ts.Step_Type = 1
-
             OR (
                 ts.Step_Type = 2
                 AND (
-                    SELECT v.Production_Model
+                    SELECT v.production_model
                     FROM versions v
                     WHERE v.ID = bp.Version_Id
                 ) <> 1
             )
-
-            OR (
-                ts.Step_Type = 3
-                AND (
-                    SELECT v.Production_Model
-                    FROM versions v
-                    WHERE v.ID = bp.Version_Id
-                ) = 1
-            )
         )
     )
-
     OR
     (
         bp.ProductToPart_ID IS NOT NULL

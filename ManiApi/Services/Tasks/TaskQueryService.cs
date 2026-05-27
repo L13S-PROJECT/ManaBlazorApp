@@ -68,6 +68,7 @@ public async Task<List<TaskRowDto>> GetForEmployee(int empId)
         tp.TopPart_Name,           -- 8 PartName
             ts.ProductToPart_ID,
         ts.Step_Name,
+        ts.WorkCentr_ID,
 
         ts.Estimated_Minutes,
 
@@ -117,7 +118,9 @@ public async Task<List<TaskRowDto>> GetForEmployee(int empId)
         b.ID                      AS BatchId,       -- 13 (batches.ID)
         bp.Version_Id             AS VersionId,     -- 14 (versions.ID)
         bp.ID                     AS BatchProductId, -- 15  (batches_products.ID)
-        COALESCE(bp.ParentBatchProduct_ID, bp.ID) AS RootId -- 16 RootId
+        COALESCE(bp.ParentBatchProduct_ID, bp.ID) AS RootId, -- 16 RootId
+        t.RAL_Color_ID,
+        rc.Name
 
         FROM tasks t
         JOIN batches_products bp   ON bp.ID  = t.BatchProduct_ID AND bp.IsActive = 1
@@ -127,6 +130,7 @@ public async Task<List<TaskRowDto>> GetForEmployee(int empId)
         JOIN toppartsteps     ts   ON ts.ID  = t.TopPartStep_ID
         JOIN producttopparts  ptp  ON ptp.ID = ts.ProductToPart_ID
         JOIN toppart          tp   ON tp.ID  = ptp.TopPart_ID
+        LEFT JOIN ral_colors rc ON rc.ID = t.RAL_Color_ID
         WHERE t.IsActive = 1
         AND (
             -- 1) Procesā (vienmēr augstākā prioritāte)
@@ -197,22 +201,25 @@ public async Task<List<TaskRowDto>> GetForEmployee(int empId)
                     PartName = r.IsDBNull(13) ? null : r.GetString(13),
                     ProductToPartId = r.IsDBNull(14) ? 0 : r.GetInt32(14),
                     StepName = r.IsDBNull(15) ? null : r.GetString(15),
-                    EstimatedMinutes = r.IsDBNull(16) ? 0 : r.GetInt32(16),
-                    ActualMinutes = r.IsDBNull(17) ? 0 : r.GetInt32(17),
-                    EstimatedTotalMinutes = r.IsDBNull(18) ? 0 : r.GetInt32(18),
-                    EstimatedStartMinutes = r.IsDBNull(19) ? 0 : r.GetInt32(19),
-                    BatchCode = r.IsDBNull(20) ? null : r.GetString(20),
-                    Done = r.IsDBNull(21) ? 0 : r.GetInt32(21),
-                    Assigned_To = r.IsDBNull(22) ? (int?)null : r.GetInt32(22),
-                    Planned = r.IsDBNull(23) ? 0 : r.GetInt32(23),
-                    StepOrder = r.IsDBNull(24) ? 0 : r.GetInt32(24),
-                    StepType = r.IsDBNull(25) ? 0 : r.GetInt32(25),
-                    IsFinal = !r.IsDBNull(26) && r.GetBoolean(26),
-                    IsPainting = !r.IsDBNull(27) && r.GetBoolean(27),
-                    BatchId = r.IsDBNull(28) ? 0 : r.GetInt32(28),
-                    VersionId = r.IsDBNull(29) ? 0 : r.GetInt32(29),
-                    BatchProductId = r.IsDBNull(30) ? 0 : r.GetInt32(30),
-                    RootId = r.IsDBNull(31) ? 0 : r.GetInt32(31),
+                    WorkCenterId = r.IsDBNull(16) ? (int?)null : r.GetInt32(16),
+                    EstimatedMinutes = r.IsDBNull(17) ? 0 : r.GetInt32(17),
+                    ActualMinutes = r.IsDBNull(18) ? 0 : r.GetInt32(18),
+                    EstimatedTotalMinutes = r.IsDBNull(19) ? 0 : r.GetInt32(19),
+                    EstimatedStartMinutes = r.IsDBNull(20) ? 0 : r.GetInt32(20),
+                    BatchCode = r.IsDBNull(21) ? null : r.GetString(21),
+                    Done = r.IsDBNull(22) ? 0 : r.GetInt32(22),
+                    Assigned_To = r.IsDBNull(23) ? (int?)null : r.GetInt32(23),
+                    Planned = r.IsDBNull(24) ? 0 : r.GetInt32(24),
+                    StepOrder = r.IsDBNull(25) ? 0 : r.GetInt32(25),
+                    StepType = r.IsDBNull(26) ? 0 : r.GetInt32(26),
+                    IsFinal = !r.IsDBNull(27) && r.GetBoolean(27),
+                    IsPainting = !r.IsDBNull(28) && r.GetBoolean(28),
+                    BatchId = r.IsDBNull(29) ? 0 : r.GetInt32(29),
+                    VersionId = r.IsDBNull(30) ? 0 : r.GetInt32(30),
+                    BatchProductId = r.IsDBNull(31) ? 0 : r.GetInt32(31),
+                    RootId = r.IsDBNull(32) ? 0 : r.GetInt32(32),
+                    RalColorId = r.IsDBNull(33) ? (int?)null : r.GetInt32(33),
+                    RalColorCode = r.IsDBNull(34) ? null : r.GetString(34),
                 });
             }
             await r.DisposeAsync(); 
@@ -276,7 +283,16 @@ public async Task<List<TaskRowDto>> GetForEmployee(int empId)
         }
 
         result = result
-            .GroupBy(t => new { t.DisplayGroupId, t.TopPartStepId })
+            .GroupBy(t => new
+                    {
+                        t.DisplayGroupId,
+                        t.TopPartStepId,
+
+                        // krāsošanā dažādi RAL = dažādi taski
+                        RalGroup = workCenterId == 4
+                            ? t.RalColorId
+                            : null
+                    })
             .Select(g =>
         {
             var totalPlanned = g.Sum(x => x.Planned);
@@ -350,6 +366,9 @@ Console.WriteLine($"GROUP {g.Key.DisplayGroupId} -> inProgress={inProgress?.Task
             PartName = row.PartName,
             ProductToPartId = row.ProductToPartId,
             StepName = row.StepName,
+            WorkCenterId = row.WorkCenterId,
+            RalColorId = row.RalColorId,
+            RalColorCode = row.RalColorCode,
             EstimatedMinutes = row.EstimatedMinutes,
             ActualMinutes = row.ActualMinutes,
             EstimatedTotalMinutes = row.EstimatedTotalMinutes,
