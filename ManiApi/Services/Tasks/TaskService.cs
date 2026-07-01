@@ -236,12 +236,21 @@ LIMIT 1;";
         : Convert.ToInt32(obj);
 }
 
+var isInlinePainting = productionModel == 1;
 var scenario =
-    hasRoot
-        ? TaskScenario.B_Root
-        : productToPartId > 0
-            ? TaskScenario.C_Child
-            : TaskScenario.A_Parent;
+    isInlinePainting
+        ? (
+            productToPartId > 0
+                ? TaskScenario.C_Child
+                : TaskScenario.A_Parent
+        )
+        : (
+            hasRoot
+                ? TaskScenario.B_Root
+                : productToPartId > 0
+                    ? TaskScenario.C_Child
+                    : TaskScenario.A_Parent
+        );
 
 Console.WriteLine(
     $"FLOW INFO -> scenario={scenario} " +
@@ -253,7 +262,7 @@ Console.WriteLine(
     $"currentDone={currentDone} " +
     $"ralColorId={ralColorId}"
 );
-var isInlinePainting = productionModel == 1;
+
 // 5️⃣ Izpilde pēc B/A/C scenārija
 
 // Detailed (StepType = 1) → pabeidzam visu
@@ -1187,14 +1196,17 @@ INSERT INTO tasks
     TopPartStep_ID,
     Tasks_Status,
     Qty_Done,
-    IsActive
+    IsActive,
+    Source_ProductToPart_ID
 )
 SELECT
     bp.ID,
     ts.ID,
     5,
     0,
-    1
+    1,
+    ts0.ProductToPart_ID
+    
 FROM batches_products bp
 
 JOIN tasks t0

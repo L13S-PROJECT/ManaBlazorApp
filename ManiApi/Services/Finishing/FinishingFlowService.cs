@@ -4,6 +4,8 @@ using ManiApi.Models;
 using Microsoft.EntityFrameworkCore;
 using ManiApi.Services.Tasks;
 using ManiApi.Services.Stock;
+using ManiApi.Services.ProductionFlows.ParentSeparate;
+using ManiApi.Services.ProductionFlows.ParentInline;
 
 namespace ManiApi.Services.Finishing
 {
@@ -12,14 +14,20 @@ namespace ManiApi.Services.Finishing
         private readonly AppDbContext _db;
         private readonly StockService _stockService;
         private readonly FinishingTasksService _finishingTasksService;
+        private readonly ParentSeparateFinishingService _parentSeparateFinishingService;
+        private readonly InlineParentFinishingService _inlineParentFinishingService;
         public FinishingFlowService(
                 AppDbContext db,
                 StockService stockService,
-                FinishingTasksService finishingTasksService)
+                FinishingTasksService finishingTasksService,
+                ParentSeparateFinishingService parentSeparateFinishingService,
+                InlineParentFinishingService inlineParentFinishingService)
         {
             _db = db;
             _stockService = stockService;
             _finishingTasksService = finishingTasksService;
+            _parentSeparateFinishingService = parentSeparateFinishingService;
+            _inlineParentFinishingService = inlineParentFinishingService;
         }
 
 public async Task<OpenFinishingResultDto> OpenFinishing(OpenFinishingDto dto)
@@ -52,6 +60,7 @@ Console.WriteLine(
                         }
 
                     var batchProductId = dto.BatchProductId;
+                    var sourceProductToPartId = finishingStep.ProductToPartId;
 
 // 4) CALCULATE ASSEMBLY AVAILABLE QTY ->
 //Aprēķinām pieejamo Assembly daudzumu, atņemot jau rezervēto Finishing apjomu
@@ -68,23 +77,10 @@ Console.WriteLine(
                 availableQty = childData.availableQty;
             }
             else
-            {
-                availableQty = await _db.StockMovements
-                    .Where(x =>
-                        x.BatchProduct_ID == batchProductId &&
-                        x.IsActive &&
-                        x.Move_Type == MoveType.DETAILED)
-                    .SumAsync(x => (int?)x.Stock_Qty) ?? 0;
-
-                var finishingQty = await _db.StockMovements
-                    .Where(x =>
-                        x.BatchProduct_ID == batchProductId &&
-                        x.IsActive &&
-                        x.Move_Type == MoveType.FINISHING)
-                    .SumAsync(x => (int?)x.Stock_Qty) ?? 0;
-
-                availableQty = Math.Max(availableQty - finishingQty, 0);
-            }
+                {
+                    availableQty = await _parentSeparateFinishingService
+                        .GetAvailableAssemblyQty(batchProductId);
+                }
 
 // 5) GET WAITING FINISHING TASKS (status=5) ->
 // Atlasām visus gaidošos (status=5) Finishing uzdevumus šai partijai un detaļai
@@ -189,6 +185,10 @@ private async Task<ManiApi.Models.Tasks> CreateOrSplitFinishingTask(
         x.IsActive &&
         x.BatchProduct_ID == batchProductId &&
         x.TopPartStep_ID == finishingStepId &&
+        (
+            x.Source_ProductToPart_ID == dto.ProductToPartId
+            || x.Source_ProductToPart_ID == null
+        ) &&
         x.RAL_Color_ID == dto.RalColorId &&
         x.Tasks_Status == 1 &&
         x.Qty_Done > 0);
@@ -252,9 +252,8 @@ private async Task<ManiApi.Models.Tasks> CreateOrSplitFinishingTask(
             finishingStepId,
             dto.Qty,
             dto.RalColorId,
-            dto.Comment);
-
-        activeTask.Source_ProductToPart_ID = dto.ProductToPartId;
+            dto.Comment,
+            dto.ProductToPartId);
 
         _db.Tasks.Add(activeTask);
         // SaveChanges tiks izsaukts augstāk (OpenFinishing)
@@ -286,8 +285,19 @@ private async Task<ManiApi.Models.Tasks> CreateOrSplitFinishingTask(
         var parent = waitingTasks[0];
         var plannedQty = waitingTasks.Sum(x => x.Qty_Done);
         var requestQty = dto.Qty;
+        var hasSameRalInProgressOrFinishedWave = await _db.Tasks
+            .AnyAsync(x =>
+                x.IsActive &&
+                x.BatchProduct_ID == batchProductId &&
+                x.TopPartStep_ID == finishingStepId &&
+                x.RAL_Color_ID == dto.RalColorId &&
+                (x.Tasks_Status == 2 || x.Tasks_Status == 3));
 
-        if (plannedQty <= 0 || requestQty >= plannedQty)
+        if ((plannedQty <= 0 || requestQty >= plannedQty)
+                && !hasSameRalInProgressOrFinishedWave
+                && !waitingTasks.Any(x =>
+                    x.RAL_Color_ID == dto.RalColorId
+                    && x.Tasks_Status == 5))
         {
             var zeroQtyTasks = await _db.Tasks
                 .Where(x =>
@@ -326,9 +336,8 @@ private async Task<ManiApi.Models.Tasks> CreateOrSplitFinishingTask(
                 finishingStepId,
                 dto.Qty,
                 dto.RalColorId,
-                dto.Comment);
-
-            activeTask.Source_ProductToPart_ID = dto.ProductToPartId;
+                dto.Comment,
+                dto.ProductToPartId);
 
             _db.Tasks.Add(activeTask);
 

@@ -9,7 +9,8 @@ namespace ManiApi.Services.Tasks
             int finishingStepId,
             int qty,
             int? ralColorId,
-            string? comment)
+            string? comment,
+            int? sourceProductToPartId)
         {
             return new ManiApi.Models.Tasks
             {
@@ -20,7 +21,11 @@ namespace ManiApi.Services.Tasks
                 Qty_Done        = qty,
                 Qty_Scrap       = 0,
                 RAL_Color_ID    = ralColorId,
-                Tasks_Comment   = comment
+                Tasks_Comment   = comment,
+                Source_ProductToPart_ID =
+                    sourceProductToPartId > 0
+                        ? sourceProductToPartId
+                        : null,
             };
         }
     }

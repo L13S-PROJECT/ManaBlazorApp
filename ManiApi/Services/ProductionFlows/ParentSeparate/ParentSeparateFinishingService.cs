@@ -29,17 +29,23 @@ public sealed class ParentSeparateFinishingService
             x.Move_Type == MoveType.FINISHING)
         .SumAsync(x => (int?)x.Stock_Qty) ?? 0;
 
-    var reservedQty = await _db.Tasks
-    .Where(x =>
-        x.IsActive &&
-        x.BatchProduct_ID == batchProductId &&
-        x.Tasks_Status == 5)
-    .SumAsync(x => (int?)x.Qty_Done) ?? 0;
+    var remainderQty = await _db.Tasks
+            .Join(_db.TopPartSteps,
+                t => t.TopPartStep_ID,
+                ts => ts.Id,
+                (t, ts) => new { t, ts })
 
-    if (reservedQty > 0)
-    return reservedQty;
+            .Where(x =>
+                x.t.IsActive &&
+                x.t.BatchProduct_ID == batchProductId &&
+                x.t.Tasks_Status == 5 &&
+                x.ts.StepType == 3)
 
-    return Math.Max(assemblyQty, 0);
+            .SumAsync(x => (int?)x.t.Qty_Done) ?? 0;
+
+        return remainderQty > 0
+            ? remainderQty
+            : assemblyQty;
 }
 
 }

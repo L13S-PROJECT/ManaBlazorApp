@@ -146,7 +146,7 @@ public async Task<List<TaskRowDto>> GetForEmployee(int empId)
             -- 3) Brīvie workcenter uzdevumi
             (
                 t.Assigned_To IS NULL
-                AND t.Tasks_Status = 1
+                AND t.Tasks_Status IN (1,5)
                 AND ts.WorkCentr_ID = @workCenterId
             )
         )
@@ -296,7 +296,9 @@ public async Task<List<TaskRowDto>> GetForEmployee(int empId)
             .Select(g =>
         {
             var totalPlanned = g.Sum(x => x.Planned);
-            var totalDone = g.Sum(x => x.Done);
+            var totalDone = g
+                .Where(x => x.Status != 5)
+                .Sum(x => x.Done);
 
             TaskRowDto row;
 
@@ -332,6 +334,7 @@ Console.WriteLine($"GROUP {g.Key.DisplayGroupId} -> inProgress={inProgress?.Task
                     // 3. CanStart
                     var canStart = g
                         .Where(x => x.CanStart == true)
+                        .Where(x => x.Done > 0)
                         .OrderBy(x => x.StepOrder)
                         .FirstOrDefault();
 

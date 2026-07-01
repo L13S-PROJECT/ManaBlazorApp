@@ -87,6 +87,9 @@
     OnToggleTopPart="@(dto => ToggleTopPartAsync(dto))">
 </ProductTechnologyBox>
 
+<WorkflowViewer
+    VersionId="selected?.VersionId" />
+
     </div>
 </div>
 </div>
@@ -292,9 +295,10 @@ private bool createNewVersion
     {
         objRef = DotNetObjectReference.Create(this);
 
-        await JS.InvokeVoidAsync(
-            "setProductsPageRef",
-            objRef);
+        // await JS.InvokeVoidAsync(
+        //  "setProductsPageRef",
+        // objRef); 
+
 
         // 1) ielādē preces sarakstu (minimāli nepieciešamais)
         rows = await Http.GetFromJsonAsync<List<ProductRow>>("http://localhost:5270/api/products/list") 
@@ -352,13 +356,19 @@ private bool createNewVersion
 
         ApplyFilters(); // lokāla filtrēšana; neuzsāk jaunus HTTP
     }
-    catch (Exception ex)
+    @* catch (Exception ex)
     {
         // nepieļaujam “mūžīgu Loading”
         Console.WriteLine("OnInitializedAsync error: " + ex);
         await JS.InvokeVoidAsync("alert", "Kļūda ielādējot datus: " + ex.Message);
         rows = new(); allRows = new(); // ļaujam lapai atvērties tukšai
-    }
+    } *@
+
+    catch (Exception ex)
+{
+    Console.WriteLine(ex.ToString());
+    throw;
+}
 }
 
 [JSInvokable]

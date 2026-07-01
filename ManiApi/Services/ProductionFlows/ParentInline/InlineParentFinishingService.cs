@@ -45,6 +45,11 @@ public sealed class InlineParentFinishingService
             .FirstOrDefaultAsync(x =>
                 x.ID == finishingTaskId &&
                 x.IsActive);
+        
+        var sourceProductToPartId = await _db.TopPartSteps
+            .Where(x => x.Id == task!.TopPartStep_ID)
+            .Select(x => x.ProductToPartId)
+            .FirstOrDefaultAsync();
 
         if (task is null)
             throw new Exception("Finishing task not found.");
@@ -87,18 +92,15 @@ public sealed class InlineParentFinishingService
             .Where(x =>
                 x.IsActive &&
                 x.StepType == 2)
-            .Join(
-                _db.Tasks,
-                ts => ts.Id,
-                t => t.TopPartStep_ID,
-                (ts, t) => new { ts, t })
-            .Where(x =>
-                x.t.ID == finishingTaskId)
-            .Select(x => x.ts.Id)
+            .Select(x => x.Id)
             .FirstOrDefaultAsync();
         
         if (assemblyStepId <= 0)
             throw new Exception("Assembly step not found.");
+
+Console.WriteLine(
+    $"ASM STEP = {assemblyStepId}"
+);
 
         bool alreadyExists = await _db.Tasks
             .AnyAsync(x =>
@@ -125,6 +127,8 @@ public sealed class InlineParentFinishingService
             {
                 BatchProduct_ID = batchProductId,
                 TopPartStep_ID = assemblyStepId,
+
+                Source_ProductToPart_ID = sourceProductToPartId,
 
                 Qty_Done = qty,
                 RAL_Color_ID = ralColorId,

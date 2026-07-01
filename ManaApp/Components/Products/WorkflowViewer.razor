@@ -1,0 +1,258 @@
+@using System.Net.Http.Json
+@using ManaApp.Models
+@using ManaApp.Components.Workflow
+
+@inject HttpClient Http
+
+@namespace ManaApp.Components.Products
+
+<div class="technology-panel">
+
+    <div class="technology-panel-header">
+        Workflow
+    </div>
+
+    <div class="technology-panel-body workflow-editor">
+
+    @if (VersionId is null)
+{
+    <div>Izvēlies produktu.</div>
+}
+else if (loading)
+{
+    <div>Ielādēju...</div>
+}
+else if (workflow is null)
+{
+    <div>Workflow nav atrasts.</div>
+
+    <button class="btn btn-primary"
+            @onclick="CreateWorkflowAsync">
+        Izveidot Workflow
+    </button>
+}
+
+else
+{    
+    <div class="workflow-list">
+
+    <div>
+        <strong>@workflow?.Workflow?.Name</strong>
+    </div>
+
+    <button class="btn btn-primary"
+            @onclick="OpenPartsDialog">
+        Detaļas
+    </button>
+
+    <button class="btn btn-success"
+            @onclick="OpenAddPartDialog">
+        + PART
+    </button>
+
+    <table class="tech-table">
+        <thead>
+            <tr>
+                <th>Type</th>
+                <th>Name</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+       @foreach (var node in workflow?.Nodes?.OrderBy(x => x.SortOrder) ?? Enumerable.Empty<WorkflowNodeModel>())
+        {
+            <tr @onclick="() => selectedNode = graph[node.Id]"
+                style="cursor:pointer">
+
+                <td>
+                    @(node.NodeType switch
+                    {
+                        1 => "PART",
+                        2 => "PROCESS",
+                        3 => "MERGE",
+                        4 => "FINISH",
+                        _ => "?"
+                    })
+                </td>
+
+                <td>@node.Name</td>
+
+            </tr>
+        }
+
+        </tbody>
+
+    </table>
+
+</div>
+
+    <div class="workflow-properties">
+
+        @if (selectedNode is null)
+        {
+            <div>Izvēlies mezglu.</div>
+        }
+        else
+        {
+            <div><strong>Tips</strong></div>
+            <div>@selectedNode.Node.NodeType</div>
+
+            <br />
+
+            <div><strong>Nosaukums</strong></div>
+            <div>@selectedNode.Node.Name</div>
+
+            <br />
+
+            <div><strong>Ieejas</strong></div>
+            <div>@selectedNode.Previous.Count</div>
+
+            <br />
+
+            <div><strong>Izejas</strong></div>
+            <div>@selectedNode.Next.Count</div>
+        }
+
+    </div>
+}
+</div>
+
+</div>
+
+<WorkflowPartsDialog
+    VersionId="VersionId"
+    Visible="isPartsDialogOpen"
+    VisibleChanged="OnPartsDialogClosed" />
+
+
+@code
+{
+    [Parameter]
+    public int? VersionId { get; set; }
+
+    private WorkflowDto? workflow;
+    private bool loading;
+    private Dictionary<int, WorkflowGraphNode> graph = new();
+    private WorkflowGraphNode? selectedNode;
+    private bool isAddPartOpen = false;
+    private bool isPartsDialogOpen = false;
+
+    private List<WorkflowPartModel> productParts = new();
+
+    private List<WorkflowPartModel> topParts = new();
+
+    private WorkflowPartModel? selectedTopPart;
+
+    protected override async Task OnParametersSetAsync()
+        {
+            if (VersionId is null || VersionId <= 0)
+            {
+                workflow = null;
+                return;
+            }
+
+            loading = true;
+
+            try
+                {
+                    workflow = await Http.GetFromJsonAsync<WorkflowDto>(
+                        $"http://localhost:5270/api/workflow/{VersionId}");
+                    
+                    BuildGraph();
+                    selectedNode = null;
+
+                }
+            catch
+            {
+                workflow = null;
+            }
+            finally
+            {
+                loading = false;
+            }
+        }
+    
+
+    private void BuildGraph()
+            {
+                graph.Clear();
+
+                if (workflow is null)
+                    return;
+
+                // izveido visus mezglus
+                foreach (var node in workflow.Nodes)
+                {
+                    graph[node.Id] = new WorkflowGraphNode
+                    {
+                        Node = node
+                    };
+                }
+
+                // savieno mezglus
+                foreach (var connection in workflow.Connections)
+                {
+                    if (!graph.TryGetValue(connection.FromNodeId, out var from))
+                        continue;
+
+                    if (!graph.TryGetValue(connection.ToNodeId, out var to))
+                        continue;
+
+                    from.Next.Add(to);
+                    to.Previous.Add(from);
+                }
+            }
+
+        private async Task CreateWorkflowAsync()
+            {
+                if (VersionId is null)
+                    return;
+
+                var response = await Http.PostAsJsonAsync(
+                    "http://localhost:5270/api/workflow",
+                    new
+                    {
+                        VersionId = VersionId,
+                        WorkflowName = "Workflow"
+                    });
+
+                if (!response.IsSuccessStatusCode)
+                    return;
+
+                await OnParametersSetAsync();
+            }
+        
+        private async Task OpenAddPartDialog()
+            {
+                topParts = await Http.GetFromJsonAsync<List<WorkflowPartModel>>(
+                    "http://localhost:5270/api/workflow/topparts")
+                    ?? new();
+
+                selectedTopPart = null;
+
+                isAddPartOpen = true;
+
+                Console.WriteLine($"TopParts: {topParts.Count}");
+            }
+        
+
+    private void ClosePartsDialog()
+        {
+            isPartsDialogOpen = false;
+        }
+    
+    private async Task OpenPartsDialog()
+        {
+            isPartsDialogOpen = true;
+        }
+    
+    private async Task OnPartsDialogClosed(bool visible)
+            {
+                isPartsDialogOpen = visible;
+
+                if (!visible)
+                    await OnParametersSetAsync();
+            }
+
+}

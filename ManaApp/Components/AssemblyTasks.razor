@@ -1,3 +1,5 @@
+@* AssemblyTasks.razor - ASSEMBLY posma uzdevumi un indikatori *@
+
 @using ManaApp.Models
 @using ManaApp.Components
 @using ManaApp.DTOs.Assembly
@@ -20,7 +22,11 @@
     return;
 }
 
-@if (AssemblySummary.Any())
+@*@if (
+    ShowAssemblySummary
+    && AssemblySummary.Any()
+)
+
 {
     <div class="ptv2-summary-table">
 
@@ -94,7 +100,7 @@
 
     </div>
 }
-
+*@
 
 @foreach (var p in Parts)
 {
@@ -299,6 +305,8 @@ else
 @code {
 [Parameter] public ProductBatchRow? SelectedBatch { get; set; }
 [Parameter] public EventCallback OnDataChanged { get; set; }
+private bool IsInlinePainting =>
+    SelectedBatch?.ProductionModel == 1;
 private List<DetailPartRow> Parts = new();
 private Dictionary<int, string> DetailIndicatorsFromApi = new();
 private Dictionary<int, List<DetailTaskRow>> TasksByStep = new();
@@ -532,6 +540,9 @@ async Task OnCommentVisibilityChanged(DetailTaskRow task, ChangeEventArgs e)
 
     task.IsCommentForEmployee = isChecked; // UI sync
 }
+
+private bool ShowAssemblySummary =>
+    SelectedBatch?.ProductionModel != 1;
 
 
 }

@@ -1,0 +1,172 @@
+@using System.Net.Http.Json
+@using ManaApp.Models
+
+
+@inject HttpClient Http
+
+@namespace ManaApp.Components.Workflow
+
+@if (Visible)
+{
+    <div class="workflow-modal-backdrop">
+
+        <div class="workflow-modal">
+
+            <div class="workflow-modal-header">
+
+                <span>Detaļas</span>
+
+                <button class="workflow-close"
+                        @onclick="Close">
+                    ✕
+                </button>
+
+            </div>
+
+            <div class="workflow-modal-body">
+
+                @foreach (var group in parts.GroupBy(x => x.Stage))
+                    {
+                        <div class="workflow-stage">
+
+                            <div class="workflow-stage-title">
+                                @(group.Key == 1 ? "DETAĻAS"
+                                : group.Key == 2 ? "KOMPLEKTĒŠANA"
+                                : "KRĀSOŠANA")
+                            </div>
+
+                            @foreach (var part in group)
+                            {
+                                <div class="workflow-part-row">
+
+                                    <input type="checkbox"
+                                        @bind="part.Checked"
+                                        @bind:after="() => PartCheckedChanged(part)" />
+
+                                    <span class="workflow-part-name">
+                                        @part.TopPartName
+                                    </span>
+
+                                    <input type="number"
+                                        class="workflow-qty"
+                                        min="1"
+                                        value="@(part.Checked ? part.QtyPerProduct : null)"
+                                        @onchange="e => QtyChanged(part, e)"
+                                        disabled="@(!part.Checked)" />
+
+                                </div>
+                            }
+
+                            <div class="workflow-dialog-buttons">
+
+                                <button class="btn btn-primary"
+                                        @onclick="Save">
+                                    Saglabāt
+                                </button>
+
+                                <button class="btn btn-secondary"
+                                        @onclick="Close">
+                                    Aizvērt
+                                </button>
+
+                            </div>
+
+                        </div>
+                    }
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+@code
+{
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+
+    [Parameter]
+    public int? VersionId { get; set; }
+    private List<WorkflowPartSelectModel> parts = new();
+    private async Task Close()
+    {
+        await VisibleChanged.InvokeAsync(false);
+    }
+
+    protected override async Task OnParametersSetAsync()
+        {
+            if (!Visible || VersionId is null)
+                return;
+
+            Console.WriteLine($"WorkflowPartsDialog VersionId = {VersionId}");
+
+            var allParts = await Http.GetFromJsonAsync<List<WorkflowPartModel>>(
+                "http://localhost:5270/api/workflow/topparts")
+                ?? new();
+
+            var selectedParts = await Http.GetFromJsonAsync<List<WorkflowPartModel>>(
+                $"http://localhost:5270/api/workflow/parts/{VersionId}")
+                ?? new();
+
+            parts = allParts
+            .Select(x =>
+            {
+                var selected = selectedParts.FirstOrDefault(s => s.TopPartId == x.TopPartId);
+
+                return new WorkflowPartSelectModel
+                {
+                    TopPartId = x.TopPartId,
+                    TopPartName = x.TopPartName,
+                    Stage = x.Stage,
+                    Checked = selected != null,
+                    QtyPerProduct = selected?.QtyPerProduct ?? 1
+                };
+            })
+                .OrderBy(x => x.Stage)
+                .ThenBy(x => x.TopPartName)
+                .ToList();
+        }
+
+        private async Task Save()
+            {
+                if (VersionId is null)
+                    return;
+
+                var response = await Http.PostAsJsonAsync(
+                    "http://localhost:5270/api/workflow/parts/save",
+                    new
+                    {
+                        VersionId = VersionId,
+                        Parts = parts
+                            .Where(x => x.Checked)
+                            .Select(x => new
+                            {
+                                TopPartId = x.TopPartId,
+                                QtyPerProduct = x.QtyPerProduct
+                            })
+                            .ToList()
+                    });
+
+                if (!response.IsSuccessStatusCode)
+                    return;
+
+                await OnParametersSetAsync();
+                await Close();
+            }
+
+            private void QtyChanged(WorkflowPartSelectModel part, ChangeEventArgs e)
+                {
+                    if (int.TryParse(e.Value?.ToString(), out var qty) && qty > 0)
+                        part.QtyPerProduct = qty;
+                    else
+                        part.QtyPerProduct = 1;
+                }
+            
+            private void PartCheckedChanged(WorkflowPartSelectModel part)
+                {
+                    if (part.Checked && part.QtyPerProduct <= 0)
+                        part.QtyPerProduct = 1;
+                }
+
+}

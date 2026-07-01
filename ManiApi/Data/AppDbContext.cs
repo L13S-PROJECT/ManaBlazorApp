@@ -38,6 +38,9 @@ namespace ManiApi.Data
         public DbSet<CustomerCodeMap> CustomerCodeMaps { get; set; }
         public DbSet<OrderDraft> OrderDrafts { get; set; }
         public DbSet<OrderDraftItem> OrderDraftItems { get; set; }
+        public DbSet<Workflow> Workflows { get; set; }
+        public DbSet<WorkflowNode> WorkflowNodes { get; set; }
+        public DbSet<WorkflowNodeConnection> WorkflowNodeConnections { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         
 {

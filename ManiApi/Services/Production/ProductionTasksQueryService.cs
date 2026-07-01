@@ -604,7 +604,7 @@ SUM(
     END
 ) AS DetailsDone,
 
-        -- Child gatavie
+-- Child gatavie
         SUM(
             CASE 
                 WHEN bp.ProductToPart_ID IS NOT NULL
