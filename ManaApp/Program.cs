@@ -5,6 +5,7 @@ using Syncfusion.Licensing;
 using ManaApp;
 using ManaApp.Services;
 using ManaApp.Services.Planning;
+using ManaApp.Services.Workflow;
 
 
 
@@ -32,6 +33,9 @@ builder.Services.AddScoped<PlanningLookupService>();
 builder.Services.AddScoped<PlanningDataService>();
 builder.Services.AddScoped<PlanningDraftService>();
 
+builder.Services.AddScoped<WorkflowService>();
+builder.Services.AddScoped<WorkflowStateService>();
+builder.Services.AddScoped<WorkflowEditorService>();
 
 var culture = new System.Globalization.CultureInfo("lv-LV");
 System.Globalization.CultureInfo.DefaultThreadCurrentCulture = culture;

@@ -1,0 +1,130 @@
+@using ManaApp.Models
+@using Microsoft.AspNetCore.Components
+@using System.Net.Http.Json
+@inject IJSRuntime JS
+@inject HttpClient Http
+
+@namespace ManaApp.Components.Workflow
+
+@if (Visible)
+{
+    <div class="workflow-modal-backdrop">
+
+        <div class="workflow-modal">
+
+                            <div class="workflow-modal-header">
+
+                                <span>Pievienot PART</span>
+
+                                <button class="workflow-close"
+                                        @onclick="Close">
+                                    ✕
+
+                                </button>
+
+                            </div>
+
+                            <div class="workflow-modal-body">
+
+                <InputSelect class="form-select"
+                            @bind-Value="selectedTopPartId">
+
+                    <option value="0">-- izvēlies detaļu --</option>
+
+                    @foreach (var part in topParts)
+                    {
+                        <option value="@part.TopPartId">
+                            @part.TopPartCode - @part.TopPartName
+                        </option>
+                    }
+
+                </InputSelect>
+
+                <br />
+
+                <button class="btn btn-success"
+                        @onclick="AddPartAsync"
+                        disabled="@(selectedTopPartId == 0)">
+                    Pievienot
+                </button>
+
+                <br />
+
+                <button class="btn btn-success"
+                        disabled="@(selectedPart == null)">
+                    Pievienot
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+@code {
+
+    [Parameter] public bool Visible { get; set; }
+
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+
+    [Parameter]
+    public int WorkflowId { get; set; }
+
+    [Parameter]
+    public int VersionId { get; set; }
+
+    private List<WorkflowPartModel> topParts = new();
+
+    private WorkflowPartModel? selectedPart;
+
+    private int selectedTopPartId;
+
+    private async Task Close()
+    {
+        await VisibleChanged.InvokeAsync(false);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Visible)
+            return;
+
+        topParts = await Http.GetFromJsonAsync<List<WorkflowPartModel>>(
+            $"http://localhost:5270/api/workflow/productparts/{VersionId}")
+            ?? new();
+
+        selectedPart = null;
+    }
+
+   private async Task AddPartAsync()
+    {       
+        var part = topParts.FirstOrDefault(x => x.TopPartId == selectedTopPartId);
+
+        if (part == null)
+            return;
+        
+
+        var response = await Http.PostAsJsonAsync(
+            "http://localhost:5270/api/workflow/node",
+            new
+            {
+                WorkflowId = WorkflowId,
+                NodeType = 1,
+                Name = part.TopPartName,
+                TopPartId = part.TopPartId
+            });
+
+        if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+
+                await JS.InvokeVoidAsync("alert", error);
+
+                return;
+            }
+
+        await VisibleChanged.InvokeAsync(false);
+    }
+
+}

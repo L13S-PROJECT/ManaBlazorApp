@@ -1,0 +1,110 @@
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+@namespace ManaApp.Components.Workflow
+@using Microsoft.AspNetCore.Components
+
+@if (Visible)
+{
+    <div class="workflow-modal-backdrop">
+
+        <div class="workflow-modal">
+
+            <div class="workflow-modal-header">
+
+                <span>Pievienot MERGE</span>
+
+                <button class="workflow-close"
+                        @onclick="Close">
+                    ✕
+                </button>
+
+            </div>
+
+            <div class="workflow-modal-body">
+
+                <input class="form-control"
+                       @bind="mergeName"
+                       placeholder="MERGE nosaukums" />
+
+                <br />
+
+                <button class="btn btn-success"
+                        @onclick="AddMergeAsync">
+                    Izveidot MERGE
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+@code
+{
+    [Parameter] public bool Visible { get; set; }
+
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+    [Parameter] public EventCallback<int> MergeCreated { get; set; }
+
+    [Parameter]
+    public int WorkflowId { get; set; }
+
+    [Parameter]
+    public int PreviousNodeId { get; set; }
+
+    private string mergeName = "";
+
+    private async Task Close()
+    {
+        await VisibleChanged.InvokeAsync(false);
+    }
+
+    private async Task AddMergeAsync()
+    {
+        var response = await Http.PostAsJsonAsync(
+            "http://localhost:5270/api/workflow/node",
+            new
+            {
+                WorkflowId = WorkflowId,
+                NodeType = 3,
+                Name = mergeName
+            });
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            await JS.InvokeVoidAsync("alert", error);
+            return;
+        }
+
+        var node = await response.Content.ReadFromJsonAsync<WorkflowNodeModel>();
+
+        if (node == null)
+            return;
+
+        var connectResponse = await Http.PostAsJsonAsync(
+            "http://localhost:5270/api/workflow/connect",
+            new
+            {
+                FromNodeId = PreviousNodeId,
+                ToNodeId = node.Id
+            });
+
+        if (!connectResponse.IsSuccessStatusCode)
+        {
+            var error = await connectResponse.Content.ReadAsStringAsync();
+            await JS.InvokeVoidAsync("alert", error);
+            return;
+        }
+
+        await MergeCreated.InvokeAsync(node.Id);
+
+            mergeName = "";
+
+        await VisibleChanged.InvokeAsync(false);
+
+    }
+}

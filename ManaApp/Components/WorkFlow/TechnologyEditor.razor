@@ -1,0 +1,294 @@
+
+@using ManaApp.Services.Workflow
+
+@inject WorkflowEditorService WorkflowEditor
+
+@namespace ManaApp.Components.Workflow
+
+@if (Visible)
+{
+    <div class="technology-editor-overlay">
+
+        <div class="technology-editor-window">
+
+            <div class="technology-editor">
+
+    <div class="technology-editor-header">
+
+        <div class="editor-title">
+            Tehnoloģijas redaktors
+        </div>
+
+        <div class="editor-right">
+
+            <div class="editor-version">
+                @WorkflowEditor.Workflow?.Workflow?.Name
+            </div>
+
+            <button class="btn btn-save">
+                <i class="bi bi-floppy me-2"></i>
+                <span>Saglabāt</span>
+            </button>
+
+            <button class="btn btn-close"
+                @onclick="Close">
+            <i class="bi bi-x-lg"></i>
+        </button>
+
+        </div>
+
+    </div>
+
+    <div class="technology-editor-toolbar">
+
+        <div class="toolbar-left">
+
+            <button class="toolbar-btn top-part">
+                <i class="bi bi-box"></i>
+                <span>+ TOP PART</span>
+            </button>
+
+            <button class="toolbar-btn sub-part">
+                <i class="bi bi-box"></i>
+                <span>+ SUB PART</span>
+            </button>
+
+            <button class="toolbar-btn process">
+                <i class="bi bi-gear"></i>
+                <span>+ PROCESS</span>
+            </button>
+
+            <button class="toolbar-btn merge">
+                <i class="bi bi-diagram-3"></i>
+                <span>+ MERGE</span>
+            </button>
+
+            <button class="toolbar-btn finish">
+                <i class="bi bi-flag"></i>
+                <span>+ FINISH</span>
+                <i class="bi bi-caret-down-fill"></i>
+            </button>
+
+        </div>
+
+        <div class="toolbar-center">
+
+        </div>
+
+        <div class="toolbar-right">
+
+            <button class="toolbar-btn check">
+                <i class="bi bi-check-circle"></i>
+                <span>Pārbaudīt</span>
+            </button>
+
+        </div>
+
+    </div>
+
+    <div class="technology-editor-body">
+
+        <aside class="technology-tree">
+
+            <div class="technology-tree-header">
+
+            <div class="tree-title">
+                Tehnoloģijas struktūra
+            </div>
+
+            <div class="tree-header-actions">
+
+                <div class="tree-search">
+
+                    <i class="bi bi-search"></i>
+
+                    <input type="text"
+                        placeholder="Meklēt koku" />
+
+                </div>
+
+                <button class="tree-tool-btn">
+                    <i class="bi bi-sliders"></i>
+                </button>
+
+            </div>
+
+        </div>
+
+            <div class="technology-tree-body">
+
+                @if (!WorkflowEditor.IsLoaded)
+                    {
+                        <div>Ielādēju...</div>
+                    }
+                
+                else
+                {
+                    @foreach (var node in WorkflowEditor.Workflow!.Nodes.OrderBy(x => x.SortOrder))
+                        {
+                            <div class="tree-node"
+                                @onclick="() => SelectNode(node.Id)">
+
+                                <div class="tree-node-left">
+
+                                    <span class="tree-node-icon node-type-@node.NodeType">
+
+                                        @switch (node.NodeType)
+                                        {
+                                            case 1:
+                                                <i class="bi bi-box"></i>
+                                                break;
+
+                                            case 2:
+                                                <i class="bi bi-gear"></i>
+                                                break;
+
+                                            case 3:
+                                                <i class="bi bi-diagram-3"></i>
+                                                break;
+
+                                            case 4:
+                                                <i class="bi bi-flag"></i>
+                                                break;
+                                        }
+
+                                    </span>
+
+                                    <span class="tree-node-type node-type-@node.NodeType">
+                                        @WorkflowEditor.NodeTypeName(node.NodeType)
+                                    </span>
+
+                                    <span class="tree-node-name">
+                                        @node.Name
+                                    </span>
+
+                                </div>
+
+                                <div class="tree-node-right">
+
+                                    <span class="tree-badge node-type-@node.NodeType">
+                                        @WorkflowEditor.NodeTypeName(node.NodeType)
+                                    </span>
+
+                                    <button class="tree-menu-btn">
+                                        <i class="bi bi-three-dots-vertical"></i>
+                                    </button>
+
+                                </div>
+
+                            </div>
+                        }
+                }
+
+            </div>
+
+        </aside>
+
+        <main class="technology-properties">
+
+                <section class="selected-element">
+
+                    <div class="panel-title">
+                        Izvēlētais elements
+                    </div>
+
+                    <div class="panel-body">
+
+                    </div>
+
+                </section>
+
+                <section class="element-information">
+
+                    <div class="panel-title">
+                        Elementa informācija
+                    </div>
+
+                    <div class="panel-body">
+
+                    </div>
+
+                </section>
+
+                <section class="technology-legend">
+
+                    <div class="panel-title">
+                        Leģenda
+                    </div>
+
+                    <div class="panel-body">
+
+                    </div>
+
+                </section>
+
+            </main>
+
+    </div>
+
+    <div class="technology-editor-footer">
+        Footer
+    </div>
+
+</div>
+</div>
+</div>
+}
+
+@code
+{
+    [Parameter]
+    public bool Visible { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> VisibleChanged { get; set; }
+
+    [Parameter]
+    public int? VersionId { get; set; }
+   
+    private bool initialized;
+    
+    //private List<MergeFinishItem> availableFinishNodes = new();
+    
+            
+    
+        protected override async Task OnParametersSetAsync()
+        {
+            if (initialized && WorkflowEditor.Workflow?.Workflow?.VersionId == VersionId)
+                return;
+
+            if (VersionId is null || VersionId <= 0)
+                {
+                    return;
+                }
+
+            try
+                {
+                    if (await WorkflowEditor.LoadAsync(VersionId.Value) == null)
+                        {
+                            return;
+                        }
+                    
+                }
+            catch (Exception)
+                {
+                }
+            finally
+                {
+                    initialized = true;
+                }            
+        }
+
+        private async Task SelectNode(int nodeId)
+            {
+                await WorkflowEditor.SelectNodeAsync(nodeId);
+            }
+
+        private async Task Close()
+            {
+                await VisibleChanged.InvokeAsync(false);
+            }
+
+                
+        
+}

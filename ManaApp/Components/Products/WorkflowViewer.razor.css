@@ -4,7 +4,52 @@
     gap:12px;
 }
 
+.workflow-list{
+    min-width:0;
+    background:#ffffff;
+    border:1px solid #d1d5db;
+    border-radius:6px;
+    padding:10px;
+}
+s
 .workflow-properties{
     border-left:1px solid #d8d8d8;
     padding-left:12px;
+    background:#ffffff;
+    border:1px solid #d1d5db;
+    border-radius:6px;
+    padding:10px;
+}
+
+.workflow-actions{
+    display:flex;
+    gap:8px;
+    margin:6px 0 10px 0;
+}
+
+.workflow-actions .btn{
+    min-width:95px;
+    height:28px;
+
+    padding:0 10px;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    border-radius:5px;
+
+    font-size:12px;
+    font-weight:600;
+}
+
+.workflow-actions .btn:hover{
+    background:#2b82b3;
+}
+
+.workflow-actions .btn:disabled{
+    background:#8bb7cf;
+    border-color:#6e98ae;
+    color:#eef6fb;
+    cursor:not-allowed;
 }

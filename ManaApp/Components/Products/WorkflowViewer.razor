@@ -39,16 +39,39 @@ else
     <div>
         <strong>@workflow?.Workflow?.Name</strong>
     </div>
+<div class="workflow-actions">
 
     <button class="btn btn-primary"
             @onclick="OpenPartsDialog">
-        Detaļas
+        Preces detaļas
     </button>
 
     <button class="btn btn-success"
-            @onclick="OpenAddPartDialog">
+            @onclick="OpenAddPartDialog"
+            disabled="@(workflow?.Workflow == null)">
         + PART
     </button>
+
+    <button class="btn btn-success"
+        @onclick="OpenAddProcessDialog"
+        disabled="@(selectedNode == null ||
+            selectedNode.Node.NodeType == 4)">
+        + PROCESS
+    </button>
+
+    <button class="btn btn-success"
+        @onclick="OpenAddFinishDialog"
+        disabled="@(selectedNode == null ||
+            selectedNode.Node.NodeType == 4)">
+        + FINISH
+    </button>
+
+    <button class="btn btn-primary"
+            @onclick="() => isTechnologyEditorOpen = true">
+        Technology Editor
+    </button>
+
+</div>
 
     <table class="tech-table">
         <thead>
@@ -59,10 +82,10 @@ else
         </thead>
 
         <tbody>
-
+            
        @foreach (var node in workflow?.Nodes?.OrderBy(x => x.SortOrder) ?? Enumerable.Empty<WorkflowNodeModel>())
         {
-            <tr @onclick="() => selectedNode = graph[node.Id]"
+            <tr @onclick="() => SelectNode(node.Id)"
                 style="cursor:pointer">
 
                 <td>
@@ -96,7 +119,7 @@ else
         else
         {
             <div><strong>Tips</strong></div>
-            <div>@selectedNode.Node.NodeType</div>
+            <div>@NodeTypeName(selectedNode.Node.NodeType)</div>
 
             <br />
 
@@ -112,6 +135,81 @@ else
 
             <div><strong>Izejas</strong></div>
             <div>@selectedNode.Next.Count</div>
+
+                <br />
+
+                    <div><strong>Iepriekšējais mezgls</strong></div>
+
+                    @if (selectedNode.Previous.Count == 0)
+                    {
+                        <div>-</div>
+                    }
+                    else
+                    {
+                        @foreach (var node in selectedNode.Previous)
+                        {
+                            <div>@NodeTypeName(node.Node.NodeType) - @node.Node.Name</div>
+                        }
+                    }
+
+                    @if (selectedNode.Node.NodeType == 4)
+                        {
+                            <br />
+
+                            <button class="btn btn-success"
+                                    @onclick="OpenAddMergeDialog">
+                                Izveidot MERGE
+                            </button>
+                        }
+
+                    <br />
+
+                    <div><strong>Nākamais mezgls</strong></div>
+
+                    @if (selectedNode.Next.Count == 0)
+                    {
+                        <div>-</div>
+                    }
+                    else
+                    {
+                        @foreach (var node in selectedNode.Next)
+                        {
+                            <div>@NodeTypeName(node.Node.NodeType) - @node.Node.Name</div>
+                        }
+                    }
+
+                    @if (selectedNode?.Node.NodeType == 3)
+                        {
+                            <hr />
+
+                            <div><strong>Apvienojamie FINISH</strong></div>
+
+                            @if (availableFinishNodes.Count == 0)
+                            {
+                                <div>Nav pieejamu FINISH mezglu.</div>
+                            }
+                            else
+                            {
+                                @foreach (var finish in availableFinishNodes)
+                                {
+                                    <div>
+                                        <input type="checkbox"
+                                            checked="@finish.Selected"
+                                            @onchange="e => finish.Selected = (bool)e.Value!" />
+
+                                        @finish.Name
+                                    </div>
+                                }
+
+                                <br />
+
+                                <button class="btn btn-primary"
+                                        @onclick="SaveMergeConnectionsAsync">
+                                    Saglabāt
+                                </button>
+                            }
+                        }
+
         }
 
     </div>
@@ -125,6 +223,35 @@ else
     Visible="isPartsDialogOpen"
     VisibleChanged="OnPartsDialogClosed" />
 
+<AddWorkflowPartDialog
+    WorkflowId="@(workflow?.Workflow?.Id ?? 0)"
+    VersionId="@(VersionId ?? 0)"
+    Visible="isAddPartOpen"
+    VisibleChanged="OnAddPartDialogClosed" />
+
+<AddWorkflowProcessDialog
+    WorkflowId="@(workflow?.Workflow?.Id ?? 0)"
+    PreviousNodeId="@(selectedNode?.Node.Id ?? 0)"
+    Visible="isAddProcessOpen"
+    VisibleChanged="OnAddProcessDialogClosed" />
+
+<AddWorkflowFinishDialog
+    WorkflowId="@(workflow?.Workflow?.Id ?? 0)"
+    PreviousNodeId="@(selectedNode?.Node.Id ?? 0)"
+    Visible="isAddFinishOpen"
+    VisibleChanged="OnAddFinishDialogClosed" />
+
+<AddWorkflowMergeDialog
+    WorkflowId="@(workflow?.Workflow?.Id ?? 0)"
+    PreviousNodeId="@(selectedNode?.Node.Id ?? 0)"
+    Visible="isAddMergeOpen"
+    VisibleChanged="OnAddMergeDialogClosed"
+    MergeCreated="OnMergeCreated" />
+
+<TechnologyEditor
+    VersionId="VersionId"
+    Visible="isTechnologyEditorOpen"
+    VisibleChanged="OnTechnologyEditorClosed" />
 
 @code
 {
@@ -143,6 +270,7 @@ else
     private List<WorkflowPartModel> topParts = new();
 
     private WorkflowPartModel? selectedTopPart;
+    private bool isTechnologyEditorOpen = false;
 
     protected override async Task OnParametersSetAsync()
         {
@@ -159,8 +287,19 @@ else
                     workflow = await Http.GetFromJsonAsync<WorkflowDto>(
                         $"http://localhost:5270/api/workflow/{VersionId}");
                     
+                    var selectedNodeId = selectedNode?.Node.Id;
+
                     BuildGraph();
-                    selectedNode = null;
+
+                    if (selectedNodeId.HasValue &&
+                        graph.TryGetValue(selectedNodeId.Value, out var node))
+                    {
+                        selectedNode = node;
+                    }
+                    else
+                    {
+                        selectedNode = null;
+                    }
 
                 }
             catch
@@ -225,15 +364,10 @@ else
         
         private async Task OpenAddPartDialog()
             {
-                topParts = await Http.GetFromJsonAsync<List<WorkflowPartModel>>(
-                    "http://localhost:5270/api/workflow/topparts")
-                    ?? new();
-
-                selectedTopPart = null;
+                if (workflow?.Workflow == null)
+                    return;
 
                 isAddPartOpen = true;
-
-                Console.WriteLine($"TopParts: {topParts.Count}");
             }
         
 
@@ -247,6 +381,12 @@ else
             isPartsDialogOpen = true;
         }
     
+    private Task OnTechnologyEditorClosed(bool visible)
+        {
+            isTechnologyEditorOpen = visible;
+            return Task.CompletedTask;
+        }
+
     private async Task OnPartsDialogClosed(bool visible)
             {
                 isPartsDialogOpen = visible;
@@ -254,5 +394,176 @@ else
                 if (!visible)
                     await OnParametersSetAsync();
             }
+
+    private async Task OnAddPartDialogClosed(bool visible)
+        {
+            isAddPartOpen = visible;
+
+            if (!visible)
+                await OnParametersSetAsync();
+        }
+   
+    private bool isAddProcessOpen = false;
+
+    private Task OpenAddProcessDialog()
+    {
+        isAddProcessOpen = true;
+        return Task.CompletedTask;
+    }
+
+    private async Task OnAddProcessDialogClosed(bool visible)
+    {
+        isAddProcessOpen = visible;
+
+        if (!visible)
+            await OnParametersSetAsync();
+    }
+
+    private bool isAddFinishOpen = false;
+
+    private Task OpenAddFinishDialog()
+    {
+        isAddFinishOpen = true;
+        return Task.CompletedTask;
+    }
+
+    private async Task OnAddFinishDialogClosed(bool visible)
+    {
+        isAddFinishOpen = visible;
+
+        if (!visible)
+            await OnParametersSetAsync();
+    }
+
+    private string NodeTypeName(int type)
+        {
+            return type switch
+            {
+                1 => "PART",
+                2 => "PROCESS",
+                3 => "MERGE",
+                4 => "FINISH",
+                _ => "?"
+            };
+        }
+
+    private bool isAddMergeOpen = false;
+
+    private Task OpenAddMergeDialog()
+    {
+        isAddMergeOpen = true;
+        return Task.CompletedTask;
+    }
+
+   private async Task OnAddMergeDialogClosed(bool visible)
+        {
+            isAddMergeOpen = visible;
+
+            if (!visible)
+            {
+                await OnParametersSetAsync();
+
+                if (createdMergeNodeId.HasValue &&
+                    graph.TryGetValue(createdMergeNodeId.Value, out var mergeNode))
+                {
+                    selectedNode = mergeNode;
+
+                    await LoadAvailableFinishNodesAsync();
+
+                    createdMergeNodeId = null;
+                }
+            }
+        }
+
+    private List<MergeFinishItem> availableFinishNodes = new();
+
+    private class MergeFinishItem
+    {
+        public int Id { get; set; }
+
+        public string Name { get; set; } = "";
+
+        public bool Selected { get; set; }
+    }
+
+    private class MergeFinishItemDto
+        {
+            public int Id { get; set; }
+
+            public string? Name { get; set; }
+        }
+    
+    private class CreateWorkflowConnectionRequest
+        {
+            public int FromNodeId { get; set; }
+
+            public int ToNodeId { get; set; }
+        }
+
+    private async Task SaveMergeConnectionsAsync()
+        {
+            if (selectedNode == null)
+                return;
+
+            foreach (var finish in availableFinishNodes.Where(x => x.Selected))
+            {
+                var response = await Http.PostAsJsonAsync(
+                    "http://localhost:5270/api/workflow/connect",
+                    new CreateWorkflowConnectionRequest
+                    {
+                        FromNodeId = finish.Id,
+                        ToNodeId = selectedNode.Node.Id
+                    });
+
+                if (!response.IsSuccessStatusCode)
+                    return;
+            }
+
+            await OnParametersSetAsync();
+        }
+    
+    private async Task LoadAvailableFinishNodesAsync()
+        {
+            if (workflow?.Workflow == null)
+                return;
+
+            var items = await Http.GetFromJsonAsync<List<MergeFinishItemDto>>(
+                $"http://localhost:5270/api/workflow/finish/{workflow.Workflow.Id}");
+
+            availableFinishNodes.Clear();
+
+            if (items == null)
+                return;
+
+            foreach (var item in items)
+            {
+                availableFinishNodes.Add(new MergeFinishItem
+                {
+                    Id = item.Id,
+                    Name = item.Name ?? "",
+                    Selected = false
+                });
+            }
+        }
+
+        private async Task SelectNode(int nodeId)
+        {
+            selectedNode = graph[nodeId];
+
+            availableFinishNodes.Clear();
+
+            if (selectedNode.Node.NodeType == 3)
+            {
+                await LoadAvailableFinishNodesAsync();
+            }
+        }
+
+        private int? createdMergeNodeId;
+
+        private Task OnMergeCreated(int nodeId)
+        {
+            createdMergeNodeId = nodeId;
+            return Task.CompletedTask;
+        }
 
 }

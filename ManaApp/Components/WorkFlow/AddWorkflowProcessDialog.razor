@@ -1,0 +1,109 @@
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject IJSRuntime JS
+@using Microsoft.AspNetCore.Components
+
+@namespace ManaApp.Components.Workflow
+
+
+@if (Visible)
+{
+    <div class="workflow-modal-backdrop">
+
+        <div class="workflow-modal">
+
+            <div class="workflow-modal-header">
+
+                <span>Pievienot PROCESS</span>
+
+                <button class="workflow-close"
+                        @onclick="Close">
+                    ✕
+                </button>
+
+            </div>
+
+            <div class="workflow-modal-body">
+
+                <input class="form-control"
+                    @bind="processName"
+                    placeholder="Procesa nosaukums" />
+
+                <br />
+
+                <button class="btn btn-success"
+                        @onclick="AddProcessAsync"
+                        disabled="@string.IsNullOrWhiteSpace(processName)">
+                    Pievienot
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+@code
+{
+    [Parameter] public bool Visible { get; set; }
+
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+
+    [Parameter]
+    public int WorkflowId { get; set; }
+
+    [Parameter]
+    public int PreviousNodeId { get; set; }
+
+    private async Task Close()
+    {
+        await VisibleChanged.InvokeAsync(false);
+    }
+
+    private string processName = "";
+
+    private async Task AddProcessAsync()
+    {
+        var response = await Http.PostAsJsonAsync(
+            "http://localhost:5270/api/workflow/node",
+            new
+            {
+                WorkflowId = WorkflowId,
+                NodeType = 2,
+                Name = processName
+            });
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            await JS.InvokeVoidAsync("alert", error);
+            return;
+        }
+
+        var node = await response.Content.ReadFromJsonAsync<WorkflowNodeModel>();
+
+            if (node == null)
+                return;
+        
+        var connectResponse = await Http.PostAsJsonAsync(
+            "http://localhost:5270/api/workflow/connect",
+        new
+            {
+                FromNodeId = PreviousNodeId,
+                ToNodeId = node.Id
+            });
+
+        if (!connectResponse.IsSuccessStatusCode)
+            {
+                var error = await connectResponse.Content.ReadAsStringAsync();
+
+                await JS.InvokeVoidAsync("alert", error);
+
+                return;
+            }
+
+        await VisibleChanged.InvokeAsync(false);
+    }
+
+}

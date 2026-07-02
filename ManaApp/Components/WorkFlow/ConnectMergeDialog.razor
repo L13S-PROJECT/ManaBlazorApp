@@ -1,0 +1,98 @@
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+@namespace ManaApp.Components.Workflow
+
+@if (Visible)
+{
+    <div class="workflow-modal-backdrop">
+
+        <div class="workflow-modal">
+
+            <div class="workflow-modal-header">
+
+                <span>Pievienot pie MERGE</span>
+
+                <button class="workflow-close"
+                        @onclick="Close">
+                    ✕
+                </button>
+
+            </div>
+
+            <div class="workflow-modal-body">
+
+                <select class="form-select"
+                        @bind="selectedMergeId">
+
+                    <option value="0">
+                        -- Izvēlies MERGE --
+                    </option>
+
+                    @foreach (var merge in mergeNodes)
+                    {
+                        <option value="@merge.Id">
+                            @merge.Name
+                        </option>
+                    }
+
+                </select>
+
+                <br />
+
+                <button class="btn btn-success"
+                        @onclick="ConnectAsync"
+                        disabled="@(selectedMergeId == 0)">
+                    Pievienot
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+@code
+{
+    [Parameter] public bool Visible { get; set; }
+
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+
+    [Parameter] public int WorkflowId { get; set; }
+
+    [Parameter] public int FromNodeId { get; set; }
+
+    private List<MergeNodeDto> mergeNodes = new();
+
+    private int selectedMergeId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Visible)
+            return;
+
+        mergeNodes = await Http.GetFromJsonAsync<List<MergeNodeDto>>(
+            $"http://localhost:5270/api/workflow/merge/{WorkflowId}")
+            ?? new();
+
+        selectedMergeId = 0;
+    }
+
+    private async Task Close()
+    {
+        await VisibleChanged.InvokeAsync(false);
+    }
+
+    private Task ConnectAsync()
+    {
+        return Task.CompletedTask;
+    }
+
+    private class MergeNodeDto
+    {
+        public int Id { get; set; }
+
+        public string? Name { get; set; }
+    }
+}

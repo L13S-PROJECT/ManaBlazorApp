@@ -98,19 +98,25 @@ namespace ManiApi.Controllers
             return Ok(workflow);
         }
 
-        [HttpGet("topparts")]
-            public async Task<IActionResult> GetTopParts()
+        [HttpGet("productparts/{versionId}")]
+            public async Task<IActionResult> GetProductParts(int versionId)
             {
-                var parts = await _db.TopParts
-                    .Where(x => x.IsActive && x.Stage == 1)
-                    .OrderBy(x => x.TopPartName)
-                    .Select(x => new WorkflowPartDto
-                    {
-                        TopPartId = x.Id,
-                        TopPartCode = x.TopPartCode,
-                        TopPartName = x.TopPartName,
-                        Stage = x.Stage
-                    })
+                var parts = await _db.ProductTopParts
+                    .Where(x => x.VersionId == versionId && x.IsActive)
+                    .Join(_db.TopParts.Where(tp => tp.IsActive && tp.Stage == 1),
+                        pt => pt.TopPartId,
+                        tp => tp.Id,
+                        (pt, tp) => new WorkflowPartDto
+                        {
+                            ProductToPartId = pt.Id,
+                            TopPartId = tp.Id,
+                            TopPartCode = tp.TopPartCode,
+                            TopPartName = tp.TopPartName,
+                            QtyPerProduct = pt.QtyPerProduct,
+                            Stage = tp.Stage
+                        })
+                    .OrderBy(x => x.Stage)
+                    .ThenBy(x => x.TopPartName)
                     .ToListAsync();
 
                 return Ok(parts);
@@ -120,6 +126,7 @@ namespace ManiApi.Controllers
         [HttpPost("node")]
         public async Task<IActionResult> CreateNode(CreateWorkflowNodeRequest dto)
         {
+                       
             var workflow = await _db.Workflows
                 .FirstOrDefaultAsync(x => x.Id == dto.WorkflowId && x.IsActive);
 
@@ -157,13 +164,26 @@ namespace ManiApi.Controllers
             var maxSort = await _db.WorkflowNodes
                 .Where(x => x.WorkflowId == dto.WorkflowId)
                 .MaxAsync(x => (int?)x.SortOrder) ?? 0;
+            
+            if (dto.NodeType == 1)
+                {
+                    var exists = await _db.WorkflowNodes
+                        .AnyAsync(x =>
+                            x.WorkflowId == dto.WorkflowId &&
+                            x.NodeType == 1 &&
+                            x.ProductToPartId == productPart!.Id &&
+                            x.IsActive);
+
+                    if (exists)
+                        return BadRequest("Šī detaļa Workflow jau ir pievienota.");
+                }
 
             var node = new WorkflowNode
             {
                 WorkflowId = dto.WorkflowId,
                 NodeType = dto.NodeType,
                 Name = dto.Name,
-                ProductToPartId = productPart!.Id,
+                ProductToPartId = productPart?.Id,
                 WorkCenterId = dto.WorkCenterId,
                 EstimatedMinutes = dto.EstimatedMinutes,
                 Comments = dto.Comments,
@@ -195,6 +215,16 @@ namespace ManiApi.Controllers
 
             if (fromNode.WorkflowId != toNode.WorkflowId)
                 return BadRequest("Node pieder dažādiem Workflow.");
+            
+            // FINISH nevar būt nākamais mezgls
+            if (fromNode.NodeType == 4)
+                return BadRequest("FINISH mezglam nevar pievienot nākamo mezglu.");
+
+            var nextCount = await _db.WorkflowNodeConnections
+                .CountAsync(x => x.FromNodeId == dto.FromNodeId);
+
+            if (nextCount > 0)
+                return BadRequest("Šim mezglam jau ir pievienots nākamais mezgls.");
 
             var exists = await _db.WorkflowNodeConnections
                 .AnyAsync(x =>
@@ -262,6 +292,44 @@ namespace ManiApi.Controllers
                     await _db.SaveChangesAsync();
 
                     return Ok();
+            }
+
+        [HttpGet("merge/{workflowId}")]
+        public async Task<IActionResult> GetMergeNodes(int workflowId)
+            {
+                var nodes = await _db.WorkflowNodes
+                    .Where(x =>
+                        x.WorkflowId == workflowId &&
+                        x.NodeType == 3 &&
+                        x.IsActive)
+                    .OrderBy(x => x.SortOrder)
+                    .Select(x => new
+                    {
+                        x.Id,
+                        x.Name
+                    })
+                    .ToListAsync();
+
+                return Ok(nodes);
+            }
+
+        [HttpGet("finish/{workflowId}")]
+        public async Task<IActionResult> GetFinishNodes(int workflowId)
+            {
+                var nodes = await _db.WorkflowNodes
+                    .Where(x =>
+                        x.WorkflowId == workflowId &&
+                        x.NodeType == 4 &&
+                        x.IsActive)
+                    .OrderBy(x => x.SortOrder)
+                    .Select(x => new
+                    {
+                        x.Id,
+                        x.Name
+                    })
+                    .ToListAsync();
+
+                return Ok(nodes);
             }
 
     }
