@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using ManiApi.Data;
 using ManiApi.Models;
 using ManaApp.Shared.DTOs.Planning;
+using ManiApi.DTOs.Workflow;
 
 namespace ManiApi.Controllers
 {
@@ -813,6 +814,24 @@ public async Task<IActionResult> GetRalSummaryAll(
     ).ToListAsync();
 
     return Ok(orderRows);
+}
+
+[HttpGet("workflow")]
+public async Task<IActionResult> GetWorkflowTopParts()
+{
+    var rows = await _db.TopParts
+            .Where(x => x.IsActive && x.Stage == 1)
+            .OrderBy(x => x.TopPartName)
+            .Select(x => new WorkflowTopPartDto
+            {
+                TopPartId = x.Id,
+                TopPartName = x.TopPartName,
+                TopPartCode = x.TopPartCode,
+                Stage = x.Stage
+            })
+            .ToListAsync();
+
+    return Ok(rows);
 }
 
 

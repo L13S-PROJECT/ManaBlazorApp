@@ -22,18 +22,83 @@ namespace ManiApi.Controllers
         public async Task<IActionResult> GetWorkflow(int versionId)
         {
             var workflow = await _db.Workflows
-                .FirstOrDefaultAsync(x =>
-                    x.VersionId == versionId &&
-                    x.IsActive);
+    .FirstOrDefaultAsync(x =>
+        x.VersionId == versionId &&
+        x.IsActive);
 
-            if (workflow == null)
-                return NotFound("Workflow nav atrasts.");
+        if (workflow == null)
+        {
+            workflow = new Workflow
+            {
+                VersionId = versionId,
+                ParentNodeId = null,
+                Name = $"Workflow {versionId}",
+                IsActive = true
+            };
 
-            var nodes = await _db.WorkflowNodes
+            _db.Workflows.Add(workflow);
+
+            await _db.SaveChangesAsync();
+        }
+
+            var partMap = await _db.ProductTopParts
+            .Where(x => x.IsActive)
+            .ToDictionaryAsync(x => x.Id, x => x.TopPartId);
+
+        var nodes = await _db.WorkflowNodes
+            .Where(x =>
+                x.WorkflowId == workflow.Id &&
+                x.IsActive)
+            .OrderBy(x => x.SortOrder)
+            .Select(x => new WorkflowNodeDto
+            {
+                Id = x.Id,
+                WorkflowId = x.WorkflowId,
+                NodeType = x.NodeType,
+                Name = x.Name,
+                ProductToPartId = x.ProductToPartId,
+                WorkCenterId = x.WorkCenterId,
+                EstimatedMinutes = x.EstimatedMinutes,
+                Comments = x.Comments,
+                SortOrder = x.SortOrder
+            })
+            .ToListAsync();
+
+Console.WriteLine($"Nodes count = {nodes.Count}");
+
+foreach (var n in nodes)
+{
+    Console.WriteLine(
+        $"NodeId={n.Id}, Type={n.NodeType}, ProductToPartId={n.ProductToPartId}");
+}
+
+        foreach (var node in nodes)
+        {
+            if (node.ProductToPartId.HasValue &&
+                partMap.TryGetValue(node.ProductToPartId.Value, out var topPartId))
+            {
+                node.TopPartId = topPartId;
+            }
+        }
+            
+            var productParts = await _db.ProductTopParts
                 .Where(x =>
-                    x.WorkflowId == workflow.Id &&
+                    x.VersionId == workflow.VersionId &&
                     x.IsActive)
-                .OrderBy(x => x.SortOrder)
+                .Join(_db.TopParts.Where(tp => tp.IsActive),
+                    pt => pt.TopPartId,
+                    tp => tp.Id,
+                    (pt, tp) => new WorkflowPartDto 
+                    {
+                        ProductToPartId = pt.Id,
+                        TopPartId = pt.TopPartId,
+                        TopPartCode = tp.TopPartCode,
+                        TopPartName = tp.TopPartName,
+                        QtyPerProduct = pt.QtyPerProduct,
+                        Stage = tp.Stage,
+                        ParentProductTopPartId = pt.ParentProductTopPartId
+                    })
+                .OrderBy(x => x.TopPartName)
                 .ToListAsync();
 
             var connections = await _db.WorkflowNodeConnections
@@ -46,7 +111,8 @@ namespace ManiApi.Controllers
             {
                 Workflow = workflow,
                 Nodes = nodes,
-                Connections = connections
+                Connections = connections,
+                ProductParts = productParts
             });
         }
 
@@ -55,7 +121,7 @@ namespace ManiApi.Controllers
             {
                 var parts = await _db.ProductTopParts
                     .Where(x => x.VersionId == versionId && x.IsActive)
-                    .Join(_db.TopParts.Where(tp => tp.IsActive),
+                    .Join(_db.TopParts.Where(tp => tp.IsActive && tp.Stage == 1),
                         pt => pt.TopPartId,
                         tp => tp.Id,
                         (pt, tp) => new WorkflowPartDto
@@ -112,6 +178,7 @@ namespace ManiApi.Controllers
                             TopPartId = tp.Id,
                             TopPartCode = tp.TopPartCode,
                             TopPartName = tp.TopPartName,
+                            ParentProductTopPartId = pt.ParentProductTopPartId,
                             QtyPerProduct = pt.QtyPerProduct,
                             Stage = tp.Stage
                         })
@@ -194,6 +261,8 @@ namespace ManiApi.Controllers
             _db.WorkflowNodes.Add(node);
 
             await _db.SaveChangesAsync();
+
+            Console.WriteLine($"Node ProductToPartId = {node.ProductToPartId}");
 
             return Ok(node);
         }
@@ -330,6 +399,92 @@ namespace ManiApi.Controllers
                     .ToListAsync();
 
                 return Ok(nodes);
+            }
+
+        [HttpGet("available-topparts")]
+            public async Task<IActionResult> GetWorkflowSelect([FromQuery] int versionId)
+            {
+                var rows = await (
+                    from tp in _db.TopParts
+
+                    join ptp in _db.ProductTopParts
+                        .Where(x => x.VersionId == versionId && x.IsActive)
+                        on tp.Id equals ptp.TopPartId into grp
+
+                    from linked in grp.DefaultIfEmpty()
+
+                    where tp.IsActive
+                        && tp.Stage == 1
+
+                    orderby tp.TopPartName
+
+                    select new WorkflowTopPartSelectDto
+                    {
+                        TopPartId = tp.Id,
+                        TopPartName = tp.TopPartName,
+                        TopPartCode = tp.TopPartCode,
+                        Disabled = linked != null
+                    }
+                ).ToListAsync();
+
+                return Ok(rows);
+            }
+        
+        [HttpGet("available-subparts")]
+            public async Task<IActionResult> GetAvailableSubParts([FromQuery] int versionId)
+            {
+                var rows = await (
+                    from tp in _db.TopParts
+
+                    join ptp in _db.ProductTopParts
+                        .Where(x => x.VersionId == versionId && x.IsActive)
+                        on tp.Id equals ptp.TopPartId into grp
+
+                    from linked in grp.DefaultIfEmpty()
+
+                    where tp.IsActive
+                        && tp.Stage == 1
+
+                    orderby tp.TopPartName
+
+                    select new WorkflowTopPartSelectDto
+                    {
+                        TopPartId = tp.Id,
+                        TopPartName = tp.TopPartName,
+                        TopPartCode = tp.TopPartCode,
+                        Disabled = false
+                    }
+                ).ToListAsync();
+
+                return Ok(rows);
+            }
+
+        [HttpPost("toppart")]
+        public async Task<IActionResult> AddTopPart(AddTopPartRequest dto)
+            {
+                var exists = await _db.ProductTopParts
+                    .AnyAsync(x =>
+                        x.VersionId == dto.VersionId &&
+                        x.ParentProductTopPartId == dto.ParentProductTopPartId &&
+                        x.TopPartId == dto.TopPartId &&
+                        x.IsActive);
+
+                if (exists)
+                    return BadRequest("TOP PART jau ir pievienots.");
+
+                _db.ProductTopParts.Add(new ProductTopPart
+                {
+                    VersionId = dto.VersionId,
+                    TopPartId = dto.TopPartId,
+                    ParentProductTopPartId = dto.ParentProductTopPartId,
+                    QtyPerProduct = 1,
+                    SortOrder = 10,
+                    IsActive = true
+                });
+
+                await _db.SaveChangesAsync();
+
+                return Ok();
             }
 
     }

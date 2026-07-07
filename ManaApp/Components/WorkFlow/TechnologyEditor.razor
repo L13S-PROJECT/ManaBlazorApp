@@ -1,6 +1,11 @@
 
-@using ManaApp.Services.Workflow
+@* Technology Editor *@
 
+
+@using ManaApp.Services.Workflow
+@using ManaApp.Components.Workflow.Editors
+@using ManaApp.Models
+@inject TechnologyEditorService TechnologyEditorUi
 @inject WorkflowEditorService WorkflowEditor
 
 @namespace ManaApp.Components.Workflow
@@ -43,27 +48,32 @@
 
         <div class="toolbar-left">
 
-            <button class="toolbar-btn top-part">
+            <button class="toolbar-btn top-part"
+                @onclick="AddTopPart">
                 <i class="bi bi-box"></i>
                 <span>+ TOP PART</span>
             </button>
 
-            <button class="toolbar-btn sub-part">
+            <button class="toolbar-btn sub-part"
+                @onclick="AddSubPart">
                 <i class="bi bi-box"></i>
                 <span>+ SUB PART</span>
             </button>
 
-            <button class="toolbar-btn process">
+            <button class="toolbar-btn process"
+                @onclick="AddProcess">
                 <i class="bi bi-gear"></i>
                 <span>+ PROCESS</span>
             </button>
 
-            <button class="toolbar-btn merge">
+            <button class="toolbar-btn merge"
+                @onclick="AddMerge">
                 <i class="bi bi-diagram-3"></i>
                 <span>+ MERGE</span>
             </button>
 
-            <button class="toolbar-btn finish">
+            <button class="toolbar-btn finish"
+                @onclick="AddFinish">
                 <i class="bi bi-flag"></i>
                 <span>+ FINISH</span>
                 <i class="bi bi-caret-down-fill"></i>
@@ -121,10 +131,26 @@
                     {
                         <div>Ielādēju...</div>
                     }
-                
-                else
+                    else if (!WorkflowEditor.State.TechnologyTree.Any())
+                    {
+                        <div class="alert alert-warning m-3">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            Šai precei nav pievienota neviena pamatdetaļa. Vispirms pievieno detaļas preces tehnoloģijai.
+                        </div>
+                    }
+                    else
                 {
-                    @foreach (var node in WorkflowEditor.Workflow!.Nodes.OrderBy(x => x.SortOrder))
+                       
+                      @foreach (var item in WorkflowEditor.State.TechnologyTree)
+                            {
+                                <TechnologyTreeNode
+                                    Item="item"
+                                    Level="0"
+                                    OnNodeClick="SelectNode" />
+                            }
+                        
+                    
+                    @* @foreach (var node in WorkflowEditor.Workflow!.Nodes.OrderBy(x => x.SortOrder))
                         {
                             <div class="tree-node"
                                 @onclick="() => SelectNode(node.Id)">
@@ -177,7 +203,7 @@
                                 </div>
 
                             </div>
-                        }
+                        } *@
                 }
 
             </div>
@@ -188,15 +214,174 @@
 
                 <section class="selected-element">
 
-                    <div class="panel-title">
-                        Izvēlētais elements
-                    </div>
+    <div class="panel-title">
+        Atlasītais elements
+    </div>
 
-                    <div class="panel-body">
+    <div class="panel-body">
 
-                    </div>
+        <div class="selected-header">
 
-                </section>
+            <div class="selected-icon">
+
+                @switch (WorkflowEditor.SelectedTreeItem?.Node?.NodeType)
+                {
+                    case 1:
+                        <i class="bi bi-box text-primary"></i>
+                        break;
+
+                    case 2:
+                        <i class="bi bi-gear text-success"></i>
+                        break;
+
+                    case 3:
+                        <i class="bi bi-diagram-3 text-warning"></i>
+                        break;
+
+                    case 4:
+                        <i class="bi bi-flag text-danger"></i>
+                        break;
+                }
+
+            </div>
+
+            <div class="selected-title">
+
+                <div class="selected-type">
+                    BOM elements
+                </div>
+
+                <div class="selected-name">
+                    @WorkflowEditor.SelectedTreeItem?.Part.TopPartName
+                </div>
+
+                <div class="selected-description">
+                    @(WorkflowEditor.SelectedTreeItem is null
+                        ? "Nav atlasīts BOM elements"
+                        : "Atlasītais BOM elements")
+                </div>
+
+            </div>
+
+            <div class="selected-badge node-type-@(WorkflowEditor.SelectedTreeItem?.Node?.NodeType ?? 1)">
+                @(WorkflowEditor.SelectedTreeItem?.Node is null
+                    ? "TOP PART"
+                    : WorkflowEditor.NodeTypeName(WorkflowEditor.SelectedTreeItem.Node.NodeType))
+            </div>
+
+        </div>
+
+        <div class="element-path">
+
+            <span>TOP PART</span>
+
+            <i class="bi bi-chevron-right"></i>
+
+            <span>PROCESS</span>
+
+            <i class="bi bi-chevron-right"></i>
+
+            <span class="current">FINISH</span>
+
+        </div>
+
+        <div class="element-toolbar">
+
+            <button class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-pencil"></i>
+                Rediģēt
+            </button>
+
+            <button class="btn btn-sm btn-outline-success">
+                <i class="bi bi-copy"></i>
+                Kopēt
+            </button>
+
+            <button class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-trash"></i>
+                Dzēst
+            </button>
+
+        </div>
+
+        <div class="editor-content">
+
+    <div class="editor-content-left">
+
+        <CommonEditor WorkflowEditor="WorkflowEditor" />
+
+    </div>
+
+    <div class="editor-content-right">
+
+        <section class="property-section">
+
+    <div class="section-title">
+    Tipam specifiskie parametri
+</div>
+
+<div class="type-properties">
+
+    @if (WorkflowEditor.SelectedNode == null)
+    {
+        <div class="alert alert-info">
+            Šim BOM elementam vēl nav izveidota tehnoloģija.
+        </div>
+    }
+    else if (SelectedNodeType == 1)
+    {
+        <TopPartEditor WorkflowEditor="WorkflowEditor" />
+    }
+    else if (SelectedNodeType == 2)
+    {
+        <ProcessEditor WorkflowEditor="WorkflowEditor" />
+    }
+    else if (SelectedNodeType == 3)
+    {
+        <MergeEditor WorkflowEditor="WorkflowEditor" />
+    }
+    else if (SelectedNodeType == 4)
+    {
+        <FinishEditor WorkflowEditor="WorkflowEditor" />
+    }
+
+</div>
+
+</section>
+
+<section class="property-section">
+
+    <div class="section-title">
+        Papildus plūsmas
+    </div>
+
+    <div class="form-grid">
+
+    <label>Turpināt plūsmu:</label>
+
+    <input type="checkbox" />
+
+    <label>Rezerves daļu plūsma:</label>
+
+    <input type="checkbox" />
+
+    <label>Piezīmes:</label>
+
+    <textarea class="form-control"
+              rows="2"></textarea>
+
+</div>
+
+</section>
+
+    </div>
+
+</div>
+
+        
+    </div>
+
+</section>
 
                 <section class="element-information">
 
@@ -233,7 +418,15 @@
 </div>
 </div>
 </div>
+
 }
+
+<AddTopPartDialog
+    VersionId="VersionId ?? 0"
+    Visible="isAddTopPartOpen"
+    VisibleChanged="OnAddTopPartDialogClosed"
+    ParentProductTopPartId="WorkflowEditor.SelectedPart?.ProductToPartId" />
+
 
 @code
 {
@@ -245,17 +438,14 @@
 
     [Parameter]
     public int? VersionId { get; set; }
-   
+    private bool isAddTopPartOpen;
     private bool initialized;
-    
-    //private List<MergeFinishItem> availableFinishNodes = new();
-    
+    private int? SelectedNodeType => WorkflowEditor.SelectedNode?.Node.NodeType;
             
-    
         protected override async Task OnParametersSetAsync()
         {
-            if (initialized && WorkflowEditor.Workflow?.Workflow?.VersionId == VersionId)
-                return;
+            //if (initialized && WorkflowEditor.Workflow?.Workflow?.VersionId == VersionId)
+                //return;
 
             if (VersionId is null || VersionId <= 0)
                 {
@@ -270,8 +460,10 @@
                         }
                     
                 }
-            catch (Exception)
+            catch (Exception ex)
                 {
+                    Console.WriteLine(ex);
+                    throw;
                 }
             finally
                 {
@@ -279,9 +471,9 @@
                 }            
         }
 
-        private async Task SelectNode(int nodeId)
+        private void SelectNode(TechnologyTreeItem item)
             {
-                await WorkflowEditor.SelectNodeAsync(nodeId);
+                WorkflowEditor.SelectTreeItem(item);
             }
 
         private async Task Close()
@@ -289,6 +481,58 @@
                 await VisibleChanged.InvokeAsync(false);
             }
 
-                
+        private async Task AddTopPart()
+            {
+                if (VersionId is null)
+                    return;
+
+                await WorkflowEditor.LoadAvailableTopPartsAsync(VersionId.Value);
+
+                isAddTopPartOpen = true;
+            
+            }  
         
+        private async Task AddSubPart()
+            {
+                if (WorkflowEditor.SelectedTreeItem == null)
+                    return;
+
+                await WorkflowEditor.LoadAvailableSubPartsAsync(VersionId!.Value);
+
+                isAddTopPartOpen = true;
+            }
+
+        private bool isAddProcessOpen;
+
+        private async Task AddProcess()
+            {
+                if (!WorkflowEditor.CanAddProcess())
+                    return;
+                
+                if (WorkflowEditor.SelectedTreeItem == null)
+                    return;
+
+                var result = await WorkflowEditor.AddProcessAsync("Jauns PROCESS");
+
+Console.WriteLine($"AddProcess = {result}");
+            }
+
+        private Task AddMerge() => Task.CompletedTask;
+
+        private Task AddFinish() => Task.CompletedTask;
+
+        private async Task OnAddTopPartDialogClosed(bool visible)
+            {
+                isAddTopPartOpen = visible;
+
+                if (!visible)
+                    {
+                        await WorkflowEditor.ReloadAndRestoreSelectionAsync();
+
+                        StateHasChanged();
+                        
+                    }
+            }
+
+
 }

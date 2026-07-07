@@ -1,0 +1,113 @@
+@using ManaApp.Services.Workflow
+@using ManaApp.DTOs.Workflow
+
+@inject WorkflowEditorService WorkflowEditor
+
+@namespace ManaApp.Components.Workflow
+
+@if (Visible)
+{
+    <div class="workflow-modal-backdrop">
+
+         <div class="workflow-modal"> 
+
+            <div class="workflow-modal-header">
+
+                <span>Pievienot TOP PART</span>
+
+                <button class="workflow-close"
+                        @onclick="Close">
+                    ✕
+                </button>
+
+            </div>
+
+            <div class="workflow-modal-body">
+
+                @foreach (var part in topParts)
+                    {
+                        <div class="top-part-row">
+
+                            <input type="checkbox"
+                                @bind="part.Selected"
+                                disabled="@part.Disabled" />
+
+                            <span>@part.TopPartCode - @part.TopPartName</span>
+
+                            @if (part.Disabled)
+                            {
+                                <span class="already-added">Jau pievienots</span>
+                            }
+
+                        </div>
+                    }
+
+                <hr />
+
+                    <div class="dialog-buttons">
+
+                        <button class="btn btn-primary"
+                                @onclick="Save">
+                            Pievienot
+                        </button>
+
+                        <button class="btn btn-secondary"
+                                @onclick="Close">
+                            Atcelt
+                        </button>
+
+                    </div>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+@code
+{
+    [Parameter]
+    public bool Visible { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> VisibleChanged { get; set; }
+
+    [Parameter]
+    public int VersionId { get; set; }
+
+    [Parameter]
+    public int? ParentProductTopPartId { get; set; }
+
+    private List<WorkflowTopPartSelectDto> topParts = new();
+
+    private async Task Close()
+    {
+        await VisibleChanged.InvokeAsync(false);
+    }
+
+    protected override void OnParametersSet()
+        {
+            if (!Visible)
+                return;
+
+            topParts = WorkflowEditor.State.AvailableTopParts;
+        }
+
+    private async Task Save()
+        {
+            foreach (var part in topParts.Where(x => x.Selected && !x.Disabled))
+            {
+                var ok = await WorkflowEditor.AddTopPartAsync(
+                    part.TopPartId,
+                    ParentProductTopPartId);
+
+                if (!ok)
+                    return;
+            }
+
+            await WorkflowEditor.LoadAvailableTopPartsAsync(VersionId);
+            await Close();
+        }
+
+}

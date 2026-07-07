@@ -6,13 +6,14 @@
 
 @namespace ManaApp.Components.Products
 
-<div class="technology-panel">
+   
+    <div class="technology-panel">
 
     <div class="technology-panel-header">
-        Workflow
+        Tehnoloģijas bloks
     </div>
 
-    <div class="technology-panel-body workflow-editor">
+    <div class="technology-panel-body">
 
     @if (VersionId is null)
 {
@@ -22,231 +23,64 @@ else if (loading)
 {
     <div>Ielādēju...</div>
 }
-else if (workflow is null)
-{
-    <div>Workflow nav atrasts.</div>
-
-    <button class="btn btn-primary"
-            @onclick="CreateWorkflowAsync">
-        Izveidot Workflow
-    </button>
-}
 
 else
 {    
     <div class="workflow-list">
 
-    <div>
-        <strong>@workflow?.Workflow?.Name</strong>
-    </div>
-<div class="workflow-actions">
+    
+            <div class="workflow-actions">
 
-    <button class="btn btn-primary"
-            @onclick="OpenPartsDialog">
-        Preces detaļas
-    </button>
+                <button class="btn btn-primary"
+                        @onclick="OpenPartsDialog">
+                    Preces detaļas
+                </button>
 
-    <button class="btn btn-success"
-            @onclick="OpenAddPartDialog"
-            disabled="@(workflow?.Workflow == null)">
-        + PART
-    </button>
+                <button class="btn btn-primary"
+                        @onclick="() => isTechnologyEditorOpen = true">
+                    Tehnoloģijas redaktors
+                </button>
 
-    <button class="btn btn-success"
-        @onclick="OpenAddProcessDialog"
-        disabled="@(selectedNode == null ||
-            selectedNode.Node.NodeType == 4)">
-        + PROCESS
-    </button>
+            </div>
 
-    <button class="btn btn-success"
-        @onclick="OpenAddFinishDialog"
-        disabled="@(selectedNode == null ||
-            selectedNode.Node.NodeType == 4)">
-        + FINISH
-    </button>
+    <div class="workflow-top-parts">
 
-    <button class="btn btn-primary"
-            @onclick="() => isTechnologyEditorOpen = true">
-        Technology Editor
-    </button>
-
-</div>
-
-    <table class="tech-table">
-        <thead>
-            <tr>
-                <th>Type</th>
-                <th>Name</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            
-       @foreach (var node in workflow?.Nodes?.OrderBy(x => x.SortOrder) ?? Enumerable.Empty<WorkflowNodeModel>())
+        @if (productTopParts.Count == 0)
         {
-            <tr @onclick="() => SelectNode(node.Id)"
-                style="cursor:pointer">
-
-                <td>
-                    @(node.NodeType switch
-                    {
-                        1 => "PART",
-                        2 => "PROCESS",
-                        3 => "MERGE",
-                        4 => "FINISH",
-                        _ => "?"
-                    })
-                </td>
-
-                <td>@node.Name</td>
-
-            </tr>
-        }
-
-        </tbody>
-
-    </table>
-
-</div>
-
-    <div class="workflow-properties">
-
-        @if (selectedNode is null)
-        {
-            <div>Izvēlies mezglu.</div>
+            <div>Nav pievienota neviena detaļa.</div>
         }
         else
         {
-            <div><strong>Tips</strong></div>
-            <div>@NodeTypeName(selectedNode.Node.NodeType)</div>
+            @foreach (var part in productTopParts.OrderBy(x => x.Stage).ThenBy(x => x.TopPartName))
+            {
+                <div class="workflow-top-part">
 
-            <br />
+                    <div class="workflow-top-part-name">
+                        @part.TopPartName
+                    </div>
 
-            <div><strong>Nosaukums</strong></div>
-            <div>@selectedNode.Node.Name</div>
+                    <div class="workflow-top-part-qty">
+                        @part.QtyPerProduct
+                    </div>
 
-            <br />
-
-            <div><strong>Ieejas</strong></div>
-            <div>@selectedNode.Previous.Count</div>
-
-            <br />
-
-            <div><strong>Izejas</strong></div>
-            <div>@selectedNode.Next.Count</div>
-
-                <br />
-
-                    <div><strong>Iepriekšējais mezgls</strong></div>
-
-                    @if (selectedNode.Previous.Count == 0)
-                    {
-                        <div>-</div>
-                    }
-                    else
-                    {
-                        @foreach (var node in selectedNode.Previous)
-                        {
-                            <div>@NodeTypeName(node.Node.NodeType) - @node.Node.Name</div>
-                        }
-                    }
-
-                    @if (selectedNode.Node.NodeType == 4)
-                        {
-                            <br />
-
-                            <button class="btn btn-success"
-                                    @onclick="OpenAddMergeDialog">
-                                Izveidot MERGE
-                            </button>
-                        }
-
-                    <br />
-
-                    <div><strong>Nākamais mezgls</strong></div>
-
-                    @if (selectedNode.Next.Count == 0)
-                    {
-                        <div>-</div>
-                    }
-                    else
-                    {
-                        @foreach (var node in selectedNode.Next)
-                        {
-                            <div>@NodeTypeName(node.Node.NodeType) - @node.Node.Name</div>
-                        }
-                    }
-
-                    @if (selectedNode?.Node.NodeType == 3)
-                        {
-                            <hr />
-
-                            <div><strong>Apvienojamie FINISH</strong></div>
-
-                            @if (availableFinishNodes.Count == 0)
-                            {
-                                <div>Nav pieejamu FINISH mezglu.</div>
-                            }
-                            else
-                            {
-                                @foreach (var finish in availableFinishNodes)
-                                {
-                                    <div>
-                                        <input type="checkbox"
-                                            checked="@finish.Selected"
-                                            @onchange="e => finish.Selected = (bool)e.Value!" />
-
-                                        @finish.Name
-                                    </div>
-                                }
-
-                                <br />
-
-                                <button class="btn btn-primary"
-                                        @onclick="SaveMergeConnectionsAsync">
-                                    Saglabāt
-                                </button>
-                            }
-                        }
-
+                </div>
+            }
         }
 
     </div>
-}
-</div>
 
 </div>
+
+    
+}
+</div>
+</div>
+
 
 <WorkflowPartsDialog
     VersionId="VersionId"
     Visible="isPartsDialogOpen"
     VisibleChanged="OnPartsDialogClosed" />
-
-<AddWorkflowPartDialog
-    WorkflowId="@(workflow?.Workflow?.Id ?? 0)"
-    VersionId="@(VersionId ?? 0)"
-    Visible="isAddPartOpen"
-    VisibleChanged="OnAddPartDialogClosed" />
-
-<AddWorkflowProcessDialog
-    WorkflowId="@(workflow?.Workflow?.Id ?? 0)"
-    PreviousNodeId="@(selectedNode?.Node.Id ?? 0)"
-    Visible="isAddProcessOpen"
-    VisibleChanged="OnAddProcessDialogClosed" />
-
-<AddWorkflowFinishDialog
-    WorkflowId="@(workflow?.Workflow?.Id ?? 0)"
-    PreviousNodeId="@(selectedNode?.Node.Id ?? 0)"
-    Visible="isAddFinishOpen"
-    VisibleChanged="OnAddFinishDialogClosed" />
-
-<AddWorkflowMergeDialog
-    WorkflowId="@(workflow?.Workflow?.Id ?? 0)"
-    PreviousNodeId="@(selectedNode?.Node.Id ?? 0)"
-    Visible="isAddMergeOpen"
-    VisibleChanged="OnAddMergeDialogClosed"
-    MergeCreated="OnMergeCreated" />
 
 <TechnologyEditor
     VersionId="VersionId"
@@ -265,9 +99,7 @@ else
     private bool isAddPartOpen = false;
     private bool isPartsDialogOpen = false;
 
-    private List<WorkflowPartModel> productParts = new();
-
-    private List<WorkflowPartModel> topParts = new();
+    private List<WorkflowPartModel> productTopParts = new();
 
     private WorkflowPartModel? selectedTopPart;
     private bool isTechnologyEditorOpen = false;
@@ -281,12 +113,12 @@ else
             }
 
             loading = true;
-
+            await LoadProductTopPartsAsync();
             try
                 {
                     workflow = await Http.GetFromJsonAsync<WorkflowDto>(
                         $"http://localhost:5270/api/workflow/{VersionId}");
-                    
+                                        
                     var selectedNodeId = selectedNode?.Node.Id;
 
                     BuildGraph();
@@ -302,10 +134,14 @@ else
                     }
 
                 }
+
             catch
-            {
-                workflow = null;
-            }
+                {
+                    workflow = null;
+                    BuildGraph();
+                    selectedNode = null;
+                }
+
             finally
             {
                 loading = false;
@@ -388,12 +224,16 @@ else
         }
 
     private async Task OnPartsDialogClosed(bool visible)
-            {
-                isPartsDialogOpen = visible;
+        {
+            isPartsDialogOpen = visible;
 
-                if (!visible)
-                    await OnParametersSetAsync();
-            }
+            if (!visible && VersionId.HasValue)
+                {
+                    await LoadProductTopPartsAsync();
+
+                    StateHasChanged();
+                }
+        }
 
     private async Task OnAddPartDialogClosed(bool visible)
         {
@@ -401,6 +241,16 @@ else
 
             if (!visible)
                 await OnParametersSetAsync();
+        }
+    
+    private async Task LoadProductTopPartsAsync()
+        {
+            if (!VersionId.HasValue)
+                return;
+
+            productTopParts = await Http.GetFromJsonAsync<List<WorkflowPartModel>>(
+                $"http://localhost:5270/api/workflow/parts/{VersionId}")
+                ?? new();
         }
    
     private bool isAddProcessOpen = false;
@@ -495,7 +345,7 @@ else
     
     private class CreateWorkflowConnectionRequest
         {
-            public int FromNodeId { get; set; }
+                        public int FromNodeId { get; set; }
 
             public int ToNodeId { get; set; }
         }

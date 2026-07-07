@@ -7,6 +7,7 @@ public class WorkflowDto
     public List<WorkflowNodeModel> Nodes { get; set; } = new();
 
     public List<WorkflowConnectionModel> Connections { get; set; } = new();
+    public List<WorkflowPartModel> ProductParts { get; set; } = new();
 }
 
 public class WorkflowModel
@@ -27,8 +28,9 @@ public class WorkflowNodeModel
     public int NodeType { get; set; }
 
     public string Name { get; set; } = "";
-
     public int? TopPartId { get; set; }
+
+    public int? ProductToPartId { get; set; }
 
     public int? WorkCenterId { get; set; }
 

@@ -1,0 +1,56 @@
+@using ManaApp.Services.Workflow
+
+@namespace ManaApp.Components.Workflow.Editors
+
+<div class="parameter-group">
+
+    <div class="parameter-group-title">
+        Galvenie parametri
+    </div>
+
+    <div class="form-grid">
+
+        <label>Izmantošana:</label>
+
+        <select class="form-select">
+            <option>TOP PART</option>
+        </select>
+
+        <label>Izejas tips:</label>
+
+        <select class="form-select">
+            <option>Normāla pabeigšana</option>
+        </select>
+
+        <label>Statuss:</label>
+
+        <select class="form-select">
+            <option>Aktīvs</option>
+        </select>
+
+    </div>
+
+</div>
+
+<div class="parameter-group">
+
+    <div class="parameter-group-title">
+        Papildinformācija
+    </div>
+
+    <div class="form-grid">
+
+        <label>Piezīmes:</label>
+
+        <textarea class="form-control"
+                  rows="3"></textarea>
+
+    </div>
+
+</div>
+
+@code
+{
+    [Parameter]
+    public WorkflowEditorService WorkflowEditor { get; set; } = default!;
+}

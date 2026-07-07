@@ -101,9 +101,14 @@
 
             Console.WriteLine($"WorkflowPartsDialog VersionId = {VersionId}");
 
-            var allParts = await Http.GetFromJsonAsync<List<WorkflowPartModel>>(
-                "http://localhost:5270/api/workflow/topparts")
+            var allParts = await Http.GetFromJsonAsync<List<WorkflowTopPartModel>>(
+                "http://localhost:5270/api/topparts/workflow")
                 ?? new();
+                            
+            Console.WriteLine($"AllParts: {allParts.Count}");
+
+            foreach (var p in allParts)
+                Console.WriteLine($"{p.TopPartName}  Stage={p.Stage}");
 
             var selectedParts = await Http.GetFromJsonAsync<List<WorkflowPartModel>>(
                 $"http://localhost:5270/api/workflow/parts/{VersionId}")

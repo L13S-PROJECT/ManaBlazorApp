@@ -8,4 +8,5 @@ public class WorkflowPartDto
     public string TopPartName { get; set; } = "";
     public int QtyPerProduct { get; set; } = 1;
     public int Stage { get; set; }
+    public int? ParentProductTopPartId { get; set; }
 }

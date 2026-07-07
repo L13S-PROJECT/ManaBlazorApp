@@ -11,7 +11,7 @@
 .workflow-modal{
     width:420px;
     background:#fff;
-    border:2px solid #163548;
+    border:2px solid #2da5ef;
     border-radius:14px;
     box-shadow:0 10px 30px rgba(0,0,0,.25);
 }
@@ -32,10 +32,62 @@
 }
 
 .workflow-close{
-    width:34px;
-    height:34px;
-    border:1px solid #666;
-    background:white;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:28px;
+    height:28px;
+    border:none;
+    background:transparent;
+    color:#555;
+    font-size:22px;
     cursor:pointer;
-    font-size:18px;
+    border-radius:6px;
+    transition:.2s;
+}
+
+.workflow-close:hover{
+    background:#eef3f8;
+    color:#163548;
+}
+
+.workflow-stage-title{
+    font-weight:700;
+    margin-bottom:12px;
+    text-transform:uppercase;
+}
+
+.workflow-part-row{
+    display:grid;
+    grid-template-columns:24px 1fr 80px;
+    align-items:center;
+    gap:10px;
+    margin-bottom:8px;
+}
+
+.workflow-part-name{
+    white-space:nowrap;
+}
+
+.workflow-qty{
+    width:70px;
+    height:32px;
+    padding:4px 8px;
+    border:1px solid #8da0b3;
+    border-radius:4px;
+    text-align:center;
+    font-size:15px;
+    box-sizing:border-box;
+}
+
+.workflow-qty:disabled{
+    background:#f3f3f3;
+    color:#999;
+}
+
+.workflow-dialog-buttons{
+    display:flex;
+    justify-content:center;
+    gap:12px;
+    margin-top:24px;
 }

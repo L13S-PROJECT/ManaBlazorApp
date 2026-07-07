@@ -1,0 +1,37 @@
+@using ManaApp.Services.Workflow
+
+@namespace ManaApp.Components.Workflow.Editors
+
+<div class="parameter-group">
+
+    <div class="parameter-group-title">
+        Galvenie parametri
+    </div>
+
+    <div class="form-grid">
+
+        <label>TOP PART:</label>
+
+        <select class="form-select">
+            <option>-- izvēlēties TOP PART --</option>
+        </select>
+
+        <label>Daudzums:</label>
+
+        <input type="number"
+               class="form-control" />
+
+        <label>Piezīmes:</label>
+
+        <textarea class="form-control"
+                  rows="3"></textarea>
+
+    </div>
+
+</div>
+
+@code
+{
+    [Parameter]
+    public WorkflowEditorService WorkflowEditor { get; set; } = default!;
+}

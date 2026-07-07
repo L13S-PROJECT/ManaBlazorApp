@@ -33,9 +33,10 @@ builder.Services.AddScoped<PlanningLookupService>();
 builder.Services.AddScoped<PlanningDataService>();
 builder.Services.AddScoped<PlanningDraftService>();
 
-builder.Services.AddScoped<WorkflowService>();
+builder.Services.AddScoped<WorkflowApiService>();
 builder.Services.AddScoped<WorkflowStateService>();
 builder.Services.AddScoped<WorkflowEditorService>();
+builder.Services.AddScoped<TechnologyEditorService>();
 
 var culture = new System.Globalization.CultureInfo("lv-LV");
 System.Globalization.CultureInfo.DefaultThreadCurrentCulture = culture;

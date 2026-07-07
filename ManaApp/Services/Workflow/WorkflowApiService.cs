@@ -5,19 +5,26 @@ using ManaApp.ViewModels.Workflow;
 
 namespace ManaApp.Services.Workflow;
 
-public class WorkflowService
+public class WorkflowApiService
 {
     private readonly HttpClient _http;
 
-    public WorkflowService(HttpClient http)
+    public WorkflowApiService(HttpClient http)
     {
         _http = http;
     }
 
     public async Task<WorkflowDto?> LoadWorkflowAsync(int versionId)
         {
-            return await _http.GetFromJsonAsync<WorkflowDto>(
-                $"http://localhost:5270/api/workflow/{versionId}");
+            try
+            {
+                return await _http.GetFromJsonAsync<WorkflowDto>(
+                    $"http://localhost:5270/api/workflow/{versionId}");
+            }
+            catch (HttpRequestException)
+            {
+                return null;
+            }
         }
 
     public Dictionary<int, WorkflowGraphNode> BuildGraph(WorkflowDto workflow)
@@ -87,12 +94,84 @@ public class WorkflowService
 
                 if (workflow == null)
                     return null;
+                
+                var productParts = await LoadProductPartsAsync(versionId);
 
                 return new WorkflowState
-                {
-                    Workflow = workflow,
-                    Graph = BuildGraph(workflow)
-                };
+                    {
+                        Workflow = workflow,
+                        Graph = BuildGraph(workflow),
+                        ProductParts = productParts
+                    };
             }
+
+
+        public async Task<List<WorkflowPartModel>> LoadProductPartsAsync(int versionId)
+            {
+                return await _http.GetFromJsonAsync<List<WorkflowPartModel>>(
+                    $"http://localhost:5270/api/workflow/productparts/{versionId}")
+                    ?? new();
+            }
+        
+        public async Task<HttpResponseMessage> CreateNodeAsync(CreateWorkflowNodeRequest request)
+            {
+                return await _http.PostAsJsonAsync(
+                    "http://localhost:5270/api/workflow/node",
+                    request);
+            }
+        
+        public async Task<WorkflowNodeModel?> CreatePartNodeAsync(
+            int workflowId,
+            WorkflowPartModel part)
+        {
+            var response = await CreateNodeAsync(new CreateWorkflowNodeRequest
+            {
+                WorkflowId = workflowId,
+                NodeType = 1,
+                Name = part.TopPartName,
+                TopPartId = part.TopPartId
+            });
+
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            return await response.Content.ReadFromJsonAsync<WorkflowNodeModel>();
+        }
+        
+        public async Task<HttpResponseMessage> CreateConnectionAsync(CreateWorkflowConnectionRequest request)
+            {
+                return await _http.PostAsJsonAsync(
+                    "http://localhost:5270/api/workflow/connect",
+                    request);
+            }
+
+        public async Task<List<WorkflowTopPartSelectDto>> LoadAvailableTopPartsAsync(int versionId)
+            {
+                return await _http.GetFromJsonAsync<List<WorkflowTopPartSelectDto>>(
+                    $"http://localhost:5270/api/workflow/available-topparts?versionId={versionId}")
+                    ?? new();
+            }
+        
+        public async Task<List<WorkflowTopPartSelectDto>> LoadAvailableSubPartsAsync(int versionId)
+            {
+                return await _http.GetFromJsonAsync<List<WorkflowTopPartSelectDto>>(
+                    $"http://localhost:5270/api/workflow/available-subparts?versionId={versionId}")
+                    ?? new();
+            }
+
+        public async Task<HttpResponseMessage> AddTopPartAsync(
+            int versionId,
+            int topPartId,
+            int? parentProductTopPartId)
+        {
+            return await _http.PostAsJsonAsync(
+                "http://localhost:5270/api/workflow/toppart",
+                new
+                {
+                    VersionId = versionId,
+                    TopPartId = topPartId,
+                    ParentProductTopPartId = parentProductTopPartId
+                });
+        }
 
 }

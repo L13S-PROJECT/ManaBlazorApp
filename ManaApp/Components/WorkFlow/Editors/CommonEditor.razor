@@ -1,0 +1,45 @@
+@using ManaApp.Services.Workflow
+
+@namespace ManaApp.Components.Workflow.Editors
+
+<section class="property-section">
+
+    <div class="section-title">
+        Pamatinformācija
+    </div>
+
+    <div class="form-grid">
+
+        <label>Tips:</label>
+
+        <input class="form-control"
+            readonly
+            value="@(WorkflowEditor.SelectedNode is null
+                    ? ""
+                    : WorkflowEditor.NodeTypeName(WorkflowEditor.SelectedNode.Node.NodeType))" />
+
+        <label>Nosaukums:</label>
+
+        <input class="form-control"
+               value="@WorkflowEditor.SelectedNode?.Node.Name" />
+
+        <label>Statuss:</label>
+
+        <input class="form-control"
+            readonly
+            value="Aktīvs" />
+
+        <label>Apraksts:</label>
+
+        <textarea class="form-control"
+                  rows="3"></textarea>
+
+    </div>
+
+</section>
+
+@code
+{
+    [Parameter]
+    public WorkflowEditorService WorkflowEditor { get; set; } = default!;
+}

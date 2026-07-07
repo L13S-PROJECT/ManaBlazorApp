@@ -14,7 +14,12 @@ namespace ManiApi.Models
         [Column("TopPart_ID")]
         public int TopPartId { get; set; }
 
-        
+        [Column("Parent_ProductTopPart_ID")]
+        public int? ParentProductTopPartId { get; set; }
+
+        [Column("SortOrder")]
+        public int SortOrder { get; set; }
+
         [Column("Qty_Per_product")]
         public int QtyPerProduct { get; set; }
 

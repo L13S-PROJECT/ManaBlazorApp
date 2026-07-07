@@ -71,7 +71,7 @@
 
             <!-- Tehnoloģija -->
 
-<ProductTechnologyBox
+@* <ProductTechnologyBox
     Selected="selected"
     IsReadOnly="false"
     LoadingPartDetails="loadingPartDetails"
@@ -85,9 +85,10 @@
     OnOpenWorkCenters="OpenWorkCenterDialogAsync"
     OnDeletePart="DeletePartByCode"
     OnToggleTopPart="@(dto => ToggleTopPartAsync(dto))">
-</ProductTechnologyBox>
+</ProductTechnologyBox>  *@
 
 <WorkflowViewer
+    @key="selected?.VersionId"
     VersionId="selected?.VersionId" />
 
     </div>

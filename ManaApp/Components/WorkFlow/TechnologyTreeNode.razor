@@ -1,0 +1,85 @@
+@using ManaApp.ViewModels.Workflow
+@using ManaApp.DTOs.Workflow
+@using ManaApp.Models
+
+@namespace ManaApp.Components.Workflow
+
+<div class="tree-node">
+
+    <div class="tree-node-content"
+         @onclick="HandleClick">
+
+        <div class="tree-node-left">
+
+        <span class="tree-node-icon node-type-@(Item.Node?.NodeType ?? 1)">
+
+            @if (Item.Node != null)
+            {
+                @switch (Item.Node.NodeType)
+                {
+                    case 2:
+                        <i class="bi bi-gear"></i>
+                        break;
+
+                    case 3:
+                        <i class="bi bi-diagram-3"></i>
+                        break;
+
+                    case 4:
+                        <i class="bi bi-flag"></i>
+                        break;
+
+                    default:
+                        <i class="bi bi-box"></i>
+                        break;
+                }
+            }
+            else
+            {
+                <i class="bi bi-box"></i>
+            }
+
+        </span>
+
+        <span class="tree-node-name">
+            @(Item.Node?.Name ?? Item.Part.TopPartName)
+        </span>
+
+    </div>
+</div>
+</div>
+
+@if (Item.Children.Any())
+{
+    <div class="tree-children level-@Level">
+
+        <div class="tree-child">
+
+        @foreach (var child in Item.Children)
+            {
+                <TechnologyTreeNode
+                    Item="child"
+                    Level="Level"
+                    OnNodeClick="OnNodeClick" />
+            }
+        </div>
+    </div>
+}
+
+@code
+{
+    [Parameter]
+    public required TechnologyTreeItem Item { get; set; }
+
+    [Parameter]
+    public EventCallback<TechnologyTreeItem> OnNodeClick { get; set; }
+
+    [Parameter]
+    public int Level { get; set; }
+
+    private async Task HandleClick()
+        {
+            await OnNodeClick.InvokeAsync(Item);
+        }
+
+}
