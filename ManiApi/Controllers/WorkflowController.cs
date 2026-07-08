@@ -22,9 +22,9 @@ namespace ManiApi.Controllers
         public async Task<IActionResult> GetWorkflow(int versionId)
         {
             var workflow = await _db.Workflows
-    .FirstOrDefaultAsync(x =>
-        x.VersionId == versionId &&
-        x.IsActive);
+            .FirstOrDefaultAsync(x =>
+                x.VersionId == versionId &&
+                x.IsActive);
 
         if (workflow == null)
         {
@@ -41,10 +41,7 @@ namespace ManiApi.Controllers
             await _db.SaveChangesAsync();
         }
 
-            var partMap = await _db.ProductTopParts
-            .Where(x => x.IsActive)
-            .ToDictionaryAsync(x => x.Id, x => x.TopPartId);
-
+        
         var nodes = await _db.WorkflowNodes
             .Where(x =>
                 x.WorkflowId == workflow.Id &&
@@ -70,17 +67,7 @@ foreach (var n in nodes)
 {
     Console.WriteLine(
         $"NodeId={n.Id}, Type={n.NodeType}, ProductToPartId={n.ProductToPartId}");
-}
-
-        foreach (var node in nodes)
-        {
-            if (node.ProductToPartId.HasValue &&
-                partMap.TryGetValue(node.ProductToPartId.Value, out var topPartId))
-            {
-                node.TopPartId = topPartId;
-            }
-        }
-            
+}         
             var productParts = await _db.ProductTopParts
                 .Where(x =>
                     x.VersionId == workflow.VersionId &&
@@ -203,30 +190,19 @@ foreach (var n in nodes)
             ProductTopPart? productPart = null;
 
             if (dto.NodeType == 1)
-                {
-                    if (dto.TopPartId is null)
-                        return BadRequest("TopPart nav norādīts.");
+            {
+                if (dto.ProductToPartId is null)
+                    return BadRequest("ProductToPartId nav norādīts.");
 
-                    productPart = await _db.ProductTopParts
-                        .FirstOrDefaultAsync(x =>
-                            x.VersionId == workflow.VersionId &&
-                            x.TopPartId == dto.TopPartId &&
-                            x.IsActive);
+                productPart = await _db.ProductTopParts
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == dto.ProductToPartId &&
+                        x.VersionId == workflow.VersionId &&
+                        x.IsActive);
 
-                    if (productPart == null)
-                    {
-                        productPart = new ProductTopPart
-                        {
-                            VersionId = workflow.VersionId,
-                            TopPartId = dto.TopPartId.Value,
-                            QtyPerProduct = 1,
-                            IsActive = true
-                        };
-
-                        _db.ProductTopParts.Add(productPart);
-                        await _db.SaveChangesAsync();
-                    }
-                }
+                if (productPart == null)
+                    return BadRequest("ProductTopPart nav atrasts.");
+            }
 
             var maxSort = await _db.WorkflowNodes
                 .Where(x => x.WorkflowId == dto.WorkflowId)
@@ -238,7 +214,7 @@ foreach (var n in nodes)
                         .AnyAsync(x =>
                             x.WorkflowId == dto.WorkflowId &&
                             x.NodeType == 1 &&
-                            x.ProductToPartId == productPart!.Id &&
+                            x.ProductToPartId == dto.ProductToPartId &&
                             x.IsActive);
 
                     if (exists)
@@ -470,7 +446,7 @@ foreach (var n in nodes)
                         x.IsActive);
 
                 if (exists)
-                    return BadRequest("TOP PART jau ir pievienots.");
+                    return Ok();
 
                 _db.ProductTopParts.Add(new ProductTopPart
                 {

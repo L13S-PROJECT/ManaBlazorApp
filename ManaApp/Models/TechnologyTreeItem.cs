@@ -7,9 +7,10 @@ public class TechnologyTreeItem
     public WorkflowNodeModel? Node { get; set; }
 
     public List<TechnologyTreeItem> Children { get; set; } = new();
-
+    public bool IsLastChild { get; set; }
+    public int InputCount { get; set; }
     public int? NodeId => Node?.Id;
-
+    public bool IsSelected { get; set; }
     public bool IsActive => Node != null;
     public bool IsPart => Part != null;
     public bool IsProcess => Node?.NodeType == 2;

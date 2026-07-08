@@ -12,8 +12,6 @@ public class WorkflowNodeDto
 
     public int? ProductToPartId { get; set; }
 
-    public int? TopPartId { get; set; }
-
     public int? WorkCenterId { get; set; }
 
     public int? EstimatedMinutes { get; set; }

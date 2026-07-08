@@ -252,7 +252,7 @@
                 </div>
 
                 <div class="selected-name">
-                    @WorkflowEditor.SelectedTreeItem?.Part.TopPartName
+                    @WorkflowEditor.SelectedTreeItem?.Part?.TopPartName
                 </div>
 
                 <div class="selected-description">
@@ -530,7 +530,7 @@ Console.WriteLine($"AddProcess = {result}");
                         await WorkflowEditor.ReloadAndRestoreSelectionAsync();
 
                         StateHasChanged();
-                        
+
                     }
             }
 

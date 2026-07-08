@@ -4,14 +4,34 @@
 
 @namespace ManaApp.Components.Workflow
 
-<div class="tree-node">
+<div class="tree-node
+    @(Item.IsSelected ? "selected" : "")
+    @(Item.Node?.NodeType == 4 ? "finish-node" : "")
+    @(Item.IsLastChild ? "last-child" : "")">
 
     <div class="tree-node-content"
          @onclick="HandleClick">
 
         <div class="tree-node-left">
+        
+        @if (Item.Children.Any())
+            {
+                <button type="button"
+                        class="tree-expand-btn"
+                        @onclick:stopPropagation="true"
+                        @onclick="ToggleExpand">
+                    <i class="bi @(IsExpanded ? "bi-dash-square" : "bi-plus-square")"></i>
+                </button>
+            }
+        else
+            {
+                <span class="tree-expand-placeholder"></span>
+            }
 
-        <span class="tree-node-icon node-type-@(Item.Node?.NodeType ?? 1)">
+        <span class="tree-node-icon node-type-@(Item.Node?.NodeType ?? 1)
+            @(Item.Part != null
+                    ? (Item.Part.ParentProductTopPartId == null ? "top-part" : "sub-part")
+                    : "")">
 
             @if (Item.Node != null)
             {
@@ -20,15 +40,12 @@
                     case 2:
                         <i class="bi bi-gear"></i>
                         break;
-
                     case 3:
                         <i class="bi bi-diagram-3"></i>
                         break;
-
                     case 4:
                         <i class="bi bi-flag"></i>
                         break;
-
                     default:
                         <i class="bi bi-box"></i>
                         break;
@@ -41,27 +58,73 @@
 
         </span>
 
-        <span class="tree-node-name">
-            @(Item.Node?.Name ?? Item.Part.TopPartName)
+        @if (Item.Part != null)
+        {
+            <span class="tree-node-type @(Item.Part.ParentProductTopPartId == null ? "node-top-part" : "node-sub-part")">
+                @(Item.Part.ParentProductTopPartId == null ? "TOP PART" : "SUB PART")
+            </span>
+        }
+        else if (Item.Node != null)
+        {
+            <span class="tree-node-type node-type-@Item.Node.NodeType">
+                @switch (Item.Node.NodeType)
+                {
+                    case 2:
+                        <text>PROCESS</text>
+                        break;
+                    case 3:
+                        <text>MERGE</text>
+                        break;
+                    case 4:
+                        <text>FINISH</text>
+                        break;
+                }
+            </span>
+        }
+
+        <span class="tree-node-name @((Item.Part != null && Item.Part.ParentProductTopPartId == null) ? "top-part" : "")">
+            @(Item.Node?.Name ?? Item.Part?.TopPartName)
         </span>
+
+        <div class="tree-node-right">
+        @if (Item.Part != null)
+            {
+                <span class="tree-badge @(Item.Part.ParentProductTopPartId == null ? "badge-top-part" : "badge-sub-part")">
+                    @(Item.Part.ParentProductTopPartId == null ? "TOP PART" : "SUB PART")
+                </span>
+            }
+            else if (Item.Node?.NodeType == 3)
+            {
+                <span class="tree-badge badge-merge">
+                    INPUTS (@Item.InputCount)
+                </span>
+            }
+        </div>
 
     </div>
 </div>
 </div>
 
-@if (Item.Children.Any())
+@if (Item.Children.Any() && IsExpanded)
 {
-    <div class="tree-children level-@Level">
+    <div>
 
         <div class="tree-child">
 
-        @foreach (var child in Item.Children)
+            @for (int i = 0; i < Item.Children.Count; i++)
             {
-                <TechnologyTreeNode
-                    Item="child"
-                    Level="Level"
-                    OnNodeClick="OnNodeClick" />
+                var child = Item.Children[i];
+
+                <div class="tree-child-item @(i == Item.Children.Count - 1 ? "last-child" : "")">
+
+                    <TechnologyTreeNode
+                        Item="child"
+                        Level="@(Level + 1)"
+                        OnNodeClick="OnNodeClick" />
+
+                </div>
             }
+
         </div>
     </div>
 }
@@ -76,6 +139,14 @@
 
     [Parameter]
     public int Level { get; set; }
+    public bool IsSelected { get; set; }
+    
+    private bool IsExpanded { get; set; } = true;
+
+    private void ToggleExpand()
+    {
+        IsExpanded = !IsExpanded;
+    }
 
     private async Task HandleClick()
         {

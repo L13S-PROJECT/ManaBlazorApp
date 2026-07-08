@@ -8,7 +8,7 @@ public class CreateWorkflowNodeRequest
 
     public string? Name { get; set; }
 
-    public int? TopPartId { get; set; }
+    public int? ProductToPartId { get; set; }
 
     public int? WorkCenterId { get; set; }
 

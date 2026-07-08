@@ -7,33 +7,310 @@
 
 .tree-child{
     position:relative;
-    margin-left:22px;
+    margin-left:32px;
+    padding-left:0;
 }
 
 .tree-child::before{
+    content:"";
+    position:absolute;
+
+    left:-12px;
+    top:0;
+    bottom:0;
+
+    width:1px;
+    background:#d6dbe5;
+}
+
+.tree-child::after{
+    content:"";
+    position:absolute;
+
+    left:-12px;
+    top:16px;
+
+    width:12px;
+    height:1px;
+
+    background:#d6dbe5;
+}
+
+
+.tree-node-name{
+    color:#111827;
+}
+
+.tree-node-name.sub-part{
+    color:#111827;
+}
+
+.tree-node-icon.top-part{
+    color:#2563eb;
+}
+
+.tree-node-icon.sub-part{
+    color:#60a5fa;
+}
+
+.tree-node.selected{
+    background:#dbeafe;
+    border-radius:4px;
+}
+
+.tree-node.selected .tree-node-name{
+    font-weight:700;
+}
+
+.tree-node.selected .tree-node-icon{
+    color:#2563eb;
+}
+
+.tree-node-content{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+
+    width:100%;
+}
+
+.tree-node{
+    position:relative;
+}
+
+.tree-node.last-child::after{
+    content:"";
+
+    position:absolute;
+
+    left:8px;      /* pie +/- ikonas */
+    top:18px;
+    bottom:-12px;
+
+    width:1px;
+
+    background:#fff;
+    z-index:2;
+}
+
+.tree-node-left{
+    display:flex;
+    align-items:center;
+    flex-wrap:nowrap;
+
+    flex:1;
+    min-width:0;
+    gap:8px;
+
+    position:relative;
+
+    display:flex;
+    align-items:center;
+    gap:8px;
+
+    flex:1;
+    min-width:0;
+}
+
+
+.tree-node-icon,
+.tree-node-type,
+.tree-node-name{
+    display:flex;
+    align-items:center;
+    flex-shrink:0;
+}
+
+.tree-node-name{
+    flex:1;
+    min-width:0;
+}
+
+.tree-node-icon{
+    width:18px;
+    text-align:center;
+    flex-shrink:0;
+}
+
+.node-type-2{
+    color:#16a34a;
+}
+
+.node-type-3{
+    color:#f97316;
+}
+
+.node-type-4{
+    color:#7c3aed;
+}
+
+.tree-node-right{
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+
+    min-width:110px;
+    margin-left:auto;
+}
+
+.badge-top-part{
+    color:#2563eb;
+    background:#eff6ff;
+    border:1px solid #bfdbfe;
+}
+
+.badge-sub-part{
+    color:#259feb;
+    background:#eff6ff;
+    border:1px solid #bfdbfe;
+}
+
+.badge-merge{
+    color:#f97316;
+    background:#fff7ed;
+    border:1px solid #fed7aa;
+}
+
+.tree-badge{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+
+    height:18px;
+    padding:0 6px;
+
+    font-size:10px;
+    font-weight:600;
+    line-height:1;
+
+    white-space:nowrap;
+
+    border-radius:3px;
+}
+
+.tree-expand-btn{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    width:18px;
+    height:18px;
+    padding:0;
+
+    border:none;
+    background:transparent;
+    cursor:pointer;
+
+    color:#64748b;
+}
+
+.tree-expand-btn:hover{
+    color:#2563eb;
+}
+
+.tree-expand-placeholder{
+    display:inline-block;
+    width:18px;
+    height:18px;
+    flex-shrink:0;
+}
+
+.tree-node-type{
+    min-width:62px;
+
+    font-size:12px;
+    font-weight:700;
+
+    white-space:nowrap;
+}
+
+.tree-node-type.node-type-2{
+    color:#16a34a;
+}
+
+.tree-node-type.node-type-3{
+    color:#f97316;
+}
+
+.tree-node-type.node-type-4{
+    color:#7c3aed;
+}
+
+.node-top-part{
+    color:#2563eb;
+}
+
+.node-sub-part{
+    color:#60a5fa;
+}
+
+.tree-part-body{
+    position:relative;
+}
+
+.tree-part-body::before{
+    content:"";
+    position:absolute;
+
+    left:27px;
+    top:18px;
+    bottom:18px;
+
+    width:1px;
+    background:#d6dbe5;
+}
+
+.tree-child-item{
+    position:relative;
+}
+
+.tree-child-item::before{
+    content:"";
+
+    position:absolute;
+
+    left:-12px;
+    top:18px;
+
+    width:12px;
+    height:1px;
+
+    background:#d6dbe5;
+}
+
+.tree-child-item:last-child::after{
     content:"";
 
     position:absolute;
 
     left:-12px;
     top:0;
-    bottom:14px;
+    bottom:50%;
 
     width:1px;
 
-    background:#d6dbe5;
+    background:#fff;
 }
 
-.tree-child::after{
-    content:"";
+.tree-child-item:last-child{
+    margin-bottom:0;
+}
 
-    position:absolute;
+.tree-child{
+    padding-bottom:0;
+}
 
-    left:-12px;
-    top:14px;
+.tree-block{
+    position:relative;
+}
 
-    width:12px;
-    height:1px;
+.tree-block-bordered{
+    padding-bottom:10px;
+}
 
-    background:#d6dbe5;
+.tree-block-footer{
+    margin-left:28px;
+    margin-top:6px;
+
+    border-bottom:2px solid #cfcfcf;
 }

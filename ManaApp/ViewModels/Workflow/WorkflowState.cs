@@ -8,7 +8,7 @@ public class WorkflowState
     public WorkflowDto? Workflow { get; set; }
 
     public Dictionary<int, WorkflowGraphNode> Graph { get; set; } = new();
-
+    public Dictionary<int, WorkflowGraphNode> PartNodeByProductToPartId { get; set; } = new();
     public WorkflowGraphNode? SelectedNode { get; set; }
     public List<MergeFinishItem> AvailableFinishNodes { get; set; } = new();
     public TechnologyTreeItem? SelectedTreeItem { get; set; }

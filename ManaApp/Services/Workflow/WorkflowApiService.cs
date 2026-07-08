@@ -97,10 +97,20 @@ public class WorkflowApiService
                 
                 var productParts = await LoadProductPartsAsync(versionId);
 
+                var graph = BuildGraph(workflow);
+
+                var partIndex = graph.Values
+                    .Where(x => x.Node?.ProductToPartId != null)
+                    .GroupBy(x => x.Node!.ProductToPartId!.Value)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.OrderByDescending(x => x.Node.Id).First());
+
                 return new WorkflowState
                     {
                         Workflow = workflow,
-                        Graph = BuildGraph(workflow),
+                        Graph = graph,
+                        PartNodeByProductToPartId = partIndex,
                         ProductParts = productParts
                     };
             }
@@ -129,7 +139,7 @@ public class WorkflowApiService
                 WorkflowId = workflowId,
                 NodeType = 1,
                 Name = part.TopPartName,
-                TopPartId = part.TopPartId
+                ProductToPartId = part.ProductToPartId
             });
 
             if (!response.IsSuccessStatusCode)

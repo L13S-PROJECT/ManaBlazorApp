@@ -29,6 +29,7 @@ public class WorkflowEditorService
 
             _stateService.State.Workflow = state.Workflow;
             _stateService.State.Graph = state.Graph;
+            _stateService.State.PartNodeByProductToPartId = state.PartNodeByProductToPartId;
             _stateService.State.SelectedNode = state.SelectedNode;
             _stateService.State.AvailableFinishNodes = state.AvailableFinishNodes;
             _stateService.State.ProductParts = state.ProductParts;
@@ -234,14 +235,18 @@ public class WorkflowEditorService
                 .Where(x => x.ParentProductTopPartId == parent.Part.ProductToPartId)
                 .OrderBy(x => x.TopPartName);
 
-            foreach (var child in children)
-            {
-                var item = CreatePart(child);
+            var list = children.ToList();
 
-                parent.Children.Add(item);
+            for (int i = 0; i < list.Count; i++)
+                {
+                    var item = CreatePart(list[i]);
 
-                BuildPartChildren(item);
-            }
+                    item.IsLastChild = i == list.Count - 1;
+
+                    parent.Children.Add(item);
+
+                    BuildPartChildren(item);
+                }
         }
 
     private List<TechnologyTreeItem> NodeChildren(WorkflowGraphNode? node)
@@ -253,10 +258,14 @@ public class WorkflowEditorService
     
     private WorkflowGraphNode? FindPartNode(WorkflowPartModel part)
         {
-            return State.Graph.Values
-                .FirstOrDefault(x =>
-                    x.Node.NodeType == 1 &&
-                    x.Node.ProductToPartId == part.ProductToPartId);
+            if (part == null)
+                return null;
+
+            return State.PartNodeByProductToPartId.TryGetValue(
+                part.ProductToPartId,
+                out var node)
+                    ? node
+                    : null;
         }
     
     private async Task<WorkflowGraphNode?> GetOrCreateSelectedPartNodeAsync()
@@ -313,20 +322,30 @@ public class WorkflowEditorService
     List<TechnologyTreeItem> items,
     int level)
         {
-            foreach (var next in current.Next)
+            var nextNodes = current.Next.ToList();
+
+            for (int i = 0; i < nextNodes.Count; i++)
             {
+                var next = nextNodes[i];
+
                 if (IsPartNode(next))
-                    {
-                        var partItem = CreateNode(next, level + 1);
+                {
+                    var partItem = CreateNode(next, level + 1);
 
-                        items.Add(partItem);
+                    partItem.IsLastChild = i == nextNodes.Count - 1;
 
-                        BuildBranch(next, partItem.Children, level + 1);
+                    items.Add(partItem);
 
-                        continue;
-                    }
+                    BuildBranch(next, partItem.Children, level + 1);
 
-                items.Add(CreateNode(next, level));
+                    continue;
+                }
+
+                var nodeItem = CreateNode(next, level);
+
+                nodeItem.IsLastChild = i == nextNodes.Count - 1;
+
+                items.Add(nodeItem);
 
                 BuildBranch(next, items, level);
             }
@@ -338,6 +357,7 @@ public class WorkflowEditorService
             {
                 Node = node.Node,
                 Level = level,
+                InputCount = node.Previous.Count,
                 Children = new List<TechnologyTreeItem>()
             };
         }
@@ -393,8 +413,14 @@ Console.WriteLine(
                     ToNodeId = node.Id
                 });
 
+            // if (!connectResponse.IsSuccessStatusCode)
+            //     return null;
+
             if (!connectResponse.IsSuccessStatusCode)
-                return null;
+                {
+                    Console.WriteLine(await connectResponse.Content.ReadAsStringAsync());
+                    return null;
+                }
 
             return node;
         }
@@ -415,10 +441,12 @@ Console.WriteLine(
 
                 if (node == null)
                     return false;
+                
+                var selectedProductToPartId = SelectedPart!.ProductToPartId;
 
                 await ReloadAsync();
 
-                RestoreSelectedTreeItem(SelectedPart!.ProductToPartId);
+                RestoreSelectedTreeItem(selectedProductToPartId);
 
                 await SelectNodeAsync(node.Id);
 
@@ -459,6 +487,14 @@ Console.WriteLine(
 
         public void SelectTreeItem(TechnologyTreeItem item)
             {
+                if (State.SelectedTreeItem == item)
+                    {
+                        item.IsSelected = false;
+                        State.SelectedTreeItem = null;
+                        State.SelectedNode = null;
+                        return;
+                    }
+
                 if (item.Part == null)
                     return;
 
@@ -471,8 +507,9 @@ Console.WriteLine(
                 if (part == null)
                     return;
                 
-                var item = State.TechnologyTree
-                    .FirstOrDefault(x => x.Part.ProductToPartId == part.ProductToPartId);
+                var item = FindTreeItem(
+                    State.TechnologyTree,
+                    part.ProductToPartId);
 
                 if (item != null)
                 {
@@ -480,13 +517,43 @@ Console.WriteLine(
                 }
             }
 
+        private TechnologyTreeItem? FindTreeItem(
+            IEnumerable<TechnologyTreeItem> items,
+            int productToPartId)
+        {
+            foreach (var item in items)
+            {
+                if (item.Part?.ProductToPartId == productToPartId)
+                    return item;
+
+                var child = FindTreeItem(item.Children, productToPartId);
+
+                if (child != null)
+                    return child;
+            }
+
+            return null;
+        }
+
         private void SetSelectedTreeItem(TechnologyTreeItem item)
             {
+                ClearSelection(State.TechnologyTree);
+                item.IsSelected = true;
+
                 State.SelectedTreeItem = item;
 
                 State.SelectedNode = item.Node == null
                     ? null
                     : Graph.GetValueOrDefault(item.Node.Id);
+            }
+        
+        private void ClearSelection(IEnumerable<TechnologyTreeItem> items)
+            {
+                foreach (var item in items)
+                {
+                    item.IsSelected = false;
+                    ClearSelection(item.Children);
+                }
             }
 
 }

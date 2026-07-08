@@ -98,7 +98,7 @@
         {
             if (!Visible || VersionId is null)
                 return;
-
+                
             Console.WriteLine($"WorkflowPartsDialog VersionId = {VersionId}");
 
             var allParts = await Http.GetFromJsonAsync<List<WorkflowTopPartModel>>(

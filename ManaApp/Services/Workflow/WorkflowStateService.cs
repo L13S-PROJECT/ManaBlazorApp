@@ -12,6 +12,7 @@ public class WorkflowStateService
         {
             State.Workflow = null;
             State.Graph.Clear();
+            State.PartNodeByProductToPartId.Clear();
             State.SelectedNode = null;
             State.SelectedTreeItem = null;
             State.AvailableFinishNodes.Clear();
@@ -19,5 +20,6 @@ public class WorkflowStateService
             State.TechnologyTree.Clear();
             State.SelectedTopPartId = 0;
             State.AvailableTopParts.Clear();
+            State.AvailableFinishNodes.Clear();
         }
 }
