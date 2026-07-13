@@ -6,7 +6,17 @@ public class TechnologyTreeItem
 
     public WorkflowNodeModel? Node { get; set; }
 
-    public List<TechnologyTreeItem> Children { get; set; } = new();
+    public bool HasPart => Part is not null;
+
+        public bool HasNode => Node is not null;
+
+        public WorkflowPartModel PartOrThrow => Part!;
+
+        public WorkflowNodeModel NodeOrThrow => Node!;
+
+    // public List<TechnologyTreeItem> Children { get; set; } = new();
+    public List<TechnologyTreeItem> PartChildren { get; set; } = new();
+    public List<TechnologyTreeItem> NodeChildren { get; set; } = new();
     public bool IsLastChild { get; set; }
     public int InputCount { get; set; }
     public int? NodeId => Node?.Id;
@@ -16,5 +26,6 @@ public class TechnologyTreeItem
     public bool IsProcess => Node?.NodeType == 2;
 
     public int Level { get; set; }
+    public TechnologyTreeItem? Parent { get; set; }
 
 }

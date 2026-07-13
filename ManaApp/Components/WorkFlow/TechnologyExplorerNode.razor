@@ -1,0 +1,45 @@
+@*TehnologyExplorerNode.razor*@
+
+@using ManaApp.Models
+
+@namespace ManaApp.Components.Workflow
+
+<div class="tt-row" @onclick="HandleClick">
+
+    @if (Item.Part != null)
+    {
+        <span>@Item.Part.TopPartName</span>
+    }
+    else if (Item.GraphNode != null)
+    {
+        <span>@Item.GraphNode.Node.Name</span>
+    }
+
+</div>
+
+@if (Item.Children.Any())
+{
+    <div class="tt-children">
+        @foreach (var child in Item.Children)
+        {
+            <TechnologyExplorerNode
+                Item="child"
+                OnNodeClick="OnNodeClick" />
+        }
+    </div>
+}
+
+@code
+{
+    [Parameter]
+    public required TechnologyExplorerItem Item { get; set; }
+
+    [Parameter]
+    public EventCallback<TechnologyExplorerItem> OnNodeClick { get; set; }
+
+    private async Task HandleClick()
+        {
+            await OnNodeClick.InvokeAsync(Item);
+        }
+
+}

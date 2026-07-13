@@ -1,0 +1,171 @@
+.workflow-node {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+}
+
+.workflow-part-row {
+    position: relative;
+
+    display: flex;
+    align-items: center;
+
+    min-height: 46px;
+    margin-bottom: 12px;
+
+    padding-left: var(--node-offset);
+    padding-right: 54px;
+
+    box-sizing: border-box;
+}
+
+/* Part nosaukums */
+
+.workflow-part-name {
+    position: relative;
+    z-index: 2;
+
+    box-sizing: border-box;
+
+    height: 46px;
+    flex:1;
+    min-width:0;
+
+    display: flex;
+    align-items: center;
+
+    padding: 0 14px;
+
+    border: 1px solid #b8b8b8;
+    background: #ffffff;
+
+    color: #111111;
+    font-size: 17px;
+    font-weight: 600;
+
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Sub-part ir īsāks par Top part */
+
+.workflow-child .workflow-part-name {
+    flex:0 1 200px;
+    height: 42px;
+
+    font-size: 16px;
+}
+
+/* Qty vienmēr atrodas vienā kolonnā */
+
+.workflow-part-qty {
+    position: absolute;
+    z-index: 2;
+
+    top: 50%;
+    right: 0;
+
+    width: 48px;
+    height: 46px;
+
+    transform: translateY(-50%);
+
+    box-sizing: border-box;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border: 1px solid #b8b8b8;
+    background: #ffffff;
+
+    color: #111111;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.workflow-child .workflow-part-qty {
+    height: 42px;
+    font-size: 17px;
+}
+
+/* Bērnu grupa */
+
+.workflow-children {
+    position: relative;
+}
+
+/* Katrs tiešais bērns veido savu savienojuma zaru */
+
+.workflow-child-branch {
+    position: relative;
+}
+
+/* Vertikālā līnija no vecāka uz bērniem */
+
+.workflow-child-branch::before {
+    content: "";
+
+    position: absolute;
+    z-index: 1;
+
+    left: var(--branch-x);
+    top: -12px;
+
+    width: 0;
+    height: calc(100% + 12px);
+
+    border-left: 2px solid #4a9bea;
+
+    pointer-events: none;
+}
+
+/* Pēdējam bērnam vertikālā līnija beidzas pie tā centra */
+
+.workflow-child-branch:last-child::before {
+    height: 35px;
+}
+
+/* Horizontālā līnija uz konkrēto bērnu */
+
+.workflow-connector {
+    position: absolute;
+    z-index: 1;
+
+    left: var(--parent-offset);
+    top: 50%;
+
+    width: 38px;
+    height: 0;
+
+    border-top: 2px solid #4a9bea;
+
+    transform: translateY(-1px);
+
+    pointer-events: none;
+}
+
+/* Neliela bultiņa līnijas galā */
+
+.workflow-connector::after {
+    content: "";
+
+    position: absolute;
+
+    right: -1px;
+    top: -5px;
+
+    width: 0;
+    height: 0;
+
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-left: 8px solid #4a9bea;
+}
+
+/* Atstarpes starp atsevišķiem root Top part kokiem */
+
+.workflow-root {
+    margin-bottom: 4px;
+}

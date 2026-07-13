@@ -9,4 +9,5 @@ public class WorkflowPartDto
     public int QtyPerProduct { get; set; } = 1;
     public int Stage { get; set; }
     public int? ParentProductTopPartId { get; set; }
+    public int? AttachToNodeId { get; set; }
 }

@@ -79,6 +79,9 @@
     [Parameter]
     public int? ParentProductTopPartId { get; set; }
 
+    [Parameter]
+    public int? AttachToNodeId { get; set; }
+
     private List<WorkflowTopPartSelectDto> topParts = new();
 
     private async Task Close()
@@ -100,7 +103,8 @@
             {
                 var ok = await WorkflowEditor.AddTopPartAsync(
                     part.TopPartId,
-                    ParentProductTopPartId);
+                    ParentProductTopPartId,
+                    AttachToNodeId);
 
                 if (!ok)
                     return;

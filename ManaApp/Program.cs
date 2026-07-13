@@ -37,6 +37,7 @@ builder.Services.AddScoped<WorkflowApiService>();
 builder.Services.AddScoped<WorkflowStateService>();
 builder.Services.AddScoped<WorkflowEditorService>();
 builder.Services.AddScoped<TechnologyEditorService>();
+builder.Services.AddScoped<TechnologyTreeBuilder>();
 
 var culture = new System.Globalization.CultureInfo("lv-LV");
 System.Globalization.CultureInfo.DefaultThreadCurrentCulture = culture;

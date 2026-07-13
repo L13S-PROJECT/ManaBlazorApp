@@ -54,39 +54,13 @@ public class WorkflowApiService
             return graph;
         }
 
-        public bool TrySelectNode(
-            Dictionary<int, WorkflowGraphNode> graph,
-            int nodeId,
-            out WorkflowGraphNode? node)
-        {
-            return graph.TryGetValue(nodeId, out node);
-        }
+        
 
         public async Task<List<MergeFinishItemDto>?> LoadFinishNodesAsync(int workflowId)
         {
             return await _http.GetFromJsonAsync<List<MergeFinishItemDto>>(
                 $"http://localhost:5270/api/workflow/finish/{workflowId}");
         }
-
-        public List<MergeFinishItem> CreateFinishItems(List<MergeFinishItemDto>? items)
-            {
-                var result = new List<MergeFinishItem>();
-
-                if (items == null)
-                    return result;
-
-                foreach (var item in items)
-                {
-                    result.Add(new MergeFinishItem
-                    {
-                        Id = item.Id,
-                        Name = item.Name ?? "",
-                        Selected = false
-                    });
-                }
-
-                return result;
-            }
         
         public async Task<WorkflowState?> LoadStateAsync(int versionId)
             {
@@ -172,7 +146,8 @@ public class WorkflowApiService
         public async Task<HttpResponseMessage> AddTopPartAsync(
             int versionId,
             int topPartId,
-            int? parentProductTopPartId)
+            int? parentProductTopPartId,
+            int? attachToNodeId)
         {
             return await _http.PostAsJsonAsync(
                 "http://localhost:5270/api/workflow/toppart",
@@ -180,8 +155,67 @@ public class WorkflowApiService
                 {
                     VersionId = versionId,
                     TopPartId = topPartId,
-                    ParentProductTopPartId = parentProductTopPartId
+                    ParentProductTopPartId = parentProductTopPartId,
+                    AttachToNodeId = attachToNodeId
                 });
         }
+
+        public async Task<HttpResponseMessage> AddSubPartAsync(
+            int versionId,
+            int topPartId,
+            int parentProductTopPartId,
+            int attachToNodeId)
+        {
+            return await _http.PostAsJsonAsync(
+                "http://localhost:5270/api/workflow/subpart",
+                new
+                {
+                    VersionId = versionId,
+                    TopPartId = topPartId,
+                    ParentProductTopPartId = parentProductTopPartId,
+                    AttachToNodeId = attachToNodeId
+                });
+        }
+
+        public async Task<HttpResponseMessage> AddProcessAsync(
+                int workflowId,
+                int previousNodeId,
+                string processName)
+            {
+                return await _http.PostAsJsonAsync(
+                    "http://localhost:5270/api/workflow/process",
+                    new
+                    {
+                        WorkflowId = workflowId,
+                        PreviousNodeId = previousNodeId,
+                        ProcessName = processName
+                    });
+            }
+
+        public async Task<HttpResponseMessage> AddMergeAsync(
+                int workflowId,
+                int activeFinishNodeId,
+                List<int> finishNodeIds)
+            {
+                return await _http.PostAsJsonAsync(
+                    "http://localhost:5270/api/workflow/merge",
+                    new
+                    {
+                        WorkflowId = workflowId,
+                        ActiveFinishNodeId = activeFinishNodeId,
+                        FinishNodeIds = finishNodeIds
+                    });
+            }
+
+        public async Task<HttpResponseMessage> CreateWorkflowAsync(int versionId)
+            {
+                return await _http.PostAsJsonAsync(
+                    "http://localhost:5270/api/workflow",
+                    new
+                    {
+                        VersionId = versionId,
+                        WorkflowName = "Workflow"
+                    });
+            }
 
 }

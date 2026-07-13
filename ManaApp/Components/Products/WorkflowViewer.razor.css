@@ -106,10 +106,16 @@
 
     display:flex;
     flex-direction:column;
-    align-items:center;
-    justify-content:flex-start;
+
+    align-items:flex-start;
 
     overflow:auto;
+
+    width:100%;
+}
+
+.workflow-node{
+    width:100%;
 }
 
 .workflow-top-part{
@@ -151,3 +157,16 @@
     color:#111827;
 }
 
+
+
+.workflow-top-parts {
+    flex: 1;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+
+    width: 100%;
+    overflow: auto;
+}

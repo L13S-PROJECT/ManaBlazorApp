@@ -1,0 +1,62 @@
+@using ManaApp.Models
+
+@namespace ManaApp.Components.Workflow
+
+<div class="workflow-node @(Depth == 0 ? "workflow-root" : "workflow-child")"
+     style="@($"--node-offset:{Depth * 38}px; --parent-offset:{Math.Max(Depth - 1, 0) * 38}px;")">
+
+    <div class="workflow-part-row">
+
+        @if (Depth > 0)
+        {
+            <div class="workflow-connector"></div>
+        }
+
+        <div class="workflow-part-name">
+            @Part.TopPartName
+        </div>
+
+        <div class="workflow-part-qty">
+            @Part.QtyPerProduct
+        </div>
+
+    </div>
+
+    @if (Children.Any())
+    {
+        <div class="workflow-children">
+
+            @foreach (var child in Children)
+            {
+                <div class="workflow-child-branch"
+                     style="@($"--branch-x:{Depth * 38}px;")">
+
+                    <WorkflowPartTree
+                        Part="child"
+                        Parts="Parts"
+                        Depth="@(Depth + 1)" />
+
+                </div>
+            }
+
+        </div>
+    }
+
+</div>
+
+@code
+{
+    [Parameter]
+    public WorkflowPartModel Part { get; set; } = default!;
+
+    [Parameter]
+    public List<WorkflowPartModel> Parts { get; set; } = new();
+
+    [Parameter]
+    public int Depth { get; set; }
+
+    private IEnumerable<WorkflowPartModel> Children =>
+        Parts.Where(x =>
+                x.ParentProductTopPartId == Part.ProductToPartId)
+             .OrderBy(x => x.TopPartName);
+}

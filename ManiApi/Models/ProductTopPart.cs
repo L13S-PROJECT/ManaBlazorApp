@@ -25,5 +25,8 @@ namespace ManiApi.Models
 
         [Column("IsActive")]
         public bool IsActive { get; set; }
+
+        [Column("AttachToNode_ID")]
+        public int? AttachToNodeId { get; set; }
     }
 }

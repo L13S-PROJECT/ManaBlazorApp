@@ -12,5 +12,6 @@ public class WorkflowPartModel
     public int Stage { get; set; }
 
     public int? ParentProductTopPartId { get; set; }
+    public int? AttachToNodeId { get; set; }
     
 }

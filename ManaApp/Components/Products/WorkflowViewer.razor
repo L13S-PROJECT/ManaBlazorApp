@@ -1,8 +1,9 @@
-@using System.Net.Http.Json
+@* Workflow viever razor *@
+
 @using ManaApp.Models
 @using ManaApp.Components.Workflow
-
-@inject HttpClient Http
+@using ManaApp.Services.Workflow
+@inject WorkflowApiService WorkflowApi
 
 @namespace ManaApp.Components.Products
 
@@ -32,12 +33,7 @@ else
             <div class="workflow-actions">
 
                 <button class="btn btn-primary"
-                        @onclick="OpenPartsDialog">
-                    Preces detaļas
-                </button>
-
-                <button class="btn btn-primary"
-                        @onclick="() => isTechnologyEditorOpen = true">
+                        @onclick="OpenTechnologyEditor">
                     Tehnoloģijas redaktors
                 </button>
 
@@ -45,26 +41,13 @@ else
 
     <div class="workflow-top-parts">
 
-        @if (productTopParts.Count == 0)
+        @foreach (var part in productTopParts
+            .Where(x => x.ParentProductTopPartId == null)
+            .OrderBy(x => x.TopPartName))
         {
-            <div>Nav pievienota neviena detaļa.</div>
-        }
-        else
-        {
-            @foreach (var part in productTopParts.OrderBy(x => x.Stage).ThenBy(x => x.TopPartName))
-            {
-                <div class="workflow-top-part">
-
-                    <div class="workflow-top-part-name">
-                        @part.TopPartName
-                    </div>
-
-                    <div class="workflow-top-part-qty">
-                        @part.QtyPerProduct
-                    </div>
-
-                </div>
-            }
+            <WorkflowPartTree
+                Part="part"
+                Parts="productTopParts" />
         }
 
     </div>
@@ -77,11 +60,6 @@ else
 </div>
 
 
-<WorkflowPartsDialog
-    VersionId="VersionId"
-    Visible="isPartsDialogOpen"
-    VisibleChanged="OnPartsDialogClosed" />
-
 <TechnologyEditor
     VersionId="VersionId"
     Visible="isTechnologyEditorOpen"
@@ -91,329 +69,58 @@ else
 {
     [Parameter]
     public int? VersionId { get; set; }
-
-    private WorkflowDto? workflow;
-    private bool loading;
-    private Dictionary<int, WorkflowGraphNode> graph = new();
-    private WorkflowGraphNode? selectedNode;
-    private bool isAddPartOpen = false;
-    private bool isPartsDialogOpen = false;
-
+    private bool loading;    
     private List<WorkflowPartModel> productTopParts = new();
 
-    private WorkflowPartModel? selectedTopPart;
     private bool isTechnologyEditorOpen = false;
+
+    private async Task OpenTechnologyEditor()
+        {
+            if (VersionId is null)
+                return;
+
+            var response = await WorkflowApi.CreateWorkflowAsync(
+                 VersionId.Value);
+
+            if (!response.IsSuccessStatusCode)
+                return;
+
+            isTechnologyEditorOpen = true;
+        }
 
     protected override async Task OnParametersSetAsync()
         {
+           
             if (VersionId is null || VersionId <= 0)
             {
-                workflow = null;
+                productTopParts.Clear();
                 return;
             }
 
             loading = true;
+
             await LoadProductTopPartsAsync();
-            try
-                {
-                    workflow = await Http.GetFromJsonAsync<WorkflowDto>(
-                        $"http://localhost:5270/api/workflow/{VersionId}");
-                                        
-                    var selectedNodeId = selectedNode?.Node.Id;
-
-                    BuildGraph();
-
-                    if (selectedNodeId.HasValue &&
-                        graph.TryGetValue(selectedNodeId.Value, out var node))
-                    {
-                        selectedNode = node;
-                    }
-                    else
-                    {
-                        selectedNode = null;
-                    }
-
-                }
-
-            catch
-                {
-                    workflow = null;
-                    BuildGraph();
-                    selectedNode = null;
-                }
-
-            finally
-            {
-                loading = false;
-            }
+            loading = false;
         }
-    
-
-    private void BuildGraph()
+          
+        
+    private async Task OnTechnologyEditorClosed(bool visible)
             {
-                graph.Clear();
+                isTechnologyEditorOpen = visible;
 
-                if (workflow is null)
-                    return;
-
-                // izveido visus mezglus
-                foreach (var node in workflow.Nodes)
+                if (!visible && VersionId.HasValue)
                 {
-                    graph[node.Id] = new WorkflowGraphNode
-                    {
-                        Node = node
-                    };
+                    await OnParametersSetAsync();
                 }
-
-                // savieno mezglus
-                foreach (var connection in workflow.Connections)
-                {
-                    if (!graph.TryGetValue(connection.FromNodeId, out var from))
-                        continue;
-
-                    if (!graph.TryGetValue(connection.ToNodeId, out var to))
-                        continue;
-
-                    from.Next.Add(to);
-                    to.Previous.Add(from);
-                }
-            }
-
-        private async Task CreateWorkflowAsync()
-            {
-                if (VersionId is null)
-                    return;
-
-                var response = await Http.PostAsJsonAsync(
-                    "http://localhost:5270/api/workflow",
-                    new
-                    {
-                        VersionId = VersionId,
-                        WorkflowName = "Workflow"
-                    });
-
-                if (!response.IsSuccessStatusCode)
-                    return;
-
-                await OnParametersSetAsync();
             }
         
-        private async Task OpenAddPartDialog()
-            {
-                if (workflow?.Workflow == null)
-                    return;
-
-                isAddPartOpen = true;
-            }
-        
-
-    private void ClosePartsDialog()
-        {
-            isPartsDialogOpen = false;
-        }
-    
-    private async Task OpenPartsDialog()
-        {
-            isPartsDialogOpen = true;
-        }
-    
-    private Task OnTechnologyEditorClosed(bool visible)
-        {
-            isTechnologyEditorOpen = visible;
-            return Task.CompletedTask;
-        }
-
-    private async Task OnPartsDialogClosed(bool visible)
-        {
-            isPartsDialogOpen = visible;
-
-            if (!visible && VersionId.HasValue)
-                {
-                    await LoadProductTopPartsAsync();
-
-                    StateHasChanged();
-                }
-        }
-
-    private async Task OnAddPartDialogClosed(bool visible)
-        {
-            isAddPartOpen = visible;
-
-            if (!visible)
-                await OnParametersSetAsync();
-        }
-    
     private async Task LoadProductTopPartsAsync()
-        {
-            if (!VersionId.HasValue)
-                return;
-
-            productTopParts = await Http.GetFromJsonAsync<List<WorkflowPartModel>>(
-                $"http://localhost:5270/api/workflow/parts/{VersionId}")
-                ?? new();
-        }
-   
-    private bool isAddProcessOpen = false;
-
-    private Task OpenAddProcessDialog()
-    {
-        isAddProcessOpen = true;
-        return Task.CompletedTask;
-    }
-
-    private async Task OnAddProcessDialogClosed(bool visible)
-    {
-        isAddProcessOpen = visible;
-
-        if (!visible)
-            await OnParametersSetAsync();
-    }
-
-    private bool isAddFinishOpen = false;
-
-    private Task OpenAddFinishDialog()
-    {
-        isAddFinishOpen = true;
-        return Task.CompletedTask;
-    }
-
-    private async Task OnAddFinishDialogClosed(bool visible)
-    {
-        isAddFinishOpen = visible;
-
-        if (!visible)
-            await OnParametersSetAsync();
-    }
-
-    private string NodeTypeName(int type)
-        {
-            return type switch
             {
-                1 => "PART",
-                2 => "PROCESS",
-                3 => "MERGE",
-                4 => "FINISH",
-                _ => "?"
-            };
-        }
-
-    private bool isAddMergeOpen = false;
-
-    private Task OpenAddMergeDialog()
-    {
-        isAddMergeOpen = true;
-        return Task.CompletedTask;
-    }
-
-   private async Task OnAddMergeDialogClosed(bool visible)
-        {
-            isAddMergeOpen = visible;
-
-            if (!visible)
-            {
-                await OnParametersSetAsync();
-
-                if (createdMergeNodeId.HasValue &&
-                    graph.TryGetValue(createdMergeNodeId.Value, out var mergeNode))
-                {
-                    selectedNode = mergeNode;
-
-                    await LoadAvailableFinishNodesAsync();
-
-                    createdMergeNodeId = null;
-                }
-            }
-        }
-
-    private List<MergeFinishItem> availableFinishNodes = new();
-
-    private class MergeFinishItem
-    {
-        public int Id { get; set; }
-
-        public string Name { get; set; } = "";
-
-        public bool Selected { get; set; }
-    }
-
-    private class MergeFinishItemDto
-        {
-            public int Id { get; set; }
-
-            public string? Name { get; set; }
-        }
-    
-    private class CreateWorkflowConnectionRequest
-        {
-                        public int FromNodeId { get; set; }
-
-            public int ToNodeId { get; set; }
-        }
-
-    private async Task SaveMergeConnectionsAsync()
-        {
-            if (selectedNode == null)
-                return;
-
-            foreach (var finish in availableFinishNodes.Where(x => x.Selected))
-            {
-                var response = await Http.PostAsJsonAsync(
-                    "http://localhost:5270/api/workflow/connect",
-                    new CreateWorkflowConnectionRequest
-                    {
-                        FromNodeId = finish.Id,
-                        ToNodeId = selectedNode.Node.Id
-                    });
-
-                if (!response.IsSuccessStatusCode)
+                if (!VersionId.HasValue)
                     return;
+
+                productTopParts =
+                    await WorkflowApi.LoadProductPartsAsync(VersionId.Value);
             }
-
-            await OnParametersSetAsync();
-        }
-    
-    private async Task LoadAvailableFinishNodesAsync()
-        {
-            if (workflow?.Workflow == null)
-                return;
-
-            var items = await Http.GetFromJsonAsync<List<MergeFinishItemDto>>(
-                $"http://localhost:5270/api/workflow/finish/{workflow.Workflow.Id}");
-
-            availableFinishNodes.Clear();
-
-            if (items == null)
-                return;
-
-            foreach (var item in items)
-            {
-                availableFinishNodes.Add(new MergeFinishItem
-                {
-                    Id = item.Id,
-                    Name = item.Name ?? "",
-                    Selected = false
-                });
-            }
-        }
-
-        private async Task SelectNode(int nodeId)
-        {
-            selectedNode = graph[nodeId];
-
-            availableFinishNodes.Clear();
-
-            if (selectedNode.Node.NodeType == 3)
-            {
-                await LoadAvailableFinishNodesAsync();
-            }
-        }
-
-        private int? createdMergeNodeId;
-
-        private Task OnMergeCreated(int nodeId)
-        {
-            createdMergeNodeId = nodeId;
-            return Task.CompletedTask;
-        }
-
+   
 }

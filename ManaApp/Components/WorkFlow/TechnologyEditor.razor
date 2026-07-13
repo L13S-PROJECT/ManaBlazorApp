@@ -1,5 +1,5 @@
 
-@* Technology Editor *@
+@* Technology Editor.razor *@
 
 
 @using ManaApp.Services.Workflow
@@ -143,67 +143,24 @@
                        
                       @foreach (var item in WorkflowEditor.State.TechnologyTree)
                             {
-                                <TechnologyTreeNode
+                                <TechnologyTreeNodeV2
                                     Item="item"
                                     Level="0"
                                     OnNodeClick="SelectNode" />
-                            }
-                        
-                    
-                    @* @foreach (var node in WorkflowEditor.Workflow!.Nodes.OrderBy(x => x.SortOrder))
+                            }   
+
+                    @if (WorkflowEditor.State.TechnologyExplorer.Any())
                         {
-                            <div class="tree-node"
-                                @onclick="() => SelectNode(node.Id)">
+                            <hr />
 
-                                <div class="tree-node-left">
-
-                                    <span class="tree-node-icon node-type-@node.NodeType">
-
-                                        @switch (node.NodeType)
-                                        {
-                                            case 1:
-                                                <i class="bi bi-box"></i>
-                                                break;
-
-                                            case 2:
-                                                <i class="bi bi-gear"></i>
-                                                break;
-
-                                            case 3:
-                                                <i class="bi bi-diagram-3"></i>
-                                                break;
-
-                                            case 4:
-                                                <i class="bi bi-flag"></i>
-                                                break;
-                                        }
-
-                                    </span>
-
-                                    <span class="tree-node-type node-type-@node.NodeType">
-                                        @WorkflowEditor.NodeTypeName(node.NodeType)
-                                    </span>
-
-                                    <span class="tree-node-name">
-                                        @node.Name
-                                    </span>
-
-                                </div>
-
-                                <div class="tree-node-right">
-
-                                    <span class="tree-badge node-type-@node.NodeType">
-                                        @WorkflowEditor.NodeTypeName(node.NodeType)
-                                    </span>
-
-                                    <button class="tree-menu-btn">
-                                        <i class="bi bi-three-dots-vertical"></i>
-                                    </button>
-
-                                </div>
-
-                            </div>
-                        } *@
+                            @foreach (var item in WorkflowEditor.State.TechnologyExplorer)
+                            {
+                                <TechnologyExplorerNode
+                                    Item="item"
+                                    OnNodeClick="OnExplorerNodeClick" />
+                            }
+                        }                     
+        
                 }
 
             </div>
@@ -244,6 +201,7 @@
                 }
 
             </div>
+            
 
             <div class="selected-title">
 
@@ -425,7 +383,8 @@
     VersionId="VersionId ?? 0"
     Visible="isAddTopPartOpen"
     VisibleChanged="OnAddTopPartDialogClosed"
-    ParentProductTopPartId="WorkflowEditor.SelectedPart?.ProductToPartId" />
+    ParentProductTopPartId="WorkflowEditor.SelectedPart?.ProductToPartId"
+    AttachToNodeId="WorkflowEditor.SelectedNode?.Node.Id" />
 
 
 @code
@@ -532,6 +491,11 @@ Console.WriteLine($"AddProcess = {result}");
                         StateHasChanged();
 
                     }
+            }
+        
+        private Task OnExplorerNodeClick(TechnologyExplorerItem item)
+            {
+                return Task.CompletedTask;
             }
 
 
