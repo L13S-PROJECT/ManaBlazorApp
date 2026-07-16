@@ -1,12 +1,10 @@
+@* CommonEditor.razor *@
+
 @using ManaApp.Services.Workflow
 
 @namespace ManaApp.Components.Workflow.Editors
 
 <section class="property-section">
-
-    <div class="section-title">
-        Pamatinformācija
-    </div>
 
     <div class="form-grid">
 
@@ -20,8 +18,10 @@
 
         <label>Nosaukums:</label>
 
-        <input class="form-control"
-               value="@WorkflowEditor.SelectedNode?.Node.Name" />
+        <input class="form-control @(WorkflowEditor.SelectedProcessHasValidationError && string.IsNullOrWhiteSpace(NodeName) ? "is-invalid" : "")"
+            @bind="NodeName"
+            @bind:event="oninput"
+            @onblur="SaveProcess" />
 
         <label>Statuss:</label>
 
@@ -32,7 +32,11 @@
         <label>Apraksts:</label>
 
         <textarea class="form-control"
-                  rows="3"></textarea>
+                rows="4"
+                @bind="Comments"
+                @bind:event="oninput"
+                @onblur="SaveComments">
+        </textarea>
 
     </div>
 
@@ -42,4 +46,35 @@
 {
     [Parameter]
     public WorkflowEditorService WorkflowEditor { get; set; } = default!;
+
+    private string? Comments
+        {
+            get => WorkflowEditor.SelectedNode?.Node.Comments;
+            set
+            {
+                if (WorkflowEditor.SelectedNode?.Node != null)
+                    WorkflowEditor.SelectedNode.Node.Comments = value;
+            }
+        }
+
+       private async Task SaveComments()
+            {
+                await WorkflowEditor.SaveNodeCommentsAsync();
+            }
+
+    private string? NodeName
+        {
+            get => WorkflowEditor.SelectedNode?.Node.Name;
+            set
+            {
+                if (WorkflowEditor.SelectedNode?.Node != null)
+                   WorkflowEditor.SelectedNode.Node.Name = value ?? "";
+            }
+        }
+
+    private async Task SaveProcess()
+        {
+            await WorkflowEditor.SaveProcessAsync();
+        }
+
 }

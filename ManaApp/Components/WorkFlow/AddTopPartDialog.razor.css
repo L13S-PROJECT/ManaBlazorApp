@@ -37,3 +37,9 @@
     cursor: pointer;
     font-size: 20px;
 }
+
+.top-part-row input:disabled + span {
+    color: #6c757d;
+    opacity: .7;
+    cursor: not-allowed;
+}

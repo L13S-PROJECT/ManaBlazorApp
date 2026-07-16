@@ -64,6 +64,7 @@ builder.Services.AddScoped<InlineParentFinishingService>();
 builder.Services.AddScoped<InlineParentAssemblyService>();
 builder.Services.AddScoped<WorkflowValidator>();
 
+
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>

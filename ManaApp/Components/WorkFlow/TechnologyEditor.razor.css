@@ -13,7 +13,7 @@
 
 .technology-editor-window{
 
-    width:95vw;
+    width:85vw;
     height:95vh;
 
     background:white;
@@ -56,7 +56,7 @@
 }
 
 .technology-tree{
-    width:420px;
+    flex:4;
 
     display:flex;
     flex-direction:column;
@@ -70,7 +70,8 @@
 }
 
 .technology-properties{
-    flex:1;
+    flex:3;
+    min-width:0;
     overflow:auto;
 }
 
@@ -147,7 +148,8 @@
 
     padding:6px;
 
-    overflow:hidden;
+    overflow-y:auto;
+    overflow-x:auto;
 
     background:#fff;
 }
@@ -164,6 +166,7 @@
 
 .selected-element{
     flex:0 0 auto;
+    min-height:480px;
 }
 
 .element-information{
@@ -233,6 +236,19 @@
 
 .toolbar-btn:hover{
     background:#f7f9fc;
+}
+
+.toolbar-btn:disabled{
+    opacity:.45;
+    cursor:not-allowed;
+
+    background:#f3f4f6;
+    color:#9ca3af !important;
+    border-color:#d1d5db;
+}
+
+.toolbar-btn:disabled:hover{
+    background:#f3f4f6;
 }
 
 .toolbar-btn.top-part{
@@ -482,6 +498,27 @@
     align-items:flex-start;
     gap:14px;
     margin-bottom:22px;
+    position:relative;
+}
+
+.btn-delete-node{
+
+    margin-left:8px;
+
+    width:28px;
+    height:28px;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    padding:0;
+
+    flex:0 0 28px;
+}
+
+.btn-delete-node i{
+    font-size:14px;
 }
 
 .selected-icon{
@@ -590,8 +627,8 @@
 
 .editor-content{
     display:grid;
-    grid-template-columns:420px 1fr;
-    gap:24px;
+    grid-template-columns:300px 1fr;
+    gap:20px;
 
     align-items:start;
 }

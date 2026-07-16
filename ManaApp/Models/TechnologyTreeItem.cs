@@ -28,4 +28,8 @@ public class TechnologyTreeItem
     public int Level { get; set; }
     public TechnologyTreeItem? Parent { get; set; }
 
+    public bool IsFlowChild { get; set; }
+
+    public bool IsHierarchyChild { get; set; }
+
 }

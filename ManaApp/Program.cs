@@ -6,6 +6,7 @@ using ManaApp;
 using ManaApp.Services;
 using ManaApp.Services.Planning;
 using ManaApp.Services.Workflow;
+using ManaApp.Services.Common;
 
 
 
@@ -38,6 +39,9 @@ builder.Services.AddScoped<WorkflowStateService>();
 builder.Services.AddScoped<WorkflowEditorService>();
 builder.Services.AddScoped<TechnologyEditorService>();
 builder.Services.AddScoped<TechnologyTreeBuilder>();
+builder.Services.AddScoped<TechnologyStructureBuilder>();
+
+builder.Services.AddScoped<LookupService>();
 
 var culture = new System.Globalization.CultureInfo("lv-LV");
 System.Globalization.CultureInfo.DefaultThreadCurrentCulture = culture;

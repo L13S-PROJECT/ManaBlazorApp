@@ -11,7 +11,7 @@
      style="--level:@Level;">
 
     <div class="tt-row @((Item.IsSelected ? "selected" : ""))"
-        style="padding-left: calc(var(--level) * 24px);"
+        style="padding-left:@(Item.IsFlowChild ? "0px" : $"calc(var(--level) * 24px)")"
         @onclick="HandleClick">
 
         <div class="tt-expand">
@@ -124,8 +124,8 @@
     @if (IsExpanded && (Item.PartChildren.Any() || Item.NodeChildren.Any()))
         {
             <div class="tt-children">
-
-                @foreach (var child in Item.NodeChildren)
+                
+                @foreach (var child in Item.PartChildren)
                     {
                         <TechnologyTreeNodeV2
                             Item="child"
@@ -133,7 +133,8 @@
                             OnNodeClick="OnNodeClick" />
                     }
 
-                @foreach (var child in Item.PartChildren)
+                    
+                @foreach (var child in Item.NodeChildren)
                     {
                         <TechnologyTreeNodeV2
                             Item="child"

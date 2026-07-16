@@ -1,0 +1,93 @@
+
+@* TechnologyStructureNode.razor *@
+
+@using ManaApp.ViewModels.Workflow
+
+@namespace ManaApp.Components.Workflow
+
+
+<div class="ts-node @(Item.Part != null ? "part-node" : "flow-node")"
+     style="margin-left:@(Item.Part != null ? Item.FlowLevel * 18 : 0)px">
+
+    <div class="ts-row
+        @(Item.HasValidationError ? "validation-error" : "")
+        @(Item.IsSelected ? "selected" : "")"
+        @onclick="HandleClick">
+
+    <div class="ts-left">
+
+        @if (Item.Part != null)
+        {
+            <i class="bi bi-box"></i>
+            <span class="ts-type">
+                @(Item.Part.ParentProductTopPartId == null ? "TOP PART" : "SUB PART")
+            </span>
+        }
+        else if (Item.Node != null)
+        {
+            @switch (Item.Node.NodeType)
+            {
+                case 2:
+                    <i class="bi bi-gear"></i>
+                    <span class="ts-type">PROCESS</span>
+                    break;
+
+                case 3:
+                    <i class="bi bi-diagram-3"></i>
+                    <span class="ts-type">MERGE</span>
+                    break;
+
+                case 4:
+                    <i class="bi bi-flag"></i>
+                    <span class="ts-type">FINISH</span>
+                    break;
+            }
+        }
+
+    </div>
+
+    <div class="ts-right">
+
+        @if (Item.Part != null)
+        {
+            <span>@Item.Part.TopPartName</span>
+        }
+        else if (Item.Node != null)
+        {
+            <span>@Item.Node.Name</span>
+        }
+
+    </div>
+
+    </div>
+
+   @if (Item.Children.Any())
+    {
+        <div class="ts-children">
+
+            @foreach (var child in Item.Children)
+            {
+                <TechnologyStructureNode
+                    Item="child"
+                    OnNodeClick="OnNodeClick" />
+            }
+
+        </div>
+    }
+
+</div>
+
+
+@code
+{
+    [Parameter]
+    public required TechnologyStructureItem Item { get; set; }
+
+    [Parameter]
+    public EventCallback<TechnologyStructureItem> OnNodeClick { get; set; }
+
+    private async Task HandleClick()
+    {
+        await OnNodeClick.InvokeAsync(Item);
+    }
+}

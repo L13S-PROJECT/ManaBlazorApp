@@ -32,9 +32,13 @@ public class WorkflowNodeModel
 
     public int? ProductToPartId { get; set; }
 
+    public int? EstimatedMinutes { get; set; }
+
     public int? WorkCenterId { get; set; }
 
     public int SortOrder { get; set; }
+    public string? Comments { get; set; }
+    
 }
 
 public class WorkflowConnectionModel

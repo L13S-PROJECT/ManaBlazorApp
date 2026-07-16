@@ -56,15 +56,16 @@ public class WorkflowValidator
                 x.IsActive)
             .ToListAsync();
         
+        var analyzer = new WorkflowFlowAnalyzer(
+            nodes,
+            connections,
+            productParts);
         
+        var productFinishNode = analyzer.GetProductFinishNode();
         
         var finishNodes = nodes
             .Where(x => x.NodeType == 4)
             .ToList();
-
-        var productFinishNode = FindProductFinish(
-            nodes,
-            connections);
 
         if (productFinishNode == null)
         {
@@ -79,12 +80,14 @@ public class WorkflowValidator
             .ToList();
 
         ValidateTopPartSubParts(
+            analyzer,
             productParts,
             nodes,
             connections,
             result);
         
         ValidatePartFlows(
+            analyzer,
             partNodes,
             nodes,
             connections,
@@ -94,11 +97,12 @@ public class WorkflowValidator
             .Where(x => x.NodeType == 3)
             .ToList();
         
-        // ValidateMergeNodes(
-        //     mergeNodes,
-        //     nodes,
-        //     connections,
-        //     result);
+        ValidateMergeNodes(
+            analyzer,
+            mergeNodes,
+            nodes,
+            connections,
+            result);
 
         result.IsValid = result.Errors.Count == 0;
         return result;
@@ -147,6 +151,7 @@ public class WorkflowValidator
     // }
 
     private static void ValidateMergeNodes(
+            WorkflowFlowAnalyzer analyzer,
             List<WorkflowNode> mergeNodes,
             List<WorkflowNode> nodes,
             List<WorkflowNodeConnection> connections,
@@ -154,7 +159,7 @@ public class WorkflowValidator
         {
             foreach (var merge in mergeNodes)
             {
-                var previousNodes = GetPreviousNodeIds(merge.Id, connections);
+                var previousNodes = analyzer.GetPreviousNodeIds(merge.Id);
 
                 if (previousNodes.Count < 2)
                 {
@@ -167,7 +172,7 @@ public class WorkflowValidator
 
                 foreach (var previousNodeId in previousNodes)
                 {
-                    if (!IsFinishNode(previousNodeId, nodes))
+                   if (!analyzer.IsFinishNode(previousNodeId))
                     {
                         result.Errors.Add(new WorkflowValidationErrorDto
                         {
@@ -179,7 +184,7 @@ public class WorkflowValidator
                     }
                 }
 
-                var nextNodes = GetNextNodeIds(merge.Id, connections);
+                var nextNodes = analyzer.GetNextNodeIds(merge.Id);
 
                 if (nextNodes.Count != 1)
                 {
@@ -189,18 +194,33 @@ public class WorkflowValidator
                         Message = "MERGE mezglam jābūt tieši vienai izejai."
                     });
                 }
+
+                if (nextNodes.Count == 1)
+                    {
+                        var nextNode = analyzer.GetNode(nextNodes[0])!;
+
+                        if (analyzer.IsFinishNode(nextNode.Id))
+                        {
+                            result.Errors.Add(new WorkflowValidationErrorDto
+                            {
+                                NodeId = merge.Id,
+                                Message = "Pēc MERGE jāseko PROCESS vai MERGE. FINISH nedrīkst būt nākamais mezgls."
+                            });
+                        }
+                    }
             }
         }
     
     private static void ValidatePartFlows(
-            List<WorkflowNode> partNodes,
-            List<WorkflowNode> nodes,
-            List<WorkflowNodeConnection> connections,
-            WorkflowValidationResultDto result)
+        WorkflowFlowAnalyzer analyzer,
+        List<WorkflowNode> partNodes,
+        List<WorkflowNode> nodes,
+        List<WorkflowNodeConnection> connections,
+        WorkflowValidationResultDto result)
         {
             foreach (var part in partNodes)
             {
-                if (!CanReachFinish(part.Id, nodes, connections, new HashSet<int>()))
+                if (!analyzer.HasFlowFinish(part.Id))
                 {
                     result.Errors.Add(new WorkflowValidationErrorDto
                     {
@@ -209,11 +229,10 @@ public class WorkflowValidator
                     });
                 }
 
-                if (HasCycle(
-                        part.Id,
-                        connections,
-                        new HashSet<int>(),
-                        new HashSet<int>()))
+                 if (analyzer.HasCycle(
+                    part.Id,
+                    new HashSet<int>(),
+                    new HashSet<int>()))
                 {
                     result.Errors.Add(new WorkflowValidationErrorDto
                     {
@@ -234,83 +253,31 @@ public class WorkflowValidator
             .ToList();
     }
 
-    private static bool CanReachFinish(
-            int nodeId,
-            List<WorkflowNode> nodes,
-            List<WorkflowNodeConnection> connections,
-            HashSet<int> visited)
-        {
-            if (!visited.Add(nodeId))
-                return false;
-
-            var node = nodes.First(x => x.Id == nodeId);
-
-            if (node.NodeType == 4)
-                return true;
-
-            foreach (var nextId in GetNextNodeIds(nodeId, connections))
-            {
-                if (CanReachFinish(nextId, nodes, connections, visited))
-                    return true;
-            }
-
-            return false;
-        }
-
-    private static bool HasCycle(
-        int nodeId,
-        List<WorkflowNodeConnection> connections,
-        HashSet<int> visited,
-        HashSet<int> recursionStack)
-    {
-        if (recursionStack.Contains(nodeId))
-            return true;
-
-        if (!visited.Add(nodeId))
-            return false;
-
-        recursionStack.Add(nodeId);
-
-        foreach (var nextId in GetNextNodeIds(nodeId, connections))
-        {
-            if (HasCycle(nextId, connections, visited, recursionStack))
-                return true;
-        }
-
-        recursionStack.Remove(nodeId);
-
-        return false;
-    }
-
-    private static List<int> GetPreviousNodeIds(
-    int nodeId,
-    List<WorkflowNodeConnection> connections)
-        {
-            return connections
-                .Where(x => x.ToNodeId == nodeId)
-                .Select(x => x.FromNodeId)
-                .ToList();
-        }
-
-    private static bool IsFinishNode(
-        int nodeId,
-        List<WorkflowNode> nodes)
-            {
-                return nodes.Any(x =>
-                    x.Id == nodeId &&
-                    x.NodeType == 4);
-            }
 
     private static void ValidateTopPartSubParts(
-    List<ProductTopPart> productParts,
-    List<WorkflowNode> nodes,
-    List<WorkflowNodeConnection> connections,
-    WorkflowValidationResultDto result)
+            WorkflowFlowAnalyzer analyzer,
+            List<ProductTopPart> productParts,
+            List<WorkflowNode> nodes,
+            List<WorkflowNodeConnection> connections,
+            WorkflowValidationResultDto result)
     {
         
         var topParts = productParts
             .Where(x => x.ParentProductTopPartId == null)
             .ToList();
+        
+        if (topParts.Count < 2)
+            return;
+
+        if (topParts.Count < 2)
+            {
+                result.Errors.Add(new WorkflowValidationErrorDto
+                {
+                    Message = "Workflow nav pabeigts!"
+                });
+
+                return;
+            }
 
         foreach (var topPart in topParts)
             {
@@ -328,12 +295,24 @@ public class WorkflowValidator
                 if (topPartNode == null)
                     continue;
 
-                var topPartFinishNode = FindTopPartFinish(
-                    topPartNode,
-                    nodes,
-                    connections);
-                    
-Console.WriteLine($"TOP PART = {topPartNode.Name}, FINISH = {topPartFinishNode?.Id}");
+                var topPartFinishNode = analyzer.FindTopPartFinish(topPartNode);
+
+                var mergeExists = connections.Any(c =>
+                    c.FromNodeId == topPartFinishNode?.Id &&
+                    nodes.Any(n =>
+                        n.Id == c.ToNodeId &&
+                        n.NodeType == 3));
+
+                if (!mergeExists)
+                {
+                    result.Errors.Add(new WorkflowValidationErrorDto
+                    {
+                        NodeId = topPartNode.Id,
+                        Message = $"TOP PART '{topPartNode.Name}' gala FINISH nav pievienots MERGE."
+                    });
+
+                    continue;
+                } 
 
                 if (topPartFinishNode == null)
                 {
@@ -379,7 +358,18 @@ Console.WriteLine($"TOP PART = {topPartNode.Name}, FINISH = {topPartFinishNode?.
                     {
                         var subFinishNode = nodes.FirstOrDefault(x =>
                             x.NodeType == 4 &&
-                            CanReachNode(subPartNode.Id, x.Id, connections));
+                            analyzer.CanReachNode(subPartNode.Id, x.Id));
+
+                        if (subFinishNode == null)
+                            {
+                                result.Errors.Add(new WorkflowValidationErrorDto
+                                {
+                                    NodeId = subPartNode.Id,
+                                    Message = $"SUB PART '{subPartNode.Name}' nav sasniedzams FINISH."
+                                });
+
+                                continue;
+                            }
 
                         var subMergeNodes = nodes
                             .Where(x =>
@@ -413,10 +403,8 @@ Console.WriteLine($"TOP PART = {topPartNode.Name}, FINISH = {topPartFinishNode?.
 
                         var subMergeNode = subMergeNodes.Single();
 
-                        var parentPartNode = FindParentPartNode(
-                            subMergeNode,
-                            nodes,
-                            connections);
+                        var parentPartNode = analyzer.FindParentPartNode(
+                            subMergeNode);
 
                         if (parentPartNode == null)
                         {
@@ -440,9 +428,9 @@ Console.WriteLine($"TOP PART = {topPartNode.Name}, FINISH = {topPartFinishNode?.
                                 continue;
                             }
 
-                        var nextNodes = GetNextNodeIds(subMergeNode.Id, connections);
+                        var nextNodes = analyzer.GetNextNodeIds(subMergeNode.Id);
 
-                        if (!CanReachNode(subMergeNode.Id, topPartFinishNode.Id, connections))
+                        if (!analyzer.CanReachNode(subMergeNode.Id, topPartFinishNode.Id))
                             {
                                 result.Errors.Add(new WorkflowValidationErrorDto
                                 {
@@ -453,7 +441,7 @@ Console.WriteLine($"TOP PART = {topPartNode.Name}, FINISH = {topPartFinishNode?.
                                 continue;
                             }
                         
-                        if (!CanReachNode(topPartNode.Id, subMergeNode.Id, connections))
+                        if (!analyzer.CanReachNode(topPartNode.Id, subMergeNode.Id))
                             {
                                 result.Errors.Add(new WorkflowValidationErrorDto
                                 {
@@ -474,143 +462,10 @@ Console.WriteLine($"TOP PART = {topPartNode.Name}, FINISH = {topPartFinishNode?.
 
                                 continue;
                             }
-                          
-
-                        if (subFinishNode == null)
-                            {
-                                result.Errors.Add(new WorkflowValidationErrorDto
-                                {
-                                    NodeId = subPartNode.Id,
-                                    Message = $"SUB PART '{subPartNode.Name}' nav sasniedzams FINISH."
-                                });
-
-                                continue;
-                            }
                     }                
             }
     }
 
-    private static bool CanReachNode(
-            int fromNodeId,
-            int targetNodeId,
-            List<WorkflowNodeConnection> connections,
-            HashSet<int>? visited = null)
-        {
-            visited ??= new HashSet<int>();
-
-            if (!visited.Add(fromNodeId))
-                return false;
-
-            if (fromNodeId == targetNodeId)
-                return true;
-
-            foreach (var nextId in GetNextNodeIds(fromNodeId, connections))
-            {
-                if (CanReachNode(nextId, targetNodeId, connections, visited))
-                    return true;
-            }
-
-            return false;
-        }
-
-    private static WorkflowNode? FindParentPartNode(
-        WorkflowNode mergeNode,
-        List<WorkflowNode> nodes,
-        List<WorkflowNodeConnection> connections)
-    {
-        var visited = new HashSet<int>();
-        var queue = new Queue<int>();
-
-        queue.Enqueue(mergeNode.Id);
-
-        while (queue.Count > 0)
-        {
-            var currentId = queue.Dequeue();
-
-            if (!visited.Add(currentId))
-                continue;
-
-            var previousIds = GetPreviousNodeIds(currentId, connections);
-
-            foreach (var previousId in previousIds)
-            {
-                var node = nodes.First(x => x.Id == previousId);
-
-                if (node.NodeType == 1)
-                    return node;
-
-                queue.Enqueue(previousId);
-            }
-        }
-
-        return null;
-    }
-
-        private static bool IsNodeBetween(
-            int startNodeId,
-            int middleNodeId,
-            int endNodeId,
-            List<WorkflowNodeConnection> connections)
-        {
-            return CanReachNode(startNodeId, middleNodeId, connections)
-                && CanReachNode(middleNodeId, endNodeId, connections);
-        }
-
-        private static WorkflowNode? FindTopPartFinish(
-            WorkflowNode topPartNode,
-            List<WorkflowNode> nodes,
-            List<WorkflowNodeConnection> connections)
-        {
-            var visited = new HashSet<int>();
-
-            return FindTopPartFinishRecursive(
-                topPartNode.Id,
-                nodes,
-                connections,
-                visited);
-        }
-
-        private static WorkflowNode? FindTopPartFinishRecursive(
-                int nodeId,
-                List<WorkflowNode> nodes,
-                List<WorkflowNodeConnection> connections,
-                HashSet<int> visited)
-            {
-                if (!visited.Add(nodeId))
-                    return null;
-
-                var currentNode = nodes.First(x => x.Id == nodeId);
-
-                if (currentNode.NodeType == 4)
-                {
-                    var nextNodeIds = GetNextNodeIds(currentNode.Id, connections);
-
-                    if (nextNodeIds.Count == 0)
-                        return currentNode;
-
-                    if (nextNodeIds.All(id =>
-                        nodes.First(x => x.Id == id).NodeType == 3))
-                    {
-                        return currentNode;
-                    }
-                }
-
-
-               foreach (var nextNodeId in GetNextNodeIds(nodeId, connections))
-                {
-                    var finish = FindTopPartFinishRecursive(
-                        nextNodeId,
-                        nodes,
-                        connections,
-                        visited);
-
-                    if (finish != null)
-                        return finish;
-                }
-
-                return null;
-                
-            }
 
         private static WorkflowNode? FindProductFinish(
                 List<WorkflowNode> nodes,

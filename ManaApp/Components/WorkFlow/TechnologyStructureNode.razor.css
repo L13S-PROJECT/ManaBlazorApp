@@ -1,0 +1,71 @@
+/* technologyStrucyureNode.razor.css */
+
+.ts-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.ts-row:hover {
+    background: #f3f8ff;
+}
+
+.ts-row.selected:not(.validation-error) {
+    background: #dbeeff;
+}
+
+.ts-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.ts-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 120px;
+    flex-shrink: 0;
+}
+
+.ts-right {
+    flex: 1;
+}
+
+.ts-type {
+    font-size: 12px;
+    font-weight: 600;
+}
+
+
+.ts-flow {
+    margin-left: 0;
+}
+
+.ts-parts {
+    border-left: 1px solid #d8dee9;
+    padding-left: 12px;
+}
+
+.part-node > .ts-row {
+    margin-top: 10px;
+    padding-top: 6px;
+    border-top: 1px solid #ececec;
+}
+
+.flow-node > .ts-row {
+    margin-top: 2px;
+}
+
+.ts-row.validation-error {
+    border-left: 4px solid #dc3545;
+    background: #f6e7e7;
+}
+
+.ts-row.validation-error.selected {
+    border: 2px solid #dc3545;
+    background: #ffe5e5;
+}

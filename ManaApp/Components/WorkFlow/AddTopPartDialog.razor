@@ -1,3 +1,5 @@
+@* AddTopPartDialog.razor *@
+
 @using ManaApp.Services.Workflow
 @using ManaApp.DTOs.Workflow
 
@@ -13,7 +15,7 @@
 
             <div class="workflow-modal-header">
 
-                <span>Pievienot TOP PART</span>
+                <span>@(IsSubPart ? "Pievienot SUB PART" : "Pievienot TOP PART")</span>
 
                 <button class="workflow-close"
                         @onclick="Close">
@@ -33,11 +35,6 @@
                                 disabled="@part.Disabled" />
 
                             <span>@part.TopPartCode - @part.TopPartName</span>
-
-                            @if (part.Disabled)
-                            {
-                                <span class="already-added">Jau pievienots</span>
-                            }
 
                         </div>
                     }
@@ -82,6 +79,8 @@
     [Parameter]
     public int? AttachToNodeId { get; set; }
 
+    [Parameter]
+    public bool IsSubPart { get; set; }
     private List<WorkflowTopPartSelectDto> topParts = new();
 
     private async Task Close()
@@ -101,10 +100,22 @@
         {
             foreach (var part in topParts.Where(x => x.Selected && !x.Disabled))
             {
-                var ok = await WorkflowEditor.AddTopPartAsync(
-                    part.TopPartId,
-                    ParentProductTopPartId,
-                    AttachToNodeId);
+                bool ok;
+
+                if (IsSubPart)
+                {
+                    ok = await WorkflowEditor.AddSubPartAsync(
+                        part.TopPartId,
+                        ParentProductTopPartId!.Value,
+                        AttachToNodeId!.Value);
+                }
+                else
+                {
+                    ok = await WorkflowEditor.AddTopPartAsync(
+                        part.TopPartId,
+                        ParentProductTopPartId,
+                        AttachToNodeId);
+                }
 
                 if (!ok)
                     return;

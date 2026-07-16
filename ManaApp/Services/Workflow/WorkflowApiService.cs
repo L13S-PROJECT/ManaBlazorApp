@@ -71,7 +71,11 @@ public class WorkflowApiService
                 
                 var productParts = await LoadProductPartsAsync(versionId);
 
+Console.WriteLine($"LoadProductParts = {productParts.Count}");
+
                 var graph = BuildGraph(workflow);
+
+Console.WriteLine($"Graph Nodes = {graph.Count}");
 
                 var partIndex = graph.Values
                     .Where(x => x.Node?.ProductToPartId != null)
@@ -217,5 +221,46 @@ public class WorkflowApiService
                         WorkflowName = "Workflow"
                     });
             }
+
+        public async Task<HttpResponseMessage> SaveNodeCommentsAsync(
+            int nodeId,
+            string? comments)
+        {
+            return await _http.PostAsJsonAsync(
+                "http://localhost:5270/api/workflow/node/comments",
+                new
+                {
+                    NodeId = nodeId,
+                    Comments = comments
+                });
+        }
+
+        public async Task<HttpResponseMessage> SaveQtyPerProductAsync(
+            int productToPartId,
+            int qtyPerProduct)
+        {
+            return await _http.PostAsJsonAsync(
+                "http://localhost:5270/api/workflow/part/qty",
+                new
+                {
+                    ProductToPartId = productToPartId,
+                    QtyPerProduct = qtyPerProduct
+                });
+        }
+
+        public async Task<HttpResponseMessage> SaveProcessAsync(
+            WorkflowNodeModel node)
+        {
+            return await _http.PostAsJsonAsync(
+                "http://localhost:5270/api/workflow/process/save",
+                new
+                {
+                    NodeId = node.Id,
+                    Name = node.Name,
+                    WorkCenterId = node.WorkCenterId,
+                    EstimatedMinutes = node.EstimatedMinutes,
+                    Comments = node.Comments
+                });
+        }
 
 }

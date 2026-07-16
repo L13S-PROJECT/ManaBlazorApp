@@ -4,27 +4,28 @@
 
 <div class="parameter-group">
 
-    <div class="parameter-group-title">
-        Galvenie parametri
-    </div>
-
     <div class="form-grid">
 
         <label>TOP PART:</label>
 
-        <select class="form-select">
-            <option>-- izvēlēties TOP PART --</option>
-        </select>
+        <input class="form-control"
+            readonly
+            value="@WorkflowEditor.GetCurrentTopPartName()" />
+
+        <label>Ražošanas posms:</label>
+
+        <input class="form-control"
+            readonly
+            value="Detail" />
 
         <label>Daudzums:</label>
 
         <input type="number"
-               class="form-control" />
-
-        <label>Piezīmes:</label>
-
-        <textarea class="form-control"
-                  rows="3"></textarea>
+            class="form-control"
+            min="1"
+            @bind="QtyPerProduct"
+            @bind:event="oninput"
+            @onblur="SaveQtyPerProduct" />
 
     </div>
 
@@ -34,4 +35,19 @@
 {
     [Parameter]
     public WorkflowEditorService WorkflowEditor { get; set; } = default!;
+
+    private int QtyPerProduct
+    {
+        get => WorkflowEditor.SelectedPart?.QtyPerProduct ?? 1;
+        set
+        {
+            if (WorkflowEditor.SelectedPart != null)
+                WorkflowEditor.SelectedPart.QtyPerProduct = value < 1 ? 1 : value;
+        }
+    }
+
+    private async Task SaveQtyPerProduct()
+        {
+            await WorkflowEditor.SaveQtyPerProductAsync();
+        }
 }

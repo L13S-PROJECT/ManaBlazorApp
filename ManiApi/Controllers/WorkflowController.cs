@@ -113,8 +113,6 @@ Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
                     .OrderBy(x => x.TopPartName)
                     .ToListAsync();
 
-Console.WriteLine($"GetParts({versionId}) = {parts.Count}");
-
                 return Ok(parts);
             }
 
@@ -369,24 +367,39 @@ Console.WriteLine($"GetParts({versionId}) = {parts.Count}");
                 return Ok(nodes);
             }
 
-        [HttpGet("finish/{workflowId}")]
-        public async Task<IActionResult> GetFinishNodes(int workflowId)
-            {
-                var nodes = await _db.WorkflowNodes
+       [HttpGet("available-flows/{workflowId}")]
+        public async Task<IActionResult> GetAvailableFlows(int workflowId)
+            {              
+                var workflowNodes = await _db.WorkflowNodes
                     .Where(x =>
                         x.WorkflowId == workflowId &&
-                        x.NodeType == 4 &&
                         x.IsActive)
-                    .OrderBy(x => x.SortOrder)
-                    .Select(x => new
-                    {
-                        x.Id,
-                        x.Name
-                    })
                     .ToListAsync();
 
-                return Ok(nodes);
+                var workflow = await _db.Workflows
+                    .FirstAsync(x =>
+                        x.Id == workflowId &&
+                        x.IsActive);
+
+                var productParts = await _db.ProductTopParts
+                    .Where(x =>
+                        x.VersionId == workflow.VersionId &&
+                        x.IsActive)
+                    .ToListAsync();
+                
+                var connections = await _db.WorkflowNodeConnections
+                    .ToListAsync();
+                
+                var analyzer = new WorkflowFlowAnalyzer(
+                    workflowNodes,
+                    connections,
+                    productParts);
+
+                var rows = analyzer.GetAvailableFlows();
+
+                return Ok(rows);
             }
+
 
         [HttpGet("available-topparts")]
             public async Task<IActionResult> GetWorkflowSelect([FromQuery] int versionId)
@@ -395,7 +408,10 @@ Console.WriteLine($"GetParts({versionId}) = {parts.Count}");
                     from tp in _db.TopParts
 
                     join ptp in _db.ProductTopParts
-                        .Where(x => x.VersionId == versionId && x.IsActive)
+                        .Where(x =>
+                            x.VersionId == versionId &&
+                            x.IsActive &&
+                            x.ParentProductTopPartId == null)
                         on tp.Id equals ptp.TopPartId into grp
 
                     from linked in grp.DefaultIfEmpty()
@@ -420,28 +436,17 @@ Console.WriteLine($"GetParts({versionId}) = {parts.Count}");
         [HttpGet("available-subparts")]
             public async Task<IActionResult> GetAvailableSubParts([FromQuery] int versionId)
             {
-                var rows = await (
-                    from tp in _db.TopParts
-
-                    join ptp in _db.ProductTopParts
-                        .Where(x => x.VersionId == versionId && x.IsActive)
-                        on tp.Id equals ptp.TopPartId into grp
-
-                    from linked in grp.DefaultIfEmpty()
-
-                    where tp.IsActive
-                        && tp.Stage == 1
-
-                    orderby tp.TopPartName
-
-                    select new WorkflowTopPartSelectDto
+                var rows = await _db.TopParts
+                    .Where(tp => tp.IsActive && tp.Stage == 1)
+                    .OrderBy(tp => tp.TopPartName)
+                    .Select(tp => new WorkflowTopPartSelectDto
                     {
                         TopPartId = tp.Id,
                         TopPartName = tp.TopPartName,
                         TopPartCode = tp.TopPartCode,
                         Disabled = false
-                    }
-                ).ToListAsync();
+                    })
+                    .ToListAsync();
 
                 return Ok(rows);
             }
@@ -468,7 +473,9 @@ Console.WriteLine($"GetParts({versionId}) = {parts.Count}");
                         ParentProductTopPartId = dto.ParentProductTopPartId,
                         AttachToNodeId = dto.AttachToNodeId,
                         QtyPerProduct = 1,
-                        SortOrder = 10,
+                        SortOrder = await _db.ProductTopParts
+                            .Where(x => x.VersionId == dto.VersionId)
+                            .MaxAsync(x => (int?)x.SortOrder) + 10 ?? 10,
                         IsActive = true
                     };
 
@@ -552,7 +559,6 @@ Console.WriteLine($"GetParts({versionId}) = {parts.Count}");
                     var attachNode = await _db.WorkflowNodes
                         .FirstOrDefaultAsync(x =>
                             x.Id == dto.AttachToNodeId &&
-                            x.NodeType == 1 &&
                             x.IsActive);
 
                     if (attachNode == null)
@@ -606,8 +612,8 @@ Console.WriteLine($"GetParts({versionId}) = {parts.Count}");
                 if (nextNode == null)
                     return BadRequest("Nākamais mezgls nav atrasts.");
                 
-                if (nextNode.NodeType != 4)
-                    return BadRequest("Nākamajam mezglam jābūt FINISH.");
+                // if (nextNode.NodeType != 4)
+                //     return BadRequest("Nākamajam mezglam jābūt FINISH.");
 
                 var finishNode = nextNode;
                 
@@ -616,7 +622,7 @@ Console.WriteLine($"GetParts({versionId}) = {parts.Count}");
                     WorkflowId = workflow.Id,
                     NodeType = 2,
                     Name = dto.ProcessName,
-                    SortOrder = finishNode.SortOrder,
+                    SortOrder = previousNode.SortOrder + 10,
                     IsActive = true
                 };
 
@@ -624,9 +630,11 @@ Console.WriteLine($"GetParts({versionId}) = {parts.Count}");
 
                 await _db.SaveChangesAsync();
 
-                finishNode.SortOrder += 10;
-
-                _db.WorkflowNodes.Update(finishNode);
+                if (nextNode.NodeType == 4)
+                    {
+                        finishNode.SortOrder += 10;
+                        _db.WorkflowNodes.Update(finishNode);
+                    }
 
                 _db.WorkflowNodeConnections.Remove(oldConnection);
 
@@ -654,9 +662,13 @@ Console.WriteLine($"GetParts({versionId}) = {parts.Count}");
                 await using var transaction = await _db.Database.BeginTransactionAsync();
 
                 dto.FinishNodeIds = dto.FinishNodeIds
-                    .Append(dto.ActiveFinishNodeId)
                     .Distinct()
                     .ToList();
+
+                if (!dto.FinishNodeIds.Contains(dto.ActiveFinishNodeId))
+                {
+                    dto.FinishNodeIds.Add(dto.ActiveFinishNodeId);
+                }
 
                 if (dto.FinishNodeIds.Count < 2)
                     return BadRequest("MERGE nepieciešami vismaz divi FINISH mezgli.");
@@ -700,26 +712,6 @@ Console.WriteLine($"GetParts({versionId}) = {parts.Count}");
                 await _db.SaveChangesAsync();
 
 
-                var mergeFinishNode = new WorkflowNode
-                {
-                    WorkflowId = workflow.Id,
-                    NodeType = 4,
-                    Name = "FINISH",
-                    SortOrder = maxSort + 20,
-                    IsActive = true
-                };
-
-                _db.WorkflowNodes.Add(mergeFinishNode);
-
-                await _db.SaveChangesAsync();
-
-
-                _db.WorkflowNodeConnections.Add(new WorkflowNodeConnection
-                {
-                    FromNodeId = mergeNode.Id,
-                    ToNodeId = mergeFinishNode.Id
-                });
-
                 foreach (var finishId in dto.FinishNodeIds)
                 {
                     var finishNode = await _db.WorkflowNodes
@@ -732,14 +724,22 @@ Console.WriteLine($"GetParts({versionId}) = {parts.Count}");
                     if (finishNode == null)
                         return BadRequest($"FINISH mezgls {finishId} nav atrasts.");
                     
-                    if (finishNode.Id == mergeFinishNode.Id)
-                        return BadRequest("Jaunizveidoto FINISH nevar izmantot MERGE ieejā.");
-                    
+                    var previousFinishNode = await _db.WorkflowNodeConnections
+                        .Where(x => x.ToNodeId == finishNode.Id)
+                        .Join(_db.WorkflowNodes,
+                            c => c.FromNodeId,
+                            n => n.Id,
+                            (c, n) => n)
+                        .FirstOrDefaultAsync();
+
+                    if (previousFinishNode == null)
+                        return BadRequest("FINISH nav iepriekšējā mezgla.");
+                                        
                     var mergeConnectionExists = await _db.WorkflowNodeConnections
                         .AnyAsync(x => x.FromNodeId == finishId);
 
                     if (mergeConnectionExists)
-                        return BadRequest($"FINISH mezgls {finishId} jau ir izmantots MERGE.");
+                        return BadRequest("Selected Flow jau ir izmantots citā MERGE.");
                     
                     _db.WorkflowNodeConnections.Add(new WorkflowNodeConnection
                     {
@@ -747,6 +747,8 @@ Console.WriteLine($"GetParts({versionId}) = {parts.Count}");
                         ToNodeId = mergeNode.Id
                     });
                 }
+
+
 
                 await _db.SaveChangesAsync();
 
@@ -761,6 +763,64 @@ Console.WriteLine($"GetParts({versionId}) = {parts.Count}");
                 var result = await _validator.ValidateAsync(workflowId);
 
                 return Ok(result);
+            }
+
+            [HttpPost("node/comments")]
+            public async Task<IActionResult> SaveNodeComments(SaveNodeCommentsRequest dto)
+            {
+                var node = await _db.WorkflowNodes
+                    .FirstOrDefaultAsync(x => x.Id == dto.NodeId && x.IsActive);
+
+                if (node == null)
+                    return NotFound();
+
+                node.Comments = dto.Comments;
+
+                await _db.SaveChangesAsync();
+
+                return Ok();
+            }
+
+            [HttpPost("process/save")]
+            public async Task<IActionResult> SaveProcess(
+                SaveProcessRequest dto)
+                {
+                    var node = await _db.WorkflowNodes
+                        .FirstOrDefaultAsync(x =>
+                            x.Id == dto.NodeId &&
+                            x.IsActive);
+
+                    if (node == null)
+                        return NotFound();
+
+                    node.Name = dto.Name;
+                    node.WorkCenterId = dto.WorkCenterId;
+                    node.EstimatedMinutes = dto.EstimatedMinutes;
+                    node.Comments = dto.Comments;
+
+                    await _db.SaveChangesAsync();
+
+                    return Ok();
+                }
+
+            [HttpPost("part/qty")]
+            public async Task<IActionResult> SaveQtyPerProduct(SaveQtyPerProductRequest dto)
+            {
+                var part = await _db.ProductTopParts
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == dto.ProductToPartId &&
+                        x.IsActive);
+
+                if (part == null)
+                    return NotFound();
+
+                part.QtyPerProduct = dto.QtyPerProduct < 1
+                    ? 1
+                    : dto.QtyPerProduct;
+
+                await _db.SaveChangesAsync();
+
+                return Ok();
             }
 
     }

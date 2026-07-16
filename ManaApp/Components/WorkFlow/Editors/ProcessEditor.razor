@@ -10,45 +10,89 @@
 
     <div class="form-grid">
 
+        <div class="parameter-group">
+
+            <div class="form-grid">
+
+                <label>Piesaistītās detaļa</label>
+
+                <input class="form-control"
+                    readonly
+                    value="@WorkflowEditor.CurrentOwnerDescription"
+                    placeholder="TopPart/Sub-part nosaukums" />
+
+                <label>Iepriekšējais PROCESS</label>
+
+                <input class="form-control"
+                    readonly
+                    value="@WorkflowEditor.PreviousNodeName"
+                    placeholder="Iepriekšējais darba solis - ja ir" />
+
+            </div>
+
+        </div>
+
         <label>Darba centrs:</label>
 
-        <select class="form-select">
-            <option>-- izvēlēties --</option>
+       <select class="form-select @(WorkflowEditor.SelectedProcessHasValidationError && WorkCenterId == null ? "is-invalid" : "")"
+            @bind="WorkCenterId"
+            @onblur="SaveProcess">
+
+            <option value="">-- izvēlēties --</option>
+
+            @foreach (var wc in WorkflowEditor.State.WorkCenters)
+            {
+                <option value="@wc.Id">@wc.Name</option>
+            }
+
         </select>
 
         <label>Izpildes laiks (min):</label>
 
         <input type="number"
-               class="form-control" />
+            class="form-control @(WorkflowEditor.SelectedProcessHasValidationError && EstimatedMinutes == null ? "is-invalid" : "")"
+            @bind="EstimatedMinutes"
+            @onblur="SaveProcess" />
 
         <label>Sagatavošanas laiks (min):</label>
 
         <input type="number"
-               class="form-control" />
+                class="form-control"
+                disabled />
 
     </div>
 
 </div>
 
-<div class="parameter-group">
-
-    <div class="parameter-group-title">
-        Papildinformācija
-    </div>
-
-    <div class="form-grid">
-
-        <label>Piezīmes:</label>
-
-        <textarea class="form-control"
-                  rows="3"></textarea>
-
-    </div>
-
-</div>
 
 @code
 {
     [Parameter]
     public WorkflowEditorService WorkflowEditor { get; set; } = default!;
+
+    private int? EstimatedMinutes
+        {
+            get => WorkflowEditor.SelectedNode?.Node.EstimatedMinutes;
+            set
+            {
+                if (WorkflowEditor.SelectedNode?.Node != null)
+                    WorkflowEditor.SelectedNode.Node.EstimatedMinutes = value;
+            }
+        }
+
+    private int? WorkCenterId
+        {
+            get => WorkflowEditor.SelectedNode?.Node.WorkCenterId;
+            set
+            {
+                if (WorkflowEditor.SelectedNode?.Node != null)
+                    WorkflowEditor.SelectedNode.Node.WorkCenterId = value;
+            }
+        }
+
+    private async Task SaveProcess()
+        {
+            await WorkflowEditor.SaveProcessAsync();
+        }
+
 }
