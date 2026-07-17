@@ -1,4 +1,5 @@
 using ManaApp.Models;
+using ManaApp.DTOs.Workflow;
 
 namespace ManaApp.ViewModels.Workflow;
 
@@ -7,6 +8,7 @@ public class TechnologyStructureItem
     public WorkflowPartModel? Part { get; set; }
 
     public WorkflowNodeModel? Node { get; set; }
+    public AvailableFlowDto? Flow { get; set; }
 
     public int FlowLevel { get; set; }
     public List<TechnologyStructureItem> Children { get; set; } = new();

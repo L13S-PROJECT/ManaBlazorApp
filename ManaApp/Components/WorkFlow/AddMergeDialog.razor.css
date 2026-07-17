@@ -1,0 +1,45 @@
+.workflow-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.35);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+}
+
+.workflow-modal {
+    width: 700px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    overflow: hidden;
+}
+
+.workflow-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid #ddd;
+    font-weight: 600;
+}
+
+.workflow-modal-body {
+    padding: 16px;
+    max-height: 600px;
+    overflow: auto;
+}
+
+.workflow-close {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 20px;
+}
+
+.top-part-row input:disabled + span {
+    color: #6c757d;
+    opacity: .7;
+    cursor: not-allowed;
+}

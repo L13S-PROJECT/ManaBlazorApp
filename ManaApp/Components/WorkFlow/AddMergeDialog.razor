@@ -1,0 +1,146 @@
+@* AddMergeDialog.razor *@
+
+@using ManaApp.Services.Workflow
+@using ManaApp.ViewModels.Workflow
+@inject WorkflowEditorService WorkflowEditor
+
+@namespace ManaApp.Components.Workflow
+
+@if (Visible)
+{
+    <div class="workflow-modal-backdrop">
+
+        <div class="workflow-modal">
+
+            <div class="workflow-modal-header">
+
+                <span>Pievienot MERGE</span>
+
+                <button class="workflow-close"
+                        @onclick="Close">
+                    ✕
+                </button>
+
+            </div>
+
+            <div class="workflow-modal-body">
+
+                <div class="mb-3">
+
+                    <strong>Atlasītā plūsma:</strong>
+
+                    <div>
+                        @WorkflowEditor.CurrentOwnerDescription
+                    </div>
+
+                </div>
+
+                @if (!WorkflowEditor.State.AvailableFlows.Any())
+                    {
+                        <div>Nav pieejamu Flow.</div>
+                    }
+                    else
+                    {
+                        <div class="merge-flow-list">
+
+                           @foreach (var flow in mergeFlows.Where(x =>
+                                x.Flow.OwnerProductToPartId != WorkflowEditor.GetCurrentFlow()?.OwnerProductToPartId &&
+                                x.Flow.IsSelectable))
+                                {
+                                    <div class="merge-flow-item">
+
+                                        <label class="merge-flow-item">
+
+                                            <input type="checkbox"
+                                                @bind="flow.Selected" />
+
+                                            <div class="merge-flow-info">
+
+                                                <div class="merge-flow-title">
+                                                    @flow.Flow.DisplayName
+                                                </div>
+
+                                            </div>
+
+                                        </label>
+
+                                    </div>
+                                }
+
+                        </div>
+                    }
+
+            </div>
+
+            <div class="merge-selection-info">
+                Izvēlēti Pabeitgās plūsmas (Finished Flow):
+                <strong>@mergeFlows.Count(x => x.Selected)</strong>
+                no
+                <strong>@mergeFlows.Count(x => x.Flow.IsSelectable)</strong>
+            </div>
+
+            <div class="workflow-modal-footer">
+
+                <button class="btn btn-primary"
+                        @onclick="ContinueMerge"
+                        disabled="@(SelectedFlows.Count() < 1)">
+                    Turpināt
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+}
+
+@code
+{
+    [Parameter]
+    public bool Visible { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> VisibleChanged { get; set; }
+    
+    private readonly List<MergeFlowItem> mergeFlows = new();
+
+    private async Task Close()
+    {
+        await VisibleChanged.InvokeAsync(false);
+    }
+
+    private IEnumerable<MergeFlowItem> SelectedFlows =>
+        mergeFlows.Where(x => x.Selected);
+
+    protected override async Task OnParametersSetAsync()
+        {
+            if (!Visible)
+                return;
+
+            await WorkflowEditor.LoadAvailableFlowsAsync();
+
+            mergeFlows.Clear();
+            mergeFlows.AddRange(WorkflowEditor.State.AvailableFlows);
+
+            foreach (var flow in mergeFlows)
+                flow.Selected = false;
+        }
+
+    private async Task ContinueMerge()
+        {
+           var currentFlow = WorkflowEditor.GetCurrentFlow();
+
+                if (currentFlow == null)
+                    return;
+
+            var selectedFinishNodes = SelectedFlows
+                .Select(x => x.Flow.FinishNodeId)
+                .ToList();
+
+            await WorkflowEditor.AddMergeAsync(
+                currentFlow.FinishNodeId,
+                selectedFinishNodes);
+
+        }
+
+}

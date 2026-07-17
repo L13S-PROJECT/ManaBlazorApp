@@ -36,6 +36,7 @@ public class WorkflowEditorService
             _stateService.State.PartNodeByProductToPartId = state.PartNodeByProductToPartId;
             _stateService.State.SelectedNode = state.SelectedNode;
             _stateService.State.AvailableFinishNodes = state.AvailableFinishNodes;
+            _stateService.State.AvailableFlows = state.AvailableFlows;
             _stateService.State.ProductParts = state.ProductParts;
             _stateService.State.WorkCenters =
                 await _lookupService.LoadWorkCentersAsync();
@@ -119,6 +120,25 @@ public class WorkflowEditorService
 
                 FillFinishNodes(items);
 
+            }
+
+        public async Task LoadAvailableFlowsAsync()
+            {
+                if (State.Workflow?.Workflow == null)
+                    return;
+
+                var flows = await _workflowApiService.LoadAvailableFlowsAsync(
+                    State.Workflow.Workflow.Id);
+
+                State.AvailableFlows.Clear();
+
+                foreach (var flow in flows)
+                {
+                    State.AvailableFlows.Add(new MergeFlowItem
+                    {
+                        Flow = flow
+                    });
+                }
             }
 
         public string NodeTypeName(int type)
@@ -562,6 +582,10 @@ foreach (var part in attachedParts)
             return result;
         }
     
+        public AvailableFlowDto? GetCurrentFlow()
+            {
+                return SelectedStructureItem?.Flow;
+            }
 
         public async Task<bool> AddProcessAsync(string processName)
             {
@@ -588,7 +612,7 @@ foreach (var part in attachedParts)
                 
                 // var selectedProductToPartId = SelectedPart!.ProductToPartId;
 
-                var currentPart = GetCurrentPart();
+                var currentPart = GetCurrentFlowOwner();
 
                     if (currentPart == null)
                         return false;
@@ -605,19 +629,26 @@ foreach (var part in attachedParts)
             }
 
         public async Task<bool> AddMergeAsync(
-            int activeFinishNodeId,
-            List<int> finishNodeIds)
-        {
-            if (Workflow?.Workflow == null)
-                return false;
+            int currentFinishNodeId,
+            List<int> mergeFinishNodeIds)
+            {
+                if (Workflow?.Workflow == null)
+                    return false;
 
-            var response = await _workflowApiService.AddMergeAsync(
-                Workflow.Workflow.Id,
-                activeFinishNodeId,
-                finishNodeIds);
+                var response = await _workflowApiService.AddMergeAsync(
+                    Workflow.Workflow.Id,
+                    currentFinishNodeId,
+                    mergeFinishNodeIds);
 
-            return response.IsSuccessStatusCode;
-        }
+                if (!response.IsSuccessStatusCode)
+                    return false;
+
+                await ReloadAndRestoreSelectionAsync();
+
+                RefreshValidationState();
+
+                return true;
+            }
 
         private bool IsPartNode(WorkflowGraphNode node)
         {
@@ -829,7 +860,7 @@ foreach (var part in attachedParts)
                     return null;
                 }
 
-            public WorkflowPartModel? GetCurrentPart()
+            public WorkflowPartModel? GetCurrentFlowOwner()
                 {
                     var item = SelectedStructureItem;
 
@@ -845,13 +876,13 @@ foreach (var part in attachedParts)
                 }
             
             public string? CurrentPartName =>
-                GetCurrentPart()?.TopPartName;
+                GetCurrentFlowOwner()?.TopPartName;
             
             public string CurrentOwnerDescription
                 {
                     get
                     {
-                        var part = GetCurrentPart();
+                        var part = GetCurrentFlowOwner();
 
                         if (part == null)
                             return "-";
@@ -960,6 +991,28 @@ private void RefreshValidation(TechnologyStructureItem item)
                     || SelectedNode.Node.WorkCenterId == null
                     || SelectedNode.Node.EstimatedMinutes == null;
             }
+        }
+
+    public async Task<bool> AddFinishAsync()
+        {
+            if (Workflow?.Workflow == null)
+                return false;
+
+            if (SelectedNode == null)
+                return false;
+
+            var response = await _workflowApiService.AddFinishAsync(
+                Workflow.Workflow.Id,
+                SelectedNode.Node.Id);
+
+            if (!response.IsSuccessStatusCode)
+                return false;
+
+            await ReloadAndRestoreSelectionAsync();
+
+            RefreshValidationState();
+
+            return true;
         }
 
 }

@@ -63,10 +63,6 @@ public class WorkflowValidator
         
         var productFinishNode = analyzer.GetProductFinishNode();
         
-        var finishNodes = nodes
-            .Where(x => x.NodeType == 4)
-            .ToList();
-
         if (productFinishNode == null)
         {
             result.Errors.Add(new WorkflowValidationErrorDto
@@ -75,52 +71,29 @@ public class WorkflowValidator
             });
         }
 
-        var partNodes = nodes
-            .Where(x => x.NodeType == 1)
-            .ToList();
+        var flowOwners = analyzer.GetFlowOwnerNodes().ToList();
 
         ValidateTopPartSubParts(
             analyzer,
             productParts,
-            nodes,
-            connections,
             result);
         
         ValidatePartFlows(
             analyzer,
-            partNodes,
-            nodes,
-            connections,
+            flowOwners,
             result);
         
-        var mergeNodes = nodes
-            .Where(x => x.NodeType == 3)
-            .ToList();
+        var mergeNodes = analyzer.GetMergeNodes().ToList();
         
         ValidateMergeNodes(
             analyzer,
             mergeNodes,
-            nodes,
-            connections,
             result);
 
         result.IsValid = result.Errors.Count == 0;
         return result;
     }
 
-    private static void ValidateOrphanNodes(
-            List<WorkflowNode> orphanNodes,
-            WorkflowValidationResultDto result)
-        {
-            foreach (var node in orphanNodes)
-            {
-                result.Errors.Add(new WorkflowValidationErrorDto
-                {
-                    NodeId = node.Id,
-                    Message = $"Mezgls '{node.Name}' nav pieslēgts Workflow."
-                });
-            }
-        }
 
     // private static void ValidateFinishNodes(
     //     List<WorkflowNode> finishNodes,
@@ -151,11 +124,9 @@ public class WorkflowValidator
     // }
 
     private static void ValidateMergeNodes(
-            WorkflowFlowAnalyzer analyzer,
-            List<WorkflowNode> mergeNodes,
-            List<WorkflowNode> nodes,
-            List<WorkflowNodeConnection> connections,
-            WorkflowValidationResultDto result)
+        WorkflowFlowAnalyzer analyzer,
+        List<WorkflowNode> mergeNodes,
+        WorkflowValidationResultDto result)
         {
             foreach (var merge in mergeNodes)
             {
@@ -170,19 +141,14 @@ public class WorkflowValidator
                     });
                 }
 
-                foreach (var previousNodeId in previousNodes)
-                {
-                   if (!analyzer.IsFinishNode(previousNodeId))
+                if (!previousNodes.All(analyzer.IsFinishNode))
                     {
                         result.Errors.Add(new WorkflowValidationErrorDto
                         {
                             NodeId = merge.Id,
                             Message = "MERGE drīkst pievienot tikai FINISH mezglus."
                         });
-
-                        break;
                     }
-                }
 
                 var nextNodes = analyzer.GetNextNodeIds(merge.Id);
 
@@ -195,292 +161,475 @@ public class WorkflowValidator
                     });
                 }
 
-                if (nextNodes.Count == 1)
+                if (analyzer.IsFinishNode(nextNodes[0]))
+                {
+                    result.Errors.Add(new WorkflowValidationErrorDto
                     {
-                        var nextNode = analyzer.GetNode(nextNodes[0])!;
-
-                        if (analyzer.IsFinishNode(nextNode.Id))
-                        {
-                            result.Errors.Add(new WorkflowValidationErrorDto
-                            {
-                                NodeId = merge.Id,
-                                Message = "Pēc MERGE jāseko PROCESS vai MERGE. FINISH nedrīkst būt nākamais mezgls."
-                            });
-                        }
-                    }
+                        NodeId = merge.Id,
+                        Message = "Pēc MERGE jāseko PROCESS vai MERGE. FINISH nedrīkst būt nākamais mezgls."
+                    });
+                }
             }
         }
     
     private static void ValidatePartFlows(
         WorkflowFlowAnalyzer analyzer,
-        List<WorkflowNode> partNodes,
-        List<WorkflowNode> nodes,
-        List<WorkflowNodeConnection> connections,
+        List<WorkflowNode> flowOwners,
         WorkflowValidationResultDto result)
         {
-            foreach (var part in partNodes)
+            foreach (var owner in flowOwners)
             {
-                if (!analyzer.HasFlowFinish(part.Id))
+               if (analyzer.GetFlowFinishNode(owner) == null)
                 {
                     result.Errors.Add(new WorkflowValidationErrorDto
                     {
-                        NodeId = part.Id,
-                        Message = $"Detaļai '{part.Name}' nav sasniedzams FINISH."
+                        NodeId = owner.Id,
+                        Message = $"Flow '{owner.Name}' nav sasniedzams FINISH."
                     });
                 }
 
+                var visited = new HashSet<int>();
+                var recursionStack = new HashSet<int>();        
+
                  if (analyzer.HasCycle(
-                    part.Id,
-                    new HashSet<int>(),
-                    new HashSet<int>()))
+                    owner.Id,
+                    visited,
+                    recursionStack))
                 {
                     result.Errors.Add(new WorkflowValidationErrorDto
                     {
-                        NodeId = part.Id,
-                        Message = $"Plūsmā '{part.Name}' atrasts ciklisks savienojums."
+                        NodeId = owner.Id,
+                        Message = $"Plūsmā '{owner.Name}' atrasts ciklisks savienojums."
                     });
                 }
             }
         }
 
-    private static List<int> GetNextNodeIds(
-        int nodeId,
-        List<WorkflowNodeConnection> connections)
-    {
-        return connections
-            .Where(x => x.FromNodeId == nodeId)
-            .Select(x => x.ToNodeId)
-            .ToList();
-    }
+    private static List<ProductTopPart> GetTopParts(
+    List<ProductTopPart> productParts)
+        {
+            return productParts
+                .Where(x => x.ParentProductTopPartId == null)
+                .ToList();
+        }
 
+    private static List<ProductTopPart> GetDirectSubParts(
+    List<ProductTopPart> productParts,
+    ProductTopPart topPart)
+        {
+            return productParts
+                .Where(x => x.ParentProductTopPartId == topPart.Id)
+                .ToList();
+        }
 
-    private static void ValidateTopPartSubParts(
+    private static WorkflowNode? GetValidatedTopPartNode(
             WorkflowFlowAnalyzer analyzer,
-            List<ProductTopPart> productParts,
-            List<WorkflowNode> nodes,
-            List<WorkflowNodeConnection> connections,
+            ProductTopPart topPart,
             WorkflowValidationResultDto result)
-    {
-        
-        var topParts = productParts
-            .Where(x => x.ParentProductTopPartId == null)
-            .ToList();
-        
-        if (topParts.Count < 2)
-            return;
+        {
+            var topPartNode = analyzer.GetPartNode(topPart.Id);
 
-        if (topParts.Count < 2)
+            if (topPartNode != null)
+                return topPartNode;
+
+            result.Errors.Add(new WorkflowValidationErrorDto
+            {
+                Message = $"TOP PART ar ID {topPart.Id} nav atrasts PART mezgls."
+            });
+
+            return null;
+        }
+
+    private static WorkflowNode? GetValidatedTopPartFinish(
+            WorkflowFlowAnalyzer analyzer,
+            WorkflowNode topPartNode,
+            WorkflowValidationResultDto result)
+        {
+            var finishNode = analyzer.GetFlowFinishNode(topPartNode);
+
+            if (finishNode != null)
+                return finishNode;
+
+            result.Errors.Add(new WorkflowValidationErrorDto
+            {
+                NodeId = topPartNode.Id,
+                Message = $"TOP PART '{topPartNode.Name}' nav atrasts gala FINISH."
+            });
+
+            return null;
+        }
+
+        private static WorkflowNode? GetValidatedSubMergeNode(
+                WorkflowFlowAnalyzer analyzer,
+                WorkflowNode subFinishNode,
+                WorkflowNode subPartNode,
+                WorkflowValidationResultDto result)
+            {
+                var subMergeNodes = analyzer.GetNextMergeNodes(subFinishNode.Id);
+
+                if (subMergeNodes.Count == 1)
+                    return subMergeNodes[0];
+
+                result.Errors.Add(new WorkflowValidationErrorDto
+                {
+                    NodeId = subPartNode.Id,
+                    Message = subMergeNodes.Count == 0
+                        ? $"SUB PART '{subPartNode.Name}' nav pievienots nevienam MERGE."
+                        : $"SUB PART '{subPartNode.Name}' ir pievienots vairākiem MERGE."
+                });
+
+                return null;
+            }
+
+        private static WorkflowNode? GetValidatedParentPartNode(
+            WorkflowFlowAnalyzer analyzer,
+            WorkflowNode subMergeNode,
+            WorkflowValidationResultDto result)
+        {
+            var parentPartNode = analyzer.FindParentPartNode(subMergeNode);
+
+            if (parentPartNode != null)
+                return parentPartNode;
+
+            result.Errors.Add(new WorkflowValidationErrorDto
+            {
+                NodeId = subMergeNode.Id,
+                Message = "MERGE nav iespējams sasaistīt ar nevienu PART."
+            });
+
+            return null;
+        }
+
+        private static bool ValidateParentFlow(
+            WorkflowNode parentPartNode,
+            WorkflowNode topPartNode,
+            WorkflowNode subPartNode,
+            WorkflowValidationResultDto result)
+        {
+            if (parentPartNode.ProductToPartId == topPartNode.ProductToPartId)
+                return true;
+
+            result.Errors.Add(new WorkflowValidationErrorDto
+            {
+                NodeId = subPartNode.Id,
+                Message = $"SUB PART '{subPartNode.Name}' ir pievienots nepareizai TOP PART plūsmai."
+            });
+
+            return false;
+        }
+
+        private static bool ValidateMergeFlow(
+                WorkflowFlowAnalyzer analyzer,
+                WorkflowNode subMergeNode,
+                WorkflowNode topPartNode,
+                WorkflowNode topPartFinishNode,
+                WorkflowValidationResultDto result)
+            {
+                if (!analyzer.CanReachNode(subMergeNode.Id, topPartFinishNode.Id))
+                {
+                    result.Errors.Add(new WorkflowValidationErrorDto
+                    {
+                        NodeId = subMergeNode.Id,
+                        Message = $"MERGE nenonāk līdz TOP PART '{topPartNode.Name}' gala FINISH."
+                    });
+
+                    return false;
+                }
+
+                if (!analyzer.CanReachNode(topPartNode.Id, subMergeNode.Id))
+                {
+                    result.Errors.Add(new WorkflowValidationErrorDto
+                    {
+                        NodeId = subMergeNode.Id,
+                        Message = $"MERGE neatrodas TOP PART '{topPartNode.Name}' plūsmā."
+                    });
+
+                    return false;
+                }
+
+                return true;
+            }
+
+        private static bool ValidateMergeOutput(
+            WorkflowFlowAnalyzer analyzer,
+            WorkflowNode subMergeNode,
+            WorkflowValidationResultDto result)
+        {
+            var nextNodes = analyzer.GetNextNodeIds(subMergeNode.Id);
+
+            if (nextNodes.Count != 1)
             {
                 result.Errors.Add(new WorkflowValidationErrorDto
                 {
-                    Message = "Workflow nav pabeigts!"
+                    NodeId = subMergeNode.Id,
+                    Message = "MERGE mezglam jābūt tieši vienai izejai."
                 });
 
-                return;
+                return false;
             }
 
-        foreach (var topPart in topParts)
+            if (analyzer.IsFinishNode(nextNodes[0]))
             {
-                var directSubParts = productParts
-                    .Where(x => x.ParentProductTopPartId == topPart.Id)
-                    .ToList();
-                
-                if (directSubParts.Count == 0)
-                    continue;
-
-                var topPartNode = nodes.FirstOrDefault(x =>
-                    x.NodeType == 1 &&
-                    x.ProductToPartId == topPart.Id);
-
-                if (topPartNode == null)
-                    continue;
-
-                var topPartFinishNode = analyzer.FindTopPartFinish(topPartNode);
-
-                var mergeExists = connections.Any(c =>
-                    c.FromNodeId == topPartFinishNode?.Id &&
-                    nodes.Any(n =>
-                        n.Id == c.ToNodeId &&
-                        n.NodeType == 3));
-
-                if (!mergeExists)
+                result.Errors.Add(new WorkflowValidationErrorDto
                 {
-                    result.Errors.Add(new WorkflowValidationErrorDto
+                    NodeId = subMergeNode.Id,
+                    Message = "Pēc MERGE jāseko PROCESS vai MERGE. FINISH nedrīkst būt nākamais mezgls."
+                });
+
+                return false;
+            }
+
+            return true;
+        }
+
+        private static void ValidateDirectSubParts(
+            WorkflowFlowAnalyzer analyzer,
+            List<ProductTopPart> directSubParts,
+            WorkflowNode topPartNode,
+            WorkflowNode topPartFinishNode,
+            WorkflowValidationResultDto result)
+            {
+                foreach (var subPart in directSubParts)
                     {
-                        NodeId = topPartNode.Id,
-                        Message = $"TOP PART '{topPartNode.Name}' gala FINISH nav pievienots MERGE."
-                    });
+                        var subPartNode = GetValidatedSubPartNode(analyzer, subPart, result);
 
-                    continue;
-                } 
-
-                if (topPartFinishNode == null)
-                {
-                    result.Errors.Add(new WorkflowValidationErrorDto
-                    {
-                        NodeId = topPartNode.Id,
-                        Message = $"TOP PART '{topPartNode.Name}' nav atrasts gala FINISH."
-                    });
-
-                    continue;
-                }
-
-                if (topPart.AttachToNodeId == null)
-                    {
-                        result.Errors.Add(new WorkflowValidationErrorDto
-                        {
-                            NodeId = topPartNode?.Id,
-                            Message = $"TOP PART '{topPartNode?.Name}' nav norādīts AttachToNodeId."
-                        });
-
-                        continue;
-                    }
-
-                
-                var subPartNodes = nodes
-                    .Where(x =>
-                        x.NodeType == 1 &&
-                        directSubParts.Any(p => p.Id == x.ProductToPartId))
-                    .ToList();
-
-                if (subPartNodes.Count != directSubParts.Count)
-                    {
-                        result.Errors.Add(new WorkflowValidationErrorDto
-                        {
-                            NodeId = topPartNode.Id,
-                            Message = $"TOP PART '{topPartNode.Name}' satur SUB PART bez PART mezgla."
-                        });
-
-                        continue;
-                    }
-
-                foreach (var subPartNode in subPartNodes)
-                    {
-                        var subFinishNode = nodes.FirstOrDefault(x =>
-                            x.NodeType == 4 &&
-                            analyzer.CanReachNode(subPartNode.Id, x.Id));
+                        if (subPartNode == null)
+                            continue;
+                        
+                        var subFinishNode = GetValidatedSubPartFinish(
+                            analyzer,
+                            subPartNode,
+                            result);
 
                         if (subFinishNode == null)
-                            {
-                                result.Errors.Add(new WorkflowValidationErrorDto
-                                {
-                                    NodeId = subPartNode.Id,
-                                    Message = $"SUB PART '{subPartNode.Name}' nav sasniedzams FINISH."
-                                });
+                            continue;
 
-                                continue;
-                            }
+                        var subFinishNodeId = subFinishNode.Id;
 
-                        var subMergeNodes = nodes
-                            .Where(x =>
-                                x.NodeType == 3 &&
-                                connections.Any(c =>
-                                    c.ToNodeId == x.Id &&
-                                    c.FromNodeId == subFinishNode!.Id))
-                            .ToList();
-                        
-                        if (subMergeNodes.Count == 0)
-                            {
-                                result.Errors.Add(new WorkflowValidationErrorDto
-                                {
-                                    NodeId = subPartNode.Id,
-                                    Message = $"SUB PART '{subPartNode.Name}' nav pievienots nevienam MERGE."
-                                });
+                        var subMergeNode = GetValidatedSubMergeNode(
+                            analyzer,
+                            subFinishNode,
+                            subPartNode,
+                            result);
 
-                                continue;
-                            }
+                        if (subMergeNode == null)
+                            continue;
 
-                        if (subMergeNodes.Count > 1)
-                            {
-                                result.Errors.Add(new WorkflowValidationErrorDto
-                                {
-                                    NodeId = subPartNode.Id,
-                                    Message = $"SUB PART '{subPartNode.Name}' ir pievienots vairākiem MERGE."
-                                });
-
-                                continue;
-                            }
-
-                        var subMergeNode = subMergeNodes.Single();
-
-                        var parentPartNode = analyzer.FindParentPartNode(
-                            subMergeNode);
+                        var parentPartNode = GetValidatedParentPartNode(
+                            analyzer,
+                            subMergeNode,
+                            result);
 
                         if (parentPartNode == null)
-                        {
-                            result.Errors.Add(new WorkflowValidationErrorDto
-                            {
-                                NodeId = subMergeNode.Id,
-                                Message = "MERGE nav iespējams sasaistīt ar nevienu PART."
-                            });
+                            continue;
 
+                        if (!ValidateParentFlow(
+                            parentPartNode,
+                            topPartNode,
+                            subPartNode,
+                            result))
+                        {
                             continue;
                         }
 
-                        if (parentPartNode.ProductToPartId != topPartNode.ProductToPartId)
-                            {
-                                result.Errors.Add(new WorkflowValidationErrorDto
-                                {
-                                    NodeId = subPartNode.Id,
-                                    Message = $"SUB PART '{subPartNode.Name}' ir pievienots nepareizai TOP PART plūsmai."
-                                });
+                        if (!ValidateMergeFlow(
+                            analyzer,
+                            subMergeNode,
+                            topPartNode,
+                            topPartFinishNode,
+                            result))
+                        {
+                            continue;
+                        }
 
+                        if (!ValidateMergeOutput(
+                                analyzer,
+                                subMergeNode,
+                                result))
+                            {
                                 continue;
                             }
-
-                        var nextNodes = analyzer.GetNextNodeIds(subMergeNode.Id);
-
-                        if (!analyzer.CanReachNode(subMergeNode.Id, topPartFinishNode.Id))
-                            {
-                                result.Errors.Add(new WorkflowValidationErrorDto
-                                {
-                                    NodeId = subMergeNode.Id,
-                                    Message = $"MERGE nenonāk līdz TOP PART '{topPartNode.Name}' gala FINISH."
-                                });
-
-                                continue;
-                            }
-                        
-                        if (!analyzer.CanReachNode(topPartNode.Id, subMergeNode.Id))
-                            {
-                                result.Errors.Add(new WorkflowValidationErrorDto
-                                {
-                                    NodeId = subMergeNode.Id,
-                                    Message = $"MERGE neatrodas TOP PART '{topPartNode.Name}' plūsmā."
-                                });
-
-                                continue;
-                            }
-
-                        if (nextNodes.Count != 1)
-                            {
-                                result.Errors.Add(new WorkflowValidationErrorDto
-                                {
-                                    NodeId = subMergeNode.Id,
-                                    Message = "MERGE mezglam jābūt tieši vienai izejai."
-                                });
-
-                                continue;
-                            }
-                    }                
+                    }  
             }
+
+    private static WorkflowNode? GetValidatedSubPartNode(
+            WorkflowFlowAnalyzer analyzer,
+            ProductTopPart subPart,
+            WorkflowValidationResultDto result)
+        {
+            var subPartNode = analyzer.GetPartNode(subPart.Id);
+
+            if (subPartNode != null)
+                return subPartNode;
+
+            result.Errors.Add(new WorkflowValidationErrorDto
+            {
+                Message = $"SUB PART ar ID {subPart.Id} nav atrasts PART mezgls."
+            });
+
+            return null;
+        }
+
+    private static WorkflowNode? GetValidatedSubPartFinish(
+            WorkflowFlowAnalyzer analyzer,
+            WorkflowNode subPartNode,
+            WorkflowValidationResultDto result)
+        {
+            var subFinishNode = analyzer.GetFlowFinishNode(subPartNode);
+
+            if (subFinishNode != null)
+                return subFinishNode;
+
+            result.Errors.Add(new WorkflowValidationErrorDto
+            {
+                NodeId = subPartNode.Id,
+                Message = $"SUB PART '{subPartNode.Name}' nav sasniedzams FINISH."
+            });
+
+            return null;
+        }
+
+        private static bool ValidateTopPartMerge(
+                WorkflowFlowAnalyzer analyzer,
+                WorkflowNode topPartNode,
+                WorkflowNode topPartFinishNode,
+                WorkflowValidationResultDto result)
+            {
+                var mergeExists = analyzer
+                    .GetNextMergeNodes(topPartFinishNode.Id)
+                    .Any();
+
+                if (mergeExists)
+                    return true;
+
+                result.Errors.Add(new WorkflowValidationErrorDto
+                {
+                    NodeId = topPartNode.Id,
+                    Message = $"TOP PART '{topPartNode.Name}' gala FINISH nav pievienots MERGE."
+                });
+
+                return false;
+            }
+
+
+        private static bool ValidateAttachNode(
+            ProductTopPart topPart,
+            WorkflowNode topPartNode,
+            WorkflowValidationResultDto result)
+        {
+            if (topPart.AttachToNodeId != null)
+                return true;
+
+            result.Errors.Add(new WorkflowValidationErrorDto
+            {
+                NodeId = topPartNode.Id,
+                Message = $"TOP PART '{topPartNode.Name}' nav norādīts AttachToNodeId."
+            });
+
+            return false;
+        }
+
+
+        private static bool ValidateSubPartNodes(
+            WorkflowFlowAnalyzer analyzer,
+            List<ProductTopPart> directSubParts,
+            WorkflowNode topPartNode,
+            WorkflowValidationResultDto result)
+        {
+            if (!directSubParts.Any(x => analyzer.GetPartNode(x.Id) == null))
+                return true;
+
+            result.Errors.Add(new WorkflowValidationErrorDto
+            {
+                NodeId = topPartNode.Id,
+                Message = $"TOP PART '{topPartNode.Name}' satur SUB PART bez PART mezgla."
+            });
+
+            return false;
+        }
+
+    private static void ValidateTopPart(
+    WorkflowFlowAnalyzer analyzer,
+    ProductTopPart topPart,
+    List<ProductTopPart> productParts,
+    WorkflowValidationResultDto result)
+        {
+            var directSubParts = GetDirectSubParts(productParts, topPart);
+
+            if (!directSubParts.Any())
+                return;
+
+            var topPartNode = GetValidatedTopPartNode(
+                analyzer,
+                topPart,
+                result);
+
+            if (topPartNode == null)
+                return;
+
+            var topPartFinishNode = GetValidatedTopPartFinish(
+                analyzer,
+                topPartNode,
+                result);
+
+            if (topPartFinishNode == null)
+                return;
+
+            if (!ValidateTopPartMerge(
+                analyzer,
+                topPartNode,
+                topPartFinishNode,
+                result))
+                return;
+
+            if (!ValidateAttachNode(
+                topPart,
+                topPartNode,
+                result))
+                return;
+
+            if (!ValidateSubPartNodes(
+                analyzer,
+                directSubParts,
+                topPartNode,
+                result))
+                return;
+
+            ValidateDirectSubParts(
+                analyzer,
+                directSubParts,
+                topPartNode,
+                topPartFinishNode,
+                result);
+        }
+
+    private static void ValidateTopPartSubParts(
+    WorkflowFlowAnalyzer analyzer,
+    List<ProductTopPart> productParts,
+    WorkflowValidationResultDto result)
+    {
+        
+        var topParts = GetTopParts(productParts);
+
+        if (!ShouldValidateTopPartSubParts(topParts))
+            return;
+
+        foreach (var topPart in topParts)
+            {
+                ValidateTopPart(
+                    analyzer,
+                    topPart,
+                    productParts,
+                    result);
+            }
+            
     }
 
+    private static bool ShouldValidateTopPartSubParts(
+            List<ProductTopPart> topParts)
+        {
+            return topParts.Count > 1;
+        }
 
-        private static WorkflowNode? FindProductFinish(
-                List<WorkflowNode> nodes,
-                List<WorkflowNodeConnection> connections)
-            {
-                var productFinishNodes = nodes
-                    .Where(x =>
-                        x.NodeType == 4 &&
-                        !connections.Any(c => c.FromNodeId == x.Id))
-                    .ToList();
-
-                if (productFinishNodes.Count != 1)
-                    return null;
-
-                return productFinishNodes.Single();
-            }
 
 }

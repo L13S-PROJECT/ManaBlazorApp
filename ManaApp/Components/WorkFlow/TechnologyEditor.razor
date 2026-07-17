@@ -363,15 +363,20 @@
     VersionId="VersionId ?? 0"
     Visible="isAddTopPartOpen"
     VisibleChanged="OnAddTopPartDialogClosed"
-    ParentProductTopPartId="WorkflowEditor.GetCurrentPart()?.ProductToPartId"
+    ParentProductTopPartId="WorkflowEditor.GetCurrentFlowOwner()?.ProductToPartId"
     AttachToNodeId="WorkflowEditor.SelectedNode?.Node.Id"
     IsSubPart="isSubPartMode" />
 
+<AddMergeDialog
+    Visible="isAddMergeOpen"
+    VisibleChanged="OnAddMergeDialogClosed" />
 
 @code
 {
     [Parameter]
     public bool Visible { get; set; }
+
+    private bool isAddMergeOpen;
 
     [Parameter]
     public EventCallback<bool> VisibleChanged { get; set; }
@@ -463,9 +468,26 @@
                 var result = await WorkflowEditor.AddProcessAsync(string.Empty);
             }
 
-        private Task AddMerge() => Task.CompletedTask;
+        private Task AddMerge()
+            {
+                isAddMergeOpen = true;
 
-        private Task AddFinish() => Task.CompletedTask;
+                StateHasChanged();
+
+                return Task.CompletedTask;
+            }
+
+        private async Task AddFinish()
+            {
+                if (WorkflowEditor.SelectedNode == null)
+                    return;
+
+                if (WorkflowEditor.SelectedNode.Node.NodeType != 1 &&
+                    WorkflowEditor.SelectedNode.Node.NodeType != 3)
+                    return;
+
+                await WorkflowEditor.AddFinishAsync();
+            }
 
         private async Task OnAddTopPartDialogClosed(bool visible)
             {
@@ -495,6 +517,15 @@ private void SelectStructureNode(TechnologyStructureItem item)
         WorkflowEditor.SelectStructureItem(item);
 
         StateHasChanged();
+    }
+
+private Task OnAddMergeDialogClosed(bool visible)
+    {
+        isAddMergeOpen = visible;
+
+        StateHasChanged();
+
+        return Task.CompletedTask;
     }
 
 

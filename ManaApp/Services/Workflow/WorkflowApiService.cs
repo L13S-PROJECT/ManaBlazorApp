@@ -27,6 +27,11 @@ public class WorkflowApiService
             }
         }
 
+
+// TODO:
+// Graph ir pagaidu UI modelis.
+// Pakāpeniski aizstāt ar WorkflowFlowAnalyzer rezultātiem no API.
+// Pēc Analyzer migrācijas šo metodi varēs dzēst.
     public Dictionary<int, WorkflowGraphNode> BuildGraph(WorkflowDto workflow)
         {
             var graph = new Dictionary<int, WorkflowGraphNode>();
@@ -70,12 +75,14 @@ public class WorkflowApiService
                     return null;
                 
                 var productParts = await LoadProductPartsAsync(versionId);
+                var availableFlows = await LoadAvailableFlowsAsync(workflow.Workflow!.Id);
 
-Console.WriteLine($"LoadProductParts = {productParts.Count}");
-
+// TODO:
+// Pagaidu risinājums.
+// Graph tiek būvēts UI vajadzībām.
+// Pēc WorkflowFlowAnalyzer migrācijas Graph tiks saņemts no API vai vairs nebūs nepieciešams.
+                
                 var graph = BuildGraph(workflow);
-
-Console.WriteLine($"Graph Nodes = {graph.Count}");
 
                 var partIndex = graph.Values
                     .Where(x => x.Node?.ProductToPartId != null)
@@ -89,7 +96,13 @@ Console.WriteLine($"Graph Nodes = {graph.Count}");
                         Workflow = workflow,
                         Graph = graph,
                         PartNodeByProductToPartId = partIndex,
-                        ProductParts = productParts
+                        ProductParts = productParts,
+                        AvailableFlows = availableFlows
+                            .Select(x => new MergeFlowItem
+                            {
+                                Flow = x
+                            })
+                            .ToList(),
                     };
             }
 
@@ -196,19 +209,19 @@ Console.WriteLine($"Graph Nodes = {graph.Count}");
                     });
             }
 
-        public async Task<HttpResponseMessage> AddMergeAsync(
-                int workflowId,
-                int activeFinishNodeId,
-                List<int> finishNodeIds)
+       public async Task<HttpResponseMessage> AddMergeAsync(
+            int workflowId,
+            int currentFinishNodeId,
+            List<int> mergeFinishNodeIds)
             {
                 return await _http.PostAsJsonAsync(
                     "http://localhost:5270/api/workflow/merge",
                     new
-                    {
-                        WorkflowId = workflowId,
-                        ActiveFinishNodeId = activeFinishNodeId,
-                        FinishNodeIds = finishNodeIds
-                    });
+                        {
+                            WorkflowId = workflowId,
+                            CurrentFinishNodeId = currentFinishNodeId,
+                            MergeFinishNodeIds = mergeFinishNodeIds
+                        });
             }
 
         public async Task<HttpResponseMessage> CreateWorkflowAsync(int versionId)
@@ -262,5 +275,26 @@ Console.WriteLine($"Graph Nodes = {graph.Count}");
                     Comments = node.Comments
                 });
         }
+
+        public async Task<List<AvailableFlowDto>> LoadAvailableFlowsAsync(int workflowId)
+            {
+                return await _http.GetFromJsonAsync<List<AvailableFlowDto>>(
+                    $"http://localhost:5270/api/workflow/available-flows/{workflowId}")
+                    ?? new();
+            }
+
+        public async Task<HttpResponseMessage> AddFinishAsync(
+            int workflowId,
+            int flowOwnerNodeId)
+        {
+            return await _http.PostAsJsonAsync(
+                "http://localhost:5270/api/workflow/finish",
+                new
+                {
+                    WorkflowId = workflowId,
+                    FlowOwnerNodeId = flowOwnerNodeId
+                });
+        }
+
 
 }

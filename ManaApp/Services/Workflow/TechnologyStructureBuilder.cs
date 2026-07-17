@@ -2,17 +2,22 @@
 
 using ManaApp.Models;
 using ManaApp.ViewModels.Workflow;
+using ManaApp.DTOs.Workflow;
 
 namespace ManaApp.Services.Workflow;
 
 public class TechnologyStructureBuilder
 {
     private readonly WorkflowState _state;
+    private readonly List<AvailableFlowDto> _flows;
 
     public TechnologyStructureBuilder(WorkflowState state)
-    {
-        _state = state;
-    }
+        {
+            _state = state;
+            _flows = state.AvailableFlows
+                .Select(x => x.Flow)
+                .ToList();
+        }
 
     public List<TechnologyStructureItem> Build()
     {
@@ -24,6 +29,7 @@ Console.WriteLine("=== TECHNOLOGY STRUCTURE BUILDER ===");
         var topParts = _state.ProductParts
             .Where(x => x.ParentProductTopPartId == null)
             .OrderBy(x => x.TopPartName);
+Console.WriteLine($"TOP PART COUNT = {topParts.Count()}");
 
         foreach (var part in topParts)
         {
@@ -39,15 +45,17 @@ Console.WriteLine("=== TECHNOLOGY STRUCTURE BUILDER ===");
         int flowLevel = 0)
 
         {
-            var startNode = FindPartNode(part);
+            var startNode = FindGraphPartNode(part);
+
+            var flow = FindFlow(part);
 
             var item = new TechnologyStructureItem
                 {
                     Part = part,
                     Node = startNode?.Node,
+                    Flow = flow,
                     FlowLevel = flowLevel + 1
                 };
-
             if (startNode != null)
                 {
                     BuildFlow(startNode, item, item.Children);
@@ -56,7 +64,12 @@ Console.WriteLine("=== TECHNOLOGY STRUCTURE BUILDER ===");
             return item;
         }
     
-    private WorkflowGraphNode? FindPartNode(WorkflowPartModel part)
+
+    // TODO:
+    // Šī metode izmanto UI Graph.
+    // Pakāpeniski aizstāt ar WorkflowFlowAnalyzer.GetPartNode().
+
+    private WorkflowGraphNode? FindGraphPartNode(WorkflowPartModel part)
         {
             return _state.PartNodeByProductToPartId.TryGetValue(
                 part.ProductToPartId,
@@ -161,5 +174,11 @@ Console.WriteLine("=== TECHNOLOGY STRUCTURE BUILDER ===");
                     BuildFlow(next, target, items);
                 }
             }
+
+    private AvailableFlowDto? FindFlow(WorkflowPartModel part)
+        {
+            return _flows.FirstOrDefault(x =>
+                x.OwnerProductToPartId == part.ProductToPartId);
+        }
 
 }

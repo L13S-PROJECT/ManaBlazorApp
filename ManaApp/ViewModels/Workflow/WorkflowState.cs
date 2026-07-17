@@ -2,6 +2,7 @@ using ManaApp.Models;
 using ManaApp.DTOs.Workflow;
 using ManaApp.Models.Lookup;
 
+
 namespace ManaApp.ViewModels.Workflow;
 
 public class WorkflowState
@@ -16,6 +17,7 @@ public class WorkflowState
     public List<WorkflowTopPartSelectDto> AvailableTopParts { get; set; } = new();
     public List<LookupItem> WorkCenters { get; set; } = new();
     public List<TechnologyExplorerItem> TechnologyExplorer { get; set; } = new();
+    public List<MergeFlowItem> AvailableFlows { get; set; } = new();
 
     public TechnologyExplorerItem? SelectedExplorerItem { get; set; }
 
