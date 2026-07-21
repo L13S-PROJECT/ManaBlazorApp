@@ -47,6 +47,10 @@ Console.WriteLine($"TOP PART COUNT = {topParts.Count()}");
         {
             var startNode = FindGraphPartNode(part);
 
+            var hasValidationError =
+                startNode != null &&
+                _state.InvalidFlowOwnerNodeIds.Contains(startNode.Node.Id);
+
             var flow = FindFlow(part);
 
             var item = new TechnologyStructureItem
@@ -54,8 +58,12 @@ Console.WriteLine($"TOP PART COUNT = {topParts.Count()}");
                     Part = part,
                     Node = startNode?.Node,
                     Flow = flow,
-                    FlowLevel = flowLevel + 1
+                    FlowLevel = flowLevel + 1,
+                    HasValidationError = hasValidationError
+                    
                 };
+Console.WriteLine($"PART {part.TopPartName} HasValidation={hasValidationError}");
+
             if (startNode != null)
                 {
                     BuildFlow(startNode, item, item.Children);
@@ -82,11 +90,15 @@ Console.WriteLine($"TOP PART COUNT = {topParts.Count()}");
             WorkflowGraphNode node,
             int flowLevel)
         {
+                      
             return new TechnologyStructureItem
-            {
-                Node = node.Node,
-                FlowLevel = flowLevel
-            };
+                {
+                    Node = node.Node,
+                    FlowLevel = flowLevel,
+                    HasValidationError =
+                        (node.Node.NodeType == 3 || node.Node.NodeType == 1) &&
+                        _state.InvalidFlowOwnerNodeIds.Contains(node.Node.Id)
+                };
         }
 
     private TechnologyStructureItem AddFlowNode(

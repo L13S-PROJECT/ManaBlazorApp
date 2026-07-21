@@ -18,7 +18,7 @@ public class WorkflowState
     public List<LookupItem> WorkCenters { get; set; } = new();
     public List<TechnologyExplorerItem> TechnologyExplorer { get; set; } = new();
     public List<MergeFlowItem> AvailableFlows { get; set; } = new();
-
+    public List<int> InvalidFlowOwnerNodeIds { get; set; } = new();
     public TechnologyExplorerItem? SelectedExplorerItem { get; set; }
 
     public List<WorkflowPartModel> ProductParts { get; set; } = new();

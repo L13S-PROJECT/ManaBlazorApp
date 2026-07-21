@@ -10,7 +10,9 @@
      style="margin-left:@(Item.Part != null ? Item.FlowLevel * 18 : 0)px">
 
     <div class="ts-row
-        @(Item.HasValidationError ? "validation-error" : "")
+        @(Item.Part != null && Item.HasValidationError ? "flow-owner-error" : "")
+        @(Item.Node?.NodeType == 3 && Item.HasValidationError ? "flow-owner-error" : "")
+        @(Item.Node?.NodeType == 2 && Item.HasProcessValidationError ? "validation-error" : "")
         @(Item.IsSelected ? "selected" : "")"
         @onclick="HandleClick">
 

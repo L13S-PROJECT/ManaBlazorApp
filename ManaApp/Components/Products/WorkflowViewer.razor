@@ -81,6 +81,8 @@ else
 
             var response = await WorkflowApi.CreateWorkflowAsync(
                  VersionId.Value);
+                 
+Console.WriteLine($"CreateWorkflow status = {response.StatusCode}");
 
             if (!response.IsSuccessStatusCode)
                 return;

@@ -99,6 +99,7 @@
     font-weight:600;
 }
 
+
 .editor-right{
     display:flex;
     align-items:center;
@@ -119,6 +120,12 @@
 
     border:1px solid rgba(255,255,255,.25);
     border-radius:4px;
+}
+
+.editor-version.workflow-invalid{
+    background:#b91c1c;
+    border:1px solid #ef4444;
+    color:#fff;
 }
 
 .btn-save{

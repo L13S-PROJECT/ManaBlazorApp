@@ -9,7 +9,7 @@ public class TechnologyStructureItem
 
     public WorkflowNodeModel? Node { get; set; }
     public AvailableFlowDto? Flow { get; set; }
-
+    
     public int FlowLevel { get; set; }
     public List<TechnologyStructureItem> Children { get; set; } = new();
 
@@ -23,4 +23,5 @@ public class TechnologyStructureItem
 
     public bool IsExpanded { get; set; } = true;
     public bool HasValidationError { get; set; }
+    public bool HasProcessValidationError { get; set; }
 }

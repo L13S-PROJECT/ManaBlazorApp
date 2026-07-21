@@ -61,15 +61,15 @@ public class WorkflowValidator
             connections,
             productParts);
         
-        var productFinishNode = analyzer.GetProductFinishNode();
+        // var productFinishNode = analyzer.GetProductFinishNode();
         
-        if (productFinishNode == null)
-        {
-            result.Errors.Add(new WorkflowValidationErrorDto
-            {
-                Message = "Workflow jābūt vienam produkta gala FINISH mezglam."
-            });
-        }
+        // if (productFinishNode == null)
+        // {
+        //     result.Errors.Add(new WorkflowValidationErrorDto
+        //     {
+        //         Message = "Workflow jābūt vienam produkta gala FINISH mezglam."
+        //     });
+        // }
 
         var flowOwners = analyzer.GetFlowOwnerNodes().ToList();
 
@@ -90,7 +90,10 @@ public class WorkflowValidator
             mergeNodes,
             result);
 
+        ValidateProductWorkflow(analyzer, result);
+
         result.IsValid = result.Errors.Count == 0;
+        
         return result;
     }
 
@@ -159,7 +162,11 @@ public class WorkflowValidator
                         NodeId = merge.Id,
                         Message = "MERGE mezglam jābūt tieši vienai izejai."
                     });
+
+                    continue;
                 }
+
+                
 
                 if (analyzer.IsFinishNode(nextNodes[0]))
                 {
@@ -628,8 +635,39 @@ public class WorkflowValidator
     private static bool ShouldValidateTopPartSubParts(
             List<ProductTopPart> topParts)
         {
-            return topParts.Count > 1;
+            return topParts.Any();
         }
+
+    private static void ValidateProductWorkflow(
+    WorkflowFlowAnalyzer analyzer,
+    WorkflowValidationResultDto result)
+    {
+        var productFinishNode = analyzer.GetProductFinishNode();
+
+        if (productFinishNode == null)
+            {
+                result.Errors.Add(new WorkflowValidationErrorDto
+                {
+                    Message = "Workflow jābūt vienam produkta gala FINISH mezglam."
+                });
+
+                return;
+            }
+        
+        var unconsumedFlowFinishes = analyzer.GetUnconsumedFlowFinishes();
+        
+
+            if (unconsumedFlowFinishes.Count != 1)
+            {
+                result.Errors.Add(new WorkflowValidationErrorDto
+                {
+                    Message = "Workflow jābeidzas ar vienu kopīgu gala Flow."
+                });
+
+                return;
+            }
+
+    }
 
 
 }

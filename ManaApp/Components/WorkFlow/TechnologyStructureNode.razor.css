@@ -69,3 +69,12 @@
     border: 2px solid #dc3545;
     background: #ffe5e5;
 }
+
+.ts-row.flow-owner-error {
+    border-left: 4px solid #dc3545;
+}
+
+.ts-row.flow-owner-error.selected {
+    border: 2px solid #dc3545;
+}
+

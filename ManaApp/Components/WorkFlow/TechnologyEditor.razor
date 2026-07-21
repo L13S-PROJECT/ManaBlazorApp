@@ -27,8 +27,8 @@
 
         <div class="editor-right">
 
-            <div class="editor-version">
-                @WorkflowEditor.Workflow?.Workflow?.Name
+            <div class="editor-version @(WorkflowEditor.Workflow?.IsValid == false ? "workflow-invalid" : "")">
+                @WorkflowEditor.Workflow?.Workflow?.Name 
             </div>
 
             <button class="btn btn-save">
@@ -41,6 +41,7 @@
             <i class="bi bi-x-lg"></i>
         </button>
 
+
         </div>
 
     </div>
@@ -51,7 +52,7 @@
 
             <button class="toolbar-btn top-part"
                 @onclick="AddTopPart"
-                disabled="@WorkflowEditor.IsEditorLocked">
+                disabled="@(!WorkflowEditor.CanAddTopPart() || WorkflowEditor.IsEditorLocked)">
                 <i class="bi bi-box"></i>
                 <span>+ TOP PART</span>
             </button>
@@ -72,14 +73,14 @@
 
             <button class="toolbar-btn merge"
                 @onclick="AddMerge"
-                disabled="@WorkflowEditor.IsEditorLocked">
+                disabled="@(!WorkflowEditor.CanAddMerge() || WorkflowEditor.IsEditorLocked)">
                 <i class="bi bi-diagram-3"></i>
                 <span>+ MERGE</span>
             </button>
 
             <button class="toolbar-btn finish"
                 @onclick="AddFinish"
-                disabled="@WorkflowEditor.IsEditorLocked">
+                disabled="@(!WorkflowEditor.CanAddFinish() || WorkflowEditor.IsEditorLocked)">
                 <i class="bi bi-flag"></i>
                 <span>+ FINISH</span>
                 <i class="bi bi-caret-down-fill"></i>
@@ -284,33 +285,6 @@
 </div>
 
 </section>
-
-@* <section class="property-section">
-
-    <div class="section-title">
-        Papildus plūsmas
-    </div>
-
-    <div class="form-grid">
-
-    <label>Turpināt plūsmu:</label>
-
-    <input type="checkbox" />
-
-    <label>Rezerves daļu plūsma:</label>
-
-    <input type="checkbox" />
-
-    <label>Piezīmes:</label>
-
-    <textarea class="form-control"
-              rows="2"></textarea>
-
-</div>
-
-</section> *@
-
-
 
     </div>
 

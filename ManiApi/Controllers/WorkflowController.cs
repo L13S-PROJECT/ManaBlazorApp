@@ -13,13 +13,16 @@ namespace ManiApi.Controllers
     {
         private readonly AppDbContext _db;
         private readonly WorkflowValidator _validator;
+        private readonly WorkflowAnalyzerFactory _analyzerFactory;
 
         public WorkflowController(
             AppDbContext db,
-            WorkflowValidator validator)
+            WorkflowValidator validator,
+            WorkflowAnalyzerFactory analyzerFactory)
         {
             _db = db;
             _validator = validator;
+            _analyzerFactory = analyzerFactory;
         }
 
         [HttpGet("{versionId}")]
@@ -81,14 +84,21 @@ Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
                     nodes.Select(n => n.Id).Contains(x.FromNodeId) ||
                     nodes.Select(n => n.Id).Contains(x.ToNodeId))
                 .ToListAsync();
+            
+            var validation = await _validator.ValidateAsync(workflow.Id);
 
             return Ok(new
-            {
-                Workflow = workflow,
-                Nodes = nodes,
-                Connections = connections,
-                ProductParts = productParts
-            });
+                {
+                    Workflow = workflow,
+                    Nodes = nodes,
+                    Connections = connections,
+                    ProductParts = productParts,
+                    IsValid = validation.IsValid,
+                    InvalidFlowOwnerNodeIds = validation.Errors
+                    .Where(x => x.NodeId.HasValue)
+                    .Select(x => x.NodeId!.Value)
+                    .ToList()
+                });
         }
 
         [HttpGet("parts/{versionId}")]
@@ -367,8 +377,10 @@ Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
                 return Ok(nodes);
             }
 
-       [HttpGet("available-flows/{workflowId}")]
-        public async Task<IActionResult> GetAvailableFlows(int workflowId)
+       [HttpGet("available-flows/{workflowId}/{flowOwnerNodeId}")]
+        public async Task<IActionResult> GetAvailableFlows(
+            int workflowId,
+            int flowOwnerNodeId)
             {              
                 var workflowNodes = await _db.WorkflowNodes
                     .Where(x =>
@@ -395,7 +407,54 @@ Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
                     connections,
                     productParts);
 
-                return Ok(analyzer.GetAvailableFlows());
+                return Ok(analyzer.GetAvailableMergeFlows(
+                    workflow.VersionId,
+                    flowOwnerNodeId));
+            }
+
+            [HttpGet("merge-available/{workflowId}/{flowOwnerNodeId}")]
+            public async Task<IActionResult> HasAvailableMerge(
+                int workflowId,
+                int flowOwnerNodeId)
+            {
+                var workflow = await _db.Workflows
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == workflowId &&
+                        x.IsActive);
+
+                if (workflow == null)
+                    return NotFound("Workflow nav atrasts.");
+
+                var workflowNodes = await _db.WorkflowNodes
+                    .Where(x =>
+                        x.WorkflowId == workflowId &&
+                        x.IsActive)
+                    .ToListAsync();
+
+                var nodeIds = workflowNodes
+                    .Select(x => x.Id)
+                    .ToList();
+
+                var connections = await _db.WorkflowNodeConnections
+                    .Where(x =>
+                        nodeIds.Contains(x.FromNodeId) ||
+                        nodeIds.Contains(x.ToNodeId))
+                    .ToListAsync();
+
+                var productParts = await _db.ProductTopParts
+                    .Where(x =>
+                        x.VersionId == workflow.VersionId &&
+                        x.IsActive)
+                    .ToListAsync();
+
+                var analyzer = new WorkflowFlowAnalyzer(
+                    workflowNodes,
+                    connections,
+                    productParts);
+
+                return Ok(analyzer.HasAvailableMerge(
+                    workflow.VersionId,
+                    flowOwnerNodeId));
             }
 
 
@@ -679,59 +738,33 @@ Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
                     .Where(x => x.IsActive)
                     .ToListAsync();
 
+// TODO: Move Merge Flow resolution to WorkflowFlowAnalyzer
+
                 var analyzer = new WorkflowFlowAnalyzer(
                     workflowNodes,
                     connections,
                     productParts);
 
-                var finishNodeIds = dto.MergeFinishNodeIds
-                    .Append(dto.CurrentFinishNodeId)
-                    .ToList();
+                var finishNodeIds = analyzer.NormalizeMergeSelection(
+                        dto.CurrentFlowId,
+                        dto.MergeFlowIds);
 
-                if (finishNodeIds.Count != finishNodeIds.Distinct().Count())
-                    return BadRequest("Tas pats Finished Flow izvēlēts vairākas reizes.");
+                        
+                var currentFlow = analyzer.GetFlowInfoByFinish(dto.CurrentFlowId);
 
-                finishNodeIds = finishNodeIds
-                    .Distinct()
-                    .ToList();
+                    if (currentFlow == null)
+                        return BadRequest("Flow nav atrasts.");
 
-                if (finishNodeIds.Count < 2)
-                    return BadRequest("MERGE nepieciešami vismaz divi Finished Flow.");
-
-                var workflow = await _db.Workflows
-                    .FirstOrDefaultAsync(x =>
-                        x.Id == dto.WorkflowId &&
-                        x.IsActive);
-
-                if (workflow == null)
-                    return BadRequest("Workflow nav atrasts.");
-                
-                var previousNode = await _db.WorkflowNodes
-                    .FirstOrDefaultAsync(x =>
-                        x.Id == dto.CurrentFinishNodeId &&
-                        x.WorkflowId == workflow.Id &&
-                        x.NodeType == 4 &&
-                        x.IsActive);
-
-                if (previousNode == null)
-                    return BadRequest("FINISH mezgls nav atrasts.");
-
-                if (previousNode == null)
-                    return BadRequest("PART FINISH nav atrasts.");
+                var previousNode = currentFlow.FinishNode!;
                 
                 
                 var maxSort = await _db.WorkflowNodes
-                    .Where(x => x.WorkflowId == workflow.Id)
+                    .Where(x => x.WorkflowId == dto.WorkflowId)
                     .MaxAsync(x => (int?)x.SortOrder) ?? 0;
 
-                var mergeNode = new WorkflowNode
-                {
-                    WorkflowId = workflow.Id,
-                    NodeType = 3,
-                    Name = "MERGE",
-                    SortOrder = maxSort + 10,
-                    IsActive = true
-                };
+                var mergeNode = CreateMergeNode(
+                    dto.WorkflowId,
+                    maxSort + 10);
 
                  _db.WorkflowNodes.Add(mergeNode);
 
@@ -741,38 +774,14 @@ Console.WriteLine($"FINISH COUNT = {finishNodeIds.Count}");
 
                 foreach (var finishId in finishNodeIds)
                 {
-Console.WriteLine($"CONNECTING FINISH {finishId}");
-                    var finishNode = await _db.WorkflowNodes
-                        .FirstOrDefaultAsync(x =>
-                            x.Id == finishId &&
-                            x.WorkflowId == workflow.Id &&
-                            x.NodeType == 4 &&
-                            x.IsActive);
+                    var flow = analyzer.GetFlowInfoByFinish(finishId);
 
-                    if (finishNode == null)
-                        return BadRequest($"FINISH mezgls {finishId} nav atrasts.");
-                    
-                    // var previousFinishNode = await _db.WorkflowNodeConnections
-                    //     .Where(x => x.ToNodeId == finishNode.Id)
-                    //     .Join(_db.WorkflowNodes,
-                    //         c => c.FromNodeId,
-                    //         n => n.Id,
-                    //         (c, n) => n)
-                    //     .FirstOrDefaultAsync();
+                    if (flow == null)
+                        return BadRequest($"Flow {finishId} nav atrasts.");
 
-                    // if (previousFinishNode == null)
-                    //     return BadRequest("FINISH nav iepriekšējā mezgla.");
-
-                    if (finishNode.Id != dto.CurrentFinishNodeId &&
-                        finishNodeIds.Count(x => x == finishNode.Id) > 1)
-                    {
-                        return BadRequest("Tas pats Finished Flow izvēlēts vairākas reizes.");
-                    }
-                                        
-                    var mergeConnectionExists = await _db.WorkflowNodeConnections
-                        .AnyAsync(x => x.FromNodeId == finishId);
-
-                    if (mergeConnectionExists)
+                    var finishNode = flow.FinishNode!;
+                                                            
+                    if (flow.IsConsumed)
                         return BadRequest("Selected Flow jau ir izmantots citā MERGE.");
                     
                     _db.WorkflowNodeConnections.Add(new WorkflowNodeConnection
@@ -781,7 +790,6 @@ Console.WriteLine($"CONNECTING FINISH {finishId}");
                         ToNodeId = mergeNode.Id
                     });
                 }
-
                 
 
                 await _db.SaveChangesAsync();
@@ -894,56 +902,45 @@ Console.WriteLine($"CONNECTING FINISH {finishId}");
                     connections,
                     productParts);
                 
-                if (flowOwner.NodeType != 1 &&
-                        flowOwner.NodeType != 3)
+                WorkflowNode? lastNode;
+
+                    try
                     {
-                        return BadRequest("Flow Owner drīkst būt tikai PART vai MERGE mezgls.");
+                        lastNode = analyzer.GetValidatedFlowLastNode(flowOwner);
                     }
-                
-                var finishNode = analyzer.GetFlowFinishNodeByOwner(
-                    flowOwner.ProductToPartId ?? 0);
+                    catch (InvalidOperationException ex)
+                    {
+                        return BadRequest(ex.Message);
+                    }
 
-                if (finishNode != null)
-                    return BadRequest("Šai plūsmai FINISH jau eksistē.");
+                    if (lastNode == null)
+                        return BadRequest("Flow nav atrasts.");
 
-                var lastNode = flowOwner;
+                var result = analyzer.BuildFinish(
+                    workflow.Id,
+                    lastNode);
 
-                while (true)
+                _db.WorkflowNodes.Add(result.FinishNode);
+
+                await _db.SaveChangesAsync();
+
+                _db.WorkflowNodeConnections.Add(result.Connection);
+
+                await _db.SaveChangesAsync();
+
+                return Ok(result.FinishNode);
+            }
+
+        private WorkflowNode CreateMergeNode(int workflowId, int sortOrder)
+            {
+                return new WorkflowNode
                 {
-                    var connection = connections
-                        .FirstOrDefault(x => x.FromNodeId == lastNode.Id);
-
-                    if (connection == null)
-                        break;
-
-                    var next = workflowNodes
-                        .First(x => x.Id == connection.ToNodeId);
-
-                    lastNode = next;
-                }
-
-                var newFinish = new WorkflowNode
-                {
-                    WorkflowId = workflow.Id,
-                    NodeType = 4,
-                    Name = "FINISH",
-                    SortOrder = lastNode.SortOrder + 10,
+                    WorkflowId = workflowId,
+                    NodeType = 3,
+                    Name = "MERGE",
+                    SortOrder = sortOrder,
                     IsActive = true
                 };
-
-                _db.WorkflowNodes.Add(newFinish);
-
-                await _db.SaveChangesAsync();
-
-                _db.WorkflowNodeConnections.Add(new WorkflowNodeConnection
-                {
-                    FromNodeId = lastNode.Id,
-                    ToNodeId = newFinish.Id
-                });
-
-                await _db.SaveChangesAsync();
-
-                return Ok(newFinish);
             }
 
     }

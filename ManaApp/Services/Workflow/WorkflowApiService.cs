@@ -75,7 +75,7 @@ public class WorkflowApiService
                     return null;
                 
                 var productParts = await LoadProductPartsAsync(versionId);
-                var availableFlows = await LoadAvailableFlowsAsync(workflow.Workflow!.Id);
+                
 
 // TODO:
 // Pagaidu risinājums.
@@ -96,13 +96,9 @@ public class WorkflowApiService
                         Workflow = workflow,
                         Graph = graph,
                         PartNodeByProductToPartId = partIndex,
-                        ProductParts = productParts,
-                        AvailableFlows = availableFlows
-                            .Select(x => new MergeFlowItem
-                            {
-                                Flow = x
-                            })
-                            .ToList(),
+                        ProductParts = productParts
+                        
+                        .ToList(),
                     };
             }
 
@@ -281,6 +277,23 @@ public class WorkflowApiService
                 return await _http.GetFromJsonAsync<List<AvailableFlowDto>>(
                     $"http://localhost:5270/api/workflow/available-flows/{workflowId}")
                     ?? new();
+            }
+            
+        public async Task<List<AvailableFlowDto>> LoadAvailableFlowsAsync(
+                int workflowId,
+                int flowOwnerNodeId)
+            {
+                return await _http.GetFromJsonAsync<List<AvailableFlowDto>>(
+                    $"http://localhost:5270/api/workflow/available-flows/{workflowId}/{flowOwnerNodeId}")
+                    ?? new();
+            }
+
+        public async Task<bool> HasAvailableMergeAsync(
+                int workflowId,
+                int flowOwnerNodeId)
+            {
+                return await _http.GetFromJsonAsync<bool>(
+                    $"http://localhost:5270/api/workflow/merge-available/{workflowId}/{flowOwnerNodeId}");
             }
 
         public async Task<HttpResponseMessage> AddFinishAsync(

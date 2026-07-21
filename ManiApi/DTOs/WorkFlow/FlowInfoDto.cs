@@ -9,4 +9,5 @@ public class FlowInfoDto
     public int? OwnerProductToPartId { get; set; }
     public AvailableFlowType FlowType { get; set; }
     public bool IsConsumed { get; set; }
+    public bool IsFinished { get; set; }
 }

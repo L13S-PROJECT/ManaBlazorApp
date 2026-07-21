@@ -5,9 +5,11 @@ public class WorkflowDto
     public WorkflowModel? Workflow { get; set; }
 
     public List<WorkflowNodeModel> Nodes { get; set; } = new();
-
+    public bool IsValid { get; set; }
+    public List<int> InvalidFlowOwnerNodeIds { get; set; } = new();
     public List<WorkflowConnectionModel> Connections { get; set; } = new();
     public List<WorkflowPartModel> ProductParts { get; set; } = new();
+    
 }
 
 public class WorkflowModel
