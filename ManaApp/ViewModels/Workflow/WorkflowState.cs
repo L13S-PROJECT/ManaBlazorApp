@@ -13,6 +13,8 @@ public class WorkflowState
     public Dictionary<int, WorkflowGraphNode> PartNodeByProductToPartId { get; set; } = new();
     public WorkflowGraphNode? SelectedNode { get; set; }
     public List<MergeFinishItem> AvailableFinishNodes { get; set; } = new();
+    public AvailableFlowDto? SelectedFlow { get; set; }
+    public bool CanMergeCurrentFlow { get; set; }
     public TechnologyTreeItem? SelectedTreeItem { get; set; }
     public List<WorkflowTopPartSelectDto> AvailableTopParts { get; set; } = new();
     public List<LookupItem> WorkCenters { get; set; } = new();

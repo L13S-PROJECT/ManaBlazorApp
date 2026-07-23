@@ -456,10 +456,6 @@
                 if (WorkflowEditor.SelectedNode == null)
                     return;
 
-                if (WorkflowEditor.SelectedNode.Node.NodeType != 1 &&
-                    WorkflowEditor.SelectedNode.Node.NodeType != 3)
-                    return;
-
                 await WorkflowEditor.AddFinishAsync();
             }
 

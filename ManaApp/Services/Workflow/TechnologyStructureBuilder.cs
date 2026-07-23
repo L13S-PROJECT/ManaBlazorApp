@@ -10,7 +10,6 @@ public class TechnologyStructureBuilder
 {
     private readonly WorkflowState _state;
     private readonly List<AvailableFlowDto> _flows;
-
     public TechnologyStructureBuilder(WorkflowState state)
         {
             _state = state;
@@ -106,7 +105,9 @@ Console.WriteLine($"PART {part.TopPartName} HasValidation={hasValidationError}")
         List<TechnologyStructureItem> items,
         WorkflowGraphNode node)
     {
+       
        var item = CreateNode(node, node.Node.NodeType == 1 ? 0 : parent.FlowLevel);
+
 
         items.Add(item);
 
@@ -177,6 +178,7 @@ Console.WriteLine($"PART {part.TopPartName} HasValidation={hasValidationError}")
                 
                 foreach (var next in current.Next.OrderBy(x => x.Node.SortOrder))
                 {
+
                     var target = AddFlowNode(parent, items, next);
 
                     target.Parent = parent;
@@ -192,5 +194,7 @@ Console.WriteLine($"PART {part.TopPartName} HasValidation={hasValidationError}")
             return _flows.FirstOrDefault(x =>
                 x.OwnerProductToPartId == part.ProductToPartId);
         }
+
+    
 
 }

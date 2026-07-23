@@ -36,11 +36,15 @@ public class WorkflowAnalyzerFactory
                 x.VersionId == workflow.VersionId &&
                 x.IsActive)
             .ToListAsync();
+        
+        var dependencies = await _db.WorkflowDependencies
+            .Where(x => x.WorkflowId == workflowId)
+            .ToListAsync();
 
         return new WorkflowFlowAnalyzer(
             workflowNodes,
             connections,
-            productParts);
+            dependencies);
     }
 
     

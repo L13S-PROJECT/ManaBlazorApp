@@ -41,6 +41,7 @@ namespace ManiApi.Data
         public DbSet<Workflow> Workflows { get; set; }
         public DbSet<WorkflowNode> WorkflowNodes { get; set; }
         public DbSet<WorkflowNodeConnection> WorkflowNodeConnections { get; set; }
+        public DbSet<WorkflowDependency> WorkflowDependencies { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         
 {
@@ -153,6 +154,10 @@ modelBuilder.Entity<OrderItem>()
 modelBuilder.Entity<OrderItem>()
     .Property(e => e.VersionId)
     .HasColumnName("version_id");
+
+modelBuilder.Entity<WorkflowDependency>()
+    .HasIndex(x => new { x.NodeId, x.DependsOnNodeId })
+    .IsUnique();
 
 }
   

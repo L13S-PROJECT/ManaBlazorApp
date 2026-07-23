@@ -56,10 +56,14 @@ public class WorkflowValidator
                 x.IsActive)
             .ToListAsync();
         
+        var dependencies = await _db.WorkflowDependencies
+            .Where(x => x.WorkflowId == workflow.Id)
+            .ToListAsync();
+        
         var analyzer = new WorkflowFlowAnalyzer(
-            nodes,
-            connections,
-            productParts);
+                nodes,
+                connections,
+                dependencies);
         
         // var productFinishNode = analyzer.GetProductFinishNode();
         
@@ -186,6 +190,20 @@ public class WorkflowValidator
         {
             foreach (var owner in flowOwners)
             {
+               ValidateContainerFlow(analyzer, owner, result);
+
+               if (analyzer.HasProcessNode(owner) &&
+                        analyzer.GetFlowFinishNode(owner) == null)
+                    {
+                        result.Errors.Add(new WorkflowValidationErrorDto
+                        {
+                            NodeId = owner.Id,
+                            Message = $"Flow '{owner.Name}' satur PROCESS, bet tam nav FINISH."
+                        });
+
+                        continue;
+                    }
+
                if (analyzer.GetFlowFinishNode(owner) == null)
                 {
                     result.Errors.Add(new WorkflowValidationErrorDto
@@ -194,6 +212,8 @@ public class WorkflowValidator
                         Message = $"Flow '{owner.Name}' nav sasniedzams FINISH."
                     });
                 }
+
+
 
                 var visited = new HashSet<int>();
                 var recursionStack = new HashSet<int>();        
@@ -211,6 +231,40 @@ public class WorkflowValidator
                 }
             }
         }
+
+    private static void ValidateContainerFlow(
+    WorkflowFlowAnalyzer analyzer,
+    WorkflowNode owner,
+    WorkflowValidationResultDto result)
+    {
+        var hasFinish = analyzer.GetFlowFinishNode(owner) != null;
+        var hasDependentFlows = analyzer.HasDependentFlows(owner);
+
+        if (hasFinish || !hasDependentFlows)
+            return;
+
+        if (analyzer.GetDependentFlowCount(owner) < 2)
+            {
+                result.Errors.Add(new WorkflowValidationErrorDto
+                {
+                    NodeId = owner.Id,
+                    Message = $"Flow '{owner.Name}' ir tikai konteineris, tāpēc tam nepieciešami vismaz divi atkarīgie Flow."
+                });
+
+        if (analyzer.HasProcessNode(owner))
+                {
+                    result.Errors.Add(new WorkflowValidationErrorDto
+                    {
+                        NodeId = owner.Id,
+                        Message = $"Flow '{owner.Name}' nevar būt PROCESS, ja tas tiek izmantots tikai kā konteineris."
+                    });
+
+                    return;
+                }
+
+                return;
+            }
+    }
 
     private static List<ProductTopPart> GetTopParts(
     List<ProductTopPart> productParts)
@@ -638,6 +692,8 @@ public class WorkflowValidator
             return topParts.Any();
         }
 
+    
+
     private static void ValidateProductWorkflow(
     WorkflowFlowAnalyzer analyzer,
     WorkflowValidationResultDto result)
@@ -666,6 +722,8 @@ public class WorkflowValidator
 
                 return;
             }
+
+            
 
     }
 

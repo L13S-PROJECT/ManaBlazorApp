@@ -9,17 +9,20 @@ namespace ManiApi.Services.Workflow
     {
         private readonly List<WorkflowNode> _workflowNodes;
         private readonly List<WorkflowNodeConnection> _connections;
-        private readonly List<ProductTopPart> _productParts;
+
         public IReadOnlyList<WorkflowNode> WorkflowNodes => _workflowNodes;
+        private readonly List<WorkflowDependency> _dependencies;
+        private readonly FlowRules _flowRules;
 
         public WorkflowFlowAnalyzer(
             List<WorkflowNode> workflowNodes,
             List<WorkflowNodeConnection> connections,
-            List<ProductTopPart> productParts)
+            List<WorkflowDependency> dependencies)
         {
             _workflowNodes = workflowNodes;
             _connections = connections;
-            _productParts = productParts;
+            _dependencies = dependencies;
+            _flowRules = new FlowRules(this);
         }
 
 
@@ -181,9 +184,9 @@ namespace ManiApi.Services.Workflow
                 if (ownerNode.NodeType == 3)
                     return AvailableFlowType.Merge;
 
-                return _productParts.FirstOrDefault(x => x.Id == ownerNode.ProductToPartId)?.ParentProductTopPartId == null
-                    ? AvailableFlowType.TopPart
-                    : AvailableFlowType.SubPart;
+                return _dependencies.Any(x => x.NodeId == ownerNode.Id)
+                    ? AvailableFlowType.SubPart
+                    : AvailableFlowType.TopPart;
             }
 
 // Šī metode atgriež visus individuāli derīgos Flow kandidātus.
@@ -205,10 +208,42 @@ namespace ManiApi.Services.Workflow
         }
     
     public List<AvailableFlowDto> GetAvailableMergeFlows(
-            int versionId,
-            int flowOwnerNodeId)
+                int versionId,
+                int flowOwnerNodeId)
         {
-            return GetAvailableMergeFlows(versionId);
+            var currentOwner = GetNode(flowOwnerNodeId);
+
+            if (currentOwner == null)
+                return new List<AvailableFlowDto>();
+
+            var currentFinish = GetFlowFinishNode(currentOwner);
+
+            if (currentFinish == null)
+                return new List<AvailableFlowDto>();
+
+            var currentFlow = GetFlowInfoByFinish(currentFinish.Id);
+
+            if (currentFlow == null)
+                return new List<AvailableFlowDto>();
+
+
+            return _workflowNodes
+                .Where(x => x.NodeType == 4 && x.IsActive)
+                .Select(x => GetFlowInfoByFinish(x.Id))
+                .Where(x => x != null)
+                .Where(flow =>
+                    flow!.FinishNode!.Id != currentFlow.FinishNode!.Id &&
+                    CanMergeFlows(currentFlow, flow))
+                .Select(flow =>
+                    CreateAvailableFlow(
+                        flow!.StartNode!.Id,
+                        flow.FinishNode!.Id,
+                        flow.FlowType,
+                        GetFlowOwnerName(flow),
+                        flow.OwnerProductToPartId,
+                        flow.IsConsumed,
+                        true))
+                .ToList();
         }
 
     private bool BelongsToSubPartFlow(FlowInfoDto flow)
@@ -234,28 +269,25 @@ namespace ManiApi.Services.Workflow
                     !HasSubPartFlows(secondFlow);
         }
 
-    private bool CanMergeTopPartWithSubPart(
-            FlowInfoDto topPartFlow,
-            FlowInfoDto subPartFlow)
-        {
-            if (topPartFlow.OwnerProductToPartId == null ||
-                subPartFlow.OwnerProductToPartId == null)
-            {
-                return false;
-            }
-
-            return BelongsToSameTopPart(
-                topPartFlow.StartNode!,
-                subPartFlow.StartNode!);
-        }
+   private bool CanMergeTopPartWithSubPart(
+        FlowInfoDto topPartFlow,
+        FlowInfoDto subPartFlow)
+    {
+        return _dependencies.Any(x =>
+            x.NodeId == subPartFlow.StartNode!.Id &&
+            IsFlowOwnerInHierarchy(
+                topPartFlow.StartNode!.Id,
+                x.DependsOnNodeId));
+    }
+    
 
     private bool HasSubPartFlows(FlowInfoDto flow)
         {
-            if (flow.StartNode?.ProductToPartId == null)
+            if (flow.StartNode == null)
                 return false;
 
-            return _productParts.Any(x =>
-                x.ParentProductTopPartId == flow.StartNode.ProductToPartId);
+            return _dependencies.Any(x =>
+                x.DependsOnNodeId == flow.StartNode.Id);
         }
     
     public bool HasAvailableMerge(int versionId)
@@ -302,11 +334,14 @@ namespace ManiApi.Services.Workflow
 
     private bool IsMergeCandidate(FlowInfoDto flow)
         {
-            if (flow.StartNode == null)
+            if (flow.StartNode != null &&
+                IsContainerFlow(flow.StartNode))
+            {
                 return false;
-            
+            }
+
             return IsAvailableFlow(flow) &&
-                    IsMergeFlowEligible(flow);
+                IsMergeFlowEligible(flow);
         }
 
     public bool CanMergeFlows(
@@ -318,11 +353,30 @@ namespace ManiApi.Services.Workflow
 
             if (firstFlow.FinishNode?.Id == secondFlow.FinishNode?.Id)
                 return false;
+            
+            if (firstFlow.StartNode == null || secondFlow.StartNode == null)
+                return false;
+
+            if (GetCurrentFlowOwner(firstFlow.StartNode) != firstFlow.StartNode)
+                return false;
+
+            if (GetCurrentFlowOwner(secondFlow.StartNode) != secondFlow.StartNode)
+                return false;
 
             if (!firstFlow.IsFinished || !secondFlow.IsFinished)
                 return false;
 
             if (firstFlow.IsConsumed || secondFlow.IsConsumed)
+                return false;
+            
+            if ((firstFlow.StartNode != null && IsContainerFlow(firstFlow.StartNode)) ||
+                (secondFlow.StartNode != null && IsContainerFlow(secondFlow.StartNode)))
+            {
+                return false;
+            }
+            
+            if (!AreDependenciesConsumed(firstFlow) ||
+                !AreDependenciesConsumed(secondFlow))
                 return false;
             
             if (BelongsToTopPartFlow(firstFlow) &&
@@ -332,12 +386,18 @@ namespace ManiApi.Services.Workflow
             }
 
             if (BelongsToSubPartFlow(firstFlow) &&
-                    BelongsToSubPartFlow(secondFlow))
-                {
-                    return BelongsToSameTopPart(
-                        firstFlow.StartNode!,
-                        secondFlow.StartNode!);
-                }            
+                BelongsToSubPartFlow(secondFlow))
+            {
+                var firstDependency = _dependencies
+                    .FirstOrDefault(x => x.NodeId == firstFlow.StartNode!.Id);
+
+                var secondDependency = _dependencies
+                    .FirstOrDefault(x => x.NodeId == secondFlow.StartNode!.Id);
+
+                return firstDependency != null &&
+                    secondDependency != null &&
+                    firstDependency.DependsOnNodeId == secondDependency.DependsOnNodeId;
+            }           
 
             if (BelongsToMergeFlow(firstFlow) && BelongsToSubPartFlow(secondFlow))
                 return true;
@@ -416,17 +476,60 @@ namespace ManiApi.Services.Workflow
 
             private bool IsAvailableFlow(FlowInfoDto flow)
                 {
+                    if (flow.StartNode == null)
+                        return false;
+                    
+                    if (IsContainerFlow(flow.StartNode))
+                        return false;
+    
+                    var currentOwner = GetCurrentFlowOwner(flow.StartNode);
+
+                    if (currentOwner != flow.StartNode)
+                        return false;
+
                     return flow.FinishNode != null &&
-                        flow.IsFinished &&
-                        !flow.IsConsumed;
+                            flow.IsFinished &&
+                            !flow.IsConsumed &&
+                            AreDependenciesConsumed(flow);
                 }
 
+    private bool AreDependenciesConsumed(FlowInfoDto flow)
+        {
+            if (flow.StartNode == null)
+                return true;
 
-    private bool HasOpenMergePoints(FlowInfoDto flow)
+            var dependencies = _dependencies
+                .Where(x => x.NodeId == flow.StartNode.Id);
+
+            foreach (var dependency in dependencies)
             {
-                // pagaidām tikai stub
-                return false;
+                var parentFlowOwner = GetNode(dependency.DependsOnNodeId);
+
+                if (parentFlowOwner != null &&
+                    IsContainerFlow(parentFlowOwner))
+                {
+                    continue;
+                }
+
+                    if (parentFlowOwner == null)
+                        return false;
+
+                var currentOwner = GetCurrentFlowOwner(parentFlowOwner);
+
+                if (currentOwner == null || currentOwner.Id == parentFlowOwner.Id)
+                    return false;
+
             }
+
+            return true;
+        }
+
+    private bool IsContainerFlow(WorkflowNode owner)
+        {
+            return !HasProcessNode(owner) &&
+                GetFlowFinishNode(owner) == null &&
+                HasDependentFlows(owner);
+        }
 
     private AvailableFlowDto BuildAvailableMergeFlow(
             WorkflowNode finishNode)
@@ -455,8 +558,8 @@ namespace ManiApi.Services.Workflow
                         isConsumed: false,
                         isSelectable: false);
 
-            var ownerTopPartId = GetTopLevelProductPartId(owner.ProductToPartId);
-            _ = ownerTopPartId;
+            // var ownerTopPartId = GetTopLevelProductPartId(owner.ProductToPartId);
+            // _ = ownerTopPartId;
 
             var isConsumed = flow.IsConsumed;
             
@@ -484,9 +587,9 @@ namespace ManiApi.Services.Workflow
                     return CreateAvailableFlow(
                         startNodeId: startNode.Id,
                         finishNodeId: finishNode.Id,
-                        flowType: AvailableFlowType.Unknown,
-                        ownerName: finishNode.Name ?? "",
-                        ownerProductToPartId: null,
+                        flowType: flow.FlowType,
+                        ownerName: GetFlowOwnerName(flow),
+                        ownerProductToPartId: flow.OwnerProductToPartId,
                         isConsumed: isConsumed,
                         isSelectable: false);
                 }
@@ -867,47 +970,21 @@ namespace ManiApi.Services.Workflow
 
                 return node.NodeType == 1 || node.NodeType == 3;
             }
-
-        private ProductTopPart? GetProductPart(int productToPartId)
-            {
-                return _productParts.FirstOrDefault(x => x.Id == productToPartId);
-            }
-
-        private ProductTopPart? GetTopLevelProductPart(int productToPartId)
-            {
-                var part = GetProductPart(productToPartId);
-
-                while (part?.ParentProductTopPartId != null)
-                {
-                    part = GetProductPart(part.ParentProductTopPartId.Value);
-                }
-
-                return part;
-            }
-
-        private int? GetTopLevelProductPartId(int? productToPartId)
-            {
-                if (productToPartId == null)
-                    return null;
-
-                return GetTopLevelProductPart(productToPartId.Value)?.Id;
-            }
-
+        
 
         private bool BelongsToSameTopPart(
                 WorkflowNode firstOwner,
                 WorkflowNode secondOwner)
             {
-                var firstTopPartId =
-                    GetTopLevelProductPartId(firstOwner.ProductToPartId);
+                var firstDependency = _dependencies
+                    .FirstOrDefault(x => x.NodeId == firstOwner.Id);
 
-                var secondTopPartId =
-                    GetTopLevelProductPartId(secondOwner.ProductToPartId);
+                var secondDependency = _dependencies
+                    .FirstOrDefault(x => x.NodeId == secondOwner.Id);
 
-                if (firstTopPartId == null || secondTopPartId == null)
-                    return false;
-
-                return firstTopPartId == secondTopPartId;
+                return firstDependency != null &&
+                    secondDependency != null &&
+                    firstDependency.DependsOnNodeId == secondDependency.DependsOnNodeId;
             }
         
         private bool CanBeMerged(
@@ -922,24 +999,41 @@ namespace ManiApi.Services.Workflow
 
         
         public List<int> NormalizeMergeSelection(
-    int currentFlowId,
-    IEnumerable<int> mergeFlowIds)
+            int currentFlowId,
+            IEnumerable<int> mergeFlowIds)
         {
             var finishNodeIds = mergeFlowIds
                 .Append(currentFlowId)
                 .ToList();
 
             if (finishNodeIds.Count != finishNodeIds.Distinct().Count())
-                throw new InvalidOperationException("Tas pats Finished Flow izvēlēts vairākas reizes.");
+                throw new InvalidOperationException(
+                    "Tas pats Finished Flow izvēlēts vairākas reizes.");
 
             finishNodeIds = finishNodeIds
                 .Distinct()
                 .ToList();
 
             if (finishNodeIds.Count < 2)
-                throw new InvalidOperationException("MERGE nepieciešami vismaz divi Finished Flow.");
+                throw new InvalidOperationException(
+                    "MERGE nepieciešami vismaz divi Finished Flow.");
 
-                return finishNodeIds;
+            foreach (var finishId in finishNodeIds)
+            {
+                var flow = GetFlowInfoByFinish(finishId);
+
+                if (flow == null)
+                    throw new InvalidOperationException(
+                        $"Flow {finishId} nav atrasts.");
+
+                if (!AreDependenciesConsumed(flow))
+                    {
+                        throw new InvalidOperationException(
+                            "Visām atkarīgajām plūsmām vispirms jābūt apvienotām ar MERGE.");
+                    }
+            }
+
+            return finishNodeIds;
         }
 
     public WorkflowNode? GetFlowLastNode(int flowOwnerNodeId)
@@ -1001,12 +1095,183 @@ namespace ManiApi.Services.Workflow
                     throw new InvalidOperationException(
                         "Šai plūsmai FINISH jau eksistē.");
             }
+        
+// TODO:
+// Šī validācija tiks aizstāta ar Flow atkarību analīzi.
+// Validācija vairs nedrīkst balstīties uz ProductPart hierarhiju.
+        private void ValidateChildFlowsFinished(WorkflowNode flowOwner)
+            {
+                var childFlows = _workflowNodes
+                    .Where(x =>
+                        x.NodeType == 1 &&
+                        x.Id != flowOwner.Id &&
+                        CanReachNode(flowOwner.Id, x.Id))
+                    .ToList();
 
+                foreach (var childFlow in childFlows)
+                {
+                    var finish = FindFlowFinish(childFlow);
+
+                    if (finish == null)
+                    {
+                        throw new InvalidOperationException(
+                            "Nevar pabeigt Flow, kamēr nav pabeigtas iekšējās plūsmas.");
+                    }
+                }
+            }
+
+// TODO:
+// Šī validācija tiks apvienota kopējā Flow atkarību validācijā.
+// MERGE un SUB PART tiks analizēti kā Flow atkarības grafā.
+        private void ValidateMergeInputsFinished(WorkflowNode flowOwner)
+            {
+                var mergeNodes = _workflowNodes
+                    .Where(x =>
+                        x.NodeType == 3 &&
+                        CanReachNode(flowOwner.Id, x.Id))
+                    .ToList();
+
+                foreach (var merge in mergeNodes)
+                {
+                    var previousNodes = GetPreviousNodeIds(merge.Id);
+
+                    foreach (var previousId in previousNodes)
+                    {
+                        var previousNode = GetNode(previousId);
+
+                        if (previousNode == null)
+                            continue;
+
+                        if (!IsFlowFinishNode(previousNode))
+                            {
+                                throw new InvalidOperationException(
+                                    "MERGE ieejas plūsmām jābūt pabeigtām ar FINISH.");
+                            }
+                    }
+                }
+            }
+
+        private void ValidateFlowDependenciesFinished(WorkflowNode flowOwner)
+        {
+            var visited = new HashSet<int>();
+
+            ValidateFlowDependenciesRecursive(
+                flowOwner.Id,
+                flowOwner.Id,
+                visited);
+
+        }
+
+        private void ValidateDependentFlowsMerged(WorkflowNode flowOwner)
+            {
+                var dependentNodes = _dependencies
+                    .Where(x => x.DependsOnNodeId == flowOwner.Id)
+                    .Select(x => GetNode(x.NodeId))
+                    .Where(x => x != null)
+                    .Cast<WorkflowNode>()
+                    .ToList();
+
+                if (dependentNodes.Count <= 1)
+                    return;
+
+                foreach (var node in dependentNodes)
+                {
+                    var finish = GetFlowFinishNode(node);
+
+                    if (finish == null)
+                        return;
+
+                    var nextNodes = GetNextNodeIds(finish.Id);
+
+                    if (!nextNodes.Any(IsMergeNode))
+                    {
+                        throw new InvalidOperationException(
+                            "Atkarīgās plūsmas jāapvieno ar MERGE.");
+                    }
+                }
+            }
+
+        private void ValidateFlowDependenciesRecursive(
+            int currentNodeId,
+            int flowOwnerNodeId,
+            HashSet<int> visited)
+        {
+            if (!visited.Add(currentNodeId))
+                return;
+
+            var currentNode = GetNode(currentNodeId);
+
+                if (currentNode == null)
+                    return;
+   
+            if (currentNode.Id != flowOwnerNodeId &&
+                    IsFlowOwner(currentNode))
+                {
+                    var flow = GetFlowInfoByFinish(
+                        GetFlowFinishNode(currentNode)?.Id ?? 0);
+
+                    if (flow == null)
+                        {
+                            throw new InvalidOperationException(
+                                "Neizdevās noteikt atkarīgās plūsmas informāciju.");
+                        }
+                    
+                    if (flow.StartNode?.Id == flowOwnerNodeId)
+                        {
+                            return;
+                        }
+
+                    if (!flow.IsFinished)
+                        {
+                            throw new InvalidOperationException(
+                                "Atkarīgajai plūsmai jābūt pabeigtai ar FINISH.");
+                        }
+
+                    if (flow.IsConsumed)
+                        {
+                            throw new InvalidOperationException(
+                                "Atkarīgā plūsma jau izmantota citā MERGE.");
+                        }
+                    
+                    if (flow.StartNode != null &&
+                            IsContainerFlow(flow.StartNode))
+                        {
+                            return;
+                        }
+
+                    if (!AreDependenciesConsumed(flow))
+                        {
+                            throw new InvalidOperationException(
+                                "Nav izpildītas Flow atkarības.");
+                        }    
+
+                    return;
+                }
+
+            foreach (var nextNodeId in GetNextNodeIds(currentNodeId))
+                {
+                    ValidateFlowDependenciesRecursive(
+                        nextNodeId,
+                        flowOwnerNodeId,
+                        visited);
+                }
+        }
+
+// TODO:
+// Pirms FINISH izveides jāpārbauda visas šī Flow neatrisinātās
+// atkarības Workflow grafā (SUB PART un MERGE), nevis ProductPart hierarhijā.
         public WorkflowNode? GetValidatedFlowLastNode(WorkflowNode flowOwner)
             {
                 ValidateFlowOwner(flowOwner);
 
                 ValidateFlowHasNoFinish(flowOwner.ProductToPartId ?? 0);
+                
+                // ValidateChildFlowsFinished(flowOwner);
+
+                // ValidateMergeInputsFinished(flowOwner);
+
+                ValidateFlowDependenciesFinished(flowOwner);
+                // ValidateDependentFlowsMerged(flowOwner);
 
                 return GetFlowLastNode(flowOwner.Id);
             }
@@ -1033,6 +1298,86 @@ namespace ManiApi.Services.Workflow
                 var connection = CreateFinishConnection(lastNode, finishNode);
 
                 return (finishNode, connection);
+            }
+
+       private WorkflowNode? GetCurrentFlowOwner(WorkflowNode ownerNode)
+            {
+                if (!IsFlowOwner(ownerNode))
+                    return null;
+
+                var finish = GetFlowFinishNode(ownerNode);
+
+                if (finish == null)
+                    return ownerNode;
+                
+                var nextMerge = GetNextMergeNodes(finish.Id).FirstOrDefault();
+
+                    if (nextMerge == null)
+                        return ownerNode;
+
+                return GetCurrentFlowOwner(nextMerge);
+            }
+
+        private bool IsFlowOwnerInHierarchy(
+                int ancestorFlowOwnerId,
+                int descendantFlowOwnerId)
+            {
+                if (ancestorFlowOwnerId == descendantFlowOwnerId)
+                    return true;
+
+                var dependency = _dependencies
+                    .FirstOrDefault(x => x.NodeId == descendantFlowOwnerId);
+
+                if (dependency == null)
+                    return false;
+
+                return IsFlowOwnerInHierarchy(
+                    ancestorFlowOwnerId,
+                    dependency.DependsOnNodeId);
+            }
+
+        public bool HasDependentFlows(WorkflowNode owner)
+            {
+                return _dependencies.Any(x => x.DependsOnNodeId == owner.Id);
+            }
+
+        public int GetDependentFlowCount(WorkflowNode owner)
+            {
+                return _dependencies.Count(x => x.DependsOnNodeId == owner.Id);
+            }
+
+        public bool HasProcessNode(WorkflowNode owner)
+            {
+                var visited = new HashSet<int>();
+
+                return HasProcessNodeRecursive(owner.Id, visited);
+            }
+
+        private bool HasProcessNodeRecursive(
+                int nodeId,
+                HashSet<int> visited)
+            {
+                if (!visited.Add(nodeId))
+                    return false;
+
+                if (IsProcessNode(nodeId))
+                    return true;
+
+                foreach (var nextId in GetNextNodeIds(nodeId))
+                {
+                    var nextNode = GetNode(nextId);
+
+                    if (nextNode == null)
+                        continue;
+
+                    if (IsFlowOwner(nextNode) && nextNode.Id != nodeId)
+                        continue;
+
+                    if (HasProcessNodeRecursive(nextId, visited))
+                        return true;
+                }
+
+                return false;
             }
 
     }

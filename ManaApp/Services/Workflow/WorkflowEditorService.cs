@@ -69,7 +69,8 @@ Console.WriteLine($"STATE PRODUCT PARTS = {_stateService.State.ProductParts.Coun
         public bool CanAddSubPart()
             {
                 return SelectedNode != null &&
-                    SelectedNode.Node.NodeType is 1 or 3;
+                    SelectedNode.Node.NodeType != 2 &&
+                    SelectedNode.Node.NodeType != 4;
             }
         
         public bool CanAddTopPart()
@@ -85,8 +86,37 @@ Console.WriteLine($"STATE PRODUCT PARTS = {_stateService.State.ProductParts.Coun
 
         public bool CanAddFinish()
             {
-                return SelectedNode != null &&
-                    SelectedNode.Node.NodeType == 2;
+                if (SelectedStructureItem == null)
+                    return false;
+
+                if (SelectedNode == null)
+                    return false;
+
+                if (SelectedNode.Node.NodeType == 1 ||
+                    SelectedNode.Node.NodeType == 2)
+                {
+                    return GetCurrentFlowOwner() != null &&
+                        GetCurrentFlowOwnerHasNoFinish();
+                }
+
+                return false;
+            }
+        
+        private bool GetCurrentFlowOwnerHasNoFinish()
+            {
+                var owner = GetCurrentFlowOwner();
+
+                if (owner == null)
+                    return false;
+
+                var ownerNode = FindPartNode(owner);
+
+                if (ownerNode == null)
+                    return false;
+
+                return !State.Graph.Values.Any(x =>
+                    x.Node.NodeType == 4 &&
+                    x.Previous.Any(p => p.Node.Id == ownerNode.Node.Id));
             }
 
         public WorkflowState State => _stateService.Current;
@@ -144,11 +174,15 @@ Console.WriteLine($"STATE PRODUCT PARTS = {_stateService.State.ProductParts.Coun
                 var currentFlow = GetCurrentFlow();
 
                     if (currentFlow == null)
+                    {
+                        State.CanMergeCurrentFlow = false;
+                        State.AvailableFlows.Clear();
                         return;
+                    }
 
                     var flows = await _workflowApiService.LoadAvailableFlowsAsync(
                         State.Workflow.Workflow.Id,
-                        currentFlow.StartNodeId);
+                        currentFlow.FinishNodeId);
 
                 State.AvailableFlows.Clear();
 
@@ -159,6 +193,8 @@ Console.WriteLine($"STATE PRODUCT PARTS = {_stateService.State.ProductParts.Coun
                         Flow = flow
                     });
                 }
+
+                State.CanMergeCurrentFlow = State.AvailableFlows.Any();
             }
 
         public string NodeTypeName(int type)
@@ -204,7 +240,16 @@ Console.WriteLine($"STATE PRODUCT PARTS = {_stateService.State.ProductParts.Coun
         {
             var selectedPartId = SelectedPart?.ProductToPartId;
 
+            var selectedFinishNodeId = State.SelectedFlow?.FinishNodeId;
+
             await ReloadAsync();
+
+            if (selectedFinishNodeId.HasValue)
+                {
+                    State.SelectedFlow = State.AvailableFlows
+                        .Select(x => x.Flow)
+                        .FirstOrDefault(x => x.FinishNodeId == selectedFinishNodeId.Value);
+                }
 
             if (selectedPartId.HasValue)
                 {
@@ -551,9 +596,9 @@ foreach (var part in attachedParts)
             return result;
         }
     
-        public AvailableFlowDto? GetCurrentFlow()
+       public AvailableFlowDto? GetCurrentFlow()
             {
-                return SelectedStructureItem?.Flow;
+                return State.SelectedFlow;
             }
 
         public async Task<bool> AddProcessAsync(string processName)
@@ -693,6 +738,7 @@ foreach (var part in attachedParts)
                 {
                     item.IsSelected = false;
                     State.SelectedStructureItem = null;
+                    State.SelectedFlow = item.Flow;
                     State.SelectedNode = null;
                     return;
                 }
@@ -700,12 +746,18 @@ foreach (var part in attachedParts)
                 ClearStructureSelection(State.TechnologyStructure);
 
                 item.IsSelected = true;
-
                 State.SelectedStructureItem = item;
 
-                State.SelectedNode = item.Node == null
-                    ? null
-                    : Graph.GetValueOrDefault(item.Node.Id);
+                if (item.Flow != null)
+                    {
+                        State.SelectedFlow = item.Flow;
+                    }
+
+                State.SelectedNode = item.Node != null
+                    ? Graph.GetValueOrDefault(item.Node.Id)
+                    : null;
+
+                _ = LoadAvailableFlowsAsync();
             }
 
         public string? ValidationMessage

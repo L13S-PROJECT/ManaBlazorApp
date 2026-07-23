@@ -402,10 +402,14 @@ Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
                 var connections = await _db.WorkflowNodeConnections
                     .ToListAsync();
                 
+                var dependencies = await _db.WorkflowDependencies
+                    .Where(x => x.WorkflowId == workflow.Id)
+                    .ToListAsync();
+                
                 var analyzer = new WorkflowFlowAnalyzer(
                     workflowNodes,
                     connections,
-                    productParts);
+                    dependencies);
 
                 return Ok(analyzer.GetAvailableMergeFlows(
                     workflow.VersionId,
@@ -446,11 +450,16 @@ Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
                         x.VersionId == workflow.VersionId &&
                         x.IsActive)
                     .ToListAsync();
+                
+                var dependencies = await _db.WorkflowDependencies
+                    .Where(x => x.WorkflowId == workflow.Id)
+                    .ToListAsync();
+                
 
                 var analyzer = new WorkflowFlowAnalyzer(
                     workflowNodes,
                     connections,
-                    productParts);
+                    dependencies);
 
                 return Ok(analyzer.HasAvailableMerge(
                     workflow.VersionId,
@@ -570,26 +579,18 @@ Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
 
                     await _db.SaveChangesAsync();
 
-                //     var finishNode = new WorkflowNode
-                //     {
-                //         WorkflowId = workflow.Id,
-                //         NodeType = 4,
-                //         Name = "FINISH",
-                //         SortOrder = partNode.SortOrder + 10,
-                //         IsActive = true
-                //     };
+                    if (dto.AttachToNodeId.HasValue)
+                        {
+                    
+                           _db.WorkflowDependencies.Add(new WorkflowDependency
+                                {
+                                    WorkflowId = workflow.Id,
+                                    NodeId = partNode.Id,
+                                    DependsOnNodeId = dto.AttachToNodeId.Value
+                                });
 
-                //     _db.WorkflowNodes.Add(finishNode);
-
-                //     await _db.SaveChangesAsync();
-
-                //     _db.WorkflowNodeConnections.Add(new WorkflowNodeConnection
-                //     {
-                //         FromNodeId = partNode.Id,
-                //         ToNodeId = finishNode.Id
-                //     });
-
-                // await _db.SaveChangesAsync();
+                            await _db.SaveChangesAsync();
+                        }
 
                 await transaction.CommitAsync();
                 return Ok();
@@ -601,8 +602,8 @@ Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
                     if (dto.ParentProductTopPartId == null)
                         return BadRequest("ParentProductTopPartId nav norādīts.");
 
-                    if (dto.AttachToNodeId == null)
-                        return BadRequest("AttachToNodeId nav norādīts.");
+                    // if (dto.AttachToNodeId == null)
+                    //     return BadRequest("AttachToNodeId nav norādīts.");
 
                     var parentPart = await _db.ProductTopParts
                         .FirstOrDefaultAsync(x =>
@@ -613,13 +614,13 @@ Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
                     if (parentPart == null)
                         return BadRequest("Parent ProductTopPart nav atrasts.");
 
-                    var attachNode = await _db.WorkflowNodes
-                        .FirstOrDefaultAsync(x =>
-                            x.Id == dto.AttachToNodeId &&
-                            x.IsActive);
+                    // var attachNode = await _db.WorkflowNodes
+                    //     .FirstOrDefaultAsync(x =>
+                    //         x.Id == dto.AttachToNodeId &&
+                    //         x.IsActive);
 
-                    if (attachNode == null)
-                        return BadRequest("Attach PART mezgls nav atrasts.");
+                    // if (attachNode == null)
+                    //     return BadRequest("Attach PART mezgls nav atrasts.");
 
                     return await AddTopPart(dto);
                 }
@@ -737,17 +738,30 @@ Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
                 var productParts = await _db.ProductTopParts
                     .Where(x => x.IsActive)
                     .ToListAsync();
+                
+                var dependencies = await _db.WorkflowDependencies
+                    .Where(x => x.WorkflowId == dto.WorkflowId)
+                    .ToListAsync();
 
 // TODO: Move Merge Flow resolution to WorkflowFlowAnalyzer
 
                 var analyzer = new WorkflowFlowAnalyzer(
                     workflowNodes,
                     connections,
-                    productParts);
+                    dependencies);
+                
+                List<int> finishNodeIds;
 
-                var finishNodeIds = analyzer.NormalizeMergeSelection(
+                try
+                {
+                    finishNodeIds = analyzer.NormalizeMergeSelection(
                         dto.CurrentFlowId,
                         dto.MergeFlowIds);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return BadRequest(ex.Message);
+                }
 
                         
                 var currentFlow = analyzer.GetFlowInfoByFinish(dto.CurrentFlowId);
@@ -788,6 +802,13 @@ Console.WriteLine($"FINISH COUNT = {finishNodeIds.Count}");
                     {
                         FromNodeId = finishNode.Id,
                         ToNodeId = mergeNode.Id
+                    });
+
+                    _db.WorkflowDependencies.Add(new WorkflowDependency
+                    {
+                        WorkflowId = dto.WorkflowId,
+                        NodeId = mergeNode.Id,
+                        DependsOnNodeId = flow.StartNode!.Id
                     });
                 }
                 
@@ -884,6 +905,8 @@ Console.WriteLine($"FINISH COUNT = {finishNodeIds.Count}");
 
                 if (flowOwner == null)
                     return BadRequest("Flow sākuma mezgls nav atrasts.");
+                
+                
 
                 var workflowNodes = await _db.WorkflowNodes
                     .Where(x => x.WorkflowId == workflow.Id && x.IsActive)
@@ -896,17 +919,26 @@ Console.WriteLine($"FINISH COUNT = {finishNodeIds.Count}");
                 var productParts = await _db.ProductTopParts
                     .Where(x => x.IsActive)
                     .ToListAsync();
+                
+                var dependencies = await _db.WorkflowDependencies
+                    .Where(x => x.WorkflowId == workflow.Id)
+                    .ToListAsync();
 
                 var analyzer = new WorkflowFlowAnalyzer(
                     workflowNodes,
                     connections,
-                    productParts);
+                    dependencies);
+
+                var ownerNode = analyzer.FindFlowOwnerNode(flowOwner);
+
+                    if (ownerNode == null)
+                        return BadRequest("Flow sākums nav atrasts.");
                 
                 WorkflowNode? lastNode;
 
                     try
                     {
-                        lastNode = analyzer.GetValidatedFlowLastNode(flowOwner);
+                        lastNode = analyzer.GetValidatedFlowLastNode(ownerNode);
                     }
                     catch (InvalidOperationException ex)
                     {
@@ -923,6 +955,8 @@ Console.WriteLine($"FINISH COUNT = {finishNodeIds.Count}");
                 _db.WorkflowNodes.Add(result.FinishNode);
 
                 await _db.SaveChangesAsync();
+
+                result.Connection.ToNodeId = result.FinishNode.Id;
 
                 _db.WorkflowNodeConnections.Add(result.Connection);
 
