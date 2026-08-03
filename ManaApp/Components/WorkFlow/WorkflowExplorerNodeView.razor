@@ -1,0 +1,50 @@
+@* WorkflowExplorerNodeView.razor *@
+
+@using ManaApp.ViewModels.Workflow
+
+@namespace ManaApp.Components.Workflow
+
+<div class="workflow-explorer-node @(Item.IsSelected ? "selected" : "") @(Item.IsDependency ? "dependency" : "")"
+     @onclick="Select">
+     
+
+    <div class="node-header">
+        <span class="node-type">
+            @GetNodeTypeName(Item.Node?.NodeType ?? 0)
+        </span>
+
+        <span class="node-name">
+            @Item.Node?.Name
+        </span>
+    </div>
+ 
+    
+
+</div>
+
+
+@code {
+    [Parameter]
+    public WorkflowGraphItem Item { get; set; } = null!;
+
+    [Parameter]
+    public EventCallback<WorkflowGraphItem> OnNodeClick { get; set; }
+
+    private async Task Select()
+    {
+        await OnNodeClick.InvokeAsync(Item);
+    }
+
+    private string GetNodeTypeName(int type)
+    {
+        return type switch
+        {
+            1 => "PART",
+            2 => "PROCESS",
+            3 => "MERGE",
+            4 => "FINISH",
+            _ => "NODE"
+        };
+    }
+
+}  

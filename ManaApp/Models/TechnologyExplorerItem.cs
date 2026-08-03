@@ -1,3 +1,5 @@
+using ManaApp.Shared.DTOs.Workflow;
+
 namespace ManaApp.Models;
 
 public class TechnologyExplorerItem

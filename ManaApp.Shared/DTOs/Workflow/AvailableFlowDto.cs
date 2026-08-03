@@ -1,4 +1,4 @@
-namespace ManiApi.DTOs.WorkFlow;
+namespace ManaApp.Shared.DTOs.Workflow;
 
 public class AvailableFlowDto
 {

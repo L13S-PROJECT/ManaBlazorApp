@@ -1,7 +1,7 @@
 @* AddTopPartDialog.razor *@
 
 @using ManaApp.Services.Workflow
-@using ManaApp.DTOs.Workflow
+@using ManaApp.Shared.DTOs.Workflow;
 
 @inject WorkflowEditorService WorkflowEditor
 
@@ -98,7 +98,9 @@
 
     private async Task Save()
         {
-            foreach (var part in topParts.Where(x => x.Selected && !x.Disabled))
+            foreach (var part in topParts
+                .Where(x => x.Selected && !x.Disabled)
+                .ToList())
             {
                 bool ok;
 

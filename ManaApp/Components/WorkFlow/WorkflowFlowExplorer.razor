@@ -1,0 +1,104 @@
+
+@* WorkflowFlowExplorer.razor *@
+
+@using ManaApp.Shared.DTOs.Workflow
+
+@using ManaApp.Services.Workflow
+@inject WorkflowStateService WorkflowState
+
+@namespace ManaApp.Components.Workflow
+
+
+<div class="workflow-flow-card"
+     style="margin-left:@((Item?.Level ?? 0) * 24)px">
+
+    @if (Item != null)
+    {
+        var item = Item;
+
+        <WorkflowExplorerItem
+            IsFlowRoot="true"
+            Icon="@GetIcon(item.Nodes.FirstOrDefault()?.NodeType)"
+            Type="@GetTypeName(item.FlowType)"
+            Name="@item.Name"
+            Badge="@GetTypeName(item.FlowType)"
+            OnSelected="@(() => OnSelected.InvokeAsync(item))"
+            IsSelected="@(WorkflowState.State.SelectedWorkflowExplorerItem?.WorkflowNodeId == item.WorkflowNodeId)"
+            IsExpanded="@IsExpanded"
+            OnToggle="Toggle" />
+
+            @if (IsExpanded)
+                {
+                    
+                   @foreach (var node in item.Nodes.Skip(1))
+                        {
+                            <WorkflowExplorerItem
+                                Icon="@GetIcon(node.NodeType)"
+                                Type="@GetNodeTypeName(node.NodeType)"
+                                Name="@node.Name"
+                                Badge="@GetNodeTypeName(node.NodeType)"
+                                OnSelected="@(() => OnNodeSelected.InvokeAsync(node))"
+                                IsSelected="@(WorkflowState.State.SelectedWorkflowExplorerItem?.WorkflowNodeId == node.WorkflowNodeId)" />
+                        }
+                
+
+            
+                    @foreach (var child in item.Children)
+                        {
+                            <WorkflowFlowExplorer
+                                Item="child"
+                                OnSelected="OnSelected"
+                                OnNodeSelected="OnNodeSelected" />
+                        }
+                }
+                    
+    }
+
+</div>
+
+@code
+{
+    [Parameter]
+    public WorkflowExplorerItemDto? Item { get; set; }
+
+    [Parameter]
+    public EventCallback<WorkflowExplorerItemDto> OnSelected { get; set; }
+
+    private static string GetTypeName(AvailableFlowType type) => type switch
+        {
+            AvailableFlowType.TopPart => "TOP PART",
+            AvailableFlowType.SubPart => "SUB PART",
+            AvailableFlowType.Merge => "MERGE",
+            _ => "FLOW"
+        };
+
+    private static string GetIcon(int? nodeType) => nodeType switch
+        {
+            1 => "bi-box",
+            2 => "bi-gear",
+            3 => "bi-intersect",
+            4 => "bi-flag",
+            _ => "bi-circle"
+        };
+
+    private static string GetNodeTypeName(int nodeType) => nodeType switch
+        {
+            1 => "TOP PART",
+            2 => "PROCESS",
+            3 => "MERGE",
+            4 => "FINISH",
+            _ => ""
+        };
+
+    private bool IsExpanded { get; set; } = true;
+
+    private Task Toggle()
+        {
+            IsExpanded = !IsExpanded;
+            return Task.CompletedTask;
+        }
+
+    [Parameter]
+    public EventCallback<WorkflowExplorerNodeDto> OnNodeSelected { get; set; }
+
+}

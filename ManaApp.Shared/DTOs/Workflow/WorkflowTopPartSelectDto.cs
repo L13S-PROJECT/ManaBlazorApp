@@ -1,4 +1,4 @@
-namespace ManaApp.DTOs.Workflow;
+namespace ManaApp.Shared.DTOs.Workflow;
 
 public class WorkflowTopPartSelectDto
 {

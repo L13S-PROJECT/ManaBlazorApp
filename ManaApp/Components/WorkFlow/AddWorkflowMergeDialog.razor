@@ -1,4 +1,8 @@
+@* AddWorklflowmergeDialog.razor *@
+
 @using System.Net.Http.Json
+@using ManaApp.Shared.DTOs.Workflow;
+
 @inject HttpClient Http
 @inject IJSRuntime JS
 
@@ -21,7 +25,7 @@
                 </button>
 
             </div>
-
+            
             <div class="workflow-modal-body">
 
                 <input class="form-control"

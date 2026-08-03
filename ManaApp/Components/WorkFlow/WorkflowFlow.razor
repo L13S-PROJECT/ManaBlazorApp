@@ -1,0 +1,154 @@
+@* WorkflowFlow.razor *@
+
+@using ManaApp.ViewModels.Workflow
+
+@namespace ManaApp.Components.Workflow
+
+
+<div class="workflow-flow-card"
+     style="margin-left:@((Item?.Level ?? 0) * 24)px">
+
+        <div class="workflow-flow
+            @(IsDependencyFlow ? "dependency-flow" : "")
+            @(IsContainer ? "container-flow" : "")">
+
+                <div class="workflow-flow-root">
+
+                  <WorkflowExplorerItem
+                    IsFlowRoot="true"
+                    IsExpanded="@IsExpanded"
+                    OnToggle="Toggle"
+                    Icon="@GetIcon()"
+                    Type="@GetTypeName()" 
+                    Name="@(Item?.Node?.Name ?? RootName)"
+                    Badge="@(Item?.IsSubPart == true ? "SUB PART" : GetTypeName())"
+                    IsSelected="@(Item?.IsSelected ?? false)"
+                    OnSelected="@(() => OnSelected.InvokeAsync(Item!))" />
+
+                </div>
+
+
+            @if (IsExpanded)
+            {
+                <div class="workflow-flow-content">
+                           
+                            @FlowContent
+
+                        
+
+                        @foreach (var node in Item?.FlowNodes.Skip(1) ?? Enumerable.Empty<WorkflowGraphItem>())
+                            {
+                                <WorkflowExplorerItem
+                                    Icon="@GetIcon(node)"
+                                    Type="@GetTypeName(node)"
+                                    Name="@(node.Node?.Name ?? "")"
+                                    Badge="@GetTypeName(node)"
+                                    IsSelected="@node.IsSelected"
+                                    OnSelected="@(() => OnSelected.InvokeAsync(node))" />
+                            }
+
+                        <div class="workflow-flow-children">
+
+                            @foreach (var child in Item?.Children ?? Enumerable.Empty<WorkflowGraphItem>())
+                            {
+                                <WorkflowFlow Item="child"
+                                            IsDependencyFlow="true"
+                                            OnSelected="OnSelected" />
+                            }
+
+                        </div>
+
+                </div>
+            }
+
+</div>
+
+</div>
+
+
+@code
+{
+
+[Parameter]
+public bool IsExpanded { get; set; } = true;
+
+private async Task Toggle()
+{
+    IsExpanded = !IsExpanded;
+
+    await InvokeAsync(StateHasChanged);
+}
+
+[Parameter]
+public RenderFragment? DependencyFlows { get; set; }
+
+[Parameter]
+public string RootIcon { get; set; } = "bi-box";
+
+[Parameter]
+public string RootType { get; set; } = "TOP PART";
+
+[Parameter]
+public string RootName { get; set; } = "Atsaite";
+
+[Parameter]
+public string RootBadge { get; set; } = "TOP PART";
+
+[Parameter]
+public bool IsContainer { get; set; }
+
+[Parameter]
+public RenderFragment? FlowContent { get; set; }
+
+[Parameter]
+public bool IsDependencyFlow { get; set; }
+
+[Parameter]
+public RenderFragment? NextFlows { get; set; }
+
+[Parameter]
+public bool ShowCard { get; set; } = true;
+
+[Parameter]
+public WorkflowGraphItem? Item { get; set; }
+
+private string GetTypeName() => Item?.Node?.NodeType switch
+{
+    1 => "TOP PART",
+    2 => "PROCESS",
+    3 => "MERGE",
+    4 => "FINISH",
+    _ => RootType
+};
+
+private string GetTypeName(WorkflowGraphItem item) => item.Node?.NodeType switch
+{
+    1 => "TOP PART",
+    2 => "PROCESS",
+    3 => "MERGE",
+    4 => "FINISH",
+    _ => ""
+};
+
+private string GetIcon() => Item?.Node?.NodeType switch
+{
+    1 => "bi-box",
+    2 => "bi-gear",
+    3 => "bi-intersect",
+    4 => "bi-flag",
+    _ => RootIcon
+};
+
+private string GetIcon(WorkflowGraphItem item) => item.Node?.NodeType switch
+{
+    1 => "bi-box",
+    2 => "bi-gear",
+    3 => "bi-intersect",
+    4 => "bi-flag",
+    _ => "bi-circle"
+};
+
+[Parameter]
+public EventCallback<WorkflowGraphItem> OnSelected { get; set; }
+
+}

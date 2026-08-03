@@ -1,0 +1,55 @@
+@* WorkflowGraphNode.razor *@
+
+@using ManaApp.ViewModels.Workflow
+
+@namespace ManaApp.Components.Workflow
+
+<div class="workflow-graph-node @(Item.IsSelected ? "selected" : "")"
+     style="position:absolute;
+            left:@($"{Item.X}px");
+            top:@($"{Item.Y}px");"
+     @onclick="HandleClick">
+
+    <div class="node-type">
+        @if (Item.Node != null)
+        {
+            @GetNodeTypeName(Item.Node.NodeType)
+        }
+    </div>
+
+    <div class="node-name">
+        @Item.Node?.Name
+    </div>
+
+    <div class="node-next">
+        Nākamie mezgli: @Item.NextNodes.Count
+    </div>
+
+</div>
+
+@code {
+
+    [Parameter]
+    public required WorkflowGraphItem Item { get; set; }
+
+    [Parameter]
+    public EventCallback<WorkflowGraphItem> OnNodeClick { get; set; }
+
+    private async Task HandleClick()
+        {
+            await OnNodeClick.InvokeAsync(Item);
+        }
+
+    private string GetNodeTypeName(int type)
+    {
+        return type switch
+        {
+            1 => "PART",
+            2 => "PROCESS",
+            3 => "MERGE",
+            4 => "FINISH",
+            _ => "NODE"
+        };
+    }
+    
+}

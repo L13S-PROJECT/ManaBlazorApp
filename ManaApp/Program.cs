@@ -10,6 +10,7 @@ using ManaApp.Services.Common;
 
 
 
+
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
@@ -38,8 +39,7 @@ builder.Services.AddScoped<WorkflowApiService>();
 builder.Services.AddScoped<WorkflowStateService>();
 builder.Services.AddScoped<WorkflowEditorService>();
 builder.Services.AddScoped<TechnologyEditorService>();
-builder.Services.AddScoped<TechnologyTreeBuilder>();
-builder.Services.AddScoped<TechnologyStructureBuilder>();
+
 
 builder.Services.AddScoped<LookupService>();
 

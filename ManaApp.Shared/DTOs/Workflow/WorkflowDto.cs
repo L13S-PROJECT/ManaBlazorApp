@@ -1,4 +1,4 @@
-namespace ManaApp.Models;
+namespace ManaApp.Shared.DTOs.Workflow;
 
 public class WorkflowDto
 {
@@ -9,7 +9,9 @@ public class WorkflowDto
     public List<int> InvalidFlowOwnerNodeIds { get; set; } = new();
     public List<WorkflowConnectionModel> Connections { get; set; } = new();
     public List<WorkflowPartModel> ProductParts { get; set; } = new();
-    
+    public List<WorkflowExplorerItemDto> Explorer { get; set; } = new();
+    public List<AvailableFlowDto> Flows { get; set; } = new();
+        
 }
 
 public class WorkflowModel

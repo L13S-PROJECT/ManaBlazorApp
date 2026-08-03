@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ManiApi.Data;
 using ManiApi.Models; 
 using ManiApi.DTOs.WorkFlow;
+using ManaApp.Shared.DTOs.Workflow;
 using ManiApi.Services.Workflow;
 
 namespace ManiApi.Controllers
@@ -33,9 +34,6 @@ namespace ManiApi.Controllers
                 x.VersionId == versionId &&
                 x.IsActive);
 
-Console.WriteLine($"GetWorkflow VersionId = {versionId}");
-Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
-
         if (workflow == null)
             return NotFound("Workflow nav atrasts.");
 
@@ -44,20 +42,8 @@ Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
                 x.WorkflowId == workflow.Id &&
                 x.IsActive)
             .OrderBy(x => x.SortOrder)
-            .Select(x => new WorkflowNodeDto
-            {
-                Id = x.Id,
-                WorkflowId = x.WorkflowId,
-                NodeType = x.NodeType,
-                Name = x.Name,
-                ProductToPartId = x.ProductToPartId,
-                WorkCenterId = x.WorkCenterId,
-                EstimatedMinutes = x.EstimatedMinutes,
-                Comments = x.Comments,
-                SortOrder = x.SortOrder
-            })
             .ToListAsync();
-       
+      
             var productParts = await _db.ProductTopParts
                 .Where(x =>
                     x.VersionId == workflow.VersionId &&
@@ -87,18 +73,85 @@ Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
             
             var validation = await _validator.ValidateAsync(workflow.Id);
 
-            return Ok(new
+            var dependencies = await _db.WorkflowDependencies
+                .Where(x => x.WorkflowId == workflow.Id)
+                .ToListAsync();
+
+            var analyzer = new WorkflowFlowAnalyzer(
+                nodes,
+                connections,
+                dependencies);
+
+            List<AvailableFlowDto> flows = analyzer.GetAvailableFlows(workflow.VersionId);
+
+            var dto = new WorkflowDto
                 {
-                    Workflow = workflow,
-                    Nodes = nodes,
-                    Connections = connections,
-                    ProductParts = productParts,
+                    Workflow = new WorkflowModel
+                    {
+                        Id = workflow.Id,
+                        VersionId = workflow.VersionId,
+                        Name = workflow.Name,
+                        
+                    },
+
+                    Flows = flows,
+                    Explorer = analyzer.BuildExplorer(),
+
+
+
+                    Nodes = nodes.Select(x => new WorkflowNodeModel
+                    {
+                        Id = x.Id,
+                        WorkflowId = x.WorkflowId,
+                        NodeType = x.NodeType,
+                        Name = x.Name ?? "",
+                        ProductToPartId = x.ProductToPartId,
+                        WorkCenterId = x.WorkCenterId,
+                        EstimatedMinutes = x.EstimatedMinutes,
+                        Comments = x.Comments,
+                        SortOrder = x.SortOrder
+                    }).ToList(),
+
+                    Connections = connections.Select(x => new WorkflowConnectionModel
+                    {
+                        Id = x.Id,
+                        FromNodeId = x.FromNodeId,
+                        ToNodeId = x.ToNodeId
+                    }).ToList(),
+
+                    ProductParts = productParts.Select(x => new WorkflowPartModel
+                        {
+                            ProductToPartId = x.ProductToPartId,
+                            WorkflowNodeId = nodes
+                                .First(n => n.ProductToPartId == x.ProductToPartId)
+                                .Id,
+                            TopPartId = x.TopPartId,
+                            TopPartCode = x.TopPartCode,
+                            TopPartName = x.TopPartName,
+                            QtyPerProduct = x.QtyPerProduct,
+                            Stage = x.Stage,
+                            ParentProductTopPartId = x.ParentProductTopPartId,
+                            AttachToNodeId = x.AttachToNodeId
+                        }).ToList(),
+
                     IsValid = validation.IsValid,
+
                     InvalidFlowOwnerNodeIds = validation.Errors
-                    .Where(x => x.NodeId.HasValue)
-                    .Select(x => x.NodeId!.Value)
-                    .ToList()
-                });
+                        .Where(x => x.NodeId.HasValue)
+                        .Select(x => x.NodeId!.Value)
+                        .ToList()
+                };
+
+Console.WriteLine(
+    System.Text.Json.JsonSerializer.Serialize(
+        dto.Explorer,
+        new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = true
+        }));
+
+                return Ok(dto);
+
         }
 
         [HttpGet("parts/{versionId}")]
@@ -172,6 +225,14 @@ Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
         [HttpGet("productparts/{versionId}")]
             public async Task<IActionResult> GetProductParts(int versionId)
             {
+                var workflow = await _db.Workflows
+                    .FirstOrDefaultAsync(x =>
+                        x.VersionId == versionId &&
+                        x.IsActive);
+
+                if (workflow == null)
+                    return Ok(new List<WorkflowPartModel>());
+                
                 var parts = await _db.ProductTopParts
                     .Where(x => x.VersionId == versionId && x.IsActive)
                     .Join(_db.TopParts.Where(tp => tp.IsActive && tp.Stage == 1),
@@ -179,6 +240,15 @@ Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
                         tp => tp.Id,
                         (pt, tp) => new WorkflowPartDto
                         {
+                            
+                            WorkflowNodeId = _db.WorkflowNodes
+                                .Where(n =>
+                                    n.WorkflowId == workflow.Id &&
+                                    n.ProductToPartId == pt.Id &&
+                                    n.IsActive)
+                                .Select(n => n.Id)
+                                .FirstOrDefault(),
+                            
                             ProductToPartId = pt.Id,
                             TopPartId = tp.Id,
                             TopPartCode = tp.TopPartCode,
@@ -411,7 +481,7 @@ Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
                     connections,
                     dependencies);
 
-                return Ok(analyzer.GetAvailableMergeFlows(
+                return Ok(analyzer.GetAvailableFlows(
                     workflow.VersionId,
                     flowOwnerNodeId));
             }
@@ -593,7 +663,12 @@ Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
                         }
 
                 await transaction.CommitAsync();
-                return Ok();
+
+                return Ok(new AddTopPartResponse
+                    {
+                        WorkflowNodeId = partNode.Id
+                    });
+
             }
 
             [HttpPost("subpart")]
@@ -602,8 +677,16 @@ Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
                     if (dto.ParentProductTopPartId == null)
                         return BadRequest("ParentProductTopPartId nav norādīts.");
 
-                    // if (dto.AttachToNodeId == null)
-                    //     return BadRequest("AttachToNodeId nav norādīts.");
+                    if (dto.AttachToNodeId == null)
+                        return BadRequest("AttachToNodeId nav norādīts.");
+                    
+                    var workflow = await _db.Workflows
+                        .FirstOrDefaultAsync(x =>
+                            x.VersionId == dto.VersionId &&
+                            x.IsActive);
+
+                    if (workflow == null)
+                        return BadRequest("Workflow nav atrasts.");
 
                     var parentPart = await _db.ProductTopParts
                         .FirstOrDefaultAsync(x =>
@@ -614,13 +697,23 @@ Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
                     if (parentPart == null)
                         return BadRequest("Parent ProductTopPart nav atrasts.");
 
-                    // var attachNode = await _db.WorkflowNodes
-                    //     .FirstOrDefaultAsync(x =>
-                    //         x.Id == dto.AttachToNodeId &&
-                    //         x.IsActive);
+                    var attachNode = await _db.WorkflowNodes
+                        .FirstOrDefaultAsync(x =>
+                            x.Id == dto.AttachToNodeId &&
+                            x.IsActive);
 
-                    // if (attachNode == null)
-                    //     return BadRequest("Attach PART mezgls nav atrasts.");
+                    if (attachNode == null)
+                        return BadRequest("Attach PART mezgls nav atrasts.");
+
+                    var analyzer = await _analyzerFactory.CreateAsync(workflow.Id);
+
+                    if (!analyzer.IsFlowOwner(attachNode))
+                        return BadRequest("SUB PART drīkst pievienot tikai Flow.");   
+
+                    if (!analyzer.HasProcessNode(attachNode))
+                        {
+                            dto.AttachToNodeId = attachNode.Id;
+                        }                        
 
                     return await AddTopPart(dto);
                 }
@@ -638,26 +731,82 @@ Console.WriteLine($"Workflow = {(workflow == null ? "NULL" : workflow.Id)}");
                 
                 
 
-                var previousNode = await _db.WorkflowNodes
+                var selectedNode = await _db.WorkflowNodes
                     .FirstOrDefaultAsync(x =>
-                        x.Id == dto.PreviousNodeId &&
+                        x.Id == dto.SelectedNodeId &&
                         x.IsActive);
 
                 
-                if (previousNode == null)
+                if (selectedNode == null)
                     return BadRequest("Previous node nav atrasts.");
                 
-                if (previousNode.WorkflowId != workflow.Id)
+                if (selectedNode.WorkflowId != workflow.Id)
                     return BadRequest("Mezgls nepieder šim Workflow.");
+
+                WorkflowNode previousNode = selectedNode;
+
+                    if (selectedNode.NodeType == 1)
+                    {
+                        var analyzer = await _analyzerFactory.CreateAsync(workflow.Id);
+
+                        if (analyzer.HasDependentFlows(selectedNode))
+                            return BadRequest("Container Flow nevar pievienot PROCESS.");
+
+                        var flowFinish = analyzer.GetFlowFinishNode(selectedNode);
+
+                        if (flowFinish != null)
+                            {
+                                var previousId = analyzer
+                                    .GetPreviousNodeIds(flowFinish.Id)
+                                    .FirstOrDefault();
+
+                                if (previousId != 0)
+                                {
+                                    var previous = analyzer.GetNode(previousId);
+
+                                    if (previous != null)
+                                        previousNode = previous;
+                                }
+                            }
+                    }
+
+                    if (selectedNode.NodeType == 2)
+                        {
+                            previousNode = selectedNode;
+                        }
+
+                       
+                    if (selectedNode.NodeType == 4)
+                        {
+                            var previous = await _db.WorkflowNodeConnections
+                                .Where(x => x.ToNodeId == selectedNode.Id)
+                                .Select(x => x.FromNodeId)
+                                .FirstOrDefaultAsync();
+
+                            if (previous == 0)
+                                return BadRequest("FINISH iepriekšējais mezgls nav atrasts.");
+
+                            previousNode = await _db.WorkflowNodes.FirstAsync(x => x.Id == previous);
+                        }
 
                 var connections = await _db.WorkflowNodeConnections
                     .Where(x => x.FromNodeId == previousNode.Id)
                     .ToListAsync();
 
                 if (connections.Count > 1)
-                    return BadRequest("Aktīvajam mezglam ir vairāk nekā viens nākamais mezgls.");
+                    return BadRequest("Aktīvajam mezglam ir vairāk nekā viens nākamais mezgls.");                
 
-                WorkflowNodeConnection? oldConnection = connections.FirstOrDefault();
+                WorkflowNodeConnection? oldConnection = null;
+
+                if (selectedNode.NodeType == 2)
+                    {
+                        oldConnection = connections
+                            .FirstOrDefault(x => x.FromNodeId == selectedNode.Id);
+                    }
+                else
+                    {
+                        oldConnection = connections.FirstOrDefault();
+                    }
 
                 WorkflowNode? nextNode = null;
 
@@ -863,7 +1012,7 @@ Console.WriteLine($"FINISH COUNT = {finishNodeIds.Count}");
 
                     await _db.SaveChangesAsync();
 
-                    return Ok();
+                    return Ok(node);
                 }
 
             [HttpPost("part/qty")]
@@ -976,6 +1125,68 @@ Console.WriteLine($"FINISH COUNT = {finishNodeIds.Count}");
                     IsActive = true
                 };
             }
+
+        [HttpGet("structure/{workflowId}")]
+            public async Task<IActionResult> GetWorkflowStructure(int workflowId)
+            {
+                var workflow = await _db.Workflows
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == workflowId &&
+                        x.IsActive);
+
+                if (workflow == null)
+                    return NotFound("Workflow nav atrasts.");
+                
+                var workflowNodes = await _db.WorkflowNodes
+                    .Where(x =>
+                        x.WorkflowId == workflow.Id &&
+                        x.IsActive)
+                    .OrderBy(x => x.SortOrder)
+                    .ToListAsync();
+                
+                var connections = await _db.WorkflowNodeConnections
+                    .Where(x =>
+                        workflowNodes.Select(n => n.Id).Contains(x.FromNodeId) ||
+                        workflowNodes.Select(n => n.Id).Contains(x.ToNodeId))
+                    .ToListAsync();
+                
+                var dependencies = await _db.WorkflowDependencies
+                    .Where(x => x.WorkflowId == workflow.Id)
+                    .ToListAsync();
+                
+                var analyzer = new WorkflowFlowAnalyzer(
+                    workflowNodes,
+                    connections,
+                    dependencies);
+    
+                return Ok(analyzer.BuildStructure());
+            }
+
+            [HttpGet("actions/{workflowId}/{selectedNodeId}")]
+                public async Task<IActionResult> GetAvailableActions(
+                    int workflowId,
+                    int selectedNodeId)
+                {
+                    var workflowNodes = await _db.WorkflowNodes
+                        .Where(x =>
+                            x.WorkflowId == workflowId &&
+                            x.IsActive)
+                        .ToListAsync();
+
+                    var connections = await _db.WorkflowNodeConnections
+                        .ToListAsync();
+
+                    var dependencies = await _db.WorkflowDependencies
+                        .Where(x => x.WorkflowId == workflowId)
+                        .ToListAsync();
+
+                    var analyzer = new WorkflowFlowAnalyzer(
+                        workflowNodes,
+                        connections,
+                        dependencies);
+
+                    return Ok(analyzer.GetAvailableActions(selectedNodeId));
+                }
 
     }
 }

@@ -1,5 +1,5 @@
 using ManaApp.ViewModels.Workflow;
-using ManaApp.DTOs.Workflow;
+using ManaApp.Shared.DTOs.Workflow;
 using ManaApp.Models;
 using System.Net.Http.Json;
 using ManaApp.Services.Common;
@@ -38,12 +38,12 @@ public class WorkflowEditorService
             _stateService.State.SelectedNode = state.SelectedNode;
             _stateService.State.AvailableFinishNodes = state.AvailableFinishNodes;
             _stateService.State.AvailableFlows = state.AvailableFlows;
+            _stateService.State.Explorer = state.Explorer;
             _stateService.State.ProductParts = state.ProductParts;
-Console.WriteLine($"STATE PRODUCT PARTS = {_stateService.State.ProductParts.Count}");
             _stateService.State.WorkCenters =
                 await _lookupService.LoadWorkCentersAsync();
 
-            RefreshTechnologyTree();
+            RefreshTechnologyExplorer();
 
             RefreshValidationState();
 
@@ -59,24 +59,14 @@ Console.WriteLine($"STATE PRODUCT PARTS = {_stateService.State.ProductParts.Coun
                 return true;
             }
         
-        public bool CanAddProcess()
-            {
-                return SelectedNode != null &&
-                    (SelectedNode.Node.NodeType == 1 ||
-                        SelectedNode.Node.NodeType == 2);
-            }
+        public bool CanAddProcess() =>
+            State.AvailableActions.CanAddProcess;
         
-        public bool CanAddSubPart()
-            {
-                return SelectedNode != null &&
-                    SelectedNode.Node.NodeType != 2 &&
-                    SelectedNode.Node.NodeType != 4;
-            }
+        public bool CanAddSubPart() =>
+            State.AvailableActions.CanAddSubPart;
         
-        public bool CanAddTopPart()
-            {
-                return SelectedStructureItem == null;
-            }
+        public bool CanAddTopPart() =>
+            State.SelectedWorkflowExplorerItem == null;
 
         public bool CanAddMerge()
             {
@@ -84,23 +74,8 @@ Console.WriteLine($"STATE PRODUCT PARTS = {_stateService.State.ProductParts.Coun
                     SelectedNode.Node.NodeType is 1 or 3;
             }
 
-        public bool CanAddFinish()
-            {
-                if (SelectedStructureItem == null)
-                    return false;
-
-                if (SelectedNode == null)
-                    return false;
-
-                if (SelectedNode.Node.NodeType == 1 ||
-                    SelectedNode.Node.NodeType == 2)
-                {
-                    return GetCurrentFlowOwner() != null &&
-                        GetCurrentFlowOwnerHasNoFinish();
-                }
-
-                return false;
-            }
+        public bool CanAddFinish() =>
+            State.AvailableActions.CanAddFinish;
         
         private bool GetCurrentFlowOwnerHasNoFinish()
             {
@@ -123,9 +98,10 @@ Console.WriteLine($"STATE PRODUCT PARTS = {_stateService.State.ProductParts.Coun
         public WorkflowDto? Workflow => State.Workflow;
         public Dictionary<int, WorkflowGraphNode> Graph => State.Graph;
         public WorkflowGraphNode? SelectedNode => State.SelectedNode;
-        public TechnologyTreeItem? SelectedTreeItem => State.SelectedTreeItem;
-        public TechnologyStructureItem? SelectedStructureItem => State.SelectedStructureItem;
-        public WorkflowPartModel? SelectedPart => SelectedStructureItem?.Part;
+        public WorkflowGraphItem? SelectedGraphItem => State.SelectedGraphItem;
+        public WorkflowPartModel? SelectedPart => State.SelectedGraphItem?.Part;
+        public List<WorkflowGraphItem> WorkflowGraphItems { get; set; } = new();
+        public List<WorkflowExplorerItemDto> WorkflowExplorerItems => State.Explorer;
         
         public List<MergeFinishItem> AvailableFinishNodes =>
             _stateService.Current.AvailableFinishNodes;
@@ -232,45 +208,39 @@ Console.WriteLine($"STATE PRODUCT PARTS = {_stateService.State.ProductParts.Coun
             if (Workflow?.Workflow == null)
                 return;
 
+            var selectedExplorer = State.SelectedWorkflowExplorerItem;
+
             await LoadAsync(Workflow.Workflow.VersionId);
-            
+
+            State.SelectedWorkflowExplorerItem = selectedExplorer;
+
+            await RestoreSelectionAsync();  
+
+        }
+    
+    private async Task RestoreSelectionAsync()
+        {
+            var selected = State.SelectedWorkflowExplorerItem;
+
+            if (selected == null)
+                return;
+
+            if (TrySelectNode(selected.WorkflowNodeId))
+            {
+                await LoadAvailableActionsAsync(selected.WorkflowNodeId);
+            }
         }
 
     public async Task ReloadAndRestoreSelectionAsync()
-        {
-            var selectedPartId = SelectedPart?.ProductToPartId;
-
-            var selectedFinishNodeId = State.SelectedFlow?.FinishNodeId;
-
-            await ReloadAsync();
-
-            if (selectedFinishNodeId.HasValue)
-                {
-                    State.SelectedFlow = State.AvailableFlows
-                        .Select(x => x.Flow)
-                        .FirstOrDefault(x => x.FinishNodeId == selectedFinishNodeId.Value);
-                }
-
-            if (selectedPartId.HasValue)
-                {
-                    RestoreSelectedStructureItem(selectedPartId.Value);
-                }
-        }
+            {
+                await ReloadAsync();
+            }
     
     public void RefreshTechnologyTree()
         {
-            State.TechnologyTree = BuildTechnologyTree();
-
-            State.TechnologyStructure = BuildTechnologyStructure();
-
             RefreshTechnologyExplorer();
         }
 
-    private List<TechnologyStructureItem> BuildTechnologyStructure()
-        {
-            return new TechnologyStructureBuilder(State).Build();
-        }
-    
     public void RefreshTechnologyExplorer()
         {
             State.TechnologyExplorer = BuildTechnologyExplorer();
@@ -402,74 +372,107 @@ foreach (var part in attachedParts)
                 }
         }
 
-    public void RestoreSelectedStructureNode(int nodeId)
-        {
-            foreach (var root in State.TechnologyStructure)
-            {
-                var item = FindStructureNode(root, nodeId);
 
-                if (item != null)
-                {
-                    SelectStructureItem(item);
+       public void RestoreSelectedGraphNode(int nodeId)
+            {
+                var item = WorkflowGraphItems
+                    .Select(root => FindGraphItem(root, nodeId))
+                    .FirstOrDefault(x => x != null);
+
+                if (item == null)
                     return;
+
+                foreach (var root in WorkflowGraphItems)
+                    {
+                        ClearGraphSelection(root);
+                    }
+
+                    item.IsSelected = true;
+
+                State.SelectedGraphItem = item;
+                State.SelectedNode = Graph.GetValueOrDefault(nodeId);
+
+                if (item.Flow != null)
+                    {
+                        State.SelectedFlow = item.Flow;
+                    }
+            }
+
+            private void ClearGraphSelection(WorkflowGraphItem item)
+                {
+                    item.IsSelected = false;
+
+                    foreach (var child in item.Children)
+                    {
+                        ClearGraphSelection(child);
+                    }
                 }
-            }
-        }
 
-    private TechnologyStructureItem? FindStructureNode(
-            TechnologyStructureItem item,
-            int nodeId)
-        {
-            if (item.Node?.Id == nodeId)
-                return item;
-
-            foreach (var child in item.Children)
-            {
-                var found = FindStructureNode(child, nodeId);
-
-                if (found != null)
-                    return found;
-            }
-
-            return null;
-        }
-
-    public void RestoreSelectedStructureItem(int productToPartId)
-        {
-            var item = FindStructureItem(
-                State.TechnologyStructure,
-                productToPartId);
-
-            if (item != null)
-            {
-                SelectStructureItem(item);
-            }
-        }
-
-    private TechnologyStructureItem? FindStructureItem(
-    IEnumerable<TechnologyStructureItem> items,
-    int productToPartId)
+private WorkflowGraphItem? FindGraphItem(WorkflowGraphItem? item, int nodeId)
 {
-    foreach (var item in items)
+    if (item == null)
+        return null;
+
+    if (item.Node?.Id == nodeId)
+        return item;
+
+    foreach (var child in item.Children)
     {
-        if (item.Part?.ProductToPartId == productToPartId)
-            return item;
+        var found = FindGraphItem(child, nodeId);
 
-        var child = FindStructureItem(
-            item.PartChildren,
-            productToPartId);
+        if (found != null)
+            return found;
+    }
 
-        if (child != null)
-            return child;
+    foreach (var next in item.NextNodes)
+    {
+        var found = FindGraphItem(next, nodeId);
+
+        if (found != null)
+            return found;
     }
 
     return null;
 }
 
-    private List<TechnologyTreeItem> BuildTechnologyTree()
-        {
-            return new TechnologyTreeBuilder(State).Build();
-        }
+    public void RestoreSelectedGraphItem(int productToPartId)
+            {
+                foreach (var root in WorkflowGraphItems)
+                {
+                    var item = FindGraphPart(root, productToPartId);
+
+                    if (item != null)
+                    {
+                        SelectGraphItem(item);
+                        return;
+                    }
+                }
+            }
+    
+    private WorkflowGraphItem? FindGraphPart(WorkflowGraphItem item, int productToPartId)
+            {
+                if (item.Part?.ProductToPartId == productToPartId)
+                    return item;
+
+                foreach (var child in item.Children)
+                {
+                    var found = FindGraphPart(child, productToPartId);
+
+                    if (found != null)
+                        return found;
+                }
+
+                foreach (var next in item.NextNodes)
+                {
+                    var found = FindGraphPart(next, productToPartId);
+
+                    if (found != null)
+                        return found;
+                }
+
+                return null;
+            }
+
     
     private IEnumerable<WorkflowPartModel> GetAttachedParts(int nodeId)
         {
@@ -478,37 +481,6 @@ foreach (var part in attachedParts)
                 .OrderBy(x => x.TopPartName);
         }
 
-    private void BuildPartChildren(TechnologyTreeItem parent)
-        {
-            var children = State.ProductParts
-                .Where(x => x.ParentProductTopPartId == parent.Part.ProductToPartId)
-                .OrderBy(x => x.TopPartName);
-
-            var list = children.ToList();
-
-            for (int i = 0; i < list.Count; i++)
-                {
-                    var item = CreatePart(list[i]);
-
-                    item.IsFlowChild = list[i].AttachToNodeId != null;
-
-                    item.IsLastChild = i == list.Count - 1;
-
-                    item.Parent = parent;
-                    item.IsHierarchyChild = true;
-
-                    parent.PartChildren.Add(item);
-
-                    BuildPartChildren(item);
-                }
-        }
-
-    private List<TechnologyTreeItem> NodeChildren(WorkflowGraphNode? node)
-            {
-                return node == null
-                    ? new()
-                    : BuildChildren(node, 1);
-            }
     
     private WorkflowGraphNode? FindPartNode(WorkflowPartModel? part)
         {
@@ -522,124 +494,45 @@ foreach (var part in attachedParts)
                     : null;
         }
        
-       
-   private List<TechnologyTreeItem> BuildChildren(WorkflowGraphNode node, int level)
-        {
-            var result = new List<TechnologyTreeItem>();
-
-            foreach (var next in node.Next)
-            {
-                var childLevel = level;
-
-                if (next.Node.NodeType == 1)
-                    childLevel = level + 1;
-
-                result.Add(CreateNode(next, childLevel));
-            }
-
-            return result;
-        }
-        
-        private void BuildBranch(
-            WorkflowGraphNode current,
-            List<TechnologyTreeItem> items,
-            int level)
-                {
-                    foreach (var next in current.Next.OrderBy(x => x.Node.SortOrder))
-                    {
-                        var item = CreateNode(next, level);
-
-                        item.Parent = items.LastOrDefault();
-                        item.IsFlowChild = true;
-                        item.IsLastChild = next == current.Next.Last();
-
-                        items.Add(item);
-
-                        BuildBranch(next, item.NodeChildren, level);
-                        
-                    }
-                }
-
-    private TechnologyTreeItem CreateNode(WorkflowGraphNode node, int level)
-        {
-            var parentPart = State.ProductParts
-                .FirstOrDefault(x => x.AttachToNodeId == node.Node.Id);
-
-            return new TechnologyTreeItem
-            {
-                Node = node.Node,
-                Level = level,
-                InputCount = node.Previous.Count,
-                PartChildren = new List<TechnologyTreeItem>(),
-                NodeChildren = new List<TechnologyTreeItem>(),
-                IsFlowChild = true
-            };
-        }
-       
-    private TechnologyTreeItem CreatePart(WorkflowPartModel part)
-        {
-            var node = FindPartNode(part);
-               var result = new TechnologyTreeItem
-                {
-                    Part = part,
-                    Node = node?.Node,
-                    PartChildren = new List<TechnologyTreeItem>(),
-                    NodeChildren = new List<TechnologyTreeItem>(),
-                    Level = 0
-                };
-
-            if (node != null)
-                {
-                    BuildBranch(node, result.NodeChildren, 1);
-                }
-
-            return result;
-        }
-    
+   
        public AvailableFlowDto? GetCurrentFlow()
             {
                 return State.SelectedFlow;
             }
 
-        public async Task<bool> AddProcessAsync(string processName)
+        public async Task<WorkflowNodeModel?> AddProcessAsync(string processName)
             {
                 if (!CanAddProcess())
-                    return false;
+                    return null;
 
                 if (SelectedNode == null)
-                    return false;
+                    return null;
 
-                var targetNode = SelectedNode;
+                var selectedNode = SelectedNode;
 
                 var response = await _workflowApiService.AddProcessAsync(
                     Workflow!.Workflow!.Id,
-                    targetNode.Node.Id,
+                    selectedNode.Node.Id,
                     processName);
 
                 if (!response.IsSuccessStatusCode)
-                    return false;
+                    return null;
 
                 var node = await response.Content.ReadFromJsonAsync<WorkflowNodeModel>();
 
                 if (node == null)
-                    return false;
+                    return null;
                 
-                // var selectedProductToPartId = SelectedPart!.ProductToPartId;
-
-                var currentPart = GetCurrentFlowOwner();
-
-                    if (currentPart == null)
-                        return false;
-
-                var selectedProductToPartId = currentPart.ProductToPartId;
 
                 await ReloadAsync();
 
                 RefreshValidationState();
 
-                RestoreSelectedStructureNode(node.Id);
+                RestoreSelectedGraphNode(node.Id);
 
-                return true;
+                await LoadAvailableActionsAsync(node.Id);
+
+                return node;
             }
 
         public async Task<bool> AddMergeAsync(
@@ -695,7 +588,19 @@ foreach (var part in attachedParts)
                 parentProductTopPartId,
                 attachToNodeId);
 
-            return response.IsSuccessStatusCode;
+            if (!response.IsSuccessStatusCode)
+                return false;
+
+            var result = await response.Content
+                .ReadFromJsonAsync<AddTopPartResponse>();
+
+            if (result == null)
+                return false;
+
+            await ReloadAsync();
+
+            return true;
+
         }
 
         public async Task<bool> AddSubPartAsync(
@@ -712,46 +617,44 @@ foreach (var part in attachedParts)
                     parentProductTopPartId,
                     attachToNodeId);
 
-                return response.IsSuccessStatusCode;
-            }
+                if (response == null)
+                    return false;
+                
+                await ReloadAsync();
 
-        public void SelectTreeItem(TechnologyTreeItem item)
-            {               
-                if (State.SelectedTreeItem == item)
+                State.SelectedWorkflowExplorerItem = new WorkflowExplorerItemDto
                     {
-                        item.IsSelected = false;
-                        State.SelectedTreeItem = null;
-                        State.SelectedNode = null;
-                        return;
-                    }
+                        WorkflowNodeId = response.WorkflowNodeId
+                    };
 
-                if (item.Part == null)
-                    return;
+                    await ReloadAsync();
 
-                SelectPart(item.Part);
+                    return true;
 
             }
 
-        public void SelectStructureItem(TechnologyStructureItem item)
-            {                
-                if (State.SelectedStructureItem == item)
+        public void SelectGraphItem(WorkflowGraphItem item)
+            {
+                
+ Console.WriteLine(
+    $"SelectGraphItem: current={State.SelectedGraphItem?.Node?.Id}, clicked={item.Node?.Id}");
+
+Console.WriteLine($"ReferenceEquals = {ReferenceEquals(State.SelectedGraphItem, item)}");
+
+                if (State.SelectedGraphItem == item)
                 {
                     item.IsSelected = false;
-                    State.SelectedStructureItem = null;
+                    State.SelectedGraphItem = null;
                     State.SelectedFlow = item.Flow;
                     State.SelectedNode = null;
                     return;
                 }
 
-                ClearStructureSelection(State.TechnologyStructure);
-
+                State.SelectedGraphItem = item;
                 item.IsSelected = true;
-                State.SelectedStructureItem = item;
 
                 if (item.Flow != null)
-                    {
-                        State.SelectedFlow = item.Flow;
-                    }
+                    State.SelectedFlow = item.Flow;
 
                 State.SelectedNode = item.Node != null
                     ? Graph.GetValueOrDefault(item.Node.Id)
@@ -775,68 +678,11 @@ foreach (var part in attachedParts)
             {
                 if (part == null)
                     return;
-                
-                var item = FindTreeItem(
-                    State.TechnologyTree,
-                    part.ProductToPartId);
 
-                if (item != null)
-                {
-                    SetSelectedTreeItem(item);
-                }
+                RestoreSelectedGraphItem(part.ProductToPartId);
             }
 
-        private TechnologyTreeItem? FindTreeItem(
-            IEnumerable<TechnologyTreeItem> items,
-            int productToPartId)
-        {
-            foreach (var item in items)
-            {
-                if (item.Part?.ProductToPartId == productToPartId)
-                    return item;
-
-                var child = FindTreeItem(item.PartChildren, productToPartId);
-
-                if (child != null)
-                    return child;
-            }
-
-            return null;
-        }
-
-        private void SetSelectedTreeItem(TechnologyTreeItem item)
-            {
-                ClearSelection(State.TechnologyTree);
-                item.IsSelected = true;
-
-                State.SelectedTreeItem = item;
-
-                State.SelectedNode = item.Node == null
-                    ? null
-                    : Graph.GetValueOrDefault(item.Node.Id);
-            }
-        
-        private void ClearSelection(IEnumerable<TechnologyTreeItem> items)
-            {
-                foreach (var item in items)
-                {
-                    item.IsSelected = false;
-                    ClearSelection(item.PartChildren);
-                    ClearSelection(item.NodeChildren);
-                }
-            }
-        
-        private void ClearStructureSelection(
-            IEnumerable<TechnologyStructureItem> items)
-        {
-            foreach (var item in items)
-            {
-                item.IsSelected = false;
-
-                ClearStructureSelection(item.Children);
-            }
-        }
-        
+                        
         private void FillFinishNodes(List<MergeFinishItemDto> items)
             {
                 foreach (var item in items)
@@ -864,32 +710,33 @@ foreach (var part in attachedParts)
 
             public string? GetCurrentTopPartName()
                 {
-                    var item = SelectedStructureItem;
+Console.WriteLine($"SelectedNodeId = {State.SelectedNode?.Node.Id}");
 
-                    while (item != null)
-                    {
-                        if (item.Part != null)
-                            return item.Part.TopPartName;
+foreach (var p in State.ProductParts)
+{
+    Console.WriteLine(
+        $"Part: Node={p.WorkflowNodeId}, ProductToPartId={p.ProductToPartId}, Name={p.TopPartName}");
+}
+                   
+                    var nodeId = State.SelectedNode?.Node.Id;
 
-                        item = item.Parent;
-                    }
+                    if (nodeId == null)
+                        return null;
 
-                    return null;
+                    return State.ProductParts
+                        .FirstOrDefault(x => x.WorkflowNodeId == nodeId)?
+                        .TopPartName;
                 }
 
             public WorkflowPartModel? GetCurrentFlowOwner()
                 {
-                    var item = SelectedStructureItem;
+                    var nodeId = State.SelectedNode?.Node.Id;
 
-                    while (item != null)
-                    {
-                        if (item.Part != null)
-                            return item.Part;
+                    if (nodeId == null)
+                        return null;
 
-                        item = item.Parent;
-                    }
-
-                    return null;
+                    return State.ProductParts
+                        .FirstOrDefault(x => x.WorkflowNodeId == nodeId);
                 }
             
             public string? CurrentPartName =>
@@ -953,13 +800,49 @@ foreach (var part in attachedParts)
                     if (SelectedNode.Node.EstimatedMinutes == null)
                         return false;
 
-                    var response = await _workflowApiService.SaveProcessAsync(
+                    var node = await _workflowApiService.SaveProcessAsync(
                         SelectedNode.Node);
+
+                    if (node == null)
+                        return false;
+
+                    SelectedNode.Node.Name = node.Name;
+                    SelectedNode.Node.WorkCenterId = node.WorkCenterId;
+                    SelectedNode.Node.EstimatedMinutes = node.EstimatedMinutes;
+                    SelectedNode.Node.Comments = node.Comments;
+                    UpdateExplorerNodeName(node.Id, node.Name);
 
                     RefreshValidationState();
 
-                    return response.IsSuccessStatusCode;
+                    await LoadAvailableActionsAsync(SelectedNode.Node.Id);
+                    
+
+                    return true;
                 }
+
+
+                private void UpdateExplorerNodeName(int workflowNodeId, string name)
+                    {
+                        foreach (var item in State.Explorer)
+                            UpdateExplorerNodeName(item, workflowNodeId, name);
+                    }
+
+                    private void UpdateExplorerNodeName(
+                        WorkflowExplorerItemDto item,
+                        int workflowNodeId,
+                        string name)
+                    {
+                        var node = item.Nodes.FirstOrDefault(x => x.WorkflowNodeId == workflowNodeId);
+
+                        if (node != null)
+                        {
+                            node.Name = name;
+                            return;
+                        }
+
+                        foreach (var child in item.Children)
+                            UpdateExplorerNodeName(child, workflowNodeId, name);
+                    }
 
                 public bool HasIncompleteProcess =>
                     Graph.Values.Any(x =>
@@ -974,14 +857,14 @@ foreach (var part in attachedParts)
                     HasIncompleteProcess;
 
         public void RefreshValidationState()
-            {
-                foreach (var root in State.TechnologyStructure)
-                {
-                    RefreshValidation(root);
-                }
-            }
+{
+    foreach (var root in WorkflowGraphItems)
+    {
+        RefreshValidation(root);
+    }
+}
 
-private void RefreshValidation(TechnologyStructureItem item)
+private void RefreshValidation(WorkflowGraphItem item)
     {
         item.HasProcessValidationError =
         item.Node?.NodeType == 2 &&
@@ -1031,5 +914,17 @@ private void RefreshValidation(TechnologyStructureItem item)
 
             return true;
         }
+
+        public async Task LoadAvailableActionsAsync(int selectedNodeId)
+            {
+                if (Workflow?.Workflow == null)
+                    return;
+
+                State.AvailableActions =
+                    await _workflowApiService.LoadAvailableActionsAsync(
+                        Workflow.Workflow.Id,
+                        selectedNodeId);
+
+            }
 
 }

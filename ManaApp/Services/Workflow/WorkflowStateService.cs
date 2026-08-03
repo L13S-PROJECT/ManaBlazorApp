@@ -14,10 +14,8 @@ public class WorkflowStateService
             State.Graph.Clear();
             State.PartNodeByProductToPartId.Clear();
             State.SelectedNode = null;
-            State.SelectedTreeItem = null;
             State.AvailableFinishNodes.Clear();
             State.ProductParts.Clear();
-            State.TechnologyTree.Clear();
             State.SelectedTopPartId = 0;
             State.AvailableTopParts.Clear();
             State.AvailableFinishNodes.Clear();

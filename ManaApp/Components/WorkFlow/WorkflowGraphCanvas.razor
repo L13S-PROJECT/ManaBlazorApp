@@ -1,0 +1,78 @@
+@* WorkfowGraphCanva *@
+
+@using ManaApp.ViewModels.Workflow
+
+@namespace ManaApp.Components.Workflow
+
+<div class="workflow-explorer">
+
+    @if (!Items.Any())
+    {
+        <div>
+            Nav Workflow mezglu
+        </div>
+    }
+
+
+    @foreach (var item in Items.Where(x => x.IsRoot))
+        {
+            @RenderExplorerNode(item)
+        }
+
+</div>
+
+@code {
+
+    [Parameter]
+    public List<WorkflowGraphItem> Items { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<WorkflowGraphItem> OnNodeClick { get; set; }
+
+    private async Task HandleNodeClick(WorkflowGraphItem item)
+        {
+            foreach (var node in Items)
+            {
+                node.IsSelected = false;
+            }
+
+            item.IsSelected = true;
+
+            await OnNodeClick.InvokeAsync(item);
+        }
+    
+    protected override void OnParametersSet()
+    {
+        BuildLayout();
+    }
+
+private void BuildLayout()
+{
+    foreach (var item in Items)
+    {
+        item.IsSelected = false;
+        item.IsDependency = false;
+    }
+}
+private RenderFragment RenderExplorerNode(
+    WorkflowGraphItem item,
+    HashSet<WorkflowGraphItem>? visited = null) => builder =>
+{
+    visited ??= new HashSet<WorkflowGraphItem>();
+
+    if (!visited.Add(item))
+        return;
+
+    builder.OpenComponent<WorkflowExplorerNodeView>(0);
+    builder.AddAttribute(1, "Item", item);
+    builder.AddAttribute(2, "OnNodeClick", OnNodeClick);
+    builder.CloseComponent();
+
+    foreach (var next in item.NextNodes)
+    {
+        builder.AddContent(3, RenderExplorerNode(next, visited));
+    }
+};
+
+    
+}

@@ -36,7 +36,7 @@
 
        <select class="form-select @(WorkflowEditor.SelectedProcessHasValidationError && WorkCenterId == null ? "is-invalid" : "")"
             @bind="WorkCenterId"
-            @onblur="SaveProcess">
+            @bind:after="SaveProcess">
 
             <option value="">-- izvēlēties --</option>
 
@@ -52,7 +52,7 @@
         <input type="number"
             class="form-control @(WorkflowEditor.SelectedProcessHasValidationError && EstimatedMinutes == null ? "is-invalid" : "")"
             @bind="EstimatedMinutes"
-            @onblur="SaveProcess" />
+            @bind:after="SaveProcess" />
 
         <label>Sagatavošanas laiks (min):</label>
 
@@ -69,6 +69,9 @@
 {
     [Parameter]
     public WorkflowEditorService WorkflowEditor { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback OnProcessSaved { get; set; }
 
     private int? EstimatedMinutes
         {
@@ -92,7 +95,10 @@
 
     private async Task SaveProcess()
         {
-            await WorkflowEditor.SaveProcessAsync();
+            var saved = await WorkflowEditor.SaveProcessAsync();
+
+            if (saved)
+                await OnProcessSaved.InvokeAsync();
         }
 
-}
+} 

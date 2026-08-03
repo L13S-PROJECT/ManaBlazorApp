@@ -47,6 +47,9 @@
     [Parameter]
     public WorkflowEditorService WorkflowEditor { get; set; } = default!;
 
+    [Parameter]
+    public EventCallback OnProcessSaved { get; set; }   
+
     private string? Comments
         {
             get => WorkflowEditor.SelectedNode?.Node.Comments;
@@ -74,7 +77,10 @@
 
     private async Task SaveProcess()
         {
-            await WorkflowEditor.SaveProcessAsync();
+            var saved = await WorkflowEditor.SaveProcessAsync();
+
+            if (saved)
+                await OnProcessSaved.InvokeAsync();
         }
 
 }

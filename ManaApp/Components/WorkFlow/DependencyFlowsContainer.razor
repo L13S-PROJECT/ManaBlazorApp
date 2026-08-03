@@ -1,0 +1,21 @@
+@* DependencyFlowsContainer.razor *@
+
+@namespace ManaApp.Components.Workflow
+
+<div class="workflow-dependency-container">
+
+    <div class="workflow-dependency-content">
+
+        <div class="workflow-dependency-list">
+            @ChildContent
+        </div>
+
+    </div>
+
+</div>  
+
+@code
+{
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

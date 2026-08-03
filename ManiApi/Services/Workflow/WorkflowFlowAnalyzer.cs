@@ -2,6 +2,7 @@
 
 using ManiApi.Models;
 using ManiApi.DTOs.WorkFlow;
+using ManaApp.Shared.DTOs.Workflow;
 
 namespace ManiApi.Services.Workflow
 {
@@ -179,6 +180,11 @@ namespace ManiApi.Services.Workflow
             };
         }
 
+        public FlowInfoDto? GetFlowInfo(AvailableFlowDto flow)
+            {
+                return GetFlowInfoByFinish(flow.FinishNodeId);
+            }
+
         private AvailableFlowType GetFlowType(WorkflowNode ownerNode)
             {
                 if (ownerNode.NodeType == 3)
@@ -201,12 +207,41 @@ namespace ManiApi.Services.Workflow
                 .ToList();
 
             var rows = finishNodes
-                .Select(BuildAvailableMergeFlow)
+                .Select(BuildAvailableFlow)
                 .ToList();
 
             return rows;
         }
+
+    public List<AvailableFlowDto> GetAvailableFlows(
+            int versionId,
+            int flowOwnerNodeId)
+        {
+            return GetAvailableMergeFlows(
+                versionId,
+                flowOwnerNodeId);
+        }
     
+// TODO:
+// Šī metode kļūs par vienīgo API ieejas punktu UI struktūras veidošanai.
+// TechnologyStructureBuilder vairs nedrīkst analizēt Graph.
+
+    public List<AvailableFlowDto> GetAvailableFlows(int versionId)
+        {
+            return GetFinishNodes()
+                .Select(BuildAvailableFlow)
+                .ToList();
+        }
+
+    public IEnumerable<WorkflowNode> GetNextNodes(int nodeId)
+        {
+            return GetNextNodeIds(nodeId)
+                .Select(GetNode)
+                .Where(x => x != null)
+                .Cast<WorkflowNode>();
+        }
+
+
     public List<AvailableFlowDto> GetAvailableMergeFlows(
                 int versionId,
                 int flowOwnerNodeId)
@@ -531,7 +566,7 @@ namespace ManiApi.Services.Workflow
                 HasDependentFlows(owner);
         }
 
-    private AvailableFlowDto BuildAvailableMergeFlow(
+    private AvailableFlowDto BuildAvailableFlow(
             WorkflowNode finishNode)
         {
             var flow = GetFlowInfoByFinish(finishNode.Id);
@@ -1379,6 +1414,364 @@ namespace ManiApi.Services.Workflow
 
                 return false;
             }
+
+public List<FlowInfoDto> GetFlows()
+{
+    return _workflowNodes
+        .Where(x => x.IsActive)
+        .Where(IsFlowOwner)
+        .Select(owner =>
+        {
+            var finish = GetFlowFinishNode(owner);
+
+            if (finish == null)
+                return null;
+
+            return GetFlowInfoByFinish(finish.Id);
+        })
+        .Where(x => x != null)
+        .Cast<FlowInfoDto>()
+        .ToList();
+}
+
+        public WorkflowStructureDto BuildStructure()
+            {
+                return new WorkflowStructureDto
+                {
+                    Items = BuildItems()
+                };
+            }
+
+        private List<WorkflowExplorerItemDto> BuildItems()
+            {
+                var result = new List<WorkflowExplorerItemDto>();
+                var visitedFlowOwners = new HashSet<int>();
+
+                foreach (var owner in GetStartFlowOwners())
+                {
+                    var item = BuildFlow(owner, visitedFlowOwners);
+
+                    if (item != null)
+                        result.Add(item);
+                }
+
+                return result;
+            }
+
+        private IEnumerable<WorkflowNode> GetStartFlowOwners()
+            {
+                return GetFlowOwnerNodes()
+                    .Where(owner => owner.NodeType == 1)
+                    .Where(owner => !HasParentFlow(owner))
+                    .OrderBy(owner => owner.SortOrder);
+            }
+        
+        private bool HasParentFlow(WorkflowNode owner)
+            {
+                return _dependencies.Any(d => d.NodeId == owner.Id);
+            }
+
+        private WorkflowStructureItemDto CreateNode(WorkflowGraphNodeDto graphNode)
+            {
+                return new WorkflowStructureItemDto
+                {
+                    Node = new WorkflowNodeDto
+                    {
+                        Id = graphNode.Node.Id,
+                        WorkflowId = graphNode.Node.WorkflowId,
+                        NodeType = graphNode.Node.NodeType,
+                        Name = graphNode.Node.Name,
+                        ProductToPartId = graphNode.Node.ProductToPartId,
+                        WorkCenterId = graphNode.Node.WorkCenterId,
+                        EstimatedMinutes = graphNode.Node.EstimatedMinutes,
+                        Comments = graphNode.Node.Comments,
+                        SortOrder = graphNode.Node.SortOrder
+                    },
+                    FlowLevel = 0,
+                    HasValidationError = false
+                };
+            }
+        
+        // private void BuildStructureRecursive(
+        //     Dictionary<int, WorkflowGraphNodeDto> graph,
+        //     WorkflowGraphNodeDto current,
+        //     WorkflowStructureItemDto parent,
+        //     HashSet<int> visited)
+        //     {
+        //         if (!visited.Add(current.Node.Id))
+        //             return;
+
+        //         foreach (var next in current.Next
+        //             .DistinctBy(x => x.Node.Id)
+        //             .OrderBy(x => x.Node.SortOrder))
+        //             {
+        //                 var child = CreateNode(next);
+
+        //                 parent.Children.Add(child);
+
+        //                 if (!IsFlowOwner(next.Node))
+        //                     {
+        //                         BuildStructureRecursive(graph, next, child, visited);
+        //                         continue;
+        //                     }
+
+        //                 BuildStructureRecursive(graph, next, child, visited);
+        //             }
+                
+        //     }
+    
+
+        // private List<WorkflowNodeDto> BuildNodes()
+        //     {
+        //         return _workflowNodes.Select(x => new WorkflowNodeDto
+        //         {
+        //             Id = x.Id,
+        //             WorkflowId = x.WorkflowId,
+        //             NodeType = x.NodeType,
+        //             Name = x.Name,
+        //             ProductToPartId = x.ProductToPartId,
+        //             WorkCenterId = x.WorkCenterId,
+        //             EstimatedMinutes = x.EstimatedMinutes,
+        //             Comments = x.Comments,
+        //             SortOrder = x.SortOrder
+        //         }).ToList();
+        //     }
+
+        // private List<WorkflowEdgeDto> BuildEdges()
+        //     {
+        //         return _connections.Select(x => new WorkflowEdgeDto
+        //         {
+        //             FromNodeId = x.FromNodeId,
+        //             ToNodeId = x.ToNodeId
+        //         }).ToList();
+        //     }
+
+//         private Dictionary<int, WorkflowGraphNodeDto> BuildGraph()
+//             {
+//                 var graph = new Dictionary<int, WorkflowGraphNodeDto>();
+
+//                 foreach (var node in _workflowNodes)
+//                 {
+//                     graph[node.Id] = new WorkflowGraphNodeDto
+//                     {
+//                         Node = node
+//                     };
+//                 }
+
+//                 foreach (var connection in _connections)
+//                     {
+//                         if (!graph.TryGetValue(connection.FromNodeId, out var from))
+//                             continue;
+
+//                         if (!graph.TryGetValue(connection.ToNodeId, out var to))
+//                             continue;
+
+//                         from.Next.Add(to);
+//                         to.Previous.Add(from);
+//                     }
+
+//                     foreach (var dependency in _dependencies)
+//                         {
+//                             if (!graph.TryGetValue(dependency.DependsOnNodeId, out var parent))
+//                                 continue;
+
+//                             if (!graph.TryGetValue(dependency.NodeId, out var child))
+//                                 continue;
+
+//                             parent.Next.Add(child);
+//                             child.Previous.Add(parent);
+//                         }
+
+//                 return graph;
+
+                
+//             }
+
+// private IEnumerable<WorkflowNode> GetRootFlowOwners()
+// {
+//     foreach (var d in _dependencies)
+// {
+//     Console.WriteLine($"DEP: Node={d.NodeId} Parent={d.DependsOnNodeId}");
+// }
+
+//     return GetFlowOwnerNodes()
+//         .Where(owner =>
+//             !_dependencies.Any(d => d.NodeId == owner.Id))
+//         .OrderBy(owner => owner.SortOrder);
+// }
+
+    private WorkflowExplorerItemDto? BuildFlow(
+            WorkflowNode owner,
+            HashSet<int> visitedFlowOwners,
+            int level = 0)
+        {
+            if (!IsFlowOwner(owner))
+                throw new InvalidOperationException("Node nav Flow Owner.");
+
+            if (!visitedFlowOwners.Add(owner.Id))
+                return null;
+
+            var root = new WorkflowExplorerItemDto
+                {
+                    WorkflowNodeId = owner.Id,
+                    Name = owner.Name ?? "",
+                    FlowType = GetFlowType(owner)
+                };
+            
+            root.Nodes.Add(new WorkflowExplorerNodeDto
+                    {
+                        WorkflowNodeId = owner.Id,
+                        NodeType = owner.NodeType,
+                        Name = owner.Name ?? ""
+                    });
+
+            root.Level = level;
+
+            var currentItem = root;
+            var currentNode = owner;
+            WorkflowNode? finishNode = null;
+
+            while (true)
+            {
+                var nextNodes = GetNextNodes(currentNode.Id)
+                    .OrderBy(x => x.SortOrder)
+                    .ToList();
+
+                if (nextNodes.Count == 0)
+                    break;
+
+                var nextNode = nextNodes[0];
+
+                if (nextNode == null)
+                    break;
+
+                if (IsFlowOwner(nextNode))
+                    break;
+                
+                if (nextNode.NodeType != 2 && nextNode.NodeType != 4)
+                    break;
+
+               currentItem.Nodes.Add(new WorkflowExplorerNodeDto
+                    {
+                        WorkflowNodeId = nextNode.Id,
+                        NodeType = nextNode.NodeType,
+                        Name = nextNode.Name ?? ""
+                    });
+
+                currentNode = nextNode;
+                
+                if (IsFinishNode(nextNode.Id))
+                {
+                    finishNode = nextNode;
+                    break;
+                }
+            }
+
+            var dependentOwners = _dependencies
+                .Where(x => x.DependsOnNodeId == owner.Id)
+                .Select(x => GetNode(x.NodeId))
+                .Where(x => x != null && IsFlowOwner(x))
+                .Cast<WorkflowNode>()
+                .DistinctBy(x => x.Id)
+                .OrderBy(x => x.SortOrder);
+
+            foreach (var dependentOwner in dependentOwners)
+            {
+                var dependentFlow = BuildFlow(
+                    dependentOwner,
+                    visitedFlowOwners,
+                    level + 1);
+
+                if (dependentFlow != null)
+                    root.Children.Add(dependentFlow);
+            }
+
+            if (finishNode != null)
+            {
+                var mergeNodes = GetNextMergeNodes(finishNode.Id)
+                    .OrderBy(x => x.SortOrder);
+
+                foreach (var mergeNode in mergeNodes)
+                {
+                    var mergeFlow = BuildFlow(
+                        mergeNode,
+                        visitedFlowOwners,
+                        level + 1);
+
+                    if (mergeFlow != null)
+                        root.Children.Add(mergeFlow);
+                }
+            }
+
+            return root;
+        }
+
+
+    public List<WorkflowExplorerItemDto> BuildExplorer()
+        {
+            var result = new List<WorkflowExplorerItemDto>();
+            var visited = new HashSet<int>();
+
+            foreach (var owner in GetStartFlowOwners())
+            {
+                var flow = BuildFlow(owner, visited);
+
+                if (flow != null)
+                {
+                    result.Add(flow);
+                }
+            }
+
+            return result;
+        }
+
+        public WorkflowActionsDto GetAvailableActions(int selectedNodeId)
+            {
+                
+                var selectedNode = GetNode(selectedNodeId);
+
+
+
+                if (selectedNode == null)
+                    return new WorkflowActionsDto();
+
+                var node = FindFlowOwnerNode(selectedNode) ?? selectedNode;
+
+
+
+                return new WorkflowActionsDto
+                {
+                    CanAddTopPart = false,
+                    CanAddProcess = CanAddProcess(node),
+                    CanAddSubPart =
+                        IsFlowOwner(selectedNode) &&
+                        !HasIncompleteProcess(),
+                    CanAddFinish = node.NodeType == 1 || node.NodeType == 2
+                };
+
+            }
+
+        private bool CanAddProcess(WorkflowNode node)
+        {
+            if (node.NodeType == 1 && IsContainerFlow(node))
+                return false;
+
+            return (node.NodeType == 1 || node.NodeType == 2)
+                && !HasIncompleteProcess();
+        }
+
+        private bool HasIncompleteProcess()
+            {
+                return _workflowNodes.Any(x =>
+                    x.NodeType == 2 &&
+                    (
+                        string.IsNullOrWhiteSpace(x.Name) ||
+                        x.WorkCenterId == null ||
+                        x.EstimatedMinutes == null
+                    ));
+            }
+
+
 
     }
 

@@ -1,7 +1,9 @@
 using System.Net.Http.Json;
 using ManaApp.Models;
 using ManaApp.DTOs.Workflow;
+using ManaApp.Shared.DTOs.Workflow;
 using ManaApp.ViewModels.Workflow;
+
 
 namespace ManaApp.Services.Workflow;
 
@@ -26,7 +28,6 @@ public class WorkflowApiService
                 return null;
             }
         }
-
 
 // TODO:
 // Graph ir pagaidu UI modelis.
@@ -96,6 +97,7 @@ public class WorkflowApiService
                         Workflow = workflow,
                         Graph = graph,
                         PartNodeByProductToPartId = partIndex,
+                        Explorer = workflow.Explorer,
                         ProductParts = productParts
                         
                         .ToList(),
@@ -173,13 +175,13 @@ public class WorkflowApiService
                 });
         }
 
-        public async Task<HttpResponseMessage> AddSubPartAsync(
+        public async Task<AddTopPartResponse?> AddSubPartAsync(
             int versionId,
             int topPartId,
             int parentProductTopPartId,
             int attachToNodeId)
         {
-            return await _http.PostAsJsonAsync(
+            var response = await _http.PostAsJsonAsync(
                 "http://localhost:5270/api/workflow/subpart",
                 new
                 {
@@ -188,11 +190,16 @@ public class WorkflowApiService
                     ParentProductTopPartId = parentProductTopPartId,
                     AttachToNodeId = attachToNodeId
                 });
+
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            return await response.Content.ReadFromJsonAsync<AddTopPartResponse>();
         }
 
         public async Task<HttpResponseMessage> AddProcessAsync(
                 int workflowId,
-                int previousNodeId,
+                int selectedNodeId,
                 string processName)
             {
                 return await _http.PostAsJsonAsync(
@@ -200,7 +207,7 @@ public class WorkflowApiService
                     new
                     {
                         WorkflowId = workflowId,
-                        PreviousNodeId = previousNodeId,
+                        SelectedNodeId = selectedNodeId,
                         ProcessName = processName
                     });
             }
@@ -257,20 +264,25 @@ public class WorkflowApiService
                 });
         }
 
-        public async Task<HttpResponseMessage> SaveProcessAsync(
-            WorkflowNodeModel node)
-        {
-            return await _http.PostAsJsonAsync(
-                "http://localhost:5270/api/workflow/process/save",
-                new
-                {
-                    NodeId = node.Id,
-                    Name = node.Name,
-                    WorkCenterId = node.WorkCenterId,
-                    EstimatedMinutes = node.EstimatedMinutes,
-                    Comments = node.Comments
-                });
-        }
+        public async Task<WorkflowNodeModel?> SaveProcessAsync(
+                WorkflowNodeModel node)
+            {
+                var response = await _http.PostAsJsonAsync(
+                    "http://localhost:5270/api/workflow/process/save",
+                    new
+                    {
+                        NodeId = node.Id,
+                        Name = node.Name,
+                        WorkCenterId = node.WorkCenterId,
+                        EstimatedMinutes = node.EstimatedMinutes,
+                        Comments = node.Comments
+                    });
+
+                if (!response.IsSuccessStatusCode)
+                    return null;
+
+                return await response.Content.ReadFromJsonAsync<WorkflowNodeModel>();
+            }
 
         public async Task<List<AvailableFlowDto>> LoadAvailableFlowsAsync(int workflowId)
             {
@@ -308,6 +320,15 @@ public class WorkflowApiService
                     FlowOwnerNodeId = flowOwnerNodeId
                 });
         }
+       
+        public async Task<WorkflowActionsDto> LoadAvailableActionsAsync(
+                int workflowId,
+                int flowOwnerNodeId)
+            {
+                return await _http.GetFromJsonAsync<WorkflowActionsDto>(
+                    $"http://localhost:5270/api/workflow/actions/{workflowId}/{flowOwnerNodeId}")
+                    ?? new WorkflowActionsDto();
+            }
 
 
 }

@@ -1,0 +1,49 @@
+/* WokflowFlow.razor.css */
+
+.workflow-flow{
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+}
+
+
+
+.workflow-flow-header{
+    display:flex;
+    flex-direction:column;
+}
+
+.workflow-flow-card{
+    border:1px solid #dbe3ef;
+    border-radius:8px;
+    background:#fff;
+    margin-bottom:12px;
+    padding:8px;
+}
+
+.dependency-flow::before{
+    content:"";
+    position:absolute;
+    left:-18px;
+    top:28px;
+    width:18px;
+    height:1px;
+    background:#d6dbe3;
+}
+
+.workflow-flow-root{
+    background:#f8fbff;
+}
+
+.workflow-flow-content{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    padding-left:24px;
+}
+
+.container-flow{
+    position:relative;
+}
+

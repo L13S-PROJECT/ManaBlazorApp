@@ -1,0 +1,25 @@
+/* DependencyFlowsContainer.razor.css */
+
+.workflow-dependency-container{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    padding-left:32px;
+    margin-top:8px;
+    margin-bottom:8px;
+    position:relative;
+}
+
+.workflow-dependency-list{
+    position:relative;
+}
+
+.workflow-dependency-list::before{
+    content:"";
+    position:absolute;
+    left:-18px;
+    top:28px;
+    bottom:0;
+    width:1px;
+    background:#d6dbe3;
+}

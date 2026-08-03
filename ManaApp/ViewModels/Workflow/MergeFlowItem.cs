@@ -1,4 +1,4 @@
-using ManaApp.DTOs.Workflow;
+using ManaApp.Shared.DTOs.Workflow;
 
 namespace ManaApp.ViewModels.Workflow;
 

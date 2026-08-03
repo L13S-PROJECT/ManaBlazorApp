@@ -1,0 +1,42 @@
+@* WorkFlow Explorer.razor *@
+
+@using ManaApp.ViewModels.Workflow
+@using ManaApp.Shared.DTOs.Workflow
+
+@namespace ManaApp.Components.Workflow
+
+
+<div class="workflow-explorer-body">
+
+    <div class="workflow-flows">
+
+        <div class="workflow-explorer-list">
+
+            @foreach (var item in RootItems)
+            {
+                <WorkflowFlowExplorer
+                    Item="item"
+                    OnSelected="OnSelected"
+                    OnNodeSelected="OnNodeSelected" />
+            }
+
+        </div>
+
+    </div>
+
+</div> 
+ 
+@code
+{
+    [Parameter]
+    public List<WorkflowExplorerItemDto> Items { get; set; } = new();
+
+    private IEnumerable<WorkflowExplorerItemDto> RootItems => Items;
+
+    [Parameter]
+    public EventCallback<WorkflowExplorerItemDto> OnSelected { get; set; }
+
+    [Parameter]
+    public EventCallback<WorkflowExplorerNodeDto> OnNodeSelected { get; set; }  
+
+}

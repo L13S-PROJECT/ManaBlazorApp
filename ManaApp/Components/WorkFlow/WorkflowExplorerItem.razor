@@ -1,0 +1,82 @@
+@* WorkflowExplorerItem.razor *@
+
+@namespace ManaApp.Components.Workflow
+
+<div class="workflow-explorer-item
+    @(IsFlowRoot ? "flow-root-item" : "")
+    @(IsSelected ? "selected" : "")"
+     @onclick="OnSelected">
+
+    @if (IsFlowRoot)
+    {
+        <div class="flow-column">
+
+            <button class="flow-toggle"
+                    type="button"
+                    @onclick="OnToggle">
+
+                <i class="bi @(IsExpanded ? "bi-chevron-down" : "bi-chevron-right")"></i>
+
+            </button>
+
+            <div class="flow-line"></div>
+
+        </div> 
+    }
+    else 
+    { 
+        <div class="flow-column"></div>
+    }
+
+    <div class="item-icon">
+        <i class="bi @Icon"></i>
+    </div>
+
+    <div class="item-header">
+
+        <span class="item-type">@Type</span>
+
+        <span class="item-name">@Name</span>
+
+    </div>
+
+    
+
+    <span class="item-spacer"></span>
+
+    <span class="item-badge">
+        @Badge
+    </span>
+
+</div>
+
+@code
+{
+    [Parameter]
+public string Name { get; set; } = "";
+
+[Parameter]
+public string Type { get; set; } = "";
+
+[Parameter]
+public string Badge { get; set; } = "";
+
+[Parameter]
+public string Icon { get; set; } = "bi-circle";
+
+[Parameter]
+public bool IsFlowRoot { get; set; }
+
+[Parameter]
+public bool IsExpanded { get; set; } = true;
+
+[Parameter]
+public EventCallback OnToggle { get; set; }
+
+[Parameter]
+public EventCallback OnSelected { get; set; }
+
+[Parameter]
+public bool IsSelected { get; set; }
+
+}

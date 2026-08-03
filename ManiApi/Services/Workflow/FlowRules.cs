@@ -1,3 +1,6 @@
+// Satur tikai Flow biznesa noteikumus.
+// Nekāda grafa traversēšana šeit nenotiek.
+
 using ManiApi.DTOs.WorkFlow;
 
 namespace ManiApi.Services.Workflow
@@ -33,6 +36,14 @@ namespace ManiApi.Services.Workflow
         {
             return IsFinishedFlow(flow) &&
                 !IsConsumedFlow(flow);
+        }
+
+        internal bool CanMergeFlows(
+            FlowInfoDto firstFlow,
+            FlowInfoDto secondFlow)
+        {
+            
+            throw new NotImplementedException();
         }
 
     }

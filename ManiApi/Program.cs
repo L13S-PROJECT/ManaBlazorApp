@@ -76,11 +76,7 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 
-builder.Services.AddControllers()
-    .AddJsonOptions(o =>
-    {
-        o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()); // ļauj enumus kā tekstu
-    });
+builder.Services.AddControllers();
 
 var app = builder.Build();
 
