@@ -8,6 +8,7 @@
 @using ManaApp.ViewModels.Workflow
 @inject TechnologyEditorService TechnologyEditorUi
 @inject WorkflowEditorService WorkflowEditor
+@inject IJSRuntime JS
 
 @namespace ManaApp.Components.Workflow
 
@@ -218,7 +219,8 @@
                     : WorkflowEditor.NodeTypeName(WorkflowEditor.State.SelectedNode.Node.NodeType))
             </div>
 
-            <button class="btn btn-outline-danger btn-delete-node">
+            <button class="btn btn-outline-danger btn-delete-node"
+                    @onclick="DeleteSelectedNode">
                 <i class="bi bi-trash"></i>
             </button>
 
@@ -482,6 +484,9 @@ private async Task AddSubPart()
 
                 var newNode = await WorkflowEditor.AddProcessAsync(string.Empty);
 
+                if (newNode == null)
+                     return;
+
                 var mapper = new WorkflowGraphMapper(WorkflowEditor.State);
 
                 WorkflowGraphItems = mapper.Map(
@@ -489,10 +494,7 @@ private async Task AddSubPart()
                     
                 WorkflowEditor.WorkflowGraphItems = WorkflowGraphItems;
 
-                if (newNode != null)
-                    {
-                        WorkflowEditor.RestoreSelectedGraphNode(newNode.Id);
-                    }
+                WorkflowEditor.RestoreSelectedGraphNode(newNode.Id);
 
                 StateHasChanged();
             }
@@ -621,5 +623,19 @@ private async Task OnAddMergeDialogClosed(bool visible)
 
             StateHasChanged();
         }
+
+        private async Task DeleteSelectedNode()
+            {
+                try
+                {
+                    await WorkflowEditor.DeleteSelectedNodeAsync();
+                }
+                catch (Exception ex)
+                {
+                    await JS.InvokeVoidAsync("alert", ex.Message);
+                }
+
+                StateHasChanged();
+            }
 
 }

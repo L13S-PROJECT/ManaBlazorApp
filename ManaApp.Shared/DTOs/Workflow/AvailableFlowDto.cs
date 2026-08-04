@@ -2,7 +2,12 @@ namespace ManaApp.Shared.DTOs.Workflow;
 
 public class AvailableFlowDto
 {
+    // Legacy.
+    // Publiskajā API vairs netiek izmantots.
+    // Nepieciešams tikai iekšējai WorkflowFlowAnalyzer darbībai.
     public int FinishNodeId { get; set; }
+
+    public int FlowOwnerNodeId { get; set; }
 
     public AvailableFlowType FlowType { get; set; }
 

@@ -144,10 +144,17 @@ public class WorkflowEditorService
 
         public async Task LoadAvailableFlowsAsync()
             {
+                
+Console.WriteLine(">>> LoadAvailableFlowsAsync");
+                
                 if (State.Workflow?.Workflow == null)
                     return;
 
                 var currentFlow = GetCurrentFlow();
+
+Console.WriteLine(currentFlow == null
+    ? "currentFlow = NULL"
+    : $"currentFlow Owner={currentFlow.FlowOwnerNodeId} Finish={currentFlow.FinishNodeId}");
 
                     if (currentFlow == null)
                     {
@@ -156,9 +163,16 @@ public class WorkflowEditorService
                         return;
                     }
 
+Console.WriteLine("Before API call");
+
+Console.WriteLine(
+    $"Calling API: Workflow={State.Workflow.Workflow.Id}, Owner={currentFlow.FlowOwnerNodeId}, Finish={currentFlow.FinishNodeId}");
+
                     var flows = await _workflowApiService.LoadAvailableFlowsAsync(
                         State.Workflow.Workflow.Id,
-                        currentFlow.FinishNodeId);
+                        currentFlow.FlowOwnerNodeId);
+
+Console.WriteLine($"API returned {flows.Count} flow(s)");
 
                 State.AvailableFlows.Clear();
 
@@ -497,7 +511,13 @@ private WorkflowGraphItem? FindGraphItem(WorkflowGraphItem? item, int nodeId)
    
        public AvailableFlowDto? GetCurrentFlow()
             {
-                return State.SelectedFlow;
+                var selectedNode = State.SelectedNode?.Node;
+
+                if (selectedNode == null)
+                    return null;
+
+                return State.Workflow?.Flows
+                    .FirstOrDefault(x => x.FlowOwnerNodeId == selectedNode.Id);
             }
 
         public async Task<WorkflowNodeModel?> AddProcessAsync(string processName)
@@ -925,6 +945,37 @@ private void RefreshValidation(WorkflowGraphItem item)
                         Workflow.Workflow.Id,
                         selectedNodeId);
 
+            }
+
+        public async Task<bool> DeleteSelectedNodeAsync()
+            {
+                if (Workflow?.Workflow == null)
+                    return false;
+
+                if (SelectedNode == null)
+                    return false;
+
+                var response = await _workflowApiService.DeleteNodeAsync(
+                    new DeleteWorkflowNodeRequest
+                    {
+                        WorkflowId = Workflow.Workflow.Id,
+                        NodeId = SelectedNode.Node.Id
+                    });
+
+                if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
+                    {
+                        await ReloadAsync();
+                        return true;
+                    }
+
+                var result = await response.Content.ReadFromJsonAsync<DeleteWorkflowResponse>();
+
+                if (result?.Success == false)
+                    {
+                        throw new InvalidOperationException(result.Message);
+                    }
+
+                return false;
             }
 
 }

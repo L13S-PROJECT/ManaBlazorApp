@@ -222,8 +222,8 @@ public class WorkflowApiService
                     new
                         {
                             WorkflowId = workflowId,
-                            CurrentFinishNodeId = currentFinishNodeId,
-                            MergeFinishNodeIds = mergeFinishNodeIds
+                            CurrentFlowId = currentFinishNodeId,
+                            MergeFlowIds = mergeFinishNodeIds
                         });
             }
 
@@ -284,29 +284,31 @@ public class WorkflowApiService
                 return await response.Content.ReadFromJsonAsync<WorkflowNodeModel>();
             }
 
-        public async Task<List<AvailableFlowDto>> LoadAvailableFlowsAsync(int workflowId)
-            {
-                return await _http.GetFromJsonAsync<List<AvailableFlowDto>>(
-                    $"http://localhost:5270/api/workflow/available-flows/{workflowId}")
-                    ?? new();
-            }
             
         public async Task<List<AvailableFlowDto>> LoadAvailableFlowsAsync(
                 int workflowId,
                 int flowOwnerNodeId)
             {
-                return await _http.GetFromJsonAsync<List<AvailableFlowDto>>(
-                    $"http://localhost:5270/api/workflow/available-flows/{workflowId}/{flowOwnerNodeId}")
-                    ?? new();
+                
+Console.WriteLine(
+    $"HTTP GET => available-flows/{workflowId}/{flowOwnerNodeId}");
+
+var result = await _http.GetFromJsonAsync<List<AvailableFlowDto>>(
+    $"http://localhost:5270/api/workflow/available-flows/{workflowId}/{flowOwnerNodeId}")
+    ?? new();
+
+Console.WriteLine($"HTTP RESULT => {result.Count}");
+
+return result;
+                
+                // return await _http.GetFromJsonAsync<List<AvailableFlowDto>>(
+                //     $"http://localhost:5270/api/workflow/available-flows/{workflowId}/{flowOwnerNodeId}")
+                //     ?? new();
+
+
             }
 
-        public async Task<bool> HasAvailableMergeAsync(
-                int workflowId,
-                int flowOwnerNodeId)
-            {
-                return await _http.GetFromJsonAsync<bool>(
-                    $"http://localhost:5270/api/workflow/merge-available/{workflowId}/{flowOwnerNodeId}");
-            }
+
 
         public async Task<HttpResponseMessage> AddFinishAsync(
             int workflowId,
@@ -328,6 +330,14 @@ public class WorkflowApiService
                 return await _http.GetFromJsonAsync<WorkflowActionsDto>(
                     $"http://localhost:5270/api/workflow/actions/{workflowId}/{flowOwnerNodeId}")
                     ?? new WorkflowActionsDto();
+            }
+
+        public async Task<HttpResponseMessage> DeleteNodeAsync(
+                DeleteWorkflowNodeRequest request)
+            {
+                return await _http.PostAsJsonAsync(
+                    "http://localhost:5270/api/workflow/delete",
+                    request);
             }
 
 

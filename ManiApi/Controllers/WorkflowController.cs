@@ -481,9 +481,21 @@ Console.WriteLine(
                     connections,
                     dependencies);
 
-                return Ok(analyzer.GetAvailableFlows(
+                var flows = analyzer.GetAvailableFlows(
                     workflow.VersionId,
-                    flowOwnerNodeId));
+                    flowOwnerNodeId);
+
+                return Ok(flows.Select(x => new
+                    {
+                        x.FlowOwnerNodeId,
+                        x.FinishNodeId,
+                        x.FlowType,
+                        x.OwnerName,
+                        x.OwnerProductToPartId,
+                        x.DisplayName,
+                        x.IsConsumed,
+                        x.IsSelectable
+                    }));
             }
 
             [HttpGet("merge-available/{workflowId}/{flowOwnerNodeId}")]
@@ -903,13 +915,21 @@ Console.WriteLine(
 
                 try
                 {
-                    finishNodeIds = analyzer.NormalizeMergeSelection(
+                    
+Console.WriteLine($"CurrentFlowId={dto.CurrentFlowId}");
+Console.WriteLine($"MergeFlowIds={string.Join(",", dto.MergeFlowIds)}");                   
+                    
+                    finishNodeIds = analyzer.ValidateAndNormalizeMergeSelection(
                         dto.CurrentFlowId,
                         dto.MergeFlowIds);
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return BadRequest(ex.Message);
+                    
+Console.WriteLine($"NormalizeMergeSelection ERROR: {ex.Message}");
+    return BadRequest(ex.Message);
+                    
+                    // return BadRequest(ex.Message);
                 }
 
                         
@@ -928,6 +948,18 @@ Console.WriteLine(
                 var mergeNode = CreateMergeNode(
                     dto.WorkflowId,
                     maxSort + 10);
+
+                mergeNode.Name = string.Join(" + ",
+                    finishNodeIds
+                        .SelectMany(id =>
+                        {
+                            var name = analyzer.GetFlowInfoByFinish(id)?.StartNode?.Name ?? "";
+
+                            return name
+                                .Split(" + ", StringSplitOptions.RemoveEmptyEntries)
+                                .Select(x => x.Trim());
+                        })
+                        .Distinct());
 
                  _db.WorkflowNodes.Add(mergeNode);
 
@@ -1083,6 +1115,9 @@ Console.WriteLine($"FINISH COUNT = {finishNodeIds.Count}");
                     if (ownerNode == null)
                         return BadRequest("Flow sākums nav atrasts.");
                 
+                if (ownerNode.NodeType == 3 && !analyzer.HasProcessNode(ownerNode))
+                    return BadRequest("MERGE Flow jābūt vismaz vienam PROCESS pirms FINISH.");
+                
                 WorkflowNode? lastNode;
 
                     try
@@ -1187,6 +1222,199 @@ Console.WriteLine($"FINISH COUNT = {finishNodeIds.Count}");
 
                     return Ok(analyzer.GetAvailableActions(selectedNodeId));
                 }
+
+        [HttpPost("delete")]
+            public async Task<IActionResult> DeleteNode(DeleteWorkflowRequest dto)
+            {
+                var node = await _db.WorkflowNodes
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == dto.NodeId &&
+                        x.WorkflowId == dto.WorkflowId &&
+                        x.IsActive);
+
+                if (node == null)
+                    return Ok(new DeleteWorkflowResponse
+                        {
+                            Success = false,
+                            Message = "Node nav atrasts."
+                        });
+                
+                var analyzer = await _analyzerFactory.CreateAsync(dto.WorkflowId);
+
+                var deleteResult = analyzer.CanDeleteNode(node);
+
+                    if (!deleteResult.Success)
+                        return Ok(deleteResult);
+
+                if (analyzer.IsFlowOwner(node))
+                    {
+                        await using var transaction = await _db.Database.BeginTransactionAsync();
+
+                        await DeleteFlowAsync(node);
+
+                        await _db.SaveChangesAsync();
+
+                        await transaction.CommitAsync();
+                    }
+                else if (node.NodeType == 2)
+                    {
+                        await DeleteProcessNodeAsync(node);
+                        await _db.SaveChangesAsync();
+                    }
+                else if (node.NodeType == 4)
+                    {
+                        await DeleteFinishNodeAsync(node);
+                        await _db.SaveChangesAsync();
+                    }
+
+                    return NoContent();
+
+            }
+
+            private async Task DeleteFlowAsync(WorkflowNode flowOwner)
+        {
+            
+            var analyzer = await _analyzerFactory.CreateAsync(flowOwner.WorkflowId);
+
+            var finishNode = analyzer.GetFlowFinishNode(flowOwner);
+
+                if (finishNode != null &&
+                    analyzer.GetNextMergeNodes(finishNode.Id).Any())
+                    {
+                        throw new InvalidOperationException(
+                            "Flow nevar dzēst, jo tas piedalās MERGE.");
+                    }
+
+            var flowNodes = analyzer.GetFlowNodes(flowOwner);
+            
+            var flowNodeIds = flowNodes.Select(x => x.Id).ToList();
+
+            var connections = _db.WorkflowNodeConnections
+                .Where(x =>
+                    flowNodeIds.Contains(x.FromNodeId) ||
+                    flowNodeIds.Contains(x.ToNodeId));
+
+            _db.WorkflowNodeConnections.RemoveRange(connections);
+
+            var dependencies = _db.WorkflowDependencies
+                .Where(x =>
+                    flowNodeIds.Contains(x.NodeId) ||
+                    flowNodeIds.Contains(x.DependsOnNodeId));
+
+            _db.WorkflowDependencies.RemoveRange(dependencies);
+
+            foreach (var workflowNode in flowNodes)
+                {
+                    workflowNode.IsActive = false;
+                }
+
+            var productPartIds = flowNodes
+                .Where(x => x.NodeType == 1 && x.ProductToPartId.HasValue)
+                .Select(x => x.ProductToPartId!.Value)
+                .ToList();
+
+            var productParts = await _db.ProductTopParts
+                .Where(x => productPartIds.Contains(x.Id))
+                .ToListAsync();
+
+            foreach (var part in productParts)
+                part.IsActive = false;
+
+            // await _db.SaveChangesAsync();
+
+            //     foreach (var workflowNode in flowNodes)
+            //     {
+            //         workflowNode.IsActive = false;
+            //     }
+
+            // await _db.SaveChangesAsync();
+        }
+
+        private async Task DeleteProcessNodeAsync(WorkflowNode node)
+        {
+            if (node.NodeType != 2)
+                throw new InvalidOperationException("Drīkst dzēst tikai PROCESS.");
+
+            var previous = await _db.WorkflowNodeConnections
+                .FirstOrDefaultAsync(x => x.ToNodeId == node.Id);
+
+            var next = await _db.WorkflowNodeConnections
+                .FirstOrDefaultAsync(x => x.FromNodeId == node.Id);
+
+            if (previous != null)
+                _db.WorkflowNodeConnections.Remove(previous);
+
+            if (next != null)
+                _db.WorkflowNodeConnections.Remove(next);
+
+            node.IsActive = false;
+
+            if (previous != null && next != null)
+                {
+                    var exists = await _db.WorkflowNodeConnections.AnyAsync(x =>
+                        x.FromNodeId == previous.FromNodeId &&
+                        x.ToNodeId == next.ToNodeId);
+
+                    if (!exists)
+                    {
+                        _db.WorkflowNodeConnections.Add(new WorkflowNodeConnection
+                        {
+                            FromNodeId = previous.FromNodeId,
+                            ToNodeId = next.ToNodeId
+                        });
+                    }
+                }
+
+            var nodes = await _db.WorkflowNodes
+                .Where(x =>
+                    x.WorkflowId == node.WorkflowId &&
+                    x.IsActive &&
+                    x.Id != node.Id)
+                .OrderBy(x => x.SortOrder)
+                .ToListAsync();
+
+            var sort = 10;
+
+            foreach (var workflowNode in nodes)
+                {
+                    workflowNode.SortOrder = sort;
+                    sort += 10;
+                }
+        }
+
+        private async Task DeleteFinishNodeAsync(WorkflowNode node)
+            {
+                var analyzer = await _analyzerFactory.CreateAsync(node.WorkflowId);
+
+                if (analyzer.GetNextMergeNodes(node.Id).Any())
+                    throw new InvalidOperationException(
+                        "FINISH nevar dzēst, jo tas piedalās MERGE.");
+
+                var previous = await _db.WorkflowNodeConnections
+                    .FirstOrDefaultAsync(x => x.ToNodeId == node.Id);
+
+                if (previous != null)
+                    _db.WorkflowNodeConnections.Remove(previous);
+
+                node.IsActive = false;
+                
+                var nodes = await _db.WorkflowNodes
+                    .Where(x =>
+                        x.WorkflowId == node.WorkflowId &&
+                        x.IsActive &&
+                        x.Id != node.Id)
+                    .OrderBy(x => x.SortOrder)
+                    .ToListAsync();
+
+                var sort = 10;
+
+                foreach (var workflowNode in nodes)
+                {
+                    workflowNode.SortOrder = sort;
+                    sort += 10;
+                }
+    
+            }
 
     }
 }

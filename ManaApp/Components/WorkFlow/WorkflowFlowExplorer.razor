@@ -10,7 +10,7 @@
 
 
 <div class="workflow-flow-card"
-     style="margin-left:@((Item?.Level ?? 0) * 24)px">
+     style="margin-left:@(GetIndent(Item))px">
 
     @if (Item != null)
     {
@@ -100,5 +100,18 @@
 
     [Parameter]
     public EventCallback<WorkflowExplorerNodeDto> OnNodeSelected { get; set; }
+
+    private static int GetIndent(WorkflowExplorerItemDto? item)
+        {
+            if (item == null)
+                return 0;
+
+            var level = item.Level;
+
+            if (item.FlowType == AvailableFlowType.Merge && level > 0)
+                level--;
+
+            return level * 24;
+        }
 
 }
