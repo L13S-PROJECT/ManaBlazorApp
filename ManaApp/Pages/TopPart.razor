@@ -1,0 +1,143 @@
+@page "/toppart"
+
+@using ManaApp.Components.TopPart
+@using ManaApp.Shared.DTOs.TopPart
+@using ManaApp.Services
+@inject TopPartService TopPartService
+
+<PageTitle>TopPart</PageTitle>
+
+<div class="toppart-page">
+
+    <h3>TopPart</h3>
+
+    <div class="toppart-layout">
+
+        <section class="toppart-main">
+
+            <TopPartToolbar 
+                OnNewTopPart="OpenNewTopPartModal" />
+
+            <TopPartList
+                @ref="topPartList"
+                OnSelected="SelectTopPart"
+                SelectedTopPartId="selectedTopPart?.Id" />
+
+        </section>
+
+        <aside class="toppart-details">
+
+            <section class="toppart-info-section">
+
+                <TopPartFlowDetails
+                    TopPart="selectedTopPart"
+                    Categories="categories"
+                    OnEdit="OpenEditTopPartModal" />
+
+            </section>
+
+            <section class="toppart-flow-section">
+                <TopPartFlowToolbar />
+                <TopPartToolbar OnNewTopPart="OpenNewTopPartModal" />
+            </section>
+
+        </aside>
+
+    </div>
+
+</div>
+
+@if (showTopPartModal)
+    {
+        <TopPartFormModal
+            TopPart="editingTopPart"
+            OnClose="CloseTopPartModal"
+            OnSaved="TopPartSaved" />
+    }
+
+@if (showSavedConfirmation)
+    {
+        <div class="save-confirm-backdrop">
+            <div class="save-confirm-modal">
+
+                <div class="save-confirm-icon">
+                    ✓
+                </div>
+
+                <div class="save-confirm-content">
+                    <div class="save-confirm-title">
+                        Saglabāts
+                    </div>
+
+                    <div class="save-confirm-text">
+                        Izmaiņas veiksmīgi saglabātas.
+                    </div>
+                </div>
+
+                <div class="save-confirm-actions">
+                    <button type="button"
+                            class="save-confirm-button"
+                            @onclick="ConfirmSaved">
+                        OK
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    }
+
+@code {
+    private bool showTopPartModal = false;
+    private TopPartList? topPartList;
+    private bool showSavedConfirmation = false;
+    private TopPartListItemDto? editingTopPart;
+
+    private void OpenNewTopPartModal()
+        {
+            editingTopPart = null;
+            showTopPartModal = true;
+        }
+
+    private void CloseTopPartModal()
+        {
+            showTopPartModal = false;
+        }
+    
+    private TopPartListItemDto? selectedTopPart;
+
+   private void SelectTopPart(TopPartListItemDto? topPart)
+        {
+            selectedTopPart = topPart;
+        }
+
+    private List<TopPartCategoryDto> categories = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = await TopPartService.GetCategoriesAsync();
+    }
+
+    private void TopPartSaved(TopPartListItemDto createdTopPart)
+        {
+            selectedTopPart = createdTopPart;
+            showTopPartModal = false;
+            showSavedConfirmation = true;
+        }
+    
+    private async Task ConfirmSaved()
+        {
+            showSavedConfirmation = false;
+
+            if (topPartList is not null)
+            {
+                await topPartList.ReloadAsync();
+            }
+        }
+    
+    private void OpenEditTopPartModal(TopPartListItemDto topPart)
+        {
+            editingTopPart = topPart;
+            showTopPartModal = true;
+        }
+
+}

@@ -1,0 +1,21 @@
+
+/* TopPartToolbar.razor.css */
+
+.toppart-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 48px;
+    padding: 0 12px;
+}
+
+.toppart-toolbar-left {
+    display: flex;
+    align-items: center;
+}
+
+.toppart-toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}

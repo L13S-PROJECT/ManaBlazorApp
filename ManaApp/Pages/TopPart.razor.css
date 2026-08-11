@@ -1,0 +1,139 @@
+/* ToPart.razor.css */
+
+.toppart-page {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.toppart-layout {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 12px;
+    min-height: 0;
+}
+
+.toppart-main,
+.toppart-details {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+
+.toppart-toolbar,
+.toppart-flow-toolbar {
+    flex: 0 0 auto;
+}
+
+.toppart-list {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+}
+
+.toppart-flow-details {
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow: visible;
+}
+
+.toppart-info-section {
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow: visible;
+}
+
+.toppart-flow-section {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+}
+
+.toppart-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: rgba(0, 0, 0, 0.35);
+}
+
+.toppart-modal {
+    min-width: 280px;
+    padding: 20px;
+    background: #fff;
+    border-radius: 8px;
+}
+
+.save-confirm-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 2100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(17, 24, 39, 0.35);
+}
+
+.save-confirm-modal {
+    width: 360px;
+    padding: 24px;
+    background: #fff;
+    border: 1px solid #d9dde3;
+    border-radius: 8px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+}
+
+.save-confirm-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    margin-bottom: 14px;
+    border-radius: 50%;
+    background: #e8f5e9;
+    color: #2e7d32;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.save-confirm-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.save-confirm-text {
+    margin-top: 5px;
+    font-size: 13px;
+    color: #6b7280;
+}
+
+.save-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 22px;
+}
+
+.save-confirm-button {
+    min-width: 80px;
+    padding: 7px 16px;
+    border: 1px solid #374151;
+    border-radius: 4px;
+    background: #374151;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.save-confirm-button:hover {
+    background: #1f2937;
+}

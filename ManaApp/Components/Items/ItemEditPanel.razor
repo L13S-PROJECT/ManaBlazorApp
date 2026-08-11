@@ -1,0 +1,222 @@
+@* ItemEditPanel.razor *@
+
+@using ManaApp.Services.Items
+@using ManaApp.Shared.DTOs.Items
+@using ManaApp.Components.Items
+
+@inject IJSRuntime JS
+@inject ItemApiService ItemApi
+@inject ItemsStateService State
+
+<ItemEditToolbar
+    OnNew="New"
+    OnSave="Save"
+    OnCancel="Cancel"
+    OnDelete="Delete" />
+
+<div class="card">
+
+    <div class="card-header">
+        Item
+    </div>
+
+    <div class="card-body">
+
+        @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+            {
+                <div class="alert alert-danger">
+                    @ErrorMessage
+                </div>
+            }
+
+        @if (Item == null)
+{
+    <div class="text-muted">
+        Izvēlieties materiālu.
+    </div>
+}
+else
+{
+    <div class="mb-3">
+        <label class="form-label">Tips</label>
+
+        <select class="form-select"
+                @bind="Item.ItemTypeId">
+
+            <option value="0">-- izvēlieties --</option>
+
+            @foreach (var type in ItemTypes)
+            {
+                <option value="@type.Id">@type.TypeName</option>
+            }
+
+        </select>
+    </div>
+    
+    <div class="mb-3">
+        <label class="form-label">Kods</label>
+        <input class="form-control"
+            @bind="Item.ItemCode" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Nosaukums</label>
+        <input class="form-control"
+            @bind="Item.ItemName" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Mērvienība</label>
+
+        <select class="form-select"
+                @bind="Item.Unit">
+
+            <option value="">-- izvēlieties --</option>
+
+            @foreach (var unit in Units)
+            {
+                <option value="@unit.UnitCode">
+                    @unit.UnitName
+                </option>
+            }
+
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Apraksts</label>
+
+        <textarea class="form-control"
+                rows="4"
+                @bind="Item.Description">
+        </textarea>
+    </div>
+}
+
+    </div>
+
+</div>
+
+@code
+{
+    private ItemEditDto? Item;
+    private string? ErrorMessage;
+    private bool IsNew;
+
+    [Parameter]
+    public int? ItemId { get; set; }
+
+    [Parameter]
+    public EventCallback OnClearSelection { get; set; }
+
+    private List<ItemTypeDto> ItemTypes = new();
+    private List<UnitDto> Units = new();
+    protected override async Task OnParametersSetAsync()
+    {        
+        if (!ItemTypes.Any())
+        {
+            ItemTypes = await ItemApi.LoadTypesAsync();
+        }
+
+        if (!Units.Any())
+            {
+                Units = await ItemApi.LoadUnitsAsync();
+            }
+
+        if (ItemId == null)
+            {
+                Item = null;
+                return;
+            }
+
+        Item = await ItemApi.LoadItemAsync(ItemId.Value);
+    }
+
+    private async Task Cancel()
+        {
+            ErrorMessage = null;
+
+            if (IsNew)
+            {
+                IsNew = false;
+                Item = null;
+                await OnClearSelection.InvokeAsync();
+                return;
+            }
+
+            if (ItemId == null)
+            {
+                Item = null;
+                return;
+            }
+
+            Item = await ItemApi.LoadItemAsync(ItemId.Value);
+        }
+
+    private async Task Delete()
+            {
+                ErrorMessage = null;
+                
+                if (Item == null)
+                    return;
+
+                var ok = await JS.InvokeAsync<bool>("confirm", "Vai tiešām dzēst?");
+
+                if (!ok)
+                    return;
+
+                await ItemApi.DeleteAsync(Item.Id);
+
+                await State.ReloadAsync();
+
+                State.ClearSelection();
+
+                await OnClearSelection.InvokeAsync();
+
+                Item = null;
+            }
+    private async Task Save()
+        {
+            ErrorMessage = null;
+
+            try
+    {
+            if (Item == null)
+                return;
+
+            if (Item.ItemTypeId == 0)
+                return;
+
+            if (Item.Id == 0)
+            {
+                Item.Id = await ItemApi.CreateAsync(Item);
+                State.SelectItem(Item.Id);
+            }
+            else
+            {
+                await ItemApi.UpdateAsync(Item);
+            }
+
+            Item = await ItemApi.LoadItemAsync(Item.Id);
+            await State.ReloadAsync();
+
+            }
+    catch (Exception ex)
+            {
+                ErrorMessage = ex.Message;
+            }
+
+        }
+
+    private void New()
+        {
+            ErrorMessage = null;
+
+            State.ClearSelection();
+
+            IsNew = true;
+
+            Item = ItemApi.CreateNew();
+        }
+
+}

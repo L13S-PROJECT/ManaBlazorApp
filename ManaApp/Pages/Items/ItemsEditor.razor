@@ -1,0 +1,47 @@
+@* ItemsEditor.razor *@
+
+@page "/items"
+
+@using ManaApp.Services.Items
+@using ManaApp.Components.Items
+@using ManaApp.Shared.DTOs.Items
+
+@inject ItemApiService ItemApi
+
+
+<PageTitle>Items</PageTitle>
+
+<div class="row">
+
+    <div class="col-5">
+        <ItemsGrid 
+            @ref="ItemsGrid"
+           OnSelected="SelectItem" />
+    </div>
+
+    <div class="col-7">
+        <ItemEditPanel
+            ItemId="SelectedItemId"
+            OnClearSelection="ClearSelection" />
+    </div>
+
+</div>
+
+
+@code
+{
+    private int? SelectedItemId;
+
+    private void SelectItem(int id)
+    {
+        SelectedItemId = id;
+    }
+
+    private void ClearSelection()
+        {
+            SelectedItemId = null;
+        }
+
+    private ItemsGrid? ItemsGrid;
+
+}

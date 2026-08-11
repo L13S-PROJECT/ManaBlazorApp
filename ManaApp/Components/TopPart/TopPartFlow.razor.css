@@ -1,0 +1,22 @@
+/* TopPartFlow.razor.css */
+
+.toppart-flow {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.flow-components,
+.flow-processes {
+    padding: 12px;
+}
+
+.flow-components {
+    flex: 0 0 auto;
+}
+
+.flow-processes {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+}

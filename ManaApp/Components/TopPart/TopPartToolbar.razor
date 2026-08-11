@@ -1,0 +1,34 @@
+@* TopPartToolbar.razor *@
+
+<div class="toppart-toolbar">
+
+    <div class="toppart-toolbar-left">
+
+        <div class="toppart-toolbar-filter">
+            TopPart
+        </div>
+
+        <div class="toppart-toolbar-filter">
+            Statuss
+        </div>
+
+    </div>
+
+    <div class="toppart-toolbar-actions">
+
+        <button type="button" @onclick="OnNewTopPart">
+            Jauns TopPart
+        </button>
+
+        <button type="button">
+            Plānot TopPart
+        </button>
+
+    </div>
+
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback OnNewTopPart { get; set; }
+}

@@ -212,19 +212,24 @@ public class WorkflowApiService
                     });
             }
 
-       public async Task<HttpResponseMessage> AddMergeAsync(
-            int workflowId,
-            int currentFinishNodeId,
-            List<int> mergeFinishNodeIds)
+       public async Task<WorkflowNodeModel?> AddMergeAsync(
+                int workflowId,
+                int currentFinishNodeId,
+                List<int> mergeFinishNodeIds)
             {
-                return await _http.PostAsJsonAsync(
+                var response = await _http.PostAsJsonAsync(
                     "http://localhost:5270/api/workflow/merge",
                     new
-                        {
-                            WorkflowId = workflowId,
-                            CurrentFlowId = currentFinishNodeId,
-                            MergeFlowIds = mergeFinishNodeIds
-                        });
+                    {
+                        WorkflowId = workflowId,
+                        CurrentFlowId = currentFinishNodeId,
+                        MergeFlowIds = mergeFinishNodeIds
+                    });
+
+                if (!response.IsSuccessStatusCode)
+                    return null;
+
+                return await response.Content.ReadFromJsonAsync<WorkflowNodeModel>();
             }
 
         public async Task<HttpResponseMessage> CreateWorkflowAsync(int versionId)

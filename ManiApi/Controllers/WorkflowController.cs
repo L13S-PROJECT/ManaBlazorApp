@@ -82,14 +82,14 @@ namespace ManiApi.Controllers
                 connections,
                 dependencies);
 
-            List<AvailableFlowDto> flows = analyzer.GetAvailableFlows(workflow.VersionId);
+            List<AvailableFlowDto> flows = analyzer.GetAvailableFlows(workflow.VersionId!.Value);
 
             var dto = new WorkflowDto
                 {
                     Workflow = new WorkflowModel
                     {
                         Id = workflow.Id,
-                        VersionId = workflow.VersionId,
+                        VersionId = workflow.VersionId!.Value,
                         Name = workflow.Name,
                         
                     },
@@ -482,7 +482,7 @@ Console.WriteLine(
                     dependencies);
 
                 var flows = analyzer.GetAvailableFlows(
-                    workflow.VersionId,
+                    workflow.VersionId!.Value,
                     flowOwnerNodeId);
 
                 return Ok(flows.Select(x => new
@@ -544,7 +544,7 @@ Console.WriteLine(
                     dependencies);
 
                 return Ok(analyzer.HasAvailableMerge(
-                    workflow.VersionId,
+                    workflow.VersionId!.Value,
                     flowOwnerNodeId));
             }
 

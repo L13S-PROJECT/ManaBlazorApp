@@ -7,6 +7,7 @@ using ManaApp.Services;
 using ManaApp.Services.Planning;
 using ManaApp.Services.Workflow;
 using ManaApp.Services.Common;
+using ManaApp.Services.Items;
 
 
 
@@ -39,6 +40,11 @@ builder.Services.AddScoped<WorkflowApiService>();
 builder.Services.AddScoped<WorkflowStateService>();
 builder.Services.AddScoped<WorkflowEditorService>();
 builder.Services.AddScoped<TechnologyEditorService>();
+
+builder.Services.AddScoped<ItemApiService>();
+builder.Services.AddScoped<ItemsStateService>();
+
+builder.Services.AddScoped<TopPartService>();
 
 
 builder.Services.AddScoped<LookupService>();

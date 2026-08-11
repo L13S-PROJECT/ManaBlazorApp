@@ -1,0 +1,102 @@
+
+@* TopPartList.razor *@
+
+@using ManaApp.Shared.DTOs.TopPart
+@using ManaApp.Services
+@inject TopPartService TopPartService
+
+<div class="toppart-list">
+
+    <table>
+        
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Kods</th>
+                    <th>TopPart</th>
+                    <th>Tips</th>
+                    <th>Kategorija</th>
+                    <th>Statuss</th>
+                    <th>Plānots</th>
+                    <th>Procesā</th>
+                    <th>Pabeigts</th>
+                    <th>Atlikums</th>
+                    <th>Rezervēts</th>
+                    <th>Iztrūkst</th>
+                </tr>
+            
+        </thead>
+
+        <tbody>
+            @foreach (var topPart in topParts)
+                {
+                    <tr class="@(SelectedTopPartId == topPart.Id ? "selected" : "")"
+                            @onclick="() => SelectTopPart(topPart)">
+
+                        <td>@topPart.Id</td>
+                        <td>@topPart.TopPartCode</td>
+                        <td>@topPart.TopPartName</td>
+                        <td>
+                            @(topPart.TopPartType switch
+                            {
+                                0 => "Part",
+                                1 => "Product",
+                                2 => "SparePart",
+                                _ => "—"
+                            })
+                        </td>
+                        <td>
+                            @(categories.FirstOrDefault(x => x.Id == topPart.TopPartCategoryID)?.CategoryName ?? "—")
+                        </td>
+                        <td>
+                            <span class="status-badge status-not-started">
+                                Nav iesākts
+                            </span>
+                        </td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td>—</td>
+                    </tr>
+                }
+        </tbody>
+
+    </table>
+
+</div>
+
+@code {
+    private List<TopPartListItemDto> topParts = new();
+    private List<TopPartCategoryDto> categories = new();
+
+    protected override async Task OnInitializedAsync()
+        {
+            await ReloadAsync();
+            categories = await TopPartService.GetCategoriesAsync();
+        }
+
+    public async Task ReloadAsync()
+        {
+            topParts = await TopPartService.GetAllAsync();
+        }
+
+    [Parameter]
+    public EventCallback<TopPartListItemDto?> OnSelected { get; set; }
+
+    [Parameter]
+    public int? SelectedTopPartId { get; set; }
+
+    private async Task SelectTopPart(TopPartListItemDto topPart)
+        {
+            if (SelectedTopPartId == topPart.Id)
+            {
+                await OnSelected.InvokeAsync(null);
+                return;
+            }
+
+            await OnSelected.InvokeAsync(topPart);
+        }
+
+}

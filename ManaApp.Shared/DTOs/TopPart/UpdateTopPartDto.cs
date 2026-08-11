@@ -1,0 +1,13 @@
+namespace ManaApp.Shared.DTOs.TopPart
+{
+    public class UpdateTopPartDto
+    {
+        public int Id { get; set; }
+
+        public string TopPartName { get; set; } = "";
+
+        public string TopPartCode { get; set; } = "";
+
+        public string? Description { get; set; }
+    }
+}

@@ -19,8 +19,15 @@ namespace ManiApi.Models
 
         [Column("Stage")]
         public byte Stage { get; set; }
+
         [Column("TopPartType")]
-        public byte TopPartType { get; set; }
+        public TopPartType TopPartType { get; set; }
+
+        [Column("TopPartCategoryID")]
+        public int? TopPartCategoryID { get; set; }
+
+        [Column("Description")]
+        public string? Description { get; set; }
 
         [Column("IsActive")]
         public bool IsActive { get; set; }

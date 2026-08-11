@@ -1,0 +1,34 @@
+.toppart-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background-color: rgba(0, 0, 0, 0.45);
+}
+
+.toppart-modal {
+    width: 520px;
+    max-width: calc(100vw - 40px);
+    max-height: calc(100vh - 40px);
+
+    padding: 20px;
+
+    background-color: white;
+    border: 1px solid #d9dde3;
+    border-radius: 8px;
+
+    overflow-y: auto;
+}
+
+.toppart-modal-header {
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+
+    border-bottom: 1px solid #d9dde3;
+    font-size: 16px;
+    font-weight: 600;
+}

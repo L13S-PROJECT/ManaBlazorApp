@@ -19,8 +19,14 @@ namespace ManiApi.Models
         [Column("Name")]
         public string? Name { get; set; }
 
+        [Column("TopPart_ID")]
+        public uint? TopPartId { get; set; }
+
         [Column("ProductToPart_ID")]
         public int? ProductToPartId { get; set; }
+
+        [Column("Output_ProductTopPart_ID")]
+        public int? OutputProductToPartId { get; set; }
 
         [Column("WorkCenter_ID")]
         public int? WorkCenterId { get; set; }

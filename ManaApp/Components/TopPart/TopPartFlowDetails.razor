@@ -1,0 +1,88 @@
+@* TopPartFlowDetails.razor *@
+
+@using ManaApp.Shared.DTOs.TopPart
+
+    <div class="toppart-flow-details">
+
+        <div class="toppart-info-header">
+
+        <span>TopPart informācija</span>
+
+        <div class="toppart-info-actions">
+
+            <button type="button"
+                @onclick="EditTopPart"
+                disabled="@(TopPart is null)">
+                Rediģēt
+            </button>
+
+        </div>
+
+    </div>
+
+    <div class="toppart-info-body">
+
+        <div class="info-row">
+            <label>ID</label>
+            <span>@(TopPart?.Id.ToString() ?? "—")</span>
+        </div>
+
+        <div class="info-row">
+            <label>Kods</label>
+            <span>@(TopPart?.TopPartCode ?? "—")</span>
+        </div>
+
+        <div class="info-row">
+            <label>Nosaukums</label>
+            <span>@(TopPart?.TopPartName ?? "—")</span>
+        </div>
+
+        <div class="info-row">
+            <label>Tips</label>
+            <span>
+                @(TopPart is null ? "—" : TopPart.TopPartType switch
+                {
+                    0 => "Part",
+                    1 => "Product",
+                    2 => "SparePart",
+                    _ => "—"
+                })
+            </span>
+        </div>
+
+        <div class="info-row">
+            <label>Kategorija</label>
+            <span>
+                @(TopPart?.TopPartCategoryID is int categoryId
+                    ? Categories.FirstOrDefault(x => x.Id == categoryId)?.CategoryName ?? "—"
+                    : "—")
+            </span>
+        </div>
+
+        <div class="info-row">
+            <label>Apraksts</label>
+            <span>@(string.IsNullOrWhiteSpace(TopPart?.Description) ? "—" : TopPart.Description)</span>
+        </div>
+
+    </div>
+
+</div>
+
+@code {
+
+    [Parameter]
+    public TopPartListItemDto? TopPart { get; set; }
+
+    [Parameter]
+    public List<TopPartCategoryDto> Categories { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<TopPartListItemDto> OnEdit { get; set; }
+
+    private async Task EditTopPart()
+    {
+        if (TopPart is not null)
+            await OnEdit.InvokeAsync(TopPart);
+    }
+
+}

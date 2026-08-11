@@ -546,11 +546,14 @@ private WorkflowGraphItem? FindGraphItem(WorkflowGraphItem? item, int nodeId)
 
                 await ReloadAsync();
 
+                State.SelectedWorkflowExplorerItem = new WorkflowExplorerItemDto
+                {
+                    WorkflowNodeId = node.Id
+                };
+
+                await RestoreSelectionAsync();
+
                 RefreshValidationState();
-
-                RestoreSelectedGraphNode(node.Id);
-
-                await LoadAvailableActionsAsync(node.Id);
 
                 return node;
             }
@@ -567,10 +570,17 @@ private WorkflowGraphItem? FindGraphItem(WorkflowGraphItem? item, int nodeId)
                     currentFinishNodeId,
                     mergeFinishNodeIds);
 
-                if (!response.IsSuccessStatusCode)
+                if (response == null)
                     return false;
 
-                await ReloadAndRestoreSelectionAsync();
+                await ReloadAsync();
+
+                State.SelectedWorkflowExplorerItem = new WorkflowExplorerItemDto
+                {
+                    WorkflowNodeId = response.Id
+                };
+
+                await RestoreSelectionAsync();
 
                 RefreshValidationState();
 
@@ -928,7 +938,19 @@ private void RefreshValidation(WorkflowGraphItem item)
             if (!response.IsSuccessStatusCode)
                 return false;
 
-            await ReloadAndRestoreSelectionAsync();
+            var finishNode = await response.Content.ReadFromJsonAsync<WorkflowNodeModel>();
+
+            if (finishNode == null)
+                return false;
+
+            await ReloadAsync();
+
+            State.SelectedWorkflowExplorerItem = new WorkflowExplorerItemDto
+            {
+                WorkflowNodeId = finishNode.Id
+            };
+
+            await RestoreSelectionAsync();
 
             RefreshValidationState();
 

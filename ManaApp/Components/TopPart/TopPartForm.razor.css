@@ -1,0 +1,126 @@
+/* TopPartForm.razor.css */
+
+.toppart-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    gap: 12px;
+    align-items: center;
+}
+
+.form-row label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+}
+
+.form-row input,
+.form-row select,
+.form-row textarea {
+    width: 100%;
+    min-width: 0;
+    padding: 6px 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.form-row textarea {
+    resize: vertical;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.form-field {
+    width: 100%;
+    min-width: 0;
+}
+
+.field-error {
+    margin-bottom: 3px;
+    font-size: 11px;
+    color: #dc2626;
+}
+
+.form-row input.input-error,
+.form-row select.input-error {
+    border-color: #dc2626;
+}
+
+.save-confirm-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 2100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(17, 24, 39, 0.35);
+}
+
+.save-confirm-modal {
+    width: 360px;
+    padding: 24px;
+    background: #fff;
+    border: 1px solid #d9dde3;
+    border-radius: 8px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+}
+
+.save-confirm-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    margin-bottom: 14px;
+    border-radius: 50%;
+    background: #e8f5e9;
+    color: #2e7d32;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.save-confirm-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.save-confirm-text {
+    margin-top: 5px;
+    font-size: 13px;
+    color: #6b7280;
+}
+
+.save-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 22px;
+}
+
+.save-confirm-button {
+    min-width: 80px;
+    padding: 7px 16px;
+    border: 1px solid #374151;
+    border-radius: 4px;
+    background: #374151;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.save-confirm-button:hover {
+    background: #1f2937;
+}

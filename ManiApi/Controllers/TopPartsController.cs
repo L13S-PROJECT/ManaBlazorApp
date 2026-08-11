@@ -6,6 +6,7 @@ using ManiApi.Data;
 using ManiApi.Models;
 using ManaApp.Shared.DTOs.Planning;
 using ManiApi.DTOs.Workflow;
+using ManaApp.Shared.DTOs.TopPart;
 
 namespace ManiApi.Controllers
 {
@@ -24,6 +25,15 @@ namespace ManiApi.Controllers
                 .Where(x => x.IsActive)
                 .OrderBy(x => x.Stage)
                 .ThenBy(x => x.TopPartName)
+                .Select(x => new TopPartListItemDto
+                {
+                    Id = x.Id,
+                    TopPartName = x.TopPartName,
+                    TopPartCode = x.TopPartCode,
+                    TopPartType = (byte)x.TopPartType,
+                    TopPartCategoryID = x.TopPartCategoryID,
+                    Description = x.Description
+                })
                 .ToListAsync();
 
             return Ok(rows);
@@ -31,13 +41,21 @@ namespace ManiApi.Controllers
 
         // POST: api/topparts
 [HttpPost]
-public async Task<IActionResult> Create([FromBody] TopPart dto)
+public async Task<IActionResult> Create([FromBody] CreateTopPartDto dto)
 {
     if (string.IsNullOrWhiteSpace(dto.TopPartName))
         return BadRequest("Nosaukums ir obligāts.");
 
-    if (string.IsNullOrWhiteSpace(dto.TopPartCode) || dto.TopPartCode.Length != 3)
-        return BadRequest("Kods obligāts un jābūt tieši 3 simboliem.");
+    if (string.IsNullOrWhiteSpace(dto.TopPartCode))
+        return BadRequest("Kods ir obligāts.");
+    
+    dto.TopPartCode = dto.TopPartCode.Trim().ToUpper();
+
+    if (dto.TopPartCategoryID is null)
+        return BadRequest("Kategorija ir obligāta.");
+    
+    if (dto.TopPartType is null)
+        return BadRequest("Tips ir obligāts.");
 
     var exists = await _db.TopParts
         .AnyAsync(x => x.TopPartCode == dto.TopPartCode);
@@ -46,32 +64,67 @@ public async Task<IActionResult> Create([FromBody] TopPart dto)
         return Conflict("Šāds kods jau eksistē.");
 
     dto.TopPartName = dto.TopPartName.Trim();
-    dto.TopPartCode = dto.TopPartCode.Trim().ToUpper();
-    dto.IsActive = true;
 
-    _db.TopParts.Add(dto);
+    var topPart = new TopPart
+        {
+            TopPartName = dto.TopPartName,
+            TopPartCode = dto.TopPartCode,
+            TopPartType = (TopPartType)dto.TopPartType!.Value,
+            TopPartCategoryID = dto.TopPartCategoryID,
+            Description = dto.Description,
+            Stage = 1,
+            IsActive = true
+        };
+
+    _db.TopParts.Add(topPart);
     await _db.SaveChangesAsync();
 
-    return Ok(dto);
+    return Ok(topPart);
+
 }
 
         // PUT: api/topparts
         [HttpPut]
-        public async Task<IActionResult> Update([FromBody] TopPart dto)
+        public async Task<IActionResult> Update([FromBody] UpdateTopPartDto dto)
         {
             var row = await _db.TopParts
                 .FirstOrDefaultAsync(x => x.Id == dto.Id && x.IsActive);
 
             if (row is null)
                 return NotFound();
+            
+            if (string.IsNullOrWhiteSpace(dto.TopPartCode))
+                return BadRequest("Kods ir obligāts.");
+
+            dto.TopPartName = dto.TopPartName.Trim();
+            dto.TopPartCode = dto.TopPartCode.Trim().ToUpper();
+
+            var codeExists = await _db.TopParts
+                .AnyAsync(x => x.Id != dto.Id &&
+                            x.TopPartCode == dto.TopPartCode);
+
+            if (codeExists)
+                return Conflict("Šāds kods jau eksistē.");
 
             if (string.IsNullOrWhiteSpace(dto.TopPartName))
                 return BadRequest("Nosaukums ir obligāts.");
 
             row.TopPartName = dto.TopPartName;
+            row.TopPartCode = dto.TopPartCode;
+            row.Description = dto.Description?.Trim();
 
             await _db.SaveChangesAsync();
-            return Ok(row);
+
+            return Ok(new TopPartListItemDto
+                {
+                    Id = row.Id,
+                    TopPartName = row.TopPartName,
+                    TopPartCode = row.TopPartCode,
+                    TopPartType = (byte)row.TopPartType,
+                    TopPartCategoryID = row.TopPartCategoryID,
+                    Description = row.Description
+                });
+
         }
 
         // DELETE: api/topparts/{id}

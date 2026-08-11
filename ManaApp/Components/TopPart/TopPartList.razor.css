@@ -1,0 +1,92 @@
+/* TopPartList.razor.css */
+
+.toppart-list {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+
+    border: 1px solid #d9dde3;
+    border-radius: 6px;
+    background: #fff;
+}
+
+.toppart-list table {
+    width: 100%;
+    table-layout: auto;
+    border-collapse: collapse;
+}
+
+.toppart-list th,
+.toppart-list td {
+    padding: 8px 6px;
+    text-align: left;
+    white-space: normal;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.toppart-list thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #f5f6f8;
+}
+
+.toppart-list th:nth-child(1),
+.toppart-list td:nth-child(1) {
+    width: 55px;
+}
+
+.toppart-list th:nth-child(2),
+.toppart-list td:nth-child(2) {
+    width: 90px;
+}
+
+.toppart-list th:nth-child(n+4),
+.toppart-list td:nth-child(n+4) {
+    text-align: center;
+}
+
+.toppart-list th {
+    background: #f5f6f8;
+    font-size: 12px;
+    font-weight: 600;
+    color: #4b5563;
+    border-bottom: 1px solid #d9dde3;
+}
+
+.toppart-list td {
+    font-size: 13px;
+    border-bottom: 1px solid #eceff3;
+}
+
+.toppart-list tbody tr:hover {
+    background: #f7f9fc;
+    cursor: pointer;
+}
+
+.status-badge {
+    display: inline-block;
+    min-width: 90px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.status-not-started {
+    background: #e5e7eb;
+    color: #4b5563;
+}
+
+.toppart-list tbody tr.selected {
+    background: #e8f1ff;
+}
+
+.toppart-list tbody tr.selected:hover {
+    background: #e8f1ff;
+}

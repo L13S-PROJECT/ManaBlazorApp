@@ -1,0 +1,35 @@
+@* TopPartFormModal.razor *@
+
+@using ManaApp.Shared.DTOs.TopPart
+
+<div class="toppart-modal-backdrop">
+
+    <div class="toppart-modal">
+
+        <div class="toppart-modal-header">
+            <span>@(TopPart is null ? "TopPart" : "Rediģēt TopPart")</span>
+        </div>
+
+        <div class="toppart-modal-body">
+            <TopPartForm
+                TopPart="TopPart"
+                OnCancel="OnClose"
+                OnSaved="OnSaved" />
+        </div>
+
+    </div>
+
+</div>
+
+@code {
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback<TopPartListItemDto> OnSaved { get; set; }
+
+    [Parameter]
+    public TopPartListItemDto? TopPart { get; set; }
+
+}

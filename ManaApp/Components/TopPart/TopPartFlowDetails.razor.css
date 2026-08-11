@@ -1,0 +1,95 @@
+/* TopPartFlowDetails.razor.css */
+
+.toppart-flow-details {
+    height: 100%;
+    padding: 12px;
+
+    background: #fff;
+    border: 1px solid #d9dde3;
+    border-radius: 6px;
+}
+
+.toppart-info-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+
+    padding-bottom: 10px;
+    margin-bottom: 4px;
+
+    border-bottom: 1px solid #d9dde3;
+
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.toppart-info-body {
+    display: flex;
+    flex-direction: column;
+}
+
+.info-row {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 12px;
+    align-items: start;
+    min-width: 0;
+
+    padding: 8px 4px;
+    border-bottom: 1px solid #eceff3;
+}
+
+.info-row:last-child {
+    border-bottom: none;
+}
+
+.info-row label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+}
+
+.info-row span {
+    min-width: 0;
+    font-size: 13px;
+    color: #111827;
+    overflow-wrap: anywhere;
+}
+
+.toppart-info-actions {
+    display: flex;
+    align-items: center;
+}
+
+.toppart-info-actions button {
+    padding: 6px 12px;
+
+    border: 1px solid #c7cdd4;
+    border-radius: 4px;
+
+    background: #fff;
+    color: #374151;
+
+    font-size: 13px;
+    font-weight: 500;
+
+    cursor: pointer;
+}
+
+.toppart-info-actions button:hover {
+    background: #f5f6f8;
+    border-color: #9ca3af;
+}
+
+.toppart-info-actions button:active {
+    background: #eceff3;
+}
+
+.toppart-info-actions button:disabled {
+    color: #9ca3af;
+    background: #f5f6f8;
+    border-color: #d9dde3;
+    cursor: default;
+}

@@ -14,6 +14,7 @@ namespace ManiApi.Data
         public DbSet<Product> Products { get; set; }
         public DbSet<ProductVersion> ProductVersions { get; set; }
         public DbSet<TopPart> TopParts { get; set; }
+        public DbSet<TopPartCategory> TopPartCategories { get; set; }
         public DbSet<ProductTopPart> ProductTopParts { get; set; }
         public DbSet<TopPartStep> TopPartSteps { get; set; }
         public DbSet<RalColor> RalColors { get; set; }
@@ -42,6 +43,14 @@ namespace ManiApi.Data
         public DbSet<WorkflowNode> WorkflowNodes { get; set; }
         public DbSet<WorkflowNodeConnection> WorkflowNodeConnections { get; set; }
         public DbSet<WorkflowDependency> WorkflowDependencies { get; set; }
+
+        public DbSet<ItemType> ItemTypes { get; set; }
+        public DbSet<Item> Items { get; set; }
+        public DbSet<Unit> Units => Set<Unit>();
+        public DbSet<WorkflowComponent> WorkflowComponents { get; set; }
+        public DbSet<WorkflowProcessComponent> WorkflowProcessComponents { get; set; }
+
+        public DbSet<ProductTopPartItem> ProductTopPartItems { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         
 {

@@ -1,0 +1,89 @@
+@* ItemsGrid.razor *@
+
+@using ManaApp.Services.Items
+@using ManaApp.Shared.DTOs.Items
+
+@implements IDisposable
+
+@inject ItemApiService ItemApi
+@inject ItemsStateService State
+
+<div class="card">
+
+    <div class="card-header">
+        Items
+    </div>
+
+    <div class="card-body">
+
+        <table class="table table-hover table-sm">
+
+            <thead>
+                <tr>
+                    <th>Kods</th>
+                    <th>Nosaukums</th>
+                    <th>Tips</th>
+                    <th>Mērv.</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+            @foreach (var item in State.Items)
+            {
+                <tr class="@(State.SelectedItemId == item.Id ? "table-primary" : "")"
+                        @onclick="() => SelectItem(item.Id)">
+                    <td>@item.ItemCode</td>
+                    <td>@item.ItemName</td>
+                    <td>@item.ItemTypeName</td>
+                    <td>@item.Unit</td>
+                </tr>
+            }
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+@code
+{
+    [Parameter]
+    public EventCallback<int> OnSelected { get; set; }
+    private List<ItemListDto> Items = new();
+    
+    protected override async Task OnInitializedAsync()
+        {
+            await Reload();
+        }
+
+    private async Task SelectItem(int id)
+        {
+            State.SelectItem(id);
+            await OnSelected.InvokeAsync(id);
+        }
+
+    public async Task Reload()
+        {
+            await State.ReloadAsync();
+        }
+
+    protected override void OnInitialized()
+        {
+            State.OnChange += Refresh;
+        }
+
+    private void Refresh()
+        {
+            InvokeAsync(StateHasChanged);
+        }
+
+    public void Dispose()
+        {
+            State.OnChange -= Refresh;
+        }
+
+    
+}

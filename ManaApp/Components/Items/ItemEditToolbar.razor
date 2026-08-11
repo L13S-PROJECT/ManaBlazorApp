@@ -1,0 +1,38 @@
+<div class="d-flex gap-2 mb-3">
+
+    <button class="btn btn-success"
+            @onclick="OnNew">
+        Jauns
+    </button>
+
+    <button class="btn btn-primary"
+            @onclick="OnSave">
+        Saglabāt
+    </button>
+
+    <button class="btn btn-secondary"
+            @onclick="OnCancel">
+        Atcelt
+    </button>
+
+    <button class="btn btn-outline-danger"
+            @onclick="OnDelete">
+        Dzēst
+    </button>
+
+</div>
+
+@code
+{
+    [Parameter]
+    public EventCallback OnSave { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+
+    [Parameter]
+    public EventCallback OnNew { get; set; }
+}

@@ -1,0 +1,264 @@
+@* TopPartForm.razor *@
+
+@using ManaApp.Shared.DTOs.TopPart
+@using ManaApp.Services
+@inject TopPartService TopPartService
+
+<div class="toppart-form">
+
+    <div class="form-row">
+        <label>Nosaukums</label>
+
+        <div class="form-field">
+            @if (nameError is not null)
+            {
+                <div class="field-error">@nameError</div>
+            }
+
+            <input type="text"
+                class="@(nameError is not null ? "input-error" : "")"
+                value="@model.TopPartName"
+                @oninput="OnNameInput" />
+        </div>
+
+    </div>
+
+    <div class="form-row">
+
+        <label>Kods</label>
+
+        <div class="form-field">
+            @if (codeError is not null)
+            {
+                <div class="field-error">@codeError</div>
+            }
+
+            <input type="text"
+                class="@(codeError is not null ? "input-error" : "")"
+                value="@model.TopPartCode"
+                @oninput="OnCodeInput" />
+        </div>
+
+    </div>
+
+    <div class="form-row">
+        <label>Tips</label>
+
+        <div class="form-field">
+            @if (typeError is not null)
+            {
+                <div class="field-error">@typeError</div>
+            }
+
+            <select class="@(typeError is not null ? "input-error" : "")"
+                    disabled="@IsEditMode"
+                    @bind="model.TopPartType"
+                    @bind:after="OnTypeChanged">
+
+                <option value="">—</option>
+                <option value="0">Part</option>
+                <option value="1">Product</option>
+                <option value="2">SparePart</option>
+            </select>
+        </div>
+
+    </div>
+
+    <div class="form-row">
+        <label>Kategorija</label>
+
+        <div class="form-field">
+            @if (categoryError is not null)
+            {
+                <div class="field-error">@categoryError</div>
+            }
+
+            <select class="@(categoryError is not null ? "input-error" : "")"
+                    disabled="@IsEditMode"
+                    @bind="model.TopPartCategoryID"
+                    @bind:after="OnCategoryChanged">
+
+                <option value="">—</option>
+
+                @foreach (var category in categories)
+                {
+                    <option value="@category.Id">@category.CategoryName</option>
+                }
+            </select>
+        </div>
+
+    </div>
+
+    <div class="form-row">
+
+        <label>Apraksts</label>
+        <textarea rows="3" 
+            @bind="model.Description"></textarea>
+
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="form-error">
+                @errorMessage
+            </div>
+        }
+
+    <div class="form-actions">
+
+        <div class="form-actions">
+            <button type="button"
+                    class="btn-secondary"
+                    @onclick="OnCancel">
+                Atcelt
+            </button>
+
+            <button type="button"
+                    class="btn-primary"
+                    @onclick="SaveAsync">
+                Saglabāt
+            </button>
+        </div>
+        
+    </div>
+
+</div>
+
+@code {
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    [Parameter]
+    public EventCallback<TopPartListItemDto> OnSaved { get; set; }
+
+    [Parameter]
+    public TopPartListItemDto? TopPart { get; set; }
+
+    private bool IsEditMode => TopPart is not null;
+    private string? errorMessage;
+    private string? nameError;
+    private string? codeError;
+    private string? typeError;
+    private string? categoryError;
+    private List<TopPartCategoryDto> categories = new();
+    private CreateTopPartDto model = new();
+
+    protected override async Task OnInitializedAsync()
+        {
+            categories = await TopPartService.GetCategoriesAsync();
+        }
+    
+    private async Task SaveAsync()
+        {
+            errorMessage = null;
+
+            if (!ValidateForm())
+                return;
+            
+            if (IsEditMode)
+                {
+                    var updateModel = new UpdateTopPartDto
+                    {
+                        Id = TopPart!.Id,
+                        TopPartName = model.TopPartName,
+                        TopPartCode = model.TopPartCode,
+                        Description = model.Description
+                    };
+
+                    var updatedTopPart = await TopPartService.UpdateAsync(updateModel);
+
+                    if (updatedTopPart is not null)
+                    {
+                        await OnSaved.InvokeAsync(updatedTopPart);
+                        return;
+                    }
+
+                    if (TopPartService.LastError?.Contains("Šāds kods jau eksistē") == true)
+                        {
+                            codeError = "Šāds kods jau eksistē.";
+                        }
+                    else
+                        {
+                            errorMessage = TopPartService.LastError;
+                        }
+
+                    return;
+                }
+
+            var createdTopPart = await TopPartService.CreateAsync(model);
+
+            if (createdTopPart is not null)
+            {
+                await OnSaved.InvokeAsync(createdTopPart);
+                return;
+            }
+
+            errorMessage = TopPartService.LastError;
+        }
+
+    private void OnCodeInput(ChangeEventArgs e)
+        {
+            model.TopPartCode = e.Value?.ToString()?.ToUpperInvariant() ?? "";
+
+            if (!string.IsNullOrWhiteSpace(model.TopPartCode))
+                codeError = null;
+        }
+
+    private bool ValidateForm()
+        {
+            nameError = string.IsNullOrWhiteSpace(model.TopPartName)
+                ? "Nosaukums ir obligāts."
+                : null;
+
+            codeError = string.IsNullOrWhiteSpace(model.TopPartCode)
+                ? "Kods ir obligāts."
+                : null;
+
+            typeError = model.TopPartType is null
+                ? "Tips ir obligāts."
+                : null;
+
+            categoryError = model.TopPartCategoryID is null
+                ? "Kategorija ir obligāta."
+                : null;
+
+            return nameError is null
+                && codeError is null
+                && typeError is null
+                && categoryError is null;
+        }
+
+        private void OnNameInput(ChangeEventArgs e)
+            {
+                model.TopPartName = e.Value?.ToString() ?? "";
+
+                if (!string.IsNullOrWhiteSpace(model.TopPartName))
+                    nameError = null;
+            }
+
+        private void OnTypeChanged()
+            {
+                if (model.TopPartType is not null)
+                    typeError = null;
+            }
+
+        private void OnCategoryChanged()
+            {
+                if (model.TopPartCategoryID is not null)
+                    categoryError = null;
+            }
+
+        protected override void OnParametersSet()
+            {
+                if (TopPart is null)
+                    return;
+
+                model.TopPartName = TopPart.TopPartName;
+                model.TopPartCode = TopPart.TopPartCode;
+                model.TopPartType = TopPart.TopPartType;
+                model.TopPartCategoryID = TopPart.TopPartCategoryID;
+                model.Description = TopPart.Description;
+            }
+
+}

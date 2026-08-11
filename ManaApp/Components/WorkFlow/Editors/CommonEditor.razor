@@ -1,6 +1,10 @@
 @* CommonEditor.razor *@
 
 @using ManaApp.Services.Workflow
+@using ManaApp.Services.Items
+@using ManaApp.Shared.DTOs.Items
+
+@inject ItemApiService ItemApi
 
 @namespace ManaApp.Components.Workflow.Editors
 
@@ -40,6 +44,46 @@
 
     </div>
 
+    <hr />
+
+        <div class="materials-panel">
+
+            <div class="materials-toolbar">
+                <button class="btn btn-sm btn-primary">
+                    <i class="bi bi-plus"></i>
+                    Pievienot
+                </button>
+            </div>
+
+            <table class="table table-sm">
+
+                <thead>
+                    <tr>
+                        <th>Kods</th>
+                        <th>Nosaukums</th>
+                        <th>Daudzums</th>
+                        <th>Mērv.</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                @foreach (var item in Items)
+                {
+                    <tr>
+                        <td>@item.ItemCode</td>
+                        <td>@item.ItemName</td>
+                        <td>@item.Qty</td>
+                        <td>@item.Unit</td>
+                    </tr>
+                }
+
+                </tbody>
+
+            </table>
+
+        </div>
+
 </section>
 
 @code
@@ -49,6 +93,8 @@
 
     [Parameter]
     public EventCallback OnProcessSaved { get; set; }   
+
+    private List<ProductTopPartItemDto> Items = new();
 
     private string? Comments
         {
@@ -81,6 +127,18 @@
 
             if (saved)
                 await OnProcessSaved.InvokeAsync();
+        }
+
+    protected override async Task OnParametersSetAsync()
+        {
+            if (WorkflowEditor.SelectedPart == null)
+            {
+                Items.Clear();
+                return;
+            }
+
+            Items = await ItemApi.LoadProductTopPartItemsAsync(
+                WorkflowEditor.SelectedPart.ProductToPartId);
         }
 
 }
