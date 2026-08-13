@@ -1,0 +1,442 @@
+@* TopPartFlowEditModal.razor *@
+
+@using ManaApp.Shared.DTOs.TopPart
+@using ManaApp.Services
+@inject TopPartWorkflowService TopPartWorkflowService
+
+<div class="modal-backdrop">
+    <div class="modal-content">
+
+        <h3>Flow labošana</h3>
+
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                <div class="flow-edit-error">
+                    @errorMessage
+                </div>
+            }
+
+        @if (hasChanges)
+            {
+                <div class="flow-edit-changed">
+                    Ir veiktas izmaiņas
+                </div>
+            }
+
+        @if (workflow is null)
+            {
+                <div>Ielādē...</div>
+            }
+        else
+            {
+                <div>
+                    <input @bind="processName"
+                        placeholder="Procesa apraksts" />
+
+                    <input @bind="wipName"
+                        placeholder="WIP nosaukums" />
+
+                    <input type="number"
+                        @bind="workCenterId"
+                        placeholder="WorkCenter ID" />
+
+                    <input type="number"
+                        @bind="estimatedMinutes"
+                        placeholder="Estimated minutes" />
+
+                    @if (editingProcessNodeId.HasValue)
+                        {
+                            <button type="button"
+                                    @onclick="UpdateProcess">
+                                Saglabāt izmaiņas
+                            </button>
+                        }
+                    else
+                        {
+                            <button type="button"
+                                    @onclick="AddProcess">
+                                + Process
+                            </button>
+                        }
+
+                </div>
+
+                <div>
+                    @foreach (var node in workflow.Nodes.OrderBy(x => x.SortOrder))
+                    {
+                        <div>
+                            @if (node.NodeType == 1 || node.NodeType == 3)
+                            {
+                                <input type="checkbox"
+                                    name="selectedNode"
+                                    value="@node.Id"
+                                    checked="@selectedNodeIds.Contains(node.Id)"
+                                    @onchange="@(() => ToggleSelectedNode(node.Id))" />
+                            }
+
+                            @(node.NodeType == 1 ? "TOPPART" :
+                                node.NodeType == 2 ? "PROCESS" :
+                                node.NodeType == 3 ? "WIP" :
+                                node.NodeType == 4 ? "FINISH" : "")
+                            -
+                            @node.Name
+
+                            @if (node.NodeType == 2)
+                                {
+                                    <button type="button"
+                                            @onclick="() => DeleteProcess(node.Id)">
+                                        Delete
+                                    </button>
+
+                                    <button type="button"
+                                            @onclick="() => SelectProcessForEdit(node)">
+                                        Labot
+                                    </button>
+
+                                    <button type="button"
+                                            @onclick="() => selectedProcessNodeId = node.Id">
+                                        BOM
+                                    </button>
+
+                                    var processBom = workflow.ProcessComponents
+                                        .Where(x => x.ProcessNodeId == node.Id)
+                                        .ToList();
+
+                                    if (processBom.Count > 0)
+                                    {
+                                        <div>
+                                            @foreach (var link in processBom)
+                                            {
+                                                var component = bom.FirstOrDefault(x =>
+                                                    x.Id == link.WorkflowComponentId);
+
+                                                if (component is not null)
+                                                {
+                                                    <div>
+                                                        ↳ @component.TopPartCode - @component.TopPartName
+                                                        | @link.Quantity
+                                                    </div>
+                                                }
+                                            }
+                                        </div>
+                                    }
+                                }
+                            
+                            
+                        </div>
+                    }
+                </div>
+
+                <div class="flow-process-bom">
+
+                    <h4>Flow BOM</h4>
+
+                    @foreach (var component in bom)
+                        {
+                            <div>
+                                @if (component.ComponentType == 1)
+                                {
+                                    <span>@component.TopPartCode - @component.TopPartName</span>
+                                }
+                                else if (component.ComponentType == 2)
+                                {
+                                    <span>@component.ItemCode - @component.ItemName</span>
+                                }
+
+                                <span>
+                                    | Nepieciešams: @component.Quantity
+                                    | Izmantots: @component.UsedQuantity
+                                    | Atlikums: @component.RemainingQuantity
+                                </span>
+                            </div>
+                        }
+
+                    @if (selectedProcessNodeId.HasValue)
+                        {
+                            <div class="flow-process-components">
+
+                                <h4>
+                                    Process BOM - @(workflow.Nodes
+                                        .FirstOrDefault(x => x.Id == selectedProcessNodeId)?.Name)
+                                </h4>
+
+                                @foreach (var link in workflow.ProcessComponents
+                                        .Where(x => x.ProcessNodeId == selectedProcessNodeId.Value))
+                                    {
+                                        var component = bom.FirstOrDefault(x =>
+                                            x.Id == link.WorkflowComponentId);
+
+                                        if (component is not null)
+                                        {
+                                            <div>
+                                                <strong>Pievienots:</strong>
+                                                @component.TopPartCode - @component.TopPartName
+                                                | Daudzums: @link.Quantity
+                                            </div>
+                                        }
+                                    }
+
+                                @foreach (var component in bom)
+                                    {
+                                        var alreadyAddedToProcess = workflow.ProcessComponents.Any(x =>
+                                            x.ProcessNodeId == selectedProcessNodeId.Value &&
+                                            x.WorkflowComponentId == component.Id);
+
+                                        <div>
+                                            @if (component.ComponentType == 1)
+                                            {
+                                                <span>@component.TopPartCode - @component.TopPartName</span>
+                                            }
+                                            else if (component.ComponentType == 2)
+                                            {
+                                                <span>@component.ItemCode - @component.ItemName</span>
+                                            }
+
+                                            <span>| Atlikums: @component.RemainingQuantity</span>
+
+                                            @if (component.RemainingQuantity > 0 && !alreadyAddedToProcess)
+                                            {
+                                                <button type="button"
+                                                        @onclick="() => selectedWorkflowComponentId = component.Id">
+                                                    Pievienot
+                                                </button>
+                                            }
+
+                                            @if (selectedWorkflowComponentId == component.Id)
+                                            {
+                                                <div>
+                                                    <input type="number"
+                                                        min="0.01"
+                                                        step="0.01"
+                                                        @bind="processComponentQuantity" />
+
+                                                    <button type="button"
+                                                            @onclick="AddProcessComponent">
+                                                        Apstiprināt
+                                                    </button>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+
+                            </div>
+                        }
+
+                </div>
+            }
+
+            
+
+        <button type="button"
+                @onclick="ReleaseFlow">
+            Saglabāt
+        </button>
+
+        <button type="button" @onclick="Close">
+            Aizvērt
+        </button>
+
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public int WorkflowId { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+    private string processName = "";
+    private string wipName = "";
+    private int workCenterId;
+    private int estimatedMinutes;
+    private int? editingProcessNodeId;
+    private TopPartWorkflowDto? workflow;
+    private List<int> selectedNodeIds = new();
+    private string? errorMessage;
+    private bool hasChanges;
+    private int? selectedProcessNodeId;
+
+    private int? selectedWorkflowComponentId;
+    private decimal processComponentQuantity = 1;
+    private List<TopPartWorkflowBomDto> bom = new();
+    protected override async Task OnInitializedAsync()
+        {
+            workflow =
+                await TopPartWorkflowService.GetWorkflowAsync(WorkflowId);
+            
+            bom =
+                await TopPartWorkflowService.GetBomAsync(WorkflowId);
+
+        }
+
+    private Task Close()
+        {
+            return OnClose.InvokeAsync();
+        }
+
+    private async Task AddProcess()
+        {
+            if (workflow is null || selectedNodeIds.Count == 0)
+                return;
+
+            var request = new CreateTopPartProcessRequest
+            {
+                WorkflowId = workflow.Workflow.Id,
+                SelectedNodeIds = selectedNodeIds.ToList(),
+                ProcessName = processName,
+                WipName = wipName,
+                WorkCenterId = workCenterId,
+                EstimatedMinutes = estimatedMinutes
+            };
+
+            var created = await TopPartWorkflowService.AddProcessAsync(request);
+
+            if (!created)
+                {
+                    errorMessage = TopPartWorkflowService.LastError;
+                    return;
+                }
+
+            errorMessage = null;
+            hasChanges = true;
+
+            workflow = await TopPartWorkflowService.GetWorkflowAsync(WorkflowId);
+
+            processName = "";
+            wipName = "";
+            workCenterId = 0;
+            estimatedMinutes = 0;
+            selectedNodeIds.Clear();
+        }
+
+    private async Task DeleteProcess(int processNodeId)
+        {
+            if (workflow is null)
+                return;
+
+            var deleted = await TopPartWorkflowService.DeleteProcessAsync(
+                workflow.Workflow.Id,
+                processNodeId);
+
+            if (!deleted)
+                {
+                    errorMessage = TopPartWorkflowService.LastError;
+                    return;
+                }
+
+            errorMessage = null;
+            hasChanges = true;
+
+            workflow = await TopPartWorkflowService.GetWorkflowAsync(WorkflowId);
+
+            selectedNodeIds.Clear();
+        }
+
+    private void SelectProcessForEdit(TopPartWorkflowNodeDto node)
+        {
+            editingProcessNodeId = node.Id;
+
+            processName = node.Name ?? "";
+
+            wipName = node.OutputWipName ?? "";
+
+            workCenterId = node.WorkCenterId ?? 0;
+            estimatedMinutes = node.EstimatedMinutes ?? 0;
+        }
+
+    private async Task UpdateProcess()
+        {
+            if (workflow is null || !editingProcessNodeId.HasValue)
+                return;
+
+            var request = new UpdateTopPartProcessRequest
+            {
+                WorkflowId = workflow.Workflow.Id,
+                ProcessNodeId = editingProcessNodeId.Value,
+                ProcessName = processName,
+                WipName = wipName,
+                WorkCenterId = workCenterId,
+                EstimatedMinutes = estimatedMinutes
+            };
+
+            var updated = await TopPartWorkflowService.UpdateProcessAsync(request);
+
+            if (!updated)
+                {
+                    errorMessage = TopPartWorkflowService.LastError;
+                    return;
+                }
+
+            errorMessage = null;
+            hasChanges = true;
+
+            workflow = await TopPartWorkflowService.GetWorkflowAsync(WorkflowId);
+
+            editingProcessNodeId = null;
+            processName = "";
+            workCenterId = 0;
+            estimatedMinutes = 0;
+        }
+
+    private async Task ReleaseFlow()
+        {
+            if (workflow is null)
+                return;
+
+            var released = await TopPartWorkflowService.ReleaseAsync(
+                workflow.Workflow.Id);
+
+            if (!released)
+            {
+                errorMessage = TopPartWorkflowService.LastError;
+                return;
+            }
+
+            errorMessage = null;
+
+            await OnClose.InvokeAsync();
+        }
+
+    private async Task AddProcessComponent()
+        {
+            
+            if (!selectedProcessNodeId.HasValue ||
+                !selectedWorkflowComponentId.HasValue)
+                return;
+
+            var request = new AddTopPartProcessComponentRequest
+            {
+                ProcessNodeId = selectedProcessNodeId.Value,
+                WorkflowComponentId = selectedWorkflowComponentId.Value,
+                Quantity = processComponentQuantity
+            };
+
+            var added = await TopPartWorkflowService.AddProcessComponentAsync(
+                WorkflowId,
+                request);
+
+            if (!added)
+            {
+                errorMessage = TopPartWorkflowService.LastError;
+                return;
+            }
+
+            errorMessage = null;
+            hasChanges = true;
+
+            workflow = await TopPartWorkflowService.GetWorkflowAsync(WorkflowId);
+            bom = await TopPartWorkflowService.GetBomAsync(WorkflowId);
+
+            selectedWorkflowComponentId = null;
+            processComponentQuantity = 1;
+        }
+
+        private void ToggleSelectedNode(int nodeId)
+            {
+                if (selectedNodeIds.Contains(nodeId))
+                    selectedNodeIds.Remove(nodeId);
+                else
+                    selectedNodeIds.Add(nodeId);
+            }
+
+}

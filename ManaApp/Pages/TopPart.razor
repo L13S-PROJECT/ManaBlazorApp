@@ -3,6 +3,7 @@
 @using ManaApp.Components.TopPart
 @using ManaApp.Shared.DTOs.TopPart
 @using ManaApp.Services
+@inject TopPartWorkflowService TopPartWorkflowService
 @inject TopPartService TopPartService
 
 <PageTitle>TopPart</PageTitle>
@@ -36,9 +37,25 @@
 
             </section>
 
+            <section class="toppart-bom-section">
+
+                <TopPartBom
+                    @ref="topPartBom"
+                    TopPart="selectedTopPart" />
+
+            </section>
+
             <section class="toppart-flow-section">
-                <TopPartFlowToolbar />
-                <TopPartToolbar OnNewTopPart="OpenNewTopPartModal" />
+                <TopPartFlowToolbar
+                    OnNewFlow="CreateNewFlow"
+                    Disabled="@hasFlow" />
+
+                <TopPartFlow
+                    @ref="topPartFlow"
+                    TopPart="selectedTopPart"
+                    OnFlowChanged="FlowChanged"
+                    OnEditRequested="OpenFlowEditModal" />
+
             </section>
 
         </aside>
@@ -54,6 +71,13 @@
             OnClose="CloseTopPartModal"
             OnSaved="TopPartSaved" />
     }
+
+@if (showFlowEditModal && editingWorkflowId.HasValue)
+{
+    <TopPartFlowEditModal
+        WorkflowId="editingWorkflowId.Value"
+        OnClose="CloseFlowEditModal" />
+}
 
 @if (showSavedConfirmation)
     {
@@ -91,7 +115,11 @@
     private TopPartList? topPartList;
     private bool showSavedConfirmation = false;
     private TopPartListItemDto? editingTopPart;
-
+    private TopPartFlow? topPartFlow;
+    private TopPartBom? topPartBom;
+    private bool showFlowEditModal;
+    private int? editingWorkflowId;
+    
     private void OpenNewTopPartModal()
         {
             editingTopPart = null;
@@ -105,9 +133,22 @@
     
     private TopPartListItemDto? selectedTopPart;
 
-   private void SelectTopPart(TopPartListItemDto? topPart)
+    private bool hasFlow;
+
+   private async Task SelectTopPart(TopPartListItemDto? topPart)
         {
             selectedTopPart = topPart;
+
+            if (topPart is null)
+            {
+                hasFlow = false;
+                return;
+            }
+
+            var workflowId =
+                await TopPartWorkflowService.GetDisplayWorkflowIdAsync(topPart.Id);
+
+            hasFlow = workflowId.HasValue;
         }
 
     private List<TopPartCategoryDto> categories = new();
@@ -138,6 +179,59 @@
         {
             editingTopPart = topPart;
             showTopPartModal = true;
+        }
+
+    private string? flowError;
+
+    private async Task CreateNewFlow()
+        {
+            if (selectedTopPart is null)
+                return;
+
+            var workflowId =
+                await TopPartWorkflowService.CreateAsync(selectedTopPart.Id);
+
+            if (!workflowId.HasValue)
+            {
+                flowError = TopPartWorkflowService.LastError;
+                return;
+            }
+
+            flowError = null;
+
+            editingWorkflowId = workflowId.Value;
+            showFlowEditModal = true;
+        }
+
+
+    private async Task FlowChanged()
+        {
+            if (topPartFlow is not null)
+            {
+                await topPartFlow.ReloadAsync();
+            }
+        }
+
+    private async Task CloseFlowEditModal()
+        {
+            showFlowEditModal = false;
+            editingWorkflowId = null;
+
+            if (topPartFlow is not null)
+            {
+                await topPartFlow.ReloadAsync();
+            }
+
+            if (topPartBom is not null)
+            {
+                await topPartBom.ReloadAsync();
+            }
+        }
+
+    private void OpenFlowEditModal(int workflowId)
+        {
+            editingWorkflowId = workflowId;
+            showFlowEditModal = true;
         }
 
 }

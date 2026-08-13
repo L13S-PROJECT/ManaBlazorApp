@@ -18,5 +18,6 @@ namespace ManiApi.Models
 
         [Column("Quantity")]
         public decimal Quantity { get; set; }
+
     }
 }

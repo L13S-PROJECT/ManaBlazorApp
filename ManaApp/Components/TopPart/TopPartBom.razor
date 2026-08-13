@@ -1,0 +1,258 @@
+@* TopPartBom.razor *@
+
+@using ManaApp.Shared.DTOs.TopPart
+@using ManaApp.Shared.DTOs.Items
+@using ManaApp.Services
+@inject TopPartWorkflowService TopPartWorkflowService
+@inject ItemService ItemService
+
+<div class="toppart-bom">
+
+    <h4>BOM</h4>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="toppart-bom-error">
+                @errorMessage
+            </div>
+        }
+
+    @if (TopPart is not null && workflowId.HasValue)
+        {
+            <button type="button"
+                    @onclick="OpenAddPart">
+                + PART
+            </button>
+
+            <button type="button"
+                    @onclick="OpenAddItem">
+                + ITEM
+            </button>
+
+        }
+    
+    @if (showAddPart)
+        {
+            <div class="toppart-bom-add">
+
+                <select @bind="selectedBomTopPartId">
+                    <option value="">-- Izvēlies PART --</option>
+
+                    @foreach (var part in bomPartOptions)
+                    {
+                        <option value="@part.TopPartId"
+                                disabled="@(!part.CanAdd)">
+                            @part.TopPartCode - @part.TopPartName
+
+                            @if (!part.CanAdd)
+                            {
+                                <text> [NAV RELEASED FLOW]</text>
+                            }
+                        </option>
+                    }
+                </select>
+
+                <input type="number"
+                    min="0.01"
+                    step="0.01"
+                    @bind="bomPartQuantity" />
+                
+                <button type="button"
+                        @onclick="AddBomPart">
+                    Pievienot
+                </button>
+
+            </div>
+        }
+
+    @if (showAddItem)
+        {
+            <div class="toppart-bom-add">
+
+                <select @bind="selectedBomItemId">
+                    <option value="">-- Izvēlies ITEM --</option>
+
+                    @foreach (var item in bomItemOptions)
+                    {
+                        <option value="@item.Id">
+                            @item.Text
+                        </option>
+                    }
+                </select>
+
+                <input type="number"
+                    min="0.01"
+                    step="0.01"
+                    @bind="bomItemQuantity" />
+
+                <button type="button"
+                        @onclick="AddBomItem">
+                    Pievienot
+                </button>
+
+            </div>
+        }
+
+    @if (TopPart is null)
+    {
+        <div>Izvēlies TopPart.</div>
+    }
+    else if (bom.Count == 0)
+    {
+        <div>BOM nav pievienotu komponenšu.</div>
+    }
+    else
+    {
+        @foreach (var row in bom)
+            {
+                <div>
+                    @if (row.ComponentType == 1)
+                    {
+                        <span>@row.TopPartCode - @row.TopPartName | @row.Quantity</span>
+                    }
+                    else if (row.ComponentType == 2)
+                    {
+                        <span>@row.ItemCode - @row.ItemName | @row.Quantity</span>
+                    }
+                </div>
+            }
+    }
+
+</div>
+
+@code {
+    [Parameter]
+    public TopPartListItemDto? TopPart { get; set; }
+
+    private List<TopPartWorkflowBomDto> bom = new();
+    private int? loadedTopPartId;
+
+    private int? workflowId;
+    private bool showAddPart;
+    private string? errorMessage;
+
+    private async Task OpenAddPart()
+        {
+            if (!workflowId.HasValue)
+                return;
+
+            bomPartOptions =
+                await TopPartWorkflowService.GetBomPartOptionsAsync(workflowId.Value);
+
+            showAddPart = true;
+        }
+
+    private async Task OpenAddItem()
+        {
+            bomItemOptions = await ItemService.GetSelectorAsync();
+            showAddItem = true;
+        }
+
+    private List<TopPartBomPartOptionDto> bomPartOptions = new();
+    private int? selectedBomTopPartId;
+    private decimal bomPartQuantity = 1;
+
+    private List<ItemSelectorDto> bomItemOptions = new();
+    private int? selectedBomItemId;
+    private decimal bomItemQuantity = 1;
+    private bool showAddItem;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (TopPart is null)
+        {
+            loadedTopPartId = null;
+            bom.Clear();
+            return;
+        }
+
+        if (loadedTopPartId == TopPart.Id)
+            return;
+
+        loadedTopPartId = TopPart.Id;
+        bom.Clear();
+
+        workflowId =
+            await TopPartWorkflowService.GetDisplayWorkflowIdAsync(TopPart.Id);
+
+        if (!workflowId.HasValue)
+            return;
+
+        bom = await TopPartWorkflowService.GetBomAsync(workflowId.Value);
+    }
+
+    public async Task ReloadAsync()
+        {
+            loadedTopPartId = null;
+            await OnParametersSetAsync();
+            StateHasChanged();
+        }
+
+    private async Task AddBomPart()
+        {
+            if (!workflowId.HasValue || !selectedBomTopPartId.HasValue)
+                return;
+
+            var request = new AddTopPartBomPartRequest
+            {
+                TopPartId = selectedBomTopPartId.Value,
+                Quantity = bomPartQuantity
+            };
+
+            var added = await TopPartWorkflowService.AddBomPartAsync(
+                workflowId.Value,
+                request);
+
+            if (!added)
+                {
+                    errorMessage = TopPartWorkflowService.LastError;
+                    return;
+                }
+
+            errorMessage = null;
+
+            selectedBomTopPartId = null;
+            bomPartQuantity = 1;
+            showAddPart = false;
+
+            await ReloadAsync();
+
+            if (workflowId.HasValue)
+                {
+                    bomPartOptions =
+                        await TopPartWorkflowService.GetBomPartOptionsAsync(workflowId.Value);
+                }
+        }
+
+
+        private async Task AddBomItem()
+            {
+                if (!workflowId.HasValue || !selectedBomItemId.HasValue)
+                    return;
+
+                var request = new AddTopPartBomItemRequest
+                {
+                    ItemId = selectedBomItemId.Value,
+                    Quantity = bomItemQuantity
+                };
+
+                var added = await TopPartWorkflowService.AddBomItemAsync(
+                    workflowId.Value,
+                    request);
+
+                if (!added)
+                {
+                    errorMessage = TopPartWorkflowService.LastError;
+                    return;
+                }
+
+                errorMessage = null;
+
+                selectedBomItemId = null;
+                bomItemQuantity = 1;
+                showAddItem = false;
+
+                await ReloadAsync();
+            }
+
+}

@@ -1,5 +1,7 @@
 @* TopPartFlowToolbar.razor *@
 
+@using Microsoft.AspNetCore.Components
+
 <div class="toppart-flow-toolbar">
 
     <div class="toppart-flow-title">
@@ -9,10 +11,22 @@
 
     <div class="toppart-flow-actions">
 
-        <button type="button">
+        <button type="button"
+                @onclick="OnNewFlow"
+                disabled="@Disabled">
             Jauns Flow
         </button>
         
     </div>
 
 </div>
+
+@code {
+
+    [Parameter]
+    public EventCallback OnNewFlow { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+}

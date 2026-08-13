@@ -1,11 +1,251 @@
+@* TopPartFlow.razor *@
+
+@using ManaApp.Shared.DTOs.TopPart
+@using ManaApp.Services
+@inject TopPartWorkflowService TopPartWorkflowService
+
+
 <div class="toppart-flow">
 
-    <div class="flow-components">
-        Flow sastāvdaļas
-    </div>
+    @if (TopPart is null)
+    {
+        <div class="toppart-flow-empty">
+            Izvēlies TopPart, lai apskatītu Flow.
+        </div>
+    }
+    else if (workflow is null)
+    {
+        <div class="toppart-flow-empty">
+            Šim TopPart nav aktīva Flow.
+        </div>
+    }
+    else
+    {
+        @if (workflow.Workflow.Status == 1)
+            {
+                <span>Melnraksts</span>
 
-    <div class="flow-processes">
-        Flow procesi
-    </div>
+                <button type="button"
+                        @onclick="OpenDraft">
+                    Labot
+                </button>
+            }
+            else if (workflow.Workflow.Status == 2)
+                {
+                    <span>Released</span>
+
+                    @if (workflow.Workflow.IsCurrent)
+                    {
+                        <button type="button"
+                                @onclick="EditFlow">
+                            Labot
+                        </button>
+                    }
+                }
+
+        <button type="button"
+                @onclick="() => showVersions = !showVersions">
+            Versijas (@versions.Count)
+        </button>
+
+        @if (showVersions)
+        {
+            <div class="toppart-flow-versions">
+                @foreach (var version in versions)
+                {
+                    <div @onclick="() => SelectVersion(version.Id)"
+                            style="cursor: pointer;">
+                        @($"V{version.WorkflowVersion}{(workflow.Workflow.Id == version.Id ? " - Apskata" : "")}")
+                        -
+                        @(version.Status == 1 ? "Melnraksts" : "Released")
+                        @(version.IsCurrent ? " - Aktuālā" : "")
+
+                            @if (workflow.Workflow.Id == version.Id)
+                                {
+                                    <button type="button"
+                                            @onclick="() => showVersionDetails = true">
+                                        Apskatīt
+                                    </button>
+                                }
+                    </div>
+                }
+            </div>
+        }
+        <div class="toppart-flow-chain">
+
+            @foreach (var node in workflow.Nodes.OrderBy(x => x.SortOrder))
+                {
+                    <div class="flow-tree-row">
+
+                        <div class="flow-tree-icon">
+                            @(node.NodeType == 1 ? "◇" :
+                            node.NodeType == 2 ? "⚙" :
+                            node.NodeType == 4 ? "⚑" : "•")
+                        </div>
+
+                        <div class="flow-tree-type">
+                            @(node.NodeType == 1 ? "TOPPART" :
+                            node.NodeType == 2 ? "PROCESS" :
+                            node.NodeType == 4 ? "FINISH" : "")
+                        </div>
+
+                        <div class="flow-tree-name">
+                            @node.Name
+                        </div>
+
+                    </div>
+                }
+
+        </div>
+    }
 
 </div>
+
+@if (showVersionDetails && workflow is not null)
+{
+    <div class="modal-backdrop">
+        <div class="modal-content">
+
+            <h3>
+                @($"Flow V{workflow.Workflow.WorkflowVersion}")
+            </h3>
+
+            <div class="toppart-flow-chain">
+                @foreach (var node in workflow.Nodes.OrderBy(x => x.SortOrder))
+                {
+                    <div class="flow-tree-row">
+
+                        <div class="flow-tree-type">
+                            @(node.NodeType == 1 ? "TOPPART" :
+                            node.NodeType == 2 ? "PROCESS" :
+                            node.NodeType == 4 ? "FINISH" : "")
+                        </div>
+
+                        <div class="flow-tree-name">
+                            @node.Name
+                        </div>
+
+                        @if (node.NodeType == 2)
+                            {
+                                <div>
+                                    WorkCenter: @node.WorkCenterId
+                                    |
+                                    Laiks: @node.EstimatedMinutes min
+                                    |
+                                    @node.Comments
+                                </div>
+                            }
+
+                    </div>
+                }
+            </div>
+
+            <button type="button"
+                    @onclick="() => showVersionDetails = false">
+                Aizvērt
+            </button>
+
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public TopPartListItemDto? TopPart { get; set; }
+
+    private TopPartWorkflowDto? workflow;
+    private List<TopPartWorkflowVersionDto> versions = new();
+    private bool showVersions;
+
+    private int? selectedVersionId;
+    private bool showVersionDetails;
+
+    private int? loadedTopPartId;
+
+    [Parameter]
+    public EventCallback OnFlowChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnEditRequested { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+{
+    
+    if (TopPart is null)
+    {
+        loadedTopPartId = null;
+        workflow = null;
+        return;
+    }
+
+    var topPartId = TopPart.Id;
+
+    if (loadedTopPartId == topPartId)
+        return;
+
+    loadedTopPartId = topPartId;
+    workflow = null;
+
+    versions = await TopPartWorkflowService.GetVersionsAsync(topPartId);
+
+    var workflowId =
+        await TopPartWorkflowService.GetDisplayWorkflowIdAsync(topPartId);
+
+
+    if (workflowId.HasValue)
+    {
+        workflow =
+            await TopPartWorkflowService.GetWorkflowAsync(workflowId.Value);
+    }
+}
+
+    public async Task ReloadAsync()
+        {
+            loadedTopPartId = null;
+            await OnParametersSetAsync();
+            StateHasChanged();
+        }
+
+    private async Task ReleaseFlow()
+        {
+            if (workflow is null)
+                return;
+
+            var released = await TopPartWorkflowService.ReleaseAsync(
+                workflow.Workflow.Id);
+
+            if (!released)
+                return;
+
+            await OnFlowChanged.InvokeAsync();
+        }
+
+    private async Task EditFlow()
+        {
+            if (workflow is null)
+                return;
+
+            var draftWorkflowId = await TopPartWorkflowService.EditAsync(
+                workflow.Workflow.Id);
+
+            if (!draftWorkflowId.HasValue)
+                return;
+
+            await OnEditRequested.InvokeAsync(draftWorkflowId.Value);
+        }
+
+    private async Task OpenDraft()
+        {
+            if (workflow is null)
+                return;
+
+            await OnEditRequested.InvokeAsync(workflow.Workflow.Id);
+        }
+
+    private async Task SelectVersion(int workflowId)
+        {
+            selectedVersionId = workflowId;
+            workflow = await TopPartWorkflowService.GetWorkflowAsync(workflowId);
+        }
+
+}

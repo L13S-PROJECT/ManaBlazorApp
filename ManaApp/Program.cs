@@ -45,6 +45,8 @@ builder.Services.AddScoped<ItemApiService>();
 builder.Services.AddScoped<ItemsStateService>();
 
 builder.Services.AddScoped<TopPartService>();
+builder.Services.AddScoped<TopPartWorkflowService>();
+builder.Services.AddScoped<ItemService>();
 
 
 builder.Services.AddScoped<LookupService>();

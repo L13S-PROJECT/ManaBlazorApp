@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ManiApi.Data;
 using ManiApi.Models;
 using ManiApi.DTOs.WorkFlow;
+using ManaApp.Shared.DTOs.TopPart;
 
 namespace ManiApi.Controllers
 {
@@ -87,7 +88,7 @@ namespace ManiApi.Controllers
                 var partNode = new WorkflowNode
                     {
                         WorkflowId = workflow.Id,
-                        NodeType = 1,
+                        NodeType = (byte)WorkflowNodeType.Part,
                         Name = topPart.TopPartName,
                         TopPartId = dto.TopPartId,
                         SortOrder = 10,
@@ -101,7 +102,7 @@ namespace ManiApi.Controllers
                 var finishNode = new WorkflowNode
                     {
                         WorkflowId = workflow.Id,
-                        NodeType = 4,
+                        NodeType = (byte)WorkflowNodeType.Finish,
                         Name = "FINISH",
                         TopPartId = dto.TopPartId,
                         SortOrder = 20,
@@ -164,6 +165,44 @@ namespace ManiApi.Controllers
                     nodeIds.Contains(x.ToNodeId))
                 .ToListAsync();
             
+            var nodeDtos = nodes.Select(node =>
+                {
+                    var dto = new TopPartWorkflowNodeDto
+                    {
+                        Id = node.Id,
+                        WorkflowId = node.WorkflowId,
+                        NodeType = node.NodeType,
+                        Name = node.Name,
+                        TopPartId = node.TopPartId,
+                        WorkCenterId = node.WorkCenterId,
+                        EstimatedMinutes = node.EstimatedMinutes,
+                        Comments = node.Comments,
+                        SortOrder = node.SortOrder
+                    };
+
+                    return dto;
+                }).ToList();
+            
+            foreach (var processDto in nodeDtos
+                    .Where(x => x.NodeType == (byte)WorkflowNodeType.Process))
+                {
+                    var connection = connections
+                        .FirstOrDefault(x => x.FromNodeId == processDto.Id);
+
+                    if (connection == null)
+                        continue;
+
+                    var wipNode = nodes.FirstOrDefault(x =>
+                        x.Id == connection.ToNodeId &&
+                        x.NodeType == (byte)WorkflowNodeType.Wip);
+
+                    if (wipNode == null)
+                        continue;
+
+                    processDto.OutputWipNodeId = wipNode.Id;
+                    processDto.OutputWipName = wipNode.Name;
+                }
+            
             var components = await _db.WorkflowComponents
                 .Where(x =>
                     x.WorkflowId == workflow.Id &&
@@ -185,7 +224,7 @@ namespace ManiApi.Controllers
                         workflow.IsCurrent,
                         workflow.Name
                     },
-                    Nodes = nodes,
+                    Nodes = nodeDtos,
                     Connections = connections,
                     Components = components,
                     ProcessComponents = processComponents
@@ -209,55 +248,105 @@ namespace ManiApi.Controllers
                 
                 if (workflow.Status != WorkflowStatus.Draft)
                     return BadRequest("RELEASED Workflow modificēt nedrīkst.");
-                
-                var selectedNode = await _db.WorkflowNodes
-                    .FirstOrDefaultAsync(x =>
-                        x.Id == dto.SelectedNodeId &&
-                        x.WorkflowId == workflow.Id &&
-                        x.IsActive);
 
-                if (selectedNode == null)
-                    return BadRequest("Izvēlētais mezgls nav atrasts šajā Workflow.");
+                if (string.IsNullOrWhiteSpace(dto.WipName))
+                    return BadRequest("WIP nosaukums ir obligāts.");
                 
-                if (selectedNode.NodeType != 1 &&
-                        selectedNode.NodeType != 2)
+                if (dto.SelectedNodeIds == null || dto.SelectedNodeIds.Count == 0)
+                    return BadRequest("PROCESS nepieciešams vismaz viens ieejas mezgls.");
+                
+                var selectedNodes = await _db.WorkflowNodes
+                    .Where(x =>
+                        dto.SelectedNodeIds.Contains(x.Id) &&
+                        x.WorkflowId == workflow.Id &&
+                        x.IsActive)
+                    .ToListAsync();
+
+                if (selectedNodes.Count != dto.SelectedNodeIds.Distinct().Count())
+                    return BadRequest("Viens vai vairāki izvēlētie mezgli nav atrasti šajā Workflow.");
+                
+                if (selectedNodes.Any(x =>
+                    x.NodeType != (byte)WorkflowNodeType.Part &&
+                    x.NodeType != (byte)WorkflowNodeType.Wip))
+                {
+                    return BadRequest("PROCESS ieejas drīkst būt tikai PART vai WIP mezgli.");
+                }
+
+                var isMerge = selectedNodes.Count > 1;
+
+                if (isMerge &&
+                        selectedNodes.Any(x => x.NodeType != (byte)WorkflowNodeType.Wip))
                     {
-                        return BadRequest("PROCESS var pievienot tikai aiz PART vai PROCESS mezgla.");
+                        return BadRequest("MERGE PROCESS ieejas drīkst būt tikai WIP mezgli.");
                     }
                 
-                var oldConnection = await _db.WorkflowNodeConnections
-                    .FirstOrDefaultAsync(x =>
-                        x.FromNodeId == selectedNode.Id);
+                var selectedWipIds = selectedNodes
+                    .Where(x => x.NodeType == (byte)WorkflowNodeType.Wip)
+                    .Select(x => x.Id)
+                    .ToList();
 
-                if (oldConnection == null)
-                    return BadRequest("Izvēlētajam mezglam nav nākamā mezgla.");
+                var alreadyConsumedWip = await (
+                    from connection in _db.WorkflowNodeConnections
+                    join node in _db.WorkflowNodes
+                        on connection.ToNodeId equals node.Id
+                    where selectedWipIds.Contains(connection.FromNodeId)
+                        && node.WorkflowId == workflow.Id
+                        && node.NodeType == (byte)WorkflowNodeType.Process
+                        && node.IsActive
+                    select connection
+                ).AnyAsync();
+
+                if (alreadyConsumedWip)
+                {
+                    return BadRequest(
+                        "Izvēlētais WIP jau ir patērēts citā PROCESS.");
+                }
+            
+
+                var existingOutgoingConnections = await _db.WorkflowNodeConnections
+                    .Where(x => dto.SelectedNodeIds.Contains(x.FromNodeId))
+                    .ToListAsync();
+
+                var mergeNextNodeIds = isMerge
+                    ? existingOutgoingConnections
+                        .Select(x => x.ToNodeId)
+                        .Distinct()
+                        .ToList()
+                    : new List<int>();
+
+                if (isMerge && mergeNextNodeIds.Count != 1)
+                    {
+                        return BadRequest(
+                            "MERGE PROCESS izvēlētajiem WIP jābūt vienam kopīgam nākamajam mezglam.");
+                    }
+
+                var consumedWipConnections = isMerge
+                    ? existingOutgoingConnections
+                    : new List<WorkflowNodeConnection>();
+
+                var sortAnchorNode = selectedNodes
+                    .OrderByDescending(x => x.SortOrder)
+                    .First();
                 
-                var nextNode = await _db.WorkflowNodes
-                    .FirstOrDefaultAsync(x =>
-                        x.Id == oldConnection.ToNodeId &&
-                        x.WorkflowId == workflow.Id &&
-                        x.IsActive);
 
-                if (nextNode == null)
-                    return BadRequest("Nākamais mezgls nav atrasts.");
 
                 await _db.WorkflowNodes
                     .Where(x =>
                         x.WorkflowId == workflow.Id &&
-                        x.SortOrder > selectedNode.SortOrder &&
+                        x.SortOrder > sortAnchorNode.SortOrder &&
                         x.IsActive)
                     .ExecuteUpdateAsync(x =>
-                        x.SetProperty(n => n.SortOrder, n => n.SortOrder + 10));
+                        x.SetProperty(n => n.SortOrder, n => n.SortOrder + 20));
 
                 var processNode = new WorkflowNode
                     {
                         WorkflowId = workflow.Id,
-                        NodeType = 2,
+                        NodeType = (byte)WorkflowNodeType.Process,
                         Name = dto.ProcessName,
                         TopPartId = workflow.TopPartId,
                         WorkCenterId = dto.WorkCenterId,
                         EstimatedMinutes = dto.EstimatedMinutes,
-                        SortOrder = selectedNode.SortOrder + 10,
+                        SortOrder = sortAnchorNode.SortOrder + 10,
                         IsActive = true
                     };
 
@@ -265,19 +354,75 @@ namespace ManiApi.Controllers
 
                 await _db.SaveChangesAsync();
 
-                _db.WorkflowNodeConnections.Remove(oldConnection);
+                var wipNode = new WorkflowNode
+                    {
+                        WorkflowId = workflow.Id,
+                        NodeType = (byte)WorkflowNodeType.Wip,
+                        Name = dto.WipName.Trim(),
+                        TopPartId = workflow.TopPartId,
+                        SortOrder = sortAnchorNode.SortOrder + 20,
+                        IsActive = true
+                    };
+
+                _db.WorkflowNodes.Add(wipNode);
+
+                await _db.SaveChangesAsync();
+
+                var inputConnections = selectedNodes
+                    .Select(x => new WorkflowNodeConnection
+                    {
+                        FromNodeId = x.Id,
+                        ToNodeId = processNode.Id
+                    })
+                    .ToList();
+            
+
+                if (isMerge && consumedWipConnections.Count > 0)
+                    {
+                        _db.WorkflowNodeConnections.RemoveRange(consumedWipConnections);
+                    }
+
+                _db.WorkflowNodeConnections.AddRange(inputConnections);
 
                 _db.WorkflowNodeConnections.AddRange(
+
                     new WorkflowNodeConnection
+                        {
+                            FromNodeId = processNode.Id,
+                            ToNodeId = wipNode.Id
+                        });
+
+                if (isMerge)
                     {
-                        FromNodeId = selectedNode.Id,
-                        ToNodeId = processNode.Id
-                    },
-                    new WorkflowNodeConnection
+                        foreach (var nextNodeId in mergeNextNodeIds)
+                        {
+                            _db.WorkflowNodeConnections.Add(
+                                new WorkflowNodeConnection
+                                {
+                                    FromNodeId = wipNode.Id,
+                                    ToNodeId = nextNodeId
+                                });
+                        }
+                    }
+
+                if (!isMerge)
                     {
-                        FromNodeId = processNode.Id,
-                        ToNodeId = nextNode.Id
-                    });
+                        var finishNode = await _db.WorkflowNodes
+                            .FirstOrDefaultAsync(x =>
+                                x.WorkflowId == workflow.Id &&
+                                x.NodeType == (byte)WorkflowNodeType.Finish &&
+                                x.IsActive);
+
+                        if (finishNode == null)
+                            return BadRequest("FINISH mezgls nav atrasts.");
+
+                        _db.WorkflowNodeConnections.Add(
+                            new WorkflowNodeConnection
+                            {
+                                FromNodeId = wipNode.Id,
+                                ToNodeId = finishNode.Id
+                            });
+                    }
 
                 await _db.SaveChangesAsync();
 
@@ -300,19 +445,37 @@ namespace ManiApi.Controllers
                 if (workflow.Status != WorkflowStatus.Draft)
                     return BadRequest("RELEASED Workflow modificēt nedrīkst.");
                 
+                if (string.IsNullOrWhiteSpace(dto.WipName))
+                    return BadRequest("WIP nosaukums ir obligāts.");
+                
                 var processNode = await _db.WorkflowNodes
                     .FirstOrDefaultAsync(x =>
                         x.Id == dto.ProcessNodeId &&
                         x.WorkflowId == dto.WorkflowId &&
-                        x.NodeType == 2 &&
+                        x.NodeType == (byte)WorkflowNodeType.Process &&
                         x.IsActive);
 
                 if (processNode == null)
                     return NotFound("PROCESS mezgls nav atrasts.");
 
+                var wipNode = await (
+                    from connection in _db.WorkflowNodeConnections
+                    join node in _db.WorkflowNodes
+                        on connection.ToNodeId equals node.Id
+                    where connection.FromNodeId == processNode.Id
+                        && node.WorkflowId == dto.WorkflowId
+                        && node.NodeType == (byte)WorkflowNodeType.Wip
+                        && node.IsActive
+                    select node
+                ).FirstOrDefaultAsync();
+
+                if (wipNode == null)
+                    return BadRequest("PROCESS WIP mezgls nav atrasts.");
+
                 processNode.Name = dto.ProcessName;
                 processNode.WorkCenterId = dto.WorkCenterId;
                 processNode.EstimatedMinutes = dto.EstimatedMinutes;
+                wipNode.Name = dto.WipName.Trim();
 
                 await _db.SaveChangesAsync();
 
@@ -342,7 +505,7 @@ namespace ManiApi.Controllers
                         .FirstOrDefaultAsync(x =>
                             x.Id == processNodeId &&
                             x.WorkflowId == workflowId &&
-                            x.NodeType == 2 &&
+                            x.NodeType == (byte)WorkflowNodeType.Process &&
                             x.IsActive);
 
                     if (processNode == null)
@@ -361,21 +524,40 @@ namespace ManiApi.Controllers
 
                     if (outgoingConnection == null)
                         return BadRequest("PROCESS mezglam nav nākamā savienojuma.");
+                    
+                    var wipNode = await _db.WorkflowNodes
+                        .FirstOrDefaultAsync(x =>
+                            x.Id == outgoingConnection.ToNodeId &&
+                            x.WorkflowId == workflowId &&
+                            x.NodeType == (byte)WorkflowNodeType.Wip &&
+                            x.IsActive);
+
+                    if (wipNode == null)
+                        return BadRequest("PROCESS WIP mezgls nav atrasts.");
+
+                    var wipOutgoingConnection = await _db.WorkflowNodeConnections
+                        .FirstOrDefaultAsync(x =>
+                            x.FromNodeId == wipNode.Id);
+
+                    if (wipOutgoingConnection == null)
+                        return BadRequest("WIP mezglam nav nākamā savienojuma.");
 
                     var newConnection = new WorkflowNodeConnection
-                        {
-                            FromNodeId = incomingConnection.FromNodeId,
-                            ToNodeId = outgoingConnection.ToNodeId
-                        };
+                    {
+                        FromNodeId = incomingConnection.FromNodeId,
+                        ToNodeId = wipOutgoingConnection.ToNodeId
+                    };
 
                     _db.WorkflowNodeConnections.Add(newConnection);
 
                     _db.WorkflowNodeConnections.Remove(incomingConnection);
                     _db.WorkflowNodeConnections.Remove(outgoingConnection);
+                    _db.WorkflowNodeConnections.Remove(wipOutgoingConnection);
 
                     await _db.SaveChangesAsync();
 
                     _db.WorkflowNodes.Remove(processNode);
+                    _db.WorkflowNodes.Remove(wipNode);
 
                     await _db.SaveChangesAsync();
 
@@ -385,12 +567,78 @@ namespace ManiApi.Controllers
                             x.SortOrder > processNode.SortOrder &&
                             x.IsActive)
                         .ExecuteUpdateAsync(x =>
-                            x.SetProperty(n => n.SortOrder, n => n.SortOrder - 10));
+                            x.SetProperty(n => n.SortOrder, n => n.SortOrder - 20));
 
                     await transaction.CommitAsync();
 
                     return NoContent();
                 }
+
+        [HttpPost("{workflowId}/process/component")]
+            public async Task<IActionResult> AddProcessComponent(
+                int workflowId,
+                AddTopPartProcessComponentRequest dto)
+            {
+                var workflow = await _db.Workflows
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == workflowId &&
+                        x.IsActive);
+
+                if (workflow == null)
+                    return NotFound("Workflow nav atrasts.");
+
+                if (workflow.Status != WorkflowStatus.Draft)
+                    return BadRequest("RELEASED Workflow modificēt nedrīkst.");
+
+                if (dto.Quantity <= 0)
+                    return BadRequest("Daudzumam jābūt lielākam par 0.");
+
+                var processNode = await _db.WorkflowNodes
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == dto.ProcessNodeId &&
+                        x.WorkflowId == workflowId &&
+                        x.NodeType == (byte)WorkflowNodeType.Process &&
+                        x.IsActive);
+
+                if (processNode == null)
+                    return BadRequest("PROCESS nav atrasts šajā Workflow.");
+
+                var component = await _db.WorkflowComponents
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == dto.WorkflowComponentId &&
+                        x.WorkflowId == workflowId &&
+                        x.IsActive);
+
+                if (component == null)
+                    return BadRequest("Komponente nav atrasta šajā Workflow.");
+
+                var alreadyAdded = await _db.WorkflowProcessComponents
+                    .AnyAsync(x =>
+                        x.ProcessNodeId == dto.ProcessNodeId &&
+                        x.WorkflowComponentId == dto.WorkflowComponentId);
+
+                if (alreadyAdded)
+                    return BadRequest("Šī BOM komponente šim PROCESS jau ir pievienota.");
+
+                var usedQuantity = await _db.WorkflowProcessComponents
+                    .Where(x => x.WorkflowComponentId == component.Id)
+                    .SumAsync(x => (decimal?)x.Quantity) ?? 0;
+
+                if (usedQuantity + dto.Quantity > component.Quantity)
+                    return BadRequest("Pievienotais daudzums pārsniedz BOM atlikumu.");
+
+                var processComponent = new WorkflowProcessComponent
+                {
+                    ProcessNodeId = processNode.Id,
+                    WorkflowComponentId = component.Id,
+                    Quantity = dto.Quantity
+                };
+
+                _db.WorkflowProcessComponents.Add(processComponent);
+                await _db.SaveChangesAsync();
+
+                return Ok(processComponent);
+            }
 
         [HttpGet("{workflowId}/draft")]
         public async Task<IActionResult> GetWorkflowDraft(int workflowId)
@@ -950,8 +1198,14 @@ namespace ManiApi.Controllers
 
                 var lastNode = nodes.LastOrDefault();
 
-                if (lastNode == null || lastNode.NodeType != 4)
+                if (lastNode == null || lastNode.NodeType != (byte)WorkflowNodeType.Finish)
                     return BadRequest("Workflow jābeidzas ar FINISH mezglu.");
+                
+                var hasProcess = nodes.Any(
+                    x => x.NodeType == (byte)WorkflowNodeType.Process);
+
+                if (!hasProcess)
+                    return BadRequest("Workflow jābūt vismaz vienam PROCESS mezglam.");
 
                 var nodesChanged = parentWorkflow != null &&
                     (
@@ -1048,6 +1302,70 @@ namespace ManiApi.Controllers
                         nodeIds.Contains(x.FromNodeId) &&
                         nodeIds.Contains(x.ToNodeId))
                     .ToListAsync();
+
+                var finishNode = nodes
+                    .FirstOrDefault(x =>
+                        x.NodeType == (byte)WorkflowNodeType.Finish);
+
+                if (finishNode == null)
+                    return BadRequest("Workflow nav FINISH mezgla.");
+
+                var incomingToFinish = currentConnections
+                    .Where(x => x.ToNodeId == finishNode.Id)
+                    .ToList();
+
+                if (incomingToFinish.Count != 1)
+                    {
+                        return BadRequest(
+                            "Pirms RELEASE paralēlie Workflow zari jāapvieno vienā plūsmā.");
+                    }
+                
+                var processWithoutWip = nodes
+                    .Where(x => x.NodeType == (byte)WorkflowNodeType.Process)
+                    .Any(process =>
+                        !currentConnections.Any(c =>
+                            c.FromNodeId == process.Id &&
+                            nodes.Any(n =>
+                                n.Id == c.ToNodeId &&
+                                n.NodeType == (byte)WorkflowNodeType.Wip)));
+
+                if (processWithoutWip)
+                    return BadRequest("Katram PROCESS mezglam jābeidzas ar WIP mezglu.");
+                
+                var wipWithoutProcess = nodes
+                    .Where(x => x.NodeType == (byte)WorkflowNodeType.Wip)
+                    .Any(wip =>
+                        !currentConnections.Any(c =>
+                            c.ToNodeId == wip.Id &&
+                            nodes.Any(n =>
+                                n.Id == c.FromNodeId &&
+                                n.NodeType == (byte)WorkflowNodeType.Process)));
+
+                if (wipWithoutProcess)
+                    return BadRequest("Katram WIP mezglam jābūt PROCESS rezultātam.");
+
+                var wipWithoutNextNode = nodes
+                    .Where(x => x.NodeType == (byte)WorkflowNodeType.Wip)
+                    .Any(wip =>
+                        !currentConnections.Any(c =>
+                            c.FromNodeId == wip.Id));
+
+                if (wipWithoutNextNode)
+                    return BadRequest("Katram WIP mezglam jābūt nākamajam mezglam.");
+
+                var wipWithInvalidNextNode = nodes
+                    .Where(x => x.NodeType == (byte)WorkflowNodeType.Wip)
+                    .Any(wip =>
+                        currentConnections
+                            .Where(c => c.FromNodeId == wip.Id)
+                            .Any(c =>
+                                !nodes.Any(n =>
+                                    n.Id == c.ToNodeId &&
+                                    (n.NodeType == (byte)WorkflowNodeType.Process ||
+                                    n.NodeType == (byte)WorkflowNodeType.Finish))));
+
+                if (wipWithInvalidNextNode)
+                    return BadRequest("WIP mezgls drīkst turpināties tikai uz PROCESS vai FINISH mezglu.");
 
                 var connectionsChanged = parentWorkflow != null &&
                     (
@@ -1299,6 +1617,284 @@ namespace ManiApi.Controllers
 
                 return false;
             }
+
+        [HttpGet("toppart/{topPartId}/display")]
+            public async Task<IActionResult> GetDisplayWorkflow(int topPartId)
+            {
+                var workflow = await _db.Workflows
+                    .Where(x =>
+                        x.TopPartId == topPartId &&
+                        x.IsActive)
+                    .OrderBy(x => x.Status == WorkflowStatus.Draft ? 0 : 1)
+                    .ThenByDescending(x => x.IsCurrent)
+                    .ThenByDescending(x => x.WorkflowVersion)
+                    .FirstOrDefaultAsync();
+
+                if (workflow == null)
+                    return NotFound("TopPart Workflow nav atrasts.");
+
+                return Ok(workflow.Id);
+            }
+        
+        [HttpGet("{workflowId}/bom")]
+            public async Task<IActionResult> GetBom(int workflowId)
+            {
+                var workflowExists = await _db.Workflows
+                    .AsNoTracking()
+                    .AnyAsync(x =>
+                        x.Id == workflowId &&
+                        x.IsActive);
+
+                if (!workflowExists)
+                    return NotFound("Workflow nav atrasts.");
+
+                var rows = await (
+                    from component in _db.WorkflowComponents.AsNoTracking()
+
+                    
+                    join item in _db.Items.AsNoTracking()
+                            on component.ItemId equals (int?)item.Id into items
+
+                        from item in items.DefaultIfEmpty()
+
+
+
+                    where component.WorkflowId == workflowId
+                        && component.IsActive
+
+                    orderby component.Id
+
+                    select new TopPartWorkflowBomDto
+                        {
+                            Id = component.Id,
+                            ComponentType = component.ComponentType,
+                            TopPartId = component.TopPartId,
+                            ItemId = component.ItemId,
+                            ReferencedWorkflowId = component.ReferencedWorkflowId,
+                            Quantity = component.Quantity,
+
+                            UsedQuantity = _db.WorkflowProcessComponents
+                                .Where(x => x.WorkflowComponentId == component.Id)
+                                .Sum(x => (decimal?)x.Quantity) ?? 0,
+
+                            RemainingQuantity =
+                                component.Quantity -
+                                (_db.WorkflowProcessComponents
+                                    .Where(x => x.WorkflowComponentId == component.Id)
+                                    .Sum(x => (decimal?)x.Quantity) ?? 0),
+
+
+
+                            ItemCode = item != null ? item.ItemCode : null,
+                            ItemName = item != null ? item.ItemName : null,
+                            ItemUnit = item != null ? item.Unit : null
+                        }
+                ).ToListAsync();
+
+                var topPartIds = rows
+                    .Where(x => x.ComponentType == 1 && x.TopPartId.HasValue)
+                    .Select(x => (int)x.TopPartId!.Value)
+                    .Distinct()
+                    .ToList();
+
+                var topParts = await _db.TopParts
+                    .AsNoTracking()
+                    .Where(x => topPartIds.Contains(x.Id))
+                    .ToDictionaryAsync(x => x.Id);
+
+                foreach (var row in rows)
+                {
+                    if (row.ComponentType != 1 || !row.TopPartId.HasValue)
+                        continue;
+
+                    if (topParts.TryGetValue((int)row.TopPartId.Value, out var topPart))
+                    {
+                        row.TopPartCode = topPart.TopPartCode;
+                        row.TopPartName = topPart.TopPartName;
+                    }
+                }
+
+                return Ok(rows);
+            }
+
+        [HttpGet("{workflowId}/bom/parts")]
+        public async Task<IActionResult> GetBomPartOptions(int workflowId)
+            {
+                var workflow = await _db.Workflows
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == workflowId &&
+                        x.TopPartId != null &&
+                        x.IsActive);
+
+                if (workflow == null)
+                    return NotFound("TopPart Workflow nav atrasts.");
+
+                var rows = await _db.TopParts
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.IsActive &&
+                        x.Id != workflow.TopPartId &&
+                        _db.Workflows.Any(w =>
+                            w.TopPartId == x.Id &&
+                            w.Status == WorkflowStatus.Released &&
+                            w.IsActive))
+                    .Select(x => new TopPartBomPartOptionDto
+                    {
+                        TopPartId = x.Id,
+                        TopPartCode = x.TopPartCode,
+                        TopPartName = x.TopPartName,
+
+                        ReleasedWorkflowId = _db.Workflows
+                            .Where(w =>
+                                w.TopPartId == x.Id &&
+                                w.Status == WorkflowStatus.Released &&
+                                w.IsActive)
+                            .OrderByDescending(w => w.WorkflowVersion)
+                            .Select(w => (int?)w.Id)
+                            .FirstOrDefault(),
+
+                        ReleasedWorkflowVersion = _db.Workflows
+                            .Where(w =>
+                                w.TopPartId == x.Id &&
+                                w.Status == WorkflowStatus.Released &&
+                                w.IsActive &&
+                                w.IsCurrent)
+                            .Select(w => (int?)w.WorkflowVersion)
+                            .FirstOrDefault(),
+
+                        HasDraft = _db.Workflows.Any(w =>
+                            w.TopPartId == x.Id &&
+                            w.Status == WorkflowStatus.Draft &&
+                            w.IsActive)
+                    })
+                    .ToListAsync();
+
+                foreach (var row in rows)
+                    row.CanAdd = row.ReleasedWorkflowId.HasValue;
+
+                return Ok(rows);
+            }
+
+        [HttpPost("{workflowId}/bom/part")]
+        public async Task<IActionResult> AddBomPart(
+            int workflowId,
+            AddTopPartBomPartRequest dto)
+        {
+            var workflow = await _db.Workflows
+                .FirstOrDefaultAsync(x =>
+                    x.Id == workflowId &&
+                    x.IsActive);
+
+            if (workflow == null)
+                return NotFound("Workflow nav atrasts.");
+
+            if (workflow.Status != WorkflowStatus.Draft)
+                return BadRequest("RELEASED Workflow modificēt nedrīkst.");
+
+            if (dto.Quantity <= 0)
+                return BadRequest("Daudzumam jābūt lielākam par 0.");
+
+            if (workflow.TopPartId == dto.TopPartId)
+                return BadRequest("Workflow nevar izmantot pats savu TopPart kā komponenti.");
+
+            var releasedWorkflow = await _db.Workflows
+                .Where(x =>
+                    x.TopPartId == dto.TopPartId &&
+                    x.Status == WorkflowStatus.Released &&
+                    x.IsCurrent &&
+                    x.IsActive)
+                .FirstOrDefaultAsync();
+
+            if (releasedWorkflow == null)
+                return BadRequest("Izvēlētajam TopPart nav aktuāla RELEASED Workflow.");
+            
+            var createsCycle = await CreatesWorkflowCycle(
+                workflow.TopPartId!.Value,
+                releasedWorkflow.Id);
+
+            if (createsCycle)
+                return BadRequest(
+                    "Workflow komponentu struktūra veido ciklisku atkarību.");
+
+            var exists = await _db.WorkflowComponents.AnyAsync(x =>
+                x.WorkflowId == workflowId &&
+                x.ComponentType == 1 &&
+                x.TopPartId == dto.TopPartId &&
+                x.IsActive);
+
+            if (exists)
+                return BadRequest("Šis TopPart jau ir pievienots Workflow.");
+
+            var component = new WorkflowComponent
+            {
+                WorkflowId = workflowId,
+                ComponentType = 1,
+                TopPartId = (uint)dto.TopPartId,
+                ItemId = null,
+                ReferencedWorkflowId = releasedWorkflow.Id,
+                Quantity = dto.Quantity,
+                IsActive = true
+            };
+
+            _db.WorkflowComponents.Add(component);
+            await _db.SaveChangesAsync();
+
+            return Ok(component);
+        }
+
+        [HttpPost("{workflowId}/bom/item")]
+        public async Task<IActionResult> AddBomItem(
+            int workflowId,
+            AddTopPartBomItemRequest dto)
+        {
+            var workflow = await _db.Workflows
+                .FirstOrDefaultAsync(x =>
+                    x.Id == workflowId &&
+                    x.IsActive);
+
+            if (workflow == null)
+                return NotFound("Workflow nav atrasts.");
+
+            if (workflow.Status != WorkflowStatus.Draft)
+                return BadRequest("RELEASED Workflow modificēt nedrīkst.");
+
+            if (dto.Quantity <= 0)
+                return BadRequest("Daudzumam jābūt lielākam par 0.");
+
+            var itemExists = await _db.Items
+                .AnyAsync(x =>
+                    x.Id == dto.ItemId &&
+                    x.IsActive);
+
+            if (!itemExists)
+                return BadRequest("Norādītais Item nav atrasts vai nav aktīvs.");
+
+            var exists = await _db.WorkflowComponents.AnyAsync(x =>
+                x.WorkflowId == workflowId &&
+                x.ComponentType == 2 &&
+                x.ItemId == dto.ItemId &&
+                x.IsActive);
+
+            if (exists)
+                return BadRequest("Šis Item jau ir pievienots Workflow.");
+
+            var component = new WorkflowComponent
+            {
+                WorkflowId = workflowId,
+                ComponentType = 2,
+                TopPartId = null,
+                ItemId = dto.ItemId,
+                ReferencedWorkflowId = null,
+                Quantity = dto.Quantity,
+                IsActive = true
+            };
+
+            _db.WorkflowComponents.Add(component);
+            await _db.SaveChangesAsync();
+
+            return Ok(component);
+        }
 
     }
 }
