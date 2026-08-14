@@ -28,6 +28,15 @@ namespace ManiApi.Models
         [Column("Workflow_Name")]
         public string Name { get; set; } = string.Empty;    
 
+        [Column("Description")]
+        public string? Description { get; set; }
+
+        [Column("Created_Date")]
+        public DateTime? CreatedDate { get; set; }
+
+        [Column("Released_Date")]
+        public DateTime? ReleasedDate { get; set; }
+
         [Column("IsCurrent")]
         public bool IsCurrent { get; set; }
 

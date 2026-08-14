@@ -46,9 +46,7 @@
             </section>
 
             <section class="toppart-flow-section">
-                <TopPartFlowToolbar
-                    OnNewFlow="CreateNewFlow"
-                    Disabled="@hasFlow" />
+
 
                 <TopPartFlow
                     @ref="topPartFlow"
@@ -133,22 +131,10 @@
     
     private TopPartListItemDto? selectedTopPart;
 
-    private bool hasFlow;
-
-   private async Task SelectTopPart(TopPartListItemDto? topPart)
+   private Task SelectTopPart(TopPartListItemDto? topPart)
         {
             selectedTopPart = topPart;
-
-            if (topPart is null)
-            {
-                hasFlow = false;
-                return;
-            }
-
-            var workflowId =
-                await TopPartWorkflowService.GetDisplayWorkflowIdAsync(topPart.Id);
-
-            hasFlow = workflowId.HasValue;
+            return Task.CompletedTask;
         }
 
     private List<TopPartCategoryDto> categories = new();
@@ -158,10 +144,16 @@
         categories = await TopPartService.GetCategoriesAsync();
     }
 
-    private void TopPartSaved(TopPartListItemDto createdTopPart)
+    private async Task TopPartSaved(TopPartListItemDto createdTopPart)
         {
-            selectedTopPart = createdTopPart;
             showTopPartModal = false;
+
+            if (topPartList is not null)
+            {
+                await topPartList.ReloadAsync();
+            }
+
+            selectedTopPart = createdTopPart;
             showSavedConfirmation = true;
         }
     
@@ -170,9 +162,9 @@
             showSavedConfirmation = false;
 
             if (topPartList is not null)
-            {
-                await topPartList.ReloadAsync();
-            }
+                {
+                    selectedTopPart = await topPartList.ReloadAsync(selectedTopPart?.Id);
+                }
         }
     
     private void OpenEditTopPartModal(TopPartListItemDto topPart)
@@ -180,29 +172,6 @@
             editingTopPart = topPart;
             showTopPartModal = true;
         }
-
-    private string? flowError;
-
-    private async Task CreateNewFlow()
-        {
-            if (selectedTopPart is null)
-                return;
-
-            var workflowId =
-                await TopPartWorkflowService.CreateAsync(selectedTopPart.Id);
-
-            if (!workflowId.HasValue)
-            {
-                flowError = TopPartWorkflowService.LastError;
-                return;
-            }
-
-            flowError = null;
-
-            editingWorkflowId = workflowId.Value;
-            showFlowEditModal = true;
-        }
-
 
     private async Task FlowChanged()
         {
@@ -226,6 +195,12 @@
             {
                 await topPartBom.ReloadAsync();
             }
+
+            if (topPartList is not null)
+                {
+                    selectedTopPart = await topPartList.ReloadAsync(selectedTopPart?.Id);
+                }
+
         }
 
     private void OpenFlowEditModal(int workflowId)

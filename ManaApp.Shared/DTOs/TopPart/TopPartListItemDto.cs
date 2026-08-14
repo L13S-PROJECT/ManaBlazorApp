@@ -8,5 +8,9 @@ namespace ManaApp.Shared.DTOs.TopPart
         public byte TopPartType { get; set; }
         public int? TopPartCategoryID { get; set; }
         public string? Description { get; set; }
+        public DateTime? DraftCreatedDate { get; set; }
+        public int? ReleasedVersion { get; set; }
+        public DateTime? ReleasedDate { get; set; }
+        public string? FlowComment { get; set; }
     }
 }

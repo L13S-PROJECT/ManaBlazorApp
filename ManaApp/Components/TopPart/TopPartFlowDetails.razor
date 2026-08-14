@@ -1,6 +1,7 @@
 @* TopPartFlowDetails.razor *@
 
 @using ManaApp.Shared.DTOs.TopPart
+@inject ManaApp.Services.TopPartService TopPartService
 
     <div class="toppart-flow-details">
 
@@ -22,46 +23,138 @@
 
     <div class="toppart-info-body">
 
-        <div class="info-row">
-            <label>ID</label>
-            <span>@(TopPart?.Id.ToString() ?? "—")</span>
+        <div class="info-row info-row-pair">
+            <div class="info-field">
+                <label>Tips</label>
+                <span>
+                    @(TopPart is null ? "—" : TopPart.TopPartType switch
+                    {
+                        0 => "Part",
+                        1 => "Product",
+                        2 => "SparePart",
+                        _ => "—"
+                    })
+                </span>
+            </div>
+
+            <div class="info-field">
+                <label>Kategorija</label>
+                <span>
+                    @(TopPart?.TopPartCategoryID is int categoryId
+                        ? Categories.FirstOrDefault(x => x.Id == categoryId)?.CategoryName ?? "—"
+                        : "—")
+                </span>
+            </div>
         </div>
 
-        <div class="info-row">
-            <label>Kods</label>
-            <span>@(TopPart?.TopPartCode ?? "—")</span>
+        <div class="info-row info-row-pair">
+            <div class="info-field">
+                <label>Kods</label>
+                <span>@(TopPart?.TopPartCode ?? "—")</span>
+            </div>
+
+            <div class="info-field">
+                <label>Nosaukums</label>
+                <span>@(TopPart?.TopPartName ?? "—")</span>
+            </div>
         </div>
 
-        <div class="info-row">
-            <label>Nosaukums</label>
-            <span>@(TopPart?.TopPartName ?? "—")</span>
-        </div>
-
-        <div class="info-row">
-            <label>Tips</label>
-            <span>
-                @(TopPart is null ? "—" : TopPart.TopPartType switch
-                {
-                    0 => "Part",
-                    1 => "Product",
-                    2 => "SparePart",
-                    _ => "—"
-                })
-            </span>
-        </div>
-
-        <div class="info-row">
-            <label>Kategorija</label>
-            <span>
-                @(TopPart?.TopPartCategoryID is int categoryId
-                    ? Categories.FirstOrDefault(x => x.Id == categoryId)?.CategoryName ?? "—"
-                    : "—")
-            </span>
-        </div>
-
-        <div class="info-row">
+        <div class="info-row description-row">
             <label>Apraksts</label>
-            <span>@(string.IsNullOrWhiteSpace(TopPart?.Description) ? "—" : TopPart.Description)</span>
+            <span class="description-text">
+                @(string.IsNullOrWhiteSpace(TopPart?.Description) ? "—" : TopPart.Description)
+            </span>
+        </div>
+
+        <div class="info-row info-row-pair">
+
+            <div class="info-field">
+                <label>Draft</label>
+                <span>
+                    @(TopPart?.DraftCreatedDate is DateTime date
+                        ? $"Izveidots {date:dd.MM.yyyy}"
+                        : "—")
+                </span>
+            </div>
+
+            <div class="info-field">
+                <label>Released</label>
+                <span>
+                    @(TopPart?.ReleasedVersion is int version &&
+                    TopPart.ReleasedDate is DateTime releasedDate
+                        ? $"V{version} | {releasedDate:dd.MM.yyyy}"
+                        : "—")
+                </span>
+            </div>
+
+        </div>
+
+        <div class="info-row">
+            <label>Iesaistīts</label>
+
+            <span>
+                @if (TopPart?.TopPartType == 0 && usage.Count > 0)
+                {
+                    <span class="usage-container">
+
+                        <span>
+                            Šī detaļa ir iesaistīta @usage.Count precēs
+                        </span>
+
+                        <span class="usage-info">
+
+                            <span class="usage-info-icon">i</span>
+
+                            <span class="usage-tooltip">
+
+                                <span class="usage-tooltip-title">
+                                    Preces
+                                </span>
+
+                                @foreach (var item in usage.Items
+                                    .Where(x => x.TopPartType == 1)
+                                    .OrderBy(x => x.TopPartName))
+                                {
+                                    <span class="usage-tooltip-item">
+                                        @item.TopPartCode — @item.TopPartName
+                                    </span>
+                                }
+
+                                <span class="usage-tooltip-divider"></span>
+
+                                <span class="usage-tooltip-title">
+                                    Spare parts
+                                </span>
+
+                                @foreach (var item in usage.Items
+                                    .Where(x => x.TopPartType == 2)
+                                    .OrderBy(x => x.TopPartName))
+                                {
+                                    <span class="usage-tooltip-item">
+                                        @item.TopPartCode — @item.TopPartName
+                                    </span>
+                                }
+
+                            </span>
+
+                        </span>
+
+                    </span>
+                }
+                else
+                {
+                    <span>—</span>
+                }
+            </span>
+        </div>
+
+        <div class="info-row flow-comment-row">
+            <label>Flow komentārs</label>
+            <span class="flow-comment">
+                @(string.IsNullOrWhiteSpace(TopPart?.FlowComment)
+                    ? "—"
+                    : TopPart.FlowComment)
+            </span>
         </div>
 
     </div>
@@ -80,9 +173,28 @@
     public EventCallback<TopPartListItemDto> OnEdit { get; set; }
 
     private async Task EditTopPart()
-    {
-        if (TopPart is not null)
-            await OnEdit.InvokeAsync(TopPart);
-    }
+        {
+            if (TopPart is not null)
+                await OnEdit.InvokeAsync(TopPart);
+        }
+
+    private TopPartUsageDto usage = new();
+
+    protected override async Task OnParametersSetAsync()
+        {
+            if (TopPart is null)
+            {
+                usage = new TopPartUsageDto();
+                return;
+            }
+
+            usage = await TopPartService.GetUsageAsync(TopPart.Id);
+        }
+
+    private IEnumerable<TopPartUsageItemDto> UsageProducts =>
+        usage.Items.Where(x => x.TopPartType == 1);
+
+    private IEnumerable<TopPartUsageItemDto> UsageSpareParts =>
+        usage.Items.Where(x => x.TopPartType == 2);
 
 }

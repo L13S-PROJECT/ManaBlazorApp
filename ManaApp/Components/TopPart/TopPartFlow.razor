@@ -106,9 +106,13 @@
     <div class="modal-backdrop">
         <div class="modal-content">
 
-            <h3>
-                @($"Flow V{workflow.Workflow.WorkflowVersion}")
-            </h3>
+            @if (!string.IsNullOrWhiteSpace(workflow.Workflow.Description))
+                {
+                    <div>
+                        <strong>Izmaiņu komentārs:</strong>
+                        @workflow.Workflow.Description
+                    </div>
+                }
 
             <div class="toppart-flow-chain">
                 @foreach (var node in workflow.Nodes.OrderBy(x => x.SortOrder))
@@ -204,20 +208,6 @@
             loadedTopPartId = null;
             await OnParametersSetAsync();
             StateHasChanged();
-        }
-
-    private async Task ReleaseFlow()
-        {
-            if (workflow is null)
-                return;
-
-            var released = await TopPartWorkflowService.ReleaseAsync(
-                workflow.Workflow.Id);
-
-            if (!released)
-                return;
-
-            await OnFlowChanged.InvokeAsync();
         }
 
     private async Task EditFlow()

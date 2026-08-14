@@ -17,6 +17,7 @@ public class TopPartWorkflowModel
     public int Status { get; set; }
     public bool IsCurrent { get; set; }
     public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
 }
 
 public class TopPartWorkflowNodeDto
@@ -54,6 +55,11 @@ public class TopPartWorkflowVersionDto
 public class CreateTopPartWorkflowRequest
     {
         public uint TopPartId { get; set; }
+    }
+
+public class ReleaseTopPartWorkflowRequest
+    {
+        public string Description { get; set; } = string.Empty;
     }
 
 public class TopPartWorkflowComponentDto

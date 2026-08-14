@@ -57,5 +57,12 @@ namespace ManaApp.Services
                 return await response.Content.ReadFromJsonAsync<TopPartListItemDto>();
             }
 
+        public async Task<TopPartUsageDto> GetUsageAsync(int topPartId)
+            {
+                return await _http.GetFromJsonAsync<TopPartUsageDto>(
+                    $"api/TopParts/{topPartId}/usage")
+                    ?? new TopPartUsageDto();
+            }
+
     }
 }

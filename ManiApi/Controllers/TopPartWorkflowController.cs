@@ -43,6 +43,7 @@ namespace ManiApi.Controllers
         [HttpPost]
             public async Task<IActionResult> CreateWorkflow(CreateTopPartWorkflowRequest dto)
             {
+                
                 await using var transaction =
                         await _db.Database.BeginTransactionAsync();
 
@@ -77,6 +78,7 @@ namespace ManiApi.Controllers
                         VersionId = null,
                         ParentNodeId = null,
                         Name = $"{topPart.TopPartName} - V{nextVersion}",
+                        CreatedDate = DateTime.Now,
                         IsCurrent = false,
                         IsActive = true
                     };
@@ -222,7 +224,8 @@ namespace ManiApi.Controllers
                         workflow.WorkflowVersion,
                         workflow.Status,
                         workflow.IsCurrent,
-                        workflow.Name
+                        workflow.Name,
+                        workflow.Description
                     },
                     Nodes = nodeDtos,
                     Connections = connections,
@@ -380,6 +383,11 @@ namespace ManiApi.Controllers
                 if (isMerge && consumedWipConnections.Count > 0)
                     {
                         _db.WorkflowNodeConnections.RemoveRange(consumedWipConnections);
+                    }
+
+                if (!isMerge && existingOutgoingConnections.Count > 0)
+                    {
+                        _db.WorkflowNodeConnections.RemoveRange(existingOutgoingConnections);
                     }
 
                 _db.WorkflowNodeConnections.AddRange(inputConnections);
@@ -1028,6 +1036,7 @@ namespace ManiApi.Controllers
                         VersionId = sourceWorkflow.VersionId,
                         ParentNodeId = sourceWorkflow.ParentNodeId,
                         Name = $"{sourceWorkflow.Name.Split(" - V")[0]} - V{nextVersion}",
+                        CreatedDate = DateTime.Now,
                         IsCurrent = false,
                         IsActive = true
                     };
@@ -1145,7 +1154,9 @@ namespace ManiApi.Controllers
             }
 
         [HttpPost("{workflowId}/release")]
-            public async Task<IActionResult> ReleaseWorkflow(int workflowId)
+            public async Task<IActionResult> ReleaseWorkflow(
+                int workflowId,
+                ReleaseTopPartWorkflowRequest dto)
             {
                 await using var transaction =
                     await _db.Database.BeginTransactionAsync();
@@ -1158,6 +1169,9 @@ namespace ManiApi.Controllers
 
                 if (workflow == null)
                     return NotFound("TopPart Workflow nav atrasts.");
+                
+                if (string.IsNullOrWhiteSpace(dto.Description))
+                    return BadRequest("Izmaiņu komentārs ir obligāts.");
 
                 if (workflow.Status != WorkflowStatus.Draft)
                     return BadRequest("Release drīkst veikt tikai DRAFT Workflow.");
@@ -1459,8 +1473,9 @@ namespace ManiApi.Controllers
                     .ExecuteUpdateAsync(x =>
                         x.SetProperty(w => w.IsCurrent, false));
 
+                workflow.Description = dto.Description.Trim();
                 workflow.Status = WorkflowStatus.Released;
-
+                workflow.ReleasedDate = DateTime.Now;
                 workflow.IsCurrent = true;
 
                 await _db.SaveChangesAsync();

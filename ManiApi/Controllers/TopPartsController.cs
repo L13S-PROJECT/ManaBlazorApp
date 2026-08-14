@@ -7,6 +7,7 @@ using ManiApi.Models;
 using ManaApp.Shared.DTOs.Planning;
 using ManiApi.DTOs.Workflow;
 using ManaApp.Shared.DTOs.TopPart;
+using ManiApi.Services.TopParts;
 
 namespace ManiApi.Controllers
 {
@@ -15,7 +16,15 @@ namespace ManiApi.Controllers
     public class TopPartsController : ControllerBase
     {
         private readonly AppDbContext _db;
-        public TopPartsController(AppDbContext db) => _db = db;
+        private readonly TopPartWorkflowService _topPartWorkflowService;
+
+        public TopPartsController(
+            AppDbContext db,
+            TopPartWorkflowService topPartWorkflowService)
+        {
+            _db = db;
+            _topPartWorkflowService = topPartWorkflowService;
+        }
 
         // GET: api/topparts
         [HttpGet]
@@ -32,7 +41,40 @@ namespace ManiApi.Controllers
                     TopPartCode = x.TopPartCode,
                     TopPartType = (byte)x.TopPartType,
                     TopPartCategoryID = x.TopPartCategoryID,
-                    Description = x.Description
+                    Description = x.Description,
+                    DraftCreatedDate = _db.Workflows
+                        .Where(w =>
+                            w.TopPartId == x.Id &&
+                            w.Status == WorkflowStatus.Draft &&
+                            w.IsActive)
+                        .Select(w => w.CreatedDate)
+                        .FirstOrDefault(),
+                    ReleasedVersion = _db.Workflows
+                        .Where(w =>
+                            w.TopPartId == x.Id &&
+                            w.Status == WorkflowStatus.Released &&
+                            w.IsActive)
+                        .OrderByDescending(w => w.WorkflowVersion)
+                        .Select(w => (int?)w.WorkflowVersion)
+                        .FirstOrDefault(),
+
+                    ReleasedDate = _db.Workflows
+                        .Where(w =>
+                            w.TopPartId == x.Id &&
+                            w.Status == WorkflowStatus.Released &&
+                            w.IsActive)
+                        .OrderByDescending(w => w.WorkflowVersion)
+                        .Select(w => w.ReleasedDate)
+                        .FirstOrDefault(),
+                    
+                    FlowComment = _db.Workflows
+                        .Where(w =>
+                            w.TopPartId == x.Id &&
+                            w.Status == WorkflowStatus.Released &&
+                            w.IsActive)
+                        .OrderByDescending(w => w.WorkflowVersion)
+                        .Select(w => w.Description)
+                        .FirstOrDefault()
                 })
                 .ToListAsync();
 
@@ -43,6 +85,9 @@ namespace ManiApi.Controllers
 [HttpPost]
 public async Task<IActionResult> Create([FromBody] CreateTopPartDto dto)
 {
+    await using var transaction =
+        await _db.Database.BeginTransactionAsync();
+
     if (string.IsNullOrWhiteSpace(dto.TopPartName))
         return BadRequest("Nosaukums ir obligāts.");
 
@@ -78,6 +123,12 @@ public async Task<IActionResult> Create([FromBody] CreateTopPartDto dto)
 
     _db.TopParts.Add(topPart);
     await _db.SaveChangesAsync();
+
+    await _topPartWorkflowService.CreateInitialWorkflowAsync(
+        topPart.Id,
+        topPart.TopPartName);
+
+    await transaction.CommitAsync();
 
     return Ok(topPart);
 
@@ -886,6 +937,100 @@ public async Task<IActionResult> GetWorkflowTopParts()
 
     return Ok(rows);
 }
+
+    [HttpGet("{topPartId:int}/usage")]
+        public async Task<IActionResult> GetUsage(int topPartId)
+            {
+                var topPart = await _db.TopParts
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == topPartId &&
+                        x.IsActive);
+
+                if (topPart == null)
+                    return NotFound("TopPart nav atrasts.");
+
+                if (topPart.TopPartType != TopPartType.Part)
+                {
+                    return Ok(new TopPartUsageDto());
+                }
+
+                var resultIds = new HashSet<int>();
+                var visitedPartIds = new HashSet<int>();
+                var queue = new Queue<int>();
+
+                queue.Enqueue(topPartId);
+
+                while (queue.Count > 0)
+                {
+                    var currentPartId = queue.Dequeue();
+
+                    if (!visitedPartIds.Add(currentPartId))
+                        continue;
+
+                    var parentTopParts = await (
+                        from component in _db.WorkflowComponents.AsNoTracking()
+
+                        join workflow in _db.Workflows.AsNoTracking()
+                            on component.WorkflowId equals workflow.Id
+
+                        join parentTopPart in _db.TopParts.AsNoTracking()
+                            on workflow.TopPartId equals (uint?)parentTopPart.Id
+
+                        where
+                            component.IsActive &&
+                            component.ComponentType == 1 &&
+                            component.TopPartId == currentPartId &&
+                            workflow.IsActive &&
+                            workflow.Status == WorkflowStatus.Released &&
+                            workflow.IsCurrent &&
+                            parentTopPart.IsActive
+
+                        select new
+                        {
+                            parentTopPart.Id,
+                            parentTopPart.TopPartType
+                        }
+                    )
+                    .Distinct()
+                    .ToListAsync();
+
+                    foreach (var parent in parentTopParts)
+                    {
+                        if (parent.TopPartType == TopPartType.Part)
+                        {
+                            queue.Enqueue(parent.Id);
+                        }
+                        else if (parent.TopPartType == TopPartType.Product ||
+                                parent.TopPartType == TopPartType.SparePart)
+                        {
+                            resultIds.Add(parent.Id);
+                        }
+                    }
+                }
+
+                var items = await _db.TopParts
+                    .AsNoTracking()
+                    .Where(x =>
+                        resultIds.Contains(x.Id) &&
+                        x.IsActive)
+                    .OrderBy(x => x.TopPartName)
+                    .Select(x => new TopPartUsageItemDto
+                    {
+                        TopPartId = x.Id,
+                        TopPartCode = x.TopPartCode,
+                        TopPartName = x.TopPartName,
+                        TopPartType = (byte)x.TopPartType
+                    })
+                    .ToListAsync();
+
+                return Ok(new TopPartUsageDto
+                {
+                    Count = items.Count,
+                    Items = items
+                });
+
+            }
 
 
     }

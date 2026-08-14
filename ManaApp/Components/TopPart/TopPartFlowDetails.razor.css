@@ -1,7 +1,8 @@
 /* TopPartFlowDetails.razor.css */
 
 .toppart-flow-details {
-    height: 100%;
+    height: 270px;
+    box-sizing: border-box;
     padding: 12px;
 
     background: #fff;
@@ -15,8 +16,8 @@
     justify-content: space-between;
     gap: 12px;
 
-    padding-bottom: 10px;
-    margin-bottom: 4px;
+    padding-bottom: 6px;
+    margin-bottom: 0px;
 
     border-bottom: 1px solid #d9dde3;
 
@@ -37,7 +38,7 @@
     align-items: start;
     min-width: 0;
 
-    padding: 8px 4px;
+    padding: 5px 4px;
     border-bottom: 1px solid #eceff3;
 }
 
@@ -47,8 +48,8 @@
 
 .info-row label {
     font-size: 12px;
-    font-weight: 600;
-    color: #6b7280;
+    font-weight: 700;
+    color: #374151;
 }
 
 .info-row span {
@@ -64,7 +65,7 @@
 }
 
 .toppart-info-actions button {
-    padding: 6px 12px;
+    padding: 4px 8px;
 
     border: 1px solid #c7cdd4;
     border-radius: 4px;
@@ -72,7 +73,7 @@
     background: #fff;
     color: #374151;
 
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 500;
 
     cursor: pointer;
@@ -92,4 +93,132 @@
     background: #f5f6f8;
     border-color: #d9dde3;
     cursor: default;
+}
+
+.info-row-pair {
+    grid-template-columns: minmax(160px, 0.7fr) minmax(0, 1.3fr);
+    gap: 12px;
+}
+
+.info-field {
+    display: grid;
+    grid-template-columns: 55px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    min-width: 0;
+}
+
+.info-row-pair .info-field:nth-child(2) {
+    grid-template-columns: 90px minmax(0, 1fr);
+}
+
+.info-field span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.description-row,
+.flow-comment-row {
+    grid-template-columns: max-content minmax(0, 1fr);
+    column-gap: 12px;
+    height: 48px;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.description-text,
+.flow-comment {
+    height: 38px;
+    min-height: 38px;
+    max-height: 38px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
+}
+
+.info-row-pair .info-field {
+    grid-template-columns: max-content minmax(0, 1fr);
+}
+
+.info-row-pair .info-field:nth-child(2) {
+    grid-template-columns: max-content minmax(0, 1fr);
+}
+
+.info-row-pair .info-field span {
+    white-space: nowrap;
+}
+
+.usage-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.usage-info {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.usage-info-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 18px;
+    height: 18px;
+
+    background: transparent;
+    color: #0d6efd !important;
+    border: 2px solid #0d6efd;
+    border-radius: 50%;
+
+    font-size: 12px;
+    font-weight: 700;
+    font-family: Arial, sans-serif;
+    line-height: 1;
+
+    cursor: help;
+}
+
+.usage-tooltip {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+
+    min-width: 260px;
+    padding: 12px 14px;
+
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+
+    color: #111827;
+    text-align: left;
+}
+
+.usage-info:hover .usage-tooltip {
+    display: flex;
+    flex-direction: column;
+}
+
+.usage-tooltip-title {
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.usage-tooltip-item {
+    display: block;
+    white-space: nowrap;
+    padding: 2px 0;
+}
+
+.usage-tooltip-divider {
+    display: block;
+    border-top: 1px solid #e5e7eb;
+    margin: 9px 0;
 }

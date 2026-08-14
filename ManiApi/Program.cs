@@ -15,6 +15,7 @@ using ManiApi.Services.Inline;
 using ManiApi.Services.ProductionFlows.ParentSeparate;
 using ManiApi.Services.ProductionFlows.ParentInline;
 using ManiApi.Services.Workflow;
+using ManiApi.Services.TopParts;
 
 
 
@@ -64,6 +65,7 @@ builder.Services.AddScoped<InlineParentFinishingService>();
 builder.Services.AddScoped<InlineParentAssemblyService>();
 builder.Services.AddScoped<WorkflowValidator>();
 builder.Services.AddScoped<WorkflowAnalyzerFactory>();
+builder.Services.AddScoped<TopPartWorkflowService>();
 
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

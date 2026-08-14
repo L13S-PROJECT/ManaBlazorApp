@@ -77,10 +77,14 @@
             categories = await TopPartService.GetCategoriesAsync();
         }
 
-    public async Task ReloadAsync()
-        {
-            topParts = await TopPartService.GetAllAsync();
-        }
+    public async Task<TopPartListItemDto?> ReloadAsync(int? selectedTopPartId = null)
+            {
+                topParts = await TopPartService.GetAllAsync();
+
+                return selectedTopPartId.HasValue
+                    ? topParts.FirstOrDefault(x => x.Id == selectedTopPartId.Value)
+                    : null;
+            }
 
     [Parameter]
     public EventCallback<TopPartListItemDto?> OnSelected { get; set; }

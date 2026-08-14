@@ -239,6 +239,38 @@
     </div>
 </div>
 
+@if (showReleaseConfirmation)
+    {
+        <div class="modal-backdrop">
+            <div class="modal-content">
+
+                <h3>Apstiprināt jauno Flow versiju</h3>
+
+                <p>
+                    Tiks izveidota jauna RELEASED Flow versija.
+                    Tā kļūs par aktuālo versiju.
+                </p>
+
+                <label>Izmaiņu komentārs</label>
+
+                <textarea rows="4"
+                        @bind="releaseDescription">
+                </textarea>
+
+                <button type="button"
+                        @onclick="ConfirmRelease">
+                    Labi
+                </button>
+
+                <button type="button"
+                        @onclick="() => showReleaseConfirmation = false">
+                    Atcelt
+                </button>
+
+            </div>
+        </div>
+    }
+
 @code {
     [Parameter]
     public int WorkflowId { get; set; }
@@ -254,6 +286,8 @@
     private List<int> selectedNodeIds = new();
     private string? errorMessage;
     private bool hasChanges;
+    private bool showReleaseConfirmation;
+    private string releaseDescription = "";
     private int? selectedProcessNodeId;
 
     private int? selectedWorkflowComponentId;
@@ -378,23 +412,14 @@
             estimatedMinutes = 0;
         }
 
-    private async Task ReleaseFlow()
+    private void ReleaseFlow()
         {
             if (workflow is null)
                 return;
 
-            var released = await TopPartWorkflowService.ReleaseAsync(
-                workflow.Workflow.Id);
-
-            if (!released)
-            {
-                errorMessage = TopPartWorkflowService.LastError;
-                return;
-            }
-
             errorMessage = null;
-
-            await OnClose.InvokeAsync();
+            releaseDescription = "";
+            showReleaseConfirmation = true;
         }
 
     private async Task AddProcessComponent()
@@ -437,6 +462,33 @@
                     selectedNodeIds.Remove(nodeId);
                 else
                     selectedNodeIds.Add(nodeId);
+            }
+
+        private async Task ConfirmRelease()
+            {
+                if (workflow is null)
+                    return;
+
+                if (string.IsNullOrWhiteSpace(releaseDescription))
+                {
+                    errorMessage = "Izmaiņu komentārs ir obligāts.";
+                    return;
+                }
+
+                var released = await TopPartWorkflowService.ReleaseAsync(
+                    workflow.Workflow.Id,
+                    releaseDescription);
+
+                if (!released)
+                {
+                    errorMessage = TopPartWorkflowService.LastError;
+                    return;
+                }
+
+                errorMessage = null;
+                showReleaseConfirmation = false;
+
+                await OnClose.InvokeAsync();
             }
 
 }

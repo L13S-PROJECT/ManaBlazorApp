@@ -65,13 +65,20 @@ namespace ManaApp.Services
                 return await response.Content.ReadFromJsonAsync<int>();
             }
 
-        public async Task<bool> ReleaseAsync(int workflowId)
+        public async Task<bool> ReleaseAsync(
+                int workflowId,
+                string description)
             {
                 LastError = null;
 
-                var response = await _http.PostAsync(
+                var request = new ReleaseTopPartWorkflowRequest
+                {
+                    Description = description
+                };
+
+                var response = await _http.PostAsJsonAsync(
                     $"api/TopPartWorkflow/{workflowId}/release",
-                    null);
+                    request);
 
                 if (!response.IsSuccessStatusCode)
                 {
