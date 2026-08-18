@@ -41,7 +41,8 @@
 
                 <TopPartBom
                     @ref="topPartBom"
-                    TopPart="selectedTopPart" />
+                    TopPart="selectedTopPart"
+                    OnWorkflowChanged="WorkflowChanged" />
 
             </section>
 
@@ -74,7 +75,8 @@
 {
     <TopPartFlowEditModal
         WorkflowId="editingWorkflowId.Value"
-        OnClose="CloseFlowEditModal" />
+        OnClose="CloseFlowEditModal"
+        OnWorkflowChanged="WorkflowChanged" />
 }
 
 @if (showSavedConfirmation)
@@ -207,6 +209,25 @@
         {
             editingWorkflowId = workflowId;
             showFlowEditModal = true;
+        }
+
+    private async Task WorkflowChanged()
+        {
+            if (topPartList is not null)
+            {
+                selectedTopPart =
+                    await topPartList.ReloadAsync(selectedTopPart?.Id);
+            }
+
+            if (topPartFlow is not null)
+            {
+                await topPartFlow.ReloadAsync();
+            }
+
+            if (topPartBom is not null)
+            {
+                await topPartBom.ReloadAsync();
+            }
         }
 
 }

@@ -132,6 +132,23 @@ namespace ManaApp.Services
                 return true;
             }
 
+        public async Task<bool> AddFinishAsync(AddTopPartFinishRequest model)
+            {
+                LastError = null;
+
+                var response = await _http.PostAsJsonAsync(
+                    "api/TopPartWorkflow/finish",
+                    model);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    LastError = await response.Content.ReadAsStringAsync();
+                    return false;
+                }
+
+                return true;
+            }
+
         public async Task<bool> DeleteProcessAsync(
                 int workflowId,
                 int processNodeId)
@@ -238,6 +255,98 @@ namespace ManaApp.Services
 
                 return true;
             }
+
+        public async Task<bool> UpdateProcessComponentAsync(
+    int workflowId,
+    UpdateTopPartProcessComponentRequest model)
+{
+    LastError = null;
+
+    var response = await _http.PutAsJsonAsync(
+        $"api/TopPartWorkflow/{workflowId}/process/component",
+        model);
+
+    if (!response.IsSuccessStatusCode)
+    {
+        LastError = await response.Content.ReadAsStringAsync();
+        return false;
+    }
+
+    return true;
+}
+
+        public async Task<bool> DeleteProcessComponentAsync(
+            int workflowId,
+            int processNodeId,
+            int workflowComponentId)
+        {
+            LastError = null;
+
+            var response = await _http.DeleteAsync(
+                $"api/TopPartWorkflow/{workflowId}/process/component/{processNodeId}/{workflowComponentId}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                LastError = await response.Content.ReadAsStringAsync();
+                return false;
+            }
+
+            return true;
+        }
+
+        public async Task<List<TopPartBomPartSelectorDto>> GetBomPartSelectorAsync(
+                int workflowId)
+            {
+                return await _http.GetFromJsonAsync<List<TopPartBomPartSelectorDto>>(
+                    $"api/TopPartWorkflow/{workflowId}/bom/parts/selector")
+                    ?? new();
+            }
+
+        public async Task<bool> SaveBomPartsAsync(
+                int workflowId,
+                SaveTopPartBomPartsRequest model)
+            {
+                LastError = null;
+
+                var response = await _http.PutAsJsonAsync(
+                    $"api/TopPartWorkflow/{workflowId}/bom/parts",
+                    model);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    LastError = await response.Content.ReadAsStringAsync();
+                    return false;
+                }
+
+                return true;
+            }
+
+        public async Task<List<TopPartBomItemSelectorDto>> GetBomItemSelectorAsync(
+                int workflowId)
+            {
+                return await _http.GetFromJsonAsync<List<TopPartBomItemSelectorDto>>(
+                    $"api/TopPartWorkflow/{workflowId}/bom/items/selector")
+                    ?? new();
+            }
+
+        public async Task<bool> SaveBomItemsAsync(
+            int workflowId,
+            SaveTopPartBomItemsRequest model)
+        {
+            LastError = null;
+
+            var response = await _http.PutAsJsonAsync(
+                $"api/TopPartWorkflow/{workflowId}/bom/items",
+                model);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                LastError = await response.Content.ReadAsStringAsync();
+                return false;
+            }
+
+            return true;
+        }
 
     }
 }

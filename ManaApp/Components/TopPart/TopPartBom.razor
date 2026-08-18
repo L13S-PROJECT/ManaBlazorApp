@@ -2,6 +2,7 @@
 
 @using ManaApp.Shared.DTOs.TopPart
 @using ManaApp.Shared.DTOs.Items
+@using ManaApp.Components.TopPart
 @using ManaApp.Services
 @inject TopPartWorkflowService TopPartWorkflowService
 @inject ItemService ItemService
@@ -17,115 +18,102 @@
             </div>
         }
 
-    @if (TopPart is not null && workflowId.HasValue)
-        {
-            <button type="button"
-                    @onclick="OpenAddPart">
-                + PART
-            </button>
-
-            <button type="button"
-                    @onclick="OpenAddItem">
-                + ITEM
-            </button>
-
-        }
-    
-    @if (showAddPart)
-        {
-            <div class="toppart-bom-add">
-
-                <select @bind="selectedBomTopPartId">
-                    <option value="">-- Izvēlies PART --</option>
-
-                    @foreach (var part in bomPartOptions)
-                    {
-                        <option value="@part.TopPartId"
-                                disabled="@(!part.CanAdd)">
-                            @part.TopPartCode - @part.TopPartName
-
-                            @if (!part.CanAdd)
-                            {
-                                <text> [NAV RELEASED FLOW]</text>
-                            }
-                        </option>
-                    }
-                </select>
-
-                <input type="number"
-                    min="0.01"
-                    step="0.01"
-                    @bind="bomPartQuantity" />
-                
-                <button type="button"
-                        @onclick="AddBomPart">
-                    Pievienot
-                </button>
-
-            </div>
-        }
-
-    @if (showAddItem)
-        {
-            <div class="toppart-bom-add">
-
-                <select @bind="selectedBomItemId">
-                    <option value="">-- Izvēlies ITEM --</option>
-
-                    @foreach (var item in bomItemOptions)
-                    {
-                        <option value="@item.Id">
-                            @item.Text
-                        </option>
-                    }
-                </select>
-
-                <input type="number"
-                    min="0.01"
-                    step="0.01"
-                    @bind="bomItemQuantity" />
-
-                <button type="button"
-                        @onclick="AddBomItem">
-                    Pievienot
-                </button>
-
-            </div>
-        }
-
     @if (TopPart is null)
-    {
-        <div>Izvēlies TopPart.</div>
-    }
-    else if (bom.Count == 0)
-    {
-        <div>BOM nav pievienotu komponenšu.</div>
-    }
-    else
-    {
-        @foreach (var row in bom)
-            {
-                <div>
-                    @if (row.ComponentType == 1)
-                    {
-                        <span>@row.TopPartCode - @row.TopPartName | @row.Quantity</span>
-                    }
-                    else if (row.ComponentType == 2)
-                    {
-                        <span>@row.ItemCode - @row.ItemName | @row.Quantity</span>
-                    }
+        {
+            <div class="toppart-bom-empty">
+                Izvēlies TopPart.
+            </div>
+        }
+        else
+        {
+            <div class="toppart-bom-columns">
+
+                <div class="toppart-bom-column">
+
+                    <div class="toppart-bom-column-header">
+                        <span>PART</span>
+
+                        <button type="button"
+                                @onclick="OpenAddPart">
+                            + PART
+                        </button>
+                    </div>
+
+                    <div class="toppart-bom-list">
+
+                        @foreach (var row in bom.Where(x => x.ComponentType == 1))
+                        {
+                            <div class="toppart-bom-row">
+                                <span>@row.TopPartCode - @row.TopPartName</span>
+                                <span>@row.Quantity.ToString("0")</span>
+                            </div>
+                        }
+
+                    </div>
+
                 </div>
-            }
-    }
+
+                <div class="toppart-bom-column">
+
+                    <div class="toppart-bom-column-header">
+                        <span>ITEM</span>
+
+                        <button type="button"
+                                @onclick="OpenAddItem">
+                            + ITEM
+                        </button>
+                    </div>
+
+                    <div class="toppart-bom-list">
+
+                        @foreach (var row in bom.Where(x => x.ComponentType == 2))
+                        {
+                            <div class="toppart-bom-row">
+                                <span>@row.ItemCode - @row.ItemName</span>
+                                <span>@row.Quantity</span>
+                            </div>
+                        }
+
+                    </div>
+
+                </div>
+
+            </div>
+        }
 
 </div>
+
+@if (showAddPart && workflowId.HasValue)
+{
+    <TopPartBomPartModal
+        WorkflowId="workflowId.Value"
+        OnClose="CloseAddPart"
+        OnSaved="PartBomSaved"
+        OnWorkflowChanged="OnWorkflowChanged" />
+
+    
+}
+
+@if (showAddItem && workflowId.HasValue)
+{
+    <TopPartBomItemModal
+        WorkflowId="workflowId.Value"
+        OnClose="CloseAddItem"
+        OnSaved="ItemBomSaved"
+        OnWorkflowChanged="OnWorkflowChanged" />
+}
+
+
 
 @code {
     [Parameter]
     public TopPartListItemDto? TopPart { get; set; }
 
+    [Parameter]
+    public EventCallback OnWorkflowChanged { get; set; }
+
     private List<TopPartWorkflowBomDto> bom = new();
-    private int? loadedTopPartId;
+    private int? loadedTopPartId;    
 
     private int? workflowId;
     private bool showAddPart;
@@ -136,15 +124,13 @@
             if (!workflowId.HasValue)
                 return;
 
-            bomPartOptions =
-                await TopPartWorkflowService.GetBomPartOptionsAsync(workflowId.Value);
-
             showAddPart = true;
+
+            await Task.CompletedTask;
         }
 
-    private async Task OpenAddItem()
+    private void OpenAddItem()
         {
-            bomItemOptions = await ItemService.GetSelectorAsync();
             showAddItem = true;
         }
 
@@ -186,6 +172,17 @@
             loadedTopPartId = null;
             await OnParametersSetAsync();
             StateHasChanged();
+        }
+
+    private void CloseAddItem()
+        {
+            showAddItem = false;
+        }
+
+    private async Task ItemBomSaved()
+        {
+            showAddItem = false;
+            await ReloadAsync();
         }
 
     private async Task AddBomPart()
@@ -254,5 +251,16 @@
 
                 await ReloadAsync();
             }
+
+    private void CloseAddPart()
+        {
+            showAddPart = false;
+        }
+
+    private async Task PartBomSaved()
+        {
+            showAddPart = false;
+            await ReloadAsync();
+        }
 
 }

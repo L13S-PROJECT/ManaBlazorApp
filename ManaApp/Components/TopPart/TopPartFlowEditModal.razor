@@ -3,25 +3,30 @@
 @using ManaApp.Shared.DTOs.TopPart
 @using ManaApp.Services
 @inject TopPartWorkflowService TopPartWorkflowService
+@inject IJSRuntime JS
+@using Microsoft.JSInterop
 
 <div class="modal-backdrop">
     <div class="modal-content">
 
-        <h3>Flow labošana</h3>
 
-        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        <div class="flow-edit-title">
+            <h3>Flow labošana</h3>
+
+            @if (!string.IsNullOrWhiteSpace(errorMessage))
             {
-                <div class="flow-edit-error">
-                    @errorMessage
-                </div>
+                <span class="flow-edit-warning">
+                    ⚠ @errorMessage
+                </span>
             }
 
-        @if (hasChanges)
+            @if (hasChanges)
             {
-                <div class="flow-edit-changed">
+                <span class="flow-edit-success">
                     Ir veiktas izmaiņas
-                </div>
+                </span>
             }
+        </div>
 
         @if (workflow is null)
             {
@@ -29,82 +34,226 @@
             }
         else
             {
-                <div>
-                    <input @bind="processName"
-                        placeholder="Procesa apraksts" />
+                
+               <div class="flow-edit-layout">
 
-                    <input @bind="wipName"
-                        placeholder="WIP nosaukums" />
+                <section class="flow-edit-left">
+                
+                <div class="flow-process-form 
+                    @(editingProcessNodeId.HasValue ? "flow-process-form-editing" : "")
+                    @(!editingProcessNodeId.HasValue && !CanAddProcess ? "flow-process-form-disabled" : "")">
 
-                    <input type="number"
-                        @bind="workCenterId"
-                        placeholder="WorkCenter ID" />
+                    <div class="flow-process-form-title">
+                        @(editingProcessNodeId.HasValue ? "Labot procesu" : "Pievienot procesu")
+                    </div>
 
-                    <input type="number"
-                        @bind="estimatedMinutes"
-                        placeholder="Estimated minutes" />
+                    <div class="flow-process-field">
+                        <label>Procesa nosaukums</label>
+                        <input @bind="processName"
+                        disabled="@(!editingProcessNodeId.HasValue && !CanAddProcess)" />
+                    </div>
 
-                    @if (editingProcessNodeId.HasValue)
+                    <div class="flow-process-field">
+                        <label>Rezultāts (WIP)</label>
+                        <input @bind="wipName"
+                        disabled="@(!editingProcessNodeId.HasValue && !CanAddProcess)" />
+                    </div>
+
+                    <div class="flow-process-field">
+                        <label>Darba centrs</label>
+                        <input type="number"
+                            @bind="workCenterId"
+                            disabled="@(!editingProcessNodeId.HasValue && !CanAddProcess)" />
+                    </div>
+
+                    <div class="flow-process-field">
+                        <label>Laiks (min)</label>
+                        <input type="number"
+                            @bind="estimatedMinutes"
+                            disabled="@(!editingProcessNodeId.HasValue && !CanAddProcess)" />
+                    </div>
+
+                    <div class="flow-process-field">
+                        <label>Stage</label>
+                        <select disabled>
+                            <option>—</option>
+                        </select>
+                    </div>
+
+                    <div class="flow-process-submit">
+                        @if (editingProcessNodeId.HasValue)
                         {
                             <button type="button"
                                     @onclick="UpdateProcess">
                                 Saglabāt izmaiņas
                             </button>
+
+                            <button type="button"
+                                    @onclick="CancelProcessEdit">
+                                Atcelt
+                            </button>
+
                         }
-                    else
+                        else
                         {
                             <button type="button"
+                                    disabled="@(!CanAddProcess)"
                                     @onclick="AddProcess">
                                 + Process
                             </button>
                         }
+                    </div>
 
                 </div>
 
-                <div>
-                    @foreach (var node in workflow.Nodes.OrderBy(x => x.SortOrder))
-                    {
-                        <div>
-                            @if (node.NodeType == 1 || node.NodeType == 3)
-                            {
-                                <input type="checkbox"
-                                    name="selectedNode"
-                                    value="@node.Id"
-                                    checked="@selectedNodeIds.Contains(node.Id)"
-                                    @onchange="@(() => ToggleSelectedNode(node.Id))" />
-                            }
+                <div class="flow-graph"
+                        id="workflow-graph-@WorkflowId">
 
-                            @(node.NodeType == 1 ? "TOPPART" :
-                                node.NodeType == 2 ? "PROCESS" :
-                                node.NodeType == 3 ? "WIP" :
-                                node.NodeType == 4 ? "FINISH" : "")
-                            -
-                            @node.Name
+                    <svg class="workflow-connections"
+                        id="workflow-connections-@WorkflowId">
+                    </svg>                    
 
-                            @if (node.NodeType == 2)
+                   @foreach (var level in workflow.Nodes
+                    .GroupBy(x => x.GraphLevel)
+                    .OrderBy(x => x.Key))
+                {
+                    <div class="flow-graph-level"
+    style="grid-template-columns: repeat(@((int)Math.Round(workflow.Nodes.Max(x => x.GraphColumn) * 2) + 2), minmax(90px, 1fr));">
+
+                        @foreach (var node in level.OrderBy(x => x.GraphColumn))
+                        {
+                            <div class="flow-graph-node"
+                                id="workflow-node-@node.Id"
+                                data-node-id="@node.Id"
+                                style="grid-column: @(node.NodeType == 1 || node.NodeType == 4
+                                    ? "1 / -1"
+                                    : $"{(int)Math.Round(node.GraphColumn * 2) + 1} / span 2");">
+
+                            @if (node.NodeType == 1)
                                 {
-                                    <button type="button"
-                                            @onclick="() => DeleteProcess(node.Id)">
-                                        Delete
-                                    </button>
+                                    <div class="flow-node flow-node-toppart">
 
-                                    <button type="button"
-                                            @onclick="() => SelectProcessForEdit(node)">
-                                        Labot
-                                    </button>
+                                        <input type="checkbox"
+                                            checked="@selectedNodeIds.Contains(node.Id)"
+                                            @onchange="@(() => ToggleSelectedNode(node.Id))" />
 
-                                    <button type="button"
-                                            @onclick="() => selectedProcessNodeId = node.Id">
-                                        BOM
-                                    </button>
+                                        <span class="flow-node-icon flow-node-icon-toppart">
+                                            ◆
+                                        </span>
 
-                                    var processBom = workflow.ProcessComponents
-                                        .Where(x => x.ProcessNodeId == node.Id)
-                                        .ToList();
+                                        <span class="flow-node-name">
+                                            @node.Name
+                                        </span>
 
-                                    if (processBom.Count > 0)
+                                    </div>
+                                }
+                            else if (node.NodeType == 4 &&
+                                    workflow.Connections.Any(x => x.ToNodeId == node.Id))
+                                {
+                                    <div class="flow-node flow-node-finish">
+
+                                        <span class="flow-node-icon flow-node-icon-finish">
+                                            ⚑
+                                        </span>
+
+                                        <span class="flow-node-name">
+                                            Pabeigts @workflow.Workflow.Name?.Split(" - V")[0]
+                                        </span>
+
+                                    </div>
+                                }
+                                else
+                                {
+                                    @if (node.NodeType == 3)
+                                        {
+                                            <div class="flow-node flow-node-wip">
+
+                                                @if (CanAddFinish(node))
+                                                    {
+                                                        <button type="button"
+                                                                class="flow-action-button"
+                                                                title="Pievienot FINISH"
+                                                                @onclick="() => AddFinish(node.Id)">
+                                                            ⚑
+                                                        </button>
+                                                    }
+
+                                                @if (!workflow.Connections.Any(x =>
+                                                        x.FromNodeId == node.Id &&
+                                                        workflow.Nodes.Any(n =>
+                                                            n.Id == x.ToNodeId &&
+                                                            n.NodeType == 2)))
+                                                    {
+                                                    <input type="checkbox"
+                                                        checked="@selectedNodeIds.Contains(node.Id)"
+                                                        @onchange="@(() => ToggleSelectedNode(node.Id))" />
+                                                    }
+
+                                                <span class="flow-node-icon flow-node-icon-wip">
+                                                    ●
+                                                </span>
+
+                                                <div class="flow-node-text">
+                                                    <span class="flow-node-label">Rezultāts (WIP)</span>
+                                                    <span class="flow-node-name">@node.Name</span>
+                                                </div>
+
+                                            </div>
+                                        }
+
+                                        else if (node.NodeType == 2)unchecked
+                                        {
+                                            var processBom = workflow.ProcessComponents
+                                                .Where(x => x.ProcessNodeId == node.Id)
+                                                .ToList();
+
+                                            <div class="flow-node flow-node-process 
+                                                @(editingProcessNodeId == node.Id ? "flow-node-process-selected" : "")
+                                                @(selectedProcessNodeId == node.Id ? "flow-node-process-bom-selected" : "")">
+
+                                                    <span class="flow-node-icon flow-node-icon-process">
+                                                        ⚙
+                                                    </span>
+
+                                                    <div class="flow-node-text">
+                                                        <span class="flow-node-label">Process</span>
+                                                        <span class="flow-node-name">@node.Name</span>
+                                                    </div>
+
+                                                    <div class="flow-node-actions">
+
+                                                        <button type="button"
+                                                                class="flow-action-button"
+                                                                title="Labot procesu"
+                                                                disabled="@selectedProcessNodeId.HasValue"
+                                                                @onclick="@(() => SelectProcessForEdit(node))">
+                                                            ✎
+                                                        </button>
+
+                                                        <button type="button"
+                                                                class="flow-action-button"
+                                                                title="Pievienot / labot BOM"
+                                                                disabled="@editingProcessNodeId.HasValue"
+                                                                @onclick="@(() => selectedProcessNodeId =
+                                                                selectedProcessNodeId == node.Id ? null : node.Id)">
+                                                            ◈
+                                                        </button>
+
+                                                        <button type="button"
+                                                                class="flow-action-button flow-action-delete"
+                                                                title="Dzēst procesu"
+                                                                disabled="@(editingProcessNodeId.HasValue ||
+                                                                    selectedProcessNodeId.HasValue ||
+                                                                    !CanDeleteProcess(node.Id))"
+                                                                @onclick="() => DeleteProcess(node.Id)">
+                                                            ×
+                                                        </button>
+
+                                                    </div>
+
+                                    @if (processBom.Count > 0)
                                     {
-                                        <div>
+                                        <div class="flow-node-components">
                                             @foreach (var link in processBom)
                                             {
                                                 var component = bom.FirstOrDefault(x =>
@@ -113,40 +262,113 @@
                                                 if (component is not null)
                                                 {
                                                     <div>
-                                                        ↳ @component.TopPartCode - @component.TopPartName
-                                                        | @link.Quantity
+                                                        @if (component.ComponentType == 1)
+                                                            {
+                                                                <div class="flow-component-row">
+                                                                    <span class="flow-component-icon flow-component-part">◆</span>
+
+                                                                    <span class="flow-component-name">
+                                                                        @component.TopPartCode - @component.TopPartName
+                                                                    </span>
+
+                                                                    <span class="flow-component-quantity">
+                                                                        @link.Quantity
+                                                                    </span>
+                                                                </div>
+                                                            }
+                                                            else if (component.ComponentType == 2)
+                                                            {
+                                                                <div class="flow-component-row">
+                                                                    <span class="flow-component-icon flow-component-item">■</span>
+
+                                                                    <span class="flow-component-name">
+                                                                        @component.ItemCode - @component.ItemName
+                                                                    </span>
+
+                                                                    <span class="flow-component-quantity">
+                                                                        @link.Quantity @component.ItemUnit
+                                                                    </span>
+                                                                </div>
+                                                            }
                                                     </div>
                                                 }
                                             }
                                         </div>
                                     }
+
+
+                                                </div>
+                                            }
+                                }
+
+                            @if (node.NodeType == 2)
+                                {
+                                    
                                 }
                             
                             
-                        </div>
+                       </div>
+
                     }
                 </div>
+                }
+            </div>
+                
 
-                <div class="flow-process-bom">
+               </section>
 
-                    <h4>Flow BOM</h4>
+                    <aside class="flow-edit-right">
 
-                    @foreach (var component in bom)
+                        <section class="flow-edit-parts 
+                        @(selectedProcessNodeId.HasValue ? "flow-bom-panel-active" : "flow-bom-panel-inactive")">
+
+                            <div class="flow-process-bom">
+
+        <div class="flow-bom-title">
+            <span>Flow BOM</span>
+
+            <button type="button"
+                    class="flow-bom-add-part"
+                    title="Pievienot Part Flow"
+                    @onclick="@(() => showAddPart = true)">
+                + Part
+            </button>
+
+        </div>
+
+        @if (!bom.Any(x => x.ComponentType == 1))
+{
+    <div class="flow-process-add-empty">
+        Šim Flow vēl nav pievienots neviens Part.
+    </div>
+}
+else
+{
+
+                    <div class="flow-bom-header">
+                        <span>Part</span>
+                        <span>Nepieciešams</span>
+                        <span>Izmantots</span>
+                        <span>Atlikums</span>
+                    </div>
+
+                    @foreach (var component in bom.Where(x => x.ComponentType == 1))
                         {
-                            <div>
-                                @if (component.ComponentType == 1)
-                                {
-                                    <span>@component.TopPartCode - @component.TopPartName</span>
-                                }
-                                else if (component.ComponentType == 2)
-                                {
-                                    <span>@component.ItemCode - @component.ItemName</span>
-                                }
+                            <div class="flow-bom-row">
+                                <span class="flow-bom-part">
+                                    ◆ @component.TopPartCode - @component.TopPartName
+                                </span>
 
-                                <span>
-                                    | Nepieciešams: @component.Quantity
-                                    | Izmantots: @component.UsedQuantity
-                                    | Atlikums: @component.RemainingQuantity
+                                <span class="flow-bom-qty">
+                                    @decimal.Truncate(component.Quantity)
+                                </span>
+
+                                <span class="flow-bom-used">
+                                    @decimal.Truncate(component.UsedQuantity)
+                                </span>
+
+                                <span class="flow-bom-remaining">
+                                    @decimal.Truncate(component.RemainingQuantity)
                                 </span>
                             </div>
                         }
@@ -155,10 +377,19 @@
                         {
                             <div class="flow-process-components">
 
-                                <h4>
-                                    Process BOM - @(workflow.Nodes
-                                        .FirstOrDefault(x => x.Id == selectedProcessNodeId)?.Name)
-                                </h4>
+                                <div class="flow-process-bom-title">
+                                    <span>Process BOM</span>
+                                    <strong>
+                                        @(workflow.Nodes
+                                            .FirstOrDefault(x => x.Id == selectedProcessNodeId)?.Name)
+                                    </strong>
+                                </div>
+
+                                <div class="flow-process-part-header">
+                                    <span>Part</span>
+                                    <span>Daudzums</span>
+                                    <span></span>
+                                </div>
 
                                 @foreach (var link in workflow.ProcessComponents
                                         .Where(x => x.ProcessNodeId == selectedProcessNodeId.Value))
@@ -168,21 +399,103 @@
 
                                         if (component is not null)
                                         {
-                                            <div>
-                                                <strong>Pievienots:</strong>
-                                                @component.TopPartCode - @component.TopPartName
-                                                | Daudzums: @link.Quantity
+                                            <div class="flow-process-part-row">
+                                                <span class="flow-process-part-name">
+                                                    ◆ @component.TopPartCode - @component.TopPartName
+                                                </span>
+
+                                                <span class="flow-process-part-quantity">
+                                                    @if (editingWorkflowComponentId == component.Id)
+                                                    {
+                                                        <input type="number"
+                                                            min="1"
+                                                            step="1"
+                                                            value="@decimal.Truncate(editingProcessComponentQuantity)"
+                                                            @onchange="@(e => editingProcessComponentQuantity =
+                                                                decimal.TryParse(e.Value?.ToString(), out var value) ? value : 0)" />
+                                                    }
+                                                    else
+                                                    {
+                                                        @decimal.Truncate(link.Quantity)
+                                                    }
+                                                </span>
+
+                                                <span class="flow-process-part-actions">
+                                                    @if (editingWorkflowComponentId == component.Id)
+                                                    {
+                                                        <button type="button"
+                                                                title="Saglabāt"
+                                                                @onclick="SaveProcessComponentEdit">
+                                                            ✓
+                                                        </button>
+
+                                                        <button type="button"
+                                                                title="Atcelt"
+                                                                @onclick="CancelProcessComponentEdit">
+                                                            ↶
+                                                        </button>
+
+                                                        <button type="button"
+                                                                title="Atvienot Part"
+                                                                @onclick="@(() => DeleteProcessComponent(component.Id))">
+                                                            ×
+                                                        </button>
+                                                    }
+                                                    else
+                                                    {
+                                                        <button type="button"
+                                                                title="Labot daudzumu"
+                                                                @onclick="@(() =>
+                                                                {
+                                                                    editingWorkflowComponentId = component.Id;
+                                                                    editingProcessComponentQuantity = link.Quantity;
+                                                                })">
+                                                            ✎
+                                                        </button>
+
+                                                        <button type="button"
+                                                                title="Atvienot Part"
+                                                                @onclick="@(() => DeleteProcessComponent(component.Id))">
+                                                            ×
+                                                        </button>
+                                                    }
+                                                </span>
+
                                             </div>
                                         }
                                     }
 
-                                @foreach (var component in bom)
+                                
+
+                                <div class="flow-process-add-title">
+                                    Pievienot Part procesam
+                                </div>
+
+                                @if (bom.Any(x => x.ComponentType == 1 && x.RemainingQuantity > 0))
+                                    {
+                                        <div class="flow-process-add-header">
+                                            <span>Part</span>
+                                            <span>Atlikums</span>
+                                            <span></span>
+                                        </div>
+                                    }
+
+                                @if (!bom.Any(x => x.ComponentType == 1 && x.RemainingQuantity > 0))
+                                    {
+                                        <div class="flow-process-add-empty">
+                                            Nav Part, ko pievienot šim procesam.
+                                        </div>
+                                    }
+
+                                @foreach (var component in bom.Where(x =>
+                                        x.ComponentType == 1 &&
+                                        x.RemainingQuantity > 0))
                                     {
                                         var alreadyAddedToProcess = workflow.ProcessComponents.Any(x =>
                                             x.ProcessNodeId == selectedProcessNodeId.Value &&
                                             x.WorkflowComponentId == component.Id);
 
-                                        <div>
+                                        <div class="flow-process-add-row">
                                             @if (component.ComponentType == 1)
                                             {
                                                 <span>@component.TopPartCode - @component.TopPartName</span>
@@ -192,22 +505,26 @@
                                                 <span>@component.ItemCode - @component.ItemName</span>
                                             }
 
-                                            <span>| Atlikums: @component.RemainingQuantity</span>
+                                            <span class="flow-process-add-remaining">
+                                                @decimal.Truncate(component.RemainingQuantity)
+                                            </span>
 
                                             @if (component.RemainingQuantity > 0 && !alreadyAddedToProcess)
                                             {
                                                 <button type="button"
-                                                        @onclick="() => selectedWorkflowComponentId = component.Id">
+                                                        class="flow-process-add-button"
+                                                        title="Pievienot Part procesam"
+                                                        @onclick="@(() => selectedWorkflowComponentId = component.Id)">
                                                     Pievienot
                                                 </button>
                                             }
 
                                             @if (selectedWorkflowComponentId == component.Id)
                                             {
-                                                <div>
+                                                <div class="flow-process-add-quantity">
                                                     <input type="number"
-                                                        min="0.01"
-                                                        step="0.01"
+                                                        min="1"
+                                                        step="1"
                                                         @bind="processComponentQuantity" />
 
                                                     <button type="button"
@@ -221,55 +538,278 @@
 
                             </div>
                         }
-
+}
                 </div>
-            }
+
+                        </section>
+
+                        <section class="flow-edit-items 
+                            @(selectedProcessNodeId.HasValue ? "flow-bom-panel-active" : "flow-bom-panel-inactive")">
+
+                            <div class="flow-process-bom">
+
+                                <div class="flow-bom-title">
+                                    <span>Flow BOM</span>
+
+                                    <button type="button"
+                                            class="flow-bom-add-part"
+                                            title="Pievienot Item Flow"
+                                            @onclick="@(() => showAddItem = true)">
+                                        + Item
+                                    </button>
+
+                                </div>
+
+                                @if (!bom.Any(x => x.ComponentType == 2))
+                                {
+                                    <div class="flow-process-add-empty">
+                                        Šim Flow vēl nav pievienots neviens Item.
+                                    </div>
+                                }
+                                else
+                                {
+                        
+                                    <div class="flow-bom-header">
+                                        <span>Item</span>
+                                        <span>Nepieciešams</span>
+                                        <span>Izmantots</span>
+                                        <span>Atlikums</span>
+                                    </div>
+                               
+
+                                 @foreach (var component in bom.Where(x => x.ComponentType == 2))
+                                    {
+                                        <div class="flow-bom-row @(selectedProcessNodeId.HasValue ? "" : "flow-bom-row-summary")">
+                                            <span class="flow-bom-part">
+                                                ■ @component.ItemCode - @component.ItemName
+                                            </span>
+
+                                            <span class="flow-bom-qty">
+                                                @component.Quantity.ToString("0.##", new System.Globalization.CultureInfo("lv-LV")) @component.ItemUnit
+                                            </span>
+
+                                            <span class="flow-bom-used">
+                                                @component.UsedQuantity.ToString("0.##", new System.Globalization.CultureInfo("lv-LV")) @component.ItemUnit
+                                            </span>
+
+                                            <span class="flow-bom-remaining">
+                                                @component.RemainingQuantity @component.ItemUnit
+                                            </span>
+
+                                        </div>
+                                    }
+                                }
+
+                                @if (selectedProcessNodeId.HasValue)
+                                    {
+                                        <div class="flow-process-components">
+
+                                            <div class="flow-process-bom-title">
+                                                <span>Process BOM</span>
+                                                <strong>
+                                                    @(workflow.Nodes
+                                                        .FirstOrDefault(x => x.Id == selectedProcessNodeId)?.Name)
+                                                </strong>
+                                            </div>
+
+                                            <div class="flow-process-part-header">
+                                                <span>Item</span>
+                                                <span>Daudzums</span>
+                                                <span></span>
+                                            </div>
+
+                                        </div>
+                                    }
+                                    
+
+                            </div>
+
+                            @foreach (var link in workflow.ProcessComponents
+                                .Where(x => x.ProcessNodeId == selectedProcessNodeId))
+                            {
+                                var component = bom.FirstOrDefault(x =>
+                                    x.Id == link.WorkflowComponentId);
+
+                                if (component is not null && component.ComponentType == 2)
+                                {
+                                    <div class="flow-process-part-row">
+                                        <span class="flow-process-part-name">
+                                            ■ @component.ItemCode - @component.ItemName
+                                        </span>
+
+                                        <span class="flow-process-part-quantity">
+                                            @if (editingWorkflowComponentId == component.Id)
+                                            {
+                                                <input type="number"
+                                                    min="0.01"
+                                                    step="any"
+                                                    @bind="editingProcessComponentQuantity" />
+                                            }
+                                            else
+                                            {
+                                                @link.Quantity @component.ItemUnit
+                                            }
+                                        </span>
+
+                                        <span class="flow-process-part-actions">
+                                            @if (editingWorkflowComponentId == component.Id)
+                                            {
+                                                <button type="button"
+                                                        title="Saglabāt"
+                                                        @onclick="SaveProcessComponentEdit">
+                                                    ✓
+                                                </button>
+
+                                                <button type="button"
+                                                        title="Atcelt"
+                                                        @onclick="CancelProcessComponentEdit">
+                                                    ↶
+                                                </button>
+
+                                                <button type="button"
+                                                        title="Atvienot Item"
+                                                        @onclick="@(() => DeleteProcessComponent(component.Id))">
+                                                    ×
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button type="button"
+                                                        title="Labot daudzumu"
+                                                        @onclick="@(() =>
+                                                        {
+                                                            editingWorkflowComponentId = component.Id;
+                                                            editingProcessComponentQuantity = link.Quantity;
+                                                        })">
+                                                    ✎
+                                                </button>
+
+                                                <button type="button"
+                                                        title="Atvienot Item"
+                                                        @onclick="@(() => DeleteProcessComponent(component.Id))">
+                                                    ×
+                                                </button>
+                                            }
+                                        </span>
+                                    </div>
+                                }
+                            }
+
+                        @if (selectedProcessNodeId.HasValue)
+                            {
+
+                            <div class="flow-process-add-title">
+                                Pievienot Item procesam
+                            </div>
+
+                            @if (bom.Any(x => x.ComponentType == 2 && x.RemainingQuantity > 0))
+                                {
+                                    <div class="flow-process-add-header">
+                                        <span>Item</span>
+                                        <span>Atlikums</span>
+                                        <span></span>
+                                    </div>
+                                }
+
+                            @if (!bom.Any(x => x.ComponentType == 2 && x.RemainingQuantity > 0))
+                                {
+                                    <div class="flow-process-add-empty">
+                                        Nav Item, ko pievienot šim procesam.
+                                    </div>
+                                }
+
+                            @foreach (var component in bom.Where(x =>
+                                    x.ComponentType == 2 &&
+                                    x.RemainingQuantity > 0))
+                                {
+                                    var alreadyAddedToProcess = workflow.ProcessComponents.Any(x =>
+                                        x.ProcessNodeId == selectedProcessNodeId &&
+                                        x.WorkflowComponentId == component.Id);
+
+                                    <div class="flow-process-add-row">
+                                        <span>
+                                            @component.ItemCode - @component.ItemName
+                                        </span>
+
+                                        <span class="flow-process-add-remaining">
+                                            @component.RemainingQuantity @component.ItemUnit
+                                        </span>
+
+                                        @if (component.RemainingQuantity > 0 && !alreadyAddedToProcess)
+                                            {
+                                                <button type="button"
+                                                        class="flow-process-add-button"
+                                                        title="Pievienot Item procesam"
+                                                        @onclick="@(() => selectedWorkflowComponentId = component.Id)">
+                                                    Pievienot
+                                                </button>
+
+                                                @if (selectedWorkflowComponentId == component.Id)
+                                                    {
+                                                        <div class="flow-process-add-quantity">
+                                                            <input type="number"
+                                                                min="0"
+                                                                step="any"
+                                                                @bind="processComponentQuantity" />
+
+                                                            <button type="button"
+                                                                    @onclick="AddProcessComponent">
+                                                                Apstiprināt
+                                                            </button>
+                                                        </div>
+                                                    }
+                                            }
+                                    </div>
+                                }
+
+                            }
+
+                        </section>
+
+                    </aside>
+
+                </div> 
+    }
 
             
+        <div class="flow-edit-footer">
+            <button type="button"
+                    class="flow-edit-save"
+                    @onclick="ReleaseFlow">
+                Saglabāt
+            </button>
 
-        <button type="button"
-                @onclick="ReleaseFlow">
-            Saglabāt
-        </button>
-
-        <button type="button" @onclick="Close">
-            Aizvērt
-        </button>
+            <button type="button"
+                    class="flow-edit-close"
+                    @onclick="Close">
+                Aizvērt
+            </button>
+        </div>
 
     </div>
 </div>
 
-@if (showReleaseConfirmation)
+@if (showAddPart)
     {
-        <div class="modal-backdrop">
-            <div class="modal-content">
-
-                <h3>Apstiprināt jauno Flow versiju</h3>
-
-                <p>
-                    Tiks izveidota jauna RELEASED Flow versija.
-                    Tā kļūs par aktuālo versiju.
-                </p>
-
-                <label>Izmaiņu komentārs</label>
-
-                <textarea rows="4"
-                        @bind="releaseDescription">
-                </textarea>
-
-                <button type="button"
-                        @onclick="ConfirmRelease">
-                    Labi
-                </button>
-
-                <button type="button"
-                        @onclick="() => showReleaseConfirmation = false">
-                    Atcelt
-                </button>
-
-            </div>
-        </div>
+        <TopPartBomPartModal
+            WorkflowId="WorkflowId"
+            OnClose="@(() => showAddPart = false)"
+            OnSaved="FlowPartBomSaved" />
     }
+
+@if (showAddItem)
+    {
+        <TopPartBomItemModal
+            WorkflowId="WorkflowId"
+            OnClose="@(() => showAddItem = false)"
+            OnSaved="FlowItemBomSaved" />
+    }
+
+<TopPartFlowReleaseConfirmationModal
+    IsVisible="showReleaseConfirmation"
+    ErrorMessage="@errorMessage"
+    OnConfirm="ConfirmRelease"
+    OnCancel="@(() => showReleaseConfirmation = false)" />
 
 @code {
     [Parameter]
@@ -277,6 +817,10 @@
 
     [Parameter]
     public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback OnWorkflowChanged { get; set; }
+
     private string processName = "";
     private string wipName = "";
     private int workCenterId;
@@ -287,12 +831,126 @@
     private string? errorMessage;
     private bool hasChanges;
     private bool showReleaseConfirmation;
-    private string releaseDescription = "";
     private int? selectedProcessNodeId;
 
     private int? selectedWorkflowComponentId;
     private decimal processComponentQuantity = 1;
+
+    private int? editingWorkflowComponentId;
+    private decimal editingProcessComponentQuantity;    
     private List<TopPartWorkflowBomDto> bom = new();
+    private bool showAddPart;
+    private bool showAddItem;
+    private bool redrawGraph;
+
+    private void RequestGraphRedraw()
+        {
+            redrawGraph = true;
+        }
+
+    protected override async Task OnAfterRenderAsync(
+            bool firstRender)
+        {
+            if (!redrawGraph || workflow is null)
+                return;
+
+            redrawGraph = false;
+
+            await JS.InvokeVoidAsync(
+                "workflowGraph.drawAfterLayout",
+                WorkflowId,
+                workflow.Connections);
+
+            await JS.InvokeVoidAsync(
+                "workflowGraph.observe",
+                WorkflowId);
+        }
+
+    private void CancelProcessComponentEdit()
+        {
+            editingWorkflowComponentId = null;
+            editingProcessComponentQuantity = 0;
+        }
+
+    private async Task SaveProcessComponentEdit()
+        {
+            if (!selectedProcessNodeId.HasValue ||
+                !editingWorkflowComponentId.HasValue)
+                return;
+
+            var component = bom.FirstOrDefault(x =>
+                x.Id == editingWorkflowComponentId.Value);
+
+            if (component?.ComponentType == 1 &&
+                editingProcessComponentQuantity != decimal.Truncate(editingProcessComponentQuantity))
+            {
+                errorMessage = "Part daudzumam jābūt veselam skaitlim.";
+                return;
+            }
+
+            var request = new UpdateTopPartProcessComponentRequest
+            {
+                ProcessNodeId = selectedProcessNodeId.Value,
+                WorkflowComponentId = editingWorkflowComponentId.Value,
+                Quantity = editingProcessComponentQuantity
+            };
+
+            var updated = await TopPartWorkflowService.UpdateProcessComponentAsync(
+                WorkflowId,
+                request);
+
+            if (!updated)
+            {
+                errorMessage = TopPartWorkflowService.LastError;
+                return;
+            }
+
+            errorMessage = null;
+            hasChanges = true;
+
+            workflow = await TopPartWorkflowService.GetWorkflowAsync(WorkflowId);
+            bom = await TopPartWorkflowService.GetBomAsync(WorkflowId);
+
+            RequestGraphRedraw();
+
+            editingWorkflowComponentId = null;
+            editingProcessComponentQuantity = 0;
+        }
+
+    private async Task DeleteProcessComponent(int workflowComponentId)
+        {
+            if (!selectedProcessNodeId.HasValue)
+                return;
+
+            var deleted = await TopPartWorkflowService.DeleteProcessComponentAsync(
+                WorkflowId,
+                selectedProcessNodeId.Value,
+                workflowComponentId);
+
+            if (!deleted)
+            {
+                errorMessage = TopPartWorkflowService.LastError;
+                return;
+            }
+
+            errorMessage = null;
+            hasChanges = true;
+
+            workflow = await TopPartWorkflowService.GetWorkflowAsync(WorkflowId);
+            bom = await TopPartWorkflowService.GetBomAsync(WorkflowId);
+
+            RequestGraphRedraw();
+
+            editingWorkflowComponentId = null;
+            editingProcessComponentQuantity = 0;
+        }
+
+    private bool CanAddProcess =>
+        workflow is not null &&
+        selectedNodeIds.Any(id =>
+            workflow.Nodes.Any(node =>
+                node.Id == id &&
+                (node.NodeType == 1 || node.NodeType == 3)));
     protected override async Task OnInitializedAsync()
         {
             workflow =
@@ -300,6 +958,8 @@
             
             bom =
                 await TopPartWorkflowService.GetBomAsync(WorkflowId);
+
+            RequestGraphRedraw();
 
         }
 
@@ -336,6 +996,8 @@
 
             workflow = await TopPartWorkflowService.GetWorkflowAsync(WorkflowId);
 
+            RequestGraphRedraw();
+
             processName = "";
             wipName = "";
             workCenterId = 0;
@@ -362,6 +1024,9 @@
             hasChanges = true;
 
             workflow = await TopPartWorkflowService.GetWorkflowAsync(WorkflowId);
+            bom = await TopPartWorkflowService.GetBomAsync(WorkflowId);
+
+            RequestGraphRedraw();
 
             selectedNodeIds.Clear();
         }
@@ -406,6 +1071,8 @@
 
             workflow = await TopPartWorkflowService.GetWorkflowAsync(WorkflowId);
 
+            RequestGraphRedraw();
+
             editingProcessNodeId = null;
             processName = "";
             workCenterId = 0;
@@ -418,7 +1085,7 @@
                 return;
 
             errorMessage = null;
-            releaseDescription = "";
+            
             showReleaseConfirmation = true;
         }
 
@@ -428,6 +1095,16 @@
             if (!selectedProcessNodeId.HasValue ||
                 !selectedWorkflowComponentId.HasValue)
                 return;
+
+            var component = bom.FirstOrDefault(x =>
+                x.Id == selectedWorkflowComponentId.Value);
+
+            if (component?.ComponentType == 1 &&
+                processComponentQuantity != decimal.Truncate(processComponentQuantity))
+            {
+                errorMessage = "Part daudzumam jābūt veselam skaitlim.";
+                return;
+            }
 
             var request = new AddTopPartProcessComponentRequest
             {
@@ -452,6 +1129,8 @@
             workflow = await TopPartWorkflowService.GetWorkflowAsync(WorkflowId);
             bom = await TopPartWorkflowService.GetBomAsync(WorkflowId);
 
+            RequestGraphRedraw();
+
             selectedWorkflowComponentId = null;
             processComponentQuantity = 1;
         }
@@ -464,12 +1143,12 @@
                     selectedNodeIds.Add(nodeId);
             }
 
-        private async Task ConfirmRelease()
+        private async Task ConfirmRelease(string description)
             {
                 if (workflow is null)
                     return;
 
-                if (string.IsNullOrWhiteSpace(releaseDescription))
+                if (string.IsNullOrWhiteSpace(description))
                 {
                     errorMessage = "Izmaiņu komentārs ir obligāts.";
                     return;
@@ -477,7 +1156,7 @@
 
                 var released = await TopPartWorkflowService.ReleaseAsync(
                     workflow.Workflow.Id,
-                    releaseDescription);
+                    description);
 
                 if (!released)
                 {
@@ -489,6 +1168,105 @@
                 showReleaseConfirmation = false;
 
                 await OnClose.InvokeAsync();
+            }
+
+        private void CancelProcessEdit()
+        {
+            editingProcessNodeId = null;
+            processName = "";
+            wipName = "";
+            workCenterId = 0;
+            estimatedMinutes = 0;
+        }
+
+        private async Task FlowPartBomSaved()
+            {
+                showAddPart = false;
+
+                bom = await TopPartWorkflowService.GetBomAsync(WorkflowId);
+                workflow = await TopPartWorkflowService.GetWorkflowAsync(WorkflowId);
+
+                RequestGraphRedraw();
+
+                hasChanges = true;
+
+                await OnWorkflowChanged.InvokeAsync();
+            }
+
+        private async Task FlowItemBomSaved()
+            {
+                showAddItem = false;
+
+                bom = await TopPartWorkflowService.GetBomAsync(WorkflowId);
+                workflow = await TopPartWorkflowService.GetWorkflowAsync(WorkflowId);
+
+                RequestGraphRedraw();
+
+                hasChanges = true;
+
+                await OnWorkflowChanged.InvokeAsync();
+            }
+
+        private bool CanAddFinish(TopPartWorkflowNodeDto node)
+{
+    if (workflow is null || node.NodeType != 3)
+        return false;
+
+    var freeWips = workflow.Nodes
+        .Where(x => x.NodeType == 3)
+        .Where(wip =>
+            !workflow.Connections.Any(x => x.FromNodeId == wip.Id))
+        .ToList();
+
+    return freeWips.Count == 1 &&
+           freeWips[0].Id == node.Id;
+}
+
+    private async Task AddFinish(int wipNodeId)
+        {
+            if (workflow is null)
+                return;
+
+            var request = new AddTopPartFinishRequest
+            {
+                WorkflowId = workflow.Workflow.Id,
+                WipNodeId = wipNodeId
+            };
+
+            var added = await TopPartWorkflowService.AddFinishAsync(request);
+
+            if (!added)
+            {
+                errorMessage = TopPartWorkflowService.LastError;
+                return;
+            }
+
+            errorMessage = null;
+            hasChanges = true;
+
+            workflow = await TopPartWorkflowService.GetWorkflowAsync(WorkflowId);
+
+            RequestGraphRedraw();
+        }
+
+        private bool CanDeleteProcess(int processNodeId)
+            {
+                if (workflow is null)
+                    return false;
+
+                var outputWipId = workflow.Connections
+                    .Where(x => x.FromNodeId == processNodeId)
+                    .Select(x => x.ToNodeId)
+                    .FirstOrDefault();
+
+                if (outputWipId == 0)
+                    return false;
+
+                return !workflow.Connections.Any(connection =>
+                    connection.FromNodeId == outputWipId &&
+                    workflow.Nodes.Any(node =>
+                        node.Id == connection.ToNodeId &&
+                        node.NodeType == 2));
             }
 
 }

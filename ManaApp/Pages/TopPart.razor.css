@@ -23,6 +23,10 @@
     min-height: 0;
 }
 
+.toppart-details {
+    gap: 3px;
+}
+
 .toppart-toolbar,
 .toppart-flow-toolbar {
     flex: 0 0 auto;
@@ -49,7 +53,7 @@
 .toppart-flow-section {
     flex: 1;
     min-height: 0;
-    overflow: auto;
+    overflow: hidden;
 }
 
 .toppart-modal-backdrop {

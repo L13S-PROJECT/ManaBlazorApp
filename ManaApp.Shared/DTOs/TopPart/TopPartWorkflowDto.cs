@@ -33,6 +33,9 @@ public class TopPartWorkflowNodeDto
     public int? EstimatedMinutes { get; set; }
     public string? Comments { get; set; }
     public int SortOrder { get; set; }
+
+    public int GraphLevel { get; set; }
+    public decimal GraphColumn { get; set; }
 }
 
 public class TopPartWorkflowConnectionDto
@@ -78,5 +81,11 @@ public class TopPartWorkflowProcessComponentDto
     public int ProcessNodeId { get; set; }
     public int WorkflowComponentId { get; set; }
     public decimal Quantity { get; set; }
+}
+
+public class AddTopPartFinishRequest
+{
+    public int WorkflowId { get; set; }
+    public int WipNodeId { get; set; }
 }
 

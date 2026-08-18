@@ -1,0 +1,70 @@
+@* TopPartFlowReleaseConfirmationModal.razor *@
+
+@if (IsVisible)
+{
+    <div class="modal-backdrop">
+        <div class="flow-release-modal">
+            <h3>Apstiprināt jauno Flow versiju</h3>
+
+            <p>
+                Tiks izveidota jauna RELEASED Flow versija.
+                Tā kļūs par aktuālo versiju.
+            </p>
+
+            @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+                {
+                    <div class="flow-release-error">
+                        ⚠ @ErrorMessage
+                    </div>
+                }
+
+            <div class="flow-release-comment">
+                <label>Izmaiņu komentārs</label>
+
+                <textarea rows="4"
+                        @bind="description">
+                </textarea>
+            </div>
+
+            <div class="flow-release-actions">
+            <button type="button"
+                    class="flow-release-confirm"
+                    @onclick="Confirm">
+                Labi
+            </button>
+
+            <button type="button"
+                    class="flow-release-cancel"
+                    @onclick="Cancel">
+                Atcelt
+            </button>
+        </div>
+
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnConfirm { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    [Parameter]
+    public string? ErrorMessage { get; set; }
+
+    private string description = "";
+    private Task Confirm()
+    {
+        return OnConfirm.InvokeAsync(description);
+    }
+
+    private Task Cancel()
+    {
+        return OnCancel.InvokeAsync();
+    }
+}

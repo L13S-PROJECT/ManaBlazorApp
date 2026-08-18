@@ -1,0 +1,42 @@
+/* @* TopPartFlowViewModal.razor.css *@ */
+
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    width: 1200px;
+    max-width: 95vw;
+    height: 92vh;
+    background: white;
+    border: 1px solid #999;
+    padding: 16px;
+    box-sizing: border-box;
+
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.flow-graph {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+
+    padding: 12px;
+    border: 1px dashed #d5d5d5;
+    border-radius: 5px;
+    background: #fff;
+}

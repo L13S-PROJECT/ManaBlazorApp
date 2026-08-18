@@ -7,7 +7,27 @@
 
     background: #fff;
     border: 1px solid #d9dde3;
+    border-left: 4px solid #5f9b7f;
     border-radius: 6px;
+
+    position: relative;
+    border-left: 4px solid #5f9b7f;
+}
+
+.toppart-flow-details::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    left: 0;
+    width: 45%;
+    height: 2px;
+
+    background: linear-gradient(
+        to right,
+        #5f9b7f 0%,
+        rgba(95, 155, 127, 0.45) 55%,
+        transparent 100%
+    );
 }
 
 .toppart-info-header {

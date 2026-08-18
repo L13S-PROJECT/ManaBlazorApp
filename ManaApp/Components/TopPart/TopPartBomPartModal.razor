@@ -1,0 +1,263 @@
+@using ManaApp.Shared.DTOs.TopPart
+@using ManaApp.Services
+@inject TopPartWorkflowService TopPartWorkflowService
+
+<div class="bom-modal-backdrop">
+
+    <div class="bom-modal">
+
+        <div class="bom-modal-header">
+            <span>Pievienot PART</span>
+
+            <button type="button"
+                    class="bom-modal-close"
+                    @onclick="Close">
+                ×
+            </button>
+        </div>
+
+        <div class="bom-modal-search">
+            <input type="text"
+                   placeholder="Meklēt pēc koda vai nosaukuma..."
+                   @bind="searchText"
+                   @bind:event="oninput" />
+        </div>
+
+        @if (parts.Count > 0 && !CanEdit)
+            {
+                <div class="bom-modal-warning">
+                    BOM labošana pieejama tikai DRAFT Workflow.
+                </div>
+            }
+
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                <div class="bom-modal-error">
+                    @errorMessage
+                </div>
+            }
+
+        <div class="bom-modal-list">
+
+            @foreach (var part in FilteredParts)
+            {
+                <div class="bom-modal-row">
+
+                    <input type="checkbox"
+                        checked="@part.IsSelected"
+                        @onchange="e => PartSelectionChanged(part, e)" />
+
+                    <div class="bom-modal-part">
+                        <span class="bom-modal-code">
+                            @part.TopPartCode
+                        </span>
+
+                        <span class="bom-modal-name">
+                            @part.TopPartName
+                        </span>
+                    </div>
+
+                    <input type="number"
+                        value="@part.Quantity.ToString("0")"
+                        @onchange="e => PartQuantityChanged(part, e)"
+                        class="bom-modal-quantity"
+                        min="1"
+                        step="1"
+                        disabled="@(!CanEdit || !part.IsSelected)" />
+
+                </div>
+            }
+
+        </div>
+
+        <div class="bom-modal-actions">
+
+            @if (!CanEdit)
+                {
+                    <button type="button"
+                            @onclick="OpenEditConfirmation">
+                        Labot
+                    </button>
+                }
+            
+            <button type="button"
+                    @onclick="Close">
+                Atcelt
+            </button>
+
+            <button type="button"
+                    disabled="@(!CanEdit)"
+                    @onclick="Save">
+                Saglabāt
+            </button>
+
+        </div>
+
+    </div>
+
+    @if (showEditConfirmation)
+        {
+            <div class="bom-edit-confirm">
+
+                <div class="bom-edit-confirm-box">
+
+                    <div>
+                        Tiks izveidots jauns DRAFT no šī RELEASED Workflow.
+                        Turpināt?
+                    </div>
+
+                    <div class="bom-edit-confirm-actions">
+
+                        <button type="button"
+                                @onclick="ConfirmEdit">
+                            OK
+                        </button>
+
+                        <button type="button"
+                                @onclick="CancelEdit">
+                            Atcelt
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+        }
+
+</div>
+
+@code {
+    [Parameter]
+    public int WorkflowId { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback OnSaved { get; set; }
+
+    [Parameter]
+    public EventCallback OnWorkflowChanged { get; set; }
+
+    private List<TopPartBomPartSelectorDto> parts = new();
+    private string searchText = "";
+
+    private string? errorMessage;
+
+    private IEnumerable<TopPartBomPartSelectorDto> FilteredParts =>
+        string.IsNullOrWhiteSpace(searchText)
+            ? parts
+            : parts.Where(x =>
+                x.TopPartCode.Contains(
+                    searchText,
+                    StringComparison.OrdinalIgnoreCase) ||
+                x.TopPartName.Contains(
+                    searchText,
+                    StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        parts = await TopPartWorkflowService
+            .GetBomPartSelectorAsync(WorkflowId);
+    }
+
+    private Task Close()
+    {
+        return OnClose.InvokeAsync();
+    }
+
+    private async Task Save()
+    {
+        var request = new SaveTopPartBomPartsRequest
+        {
+            Parts = parts
+                .Where(x => x.IsSelected)
+                .Select(x => new SaveTopPartBomPartDto
+                {
+                    TopPartId = x.TopPartId,
+                    Quantity = x.Quantity
+                })
+                .ToList()
+        };
+
+        var saved = await TopPartWorkflowService
+            .SaveBomPartsAsync(WorkflowId, request);
+
+        if (!saved)
+            {
+                errorMessage = TopPartWorkflowService.LastError;
+                return;
+            }
+
+        errorMessage = null;
+
+        await OnSaved.InvokeAsync();
+    }
+
+    private void PartSelectionChanged(
+            TopPartBomPartSelectorDto part,
+            ChangeEventArgs e)
+        {
+            part.IsSelected = e.Value is bool value && value;
+
+            if (part.IsSelected && part.Quantity <= 0)
+            {
+                part.Quantity = 1;
+            }
+        }
+
+    private bool CanEdit =>
+        parts.Count > 0 && parts.All(x => x.CanEdit);
+
+    private bool showEditConfirmation;
+
+        private void OpenEditConfirmation()
+        {
+            showEditConfirmation = true;
+        }
+
+    private async Task ConfirmEdit()
+        {
+            errorMessage = null;
+
+            var draftWorkflowId =
+                await TopPartWorkflowService.EditAsync(WorkflowId);
+
+            if (!draftWorkflowId.HasValue)
+            {
+                showEditConfirmation = false;
+                errorMessage = TopPartWorkflowService.LastError;
+                return;
+            }
+
+            WorkflowId = draftWorkflowId.Value;
+            showEditConfirmation = false;
+
+            parts = await TopPartWorkflowService
+                .GetBomPartSelectorAsync(WorkflowId);
+
+            await OnWorkflowChanged.InvokeAsync();
+        }
+    private async Task CancelEdit()
+        {
+            showEditConfirmation = false;
+
+        }
+
+    private void PartQuantityChanged(
+            TopPartBomPartSelectorDto part,
+            ChangeEventArgs e)
+        {
+            if (int.TryParse(e.Value?.ToString(), out var quantity) &&
+                quantity >= 1)
+            {
+                part.Quantity = quantity;
+            }
+            else
+            {
+                part.Quantity = 1;
+            }
+        }
+
+}

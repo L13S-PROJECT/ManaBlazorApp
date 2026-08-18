@@ -1,0 +1,77 @@
+.flow-release-modal {
+    width: 480px;
+    max-width: calc(100vw - 32px);
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.flow-release-comment {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 16px;
+}
+
+.flow-release-comment label {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.flow-release-comment textarea {
+    width: 100%;
+    min-height: 90px;
+    padding: 8px;
+    box-sizing: border-box;
+    resize: vertical;
+}
+
+.flow-release-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.flow-release-actions button {
+    height: 34px;
+    padding: 0 16px;
+    border-radius: 5px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.flow-release-confirm {
+    border: 1px solid #2563eb;
+    background: #2563eb;
+    color: #fff;
+}
+
+.flow-release-confirm:hover {
+    background: #1d4ed8;
+}
+
+.flow-release-cancel {
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #374151;
+}
+
+.flow-release-cancel:hover {
+    background: #f3f4f6;
+    border-color: #94a3b8;
+}
+
+.flow-release-error {
+    margin-top: 12px;
+    padding: 8px 10px;
+    border: 1px solid #fecaca;
+    border-radius: 5px;
+    background: #fef2f2;
+    color: #dc2626;
+    font-size: 13px;
+    font-weight: 600;
+}

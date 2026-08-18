@@ -6,3 +6,10 @@ public class AddTopPartProcessComponentRequest
     public int WorkflowComponentId { get; set; }
     public decimal Quantity { get; set; }
 }
+
+public class UpdateTopPartProcessComponentRequest
+{
+    public int ProcessNodeId { get; set; }
+    public int WorkflowComponentId { get; set; }
+    public decimal Quantity { get; set; }
+}
