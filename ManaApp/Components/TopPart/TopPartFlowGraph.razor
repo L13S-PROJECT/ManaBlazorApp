@@ -1,0 +1,218 @@
+@using ManaApp.Shared.DTOs.TopPart
+
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+
+@if (Workflow is not null)
+{
+    <div class="flow-graph"
+         id="workflow-graph-@WorkflowId">
+
+        <svg class="workflow-connections"
+             id="workflow-connections-@WorkflowId">
+        </svg>
+
+        @foreach (var level in Workflow.Nodes
+            .GroupBy(x => x.GraphLevel)
+            .OrderBy(x => x.Key))
+        {
+            <div class="flow-graph-level"
+                 style="grid-template-columns: repeat(@((int)Math.Round(Workflow.Nodes.Max(x => x.GraphColumn) * 2) + 2), minmax(90px, 1fr));">
+
+                @foreach (var node in level.OrderBy(x => x.GraphColumn))
+                {
+                    <div class="flow-graph-node"
+                         id="workflow-node-@node.Id"
+                         data-node-id="@node.Id"
+                         style="grid-column: @(node.NodeType == 1 || node.NodeType == 4
+                             ? "1 / -1"
+                             : $"{(int)Math.Round(node.GraphColumn * 2) + 1} / span 2");">
+
+                        @if (node.NodeType == 1)
+                        {
+                            <div class="flow-node flow-node-toppart">
+                                <span class="flow-node-icon flow-node-icon-toppart">◆</span>
+                                <span class="flow-node-name">@node.Name</span>
+                            </div>
+                        }
+                        else if (node.NodeType == 2)
+                        {
+                            var processItems = Workflow.ProcessComponents
+                                .Where(x => x.ProcessNodeId == node.Id)
+                                .Select(link => new
+                                {
+                                    Link = link,
+                                    Component = Bom.FirstOrDefault(b =>
+                                        b.Id == link.WorkflowComponentId &&
+                                        b.ComponentType == 2)
+                                })
+                                .Where(x => x.Component is not null)
+                                .ToList();
+
+                            var processParts = Workflow.ProcessComponents
+                                .Where(x => x.ProcessNodeId == node.Id)
+                                .Select(link => new
+                                {
+                                    Link = link,
+                                    Component = Bom.FirstOrDefault(b =>
+                                        b.Id == link.WorkflowComponentId &&
+                                        b.ComponentType == 1)
+                                })
+                                .Where(x => x.Component is not null)
+                                .ToList();
+                            
+                            <div class="flow-node flow-node-process @GetStageClass(node.StepTypeName)">
+                                <span class="flow-node-icon flow-node-icon-process">⚙</span>
+
+                                <div class="flow-node-text">
+                                    <span class="flow-node-label">
+                                        @(string.IsNullOrWhiteSpace(node.WorkCenterName)
+                                            ? "Process"
+                                            : node.EstimatedMinutes.HasValue
+                                                ? $"{node.WorkCenterName} ({node.EstimatedMinutes} min)"
+                                                : node.WorkCenterName)
+                                    </span>
+                                    <span class="flow-node-name">@node.Name</span>
+                                </div>
+
+                                @if (processParts.Any())
+                                    {
+                                        <div class="flow-node-components">
+
+                                            @foreach (var part in processParts)
+                                            {
+                                                <div class="flow-component-row">
+
+                                                    @if (part.Component!.ReferencedWorkflowId.HasValue)
+                                                        {
+                                                            <button type="button"
+                                                                    class="flow-component-open"
+                                                                    title="Apskatīt Part Flow"
+                                                                    aria-label="Apskatīt Part Flow"
+                                                                    @onclick="() => OnWorkflowOpenRequested.InvokeAsync(
+                                                                        (part.Component.ReferencedWorkflowId.Value,
+                                                                        part.Component.TopPartId))">
+                                                                🔍
+                                                            </button>
+                                                        }
+
+                                                    <span class="flow-component-name">
+                                                        @part.Component!.TopPartCode - @part.Component.TopPartName
+                                                    </span>
+                                                    
+
+                                                    <span class="flow-component-quantity">
+                                                        @decimal.Truncate(part.Link.Quantity)
+                                                    </span>
+
+                                                </div>
+                                            }
+
+                                        </div>
+                                    }
+
+                                @if (processItems.Any())
+                                    {
+                                        <div class="flow-node-components">
+
+                                            @foreach (var item in processItems)
+                                            {
+                                                <div class="flow-component-row">
+
+                                                    <span class="flow-component-icon flow-component-item">
+                                                        ■
+                                                    </span>
+
+                                                    <span class="flow-component-name">
+                                                        @item.Component!.ItemCode - @item.Component.ItemName
+                                                    </span>
+
+                                                    <span class="flow-component-quantity">
+                                                        @item.Link.Quantity @item.Component.ItemUnit
+                                                    </span>
+
+                                                </div>
+                                            }
+
+                                        </div>
+                                    }
+                            </div>
+                        }
+                        else if (node.NodeType == 3)
+                        {
+                            <div class="flow-node flow-node-wip">
+                                <span class="flow-node-icon flow-node-icon-wip">●</span>
+
+                                <div class="flow-node-text">
+                                    <span class="flow-node-label">Rezultāts (WIP)</span>
+                                    <span class="flow-node-name">@node.Name</span>
+                                </div>
+                            </div>
+                        }
+                        else if (node.NodeType == 4 &&
+                                 Workflow.Connections.Any(x => x.ToNodeId == node.Id))
+                        {
+                            <div class="flow-node flow-node-finish">
+                                <span class="flow-node-icon flow-node-icon-finish">⚑</span>
+
+                                <span class="flow-node-name">
+                                    Pabeigts @Workflow.Workflow.Name?.Split(" - V")[0]
+                                </span>
+                            </div>
+                        }
+
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public TopPartWorkflowDto? Workflow { get; set; }
+
+    [Parameter]
+    public int WorkflowId { get; set; }
+
+    [Parameter]
+    public bool ReadOnly { get; set; }
+
+    [Parameter]
+    public List<TopPartWorkflowBomDto> Bom { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<(int WorkflowId, uint? TopPartId)> OnWorkflowOpenRequested { get; set; }  
+
+    private bool redrawGraph = true;
+
+    protected override void OnParametersSet()
+        {
+            redrawGraph = true;
+        }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+        {
+            if (!redrawGraph || Workflow is null)
+                return;
+
+            redrawGraph = false;
+
+            await JS.InvokeVoidAsync(
+                "workflowGraph.drawAfterLayout",
+                WorkflowId,
+                Workflow.Connections);
+        }
+
+    private static string GetStageClass(string? stepTypeName)
+        {
+            return stepTypeName switch
+            {
+                "Detail" => "flow-stage-detail",
+                "Assembly" => "flow-stage-assembly",
+                "Finishing" => "flow-stage-finishing",
+                _ => ""
+            };
+        }
+}

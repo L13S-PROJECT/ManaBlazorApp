@@ -2,6 +2,7 @@ namespace ManaApp.Shared.DTOs.TopPart;
 
 public class TopPartWorkflowDto
 {
+    public string TopPartName { get; set; } = string.Empty;
     public TopPartWorkflowModel Workflow { get; set; } = new();
     public List<TopPartWorkflowNodeDto> Nodes { get; set; } = new();
     public List<TopPartWorkflowConnectionDto> Connections { get; set; } = new();
@@ -30,6 +31,9 @@ public class TopPartWorkflowNodeDto
     public string? OutputWipName { get; set; }
     public uint? TopPartId { get; set; }
     public int? WorkCenterId { get; set; }
+    public string? WorkCenterName { get; set; }
+    public uint? StepTypeId { get; set; }
+    public string? StepTypeName { get; set; }
     public int? EstimatedMinutes { get; set; }
     public string? Comments { get; set; }
     public int SortOrder { get; set; }

@@ -1,16 +1,65 @@
 @* TopPartToolbar.razor *@
 
+@using ManaApp.Shared.DTOs.TopPart
+@using Microsoft.AspNetCore.Components.Web
+
 <div class="toppart-toolbar">
 
-    <div class="toppart-toolbar-left">
+    <div class="toppart-toolbar-filters">
 
-        <div class="toppart-toolbar-filter">
-            TopPart
-        </div>
+        <button type="button"
+                class="toppart-type-filter @(selectedType == 1 ? "active" : "")"
+                title="Atlasīt Preces"
+                @onclick="() => SelectType(1)">
+            PRECES
+        </button>
 
-        <div class="toppart-toolbar-filter">
-            Statuss
-        </div>
+        <button type="button"
+                class="toppart-type-filter @(selectedType == 0 ? "active" : "")"
+                title="Atlasīt Part"
+                @onclick="() => SelectType(0)">
+            PART
+        </button>
+
+        <button type="button"
+                class="toppart-type-filter @(selectedType == 2 ? "active" : "")"
+                title="Atlasīt Rez.daļas"
+                @onclick="() => SelectType(2)">
+            REZ.DAĻAS
+        </button>
+
+        <select class="toppart-category-filter @(selectedCategoryId.HasValue ? "active" : "")"
+                value="@selectedCategoryId"
+                @onchange="CategoryChanged">
+            <option value="">Izvēlies kategoriju</option>
+
+            @foreach (var category in Categories)
+            {
+                <option value="@category.Id">
+                    @category.CategoryName
+                </option>
+            }
+        </select>
+
+        <input type="search"
+                class="toppart-search-filter @(isSearchActive ? "active" : "")"
+                placeholder="Meklēt..."
+                value="@searchText"
+                @oninput="SearchInputChanged"
+                @onkeydown="SearchKeyDown" />
+
+        <button type="button"
+                class="toppart-clear-filter"
+                @onclick="ClearFilters">
+            NOTĪRĪT
+        </button>
+
+        <button type="button"
+                class="toppart-related-filter @(isRelatedActive ? "active" : "")"
+                disabled="@(!HasSelectedTopPart)"
+                @onclick="RelatedFilterClicked">
+            SAISTĪTIE
+        </button>
 
     </div>
 
@@ -20,10 +69,6 @@
             Jauns TopPart
         </button>
 
-        @* <button type="button">
-            Plānot TopPart
-        </button> *@
-
     </div>
 
 </div>
@@ -31,4 +76,95 @@
 @code {
     [Parameter]
     public EventCallback OnNewTopPart { get; set; }
+
+    [Parameter]
+    public EventCallback<byte?> OnTypeFilterChanged { get; set; }
+
+    [Parameter]
+    public List<TopPartCategoryDto> Categories { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<int?> OnCategoryFilterChanged { get; set; }  
+    
+    [Parameter]
+    public EventCallback<string?> OnSearchChanged { get; set; }
+    
+    [Parameter]
+    public EventCallback OnClearFilters { get; set; }
+
+    [Parameter]
+    public bool HasSelectedTopPart { get; set; }
+
+    [Parameter]
+    public EventCallback OnRelatedFilter { get; set; }
+    
+    private string? searchText;
+    private int? selectedCategoryId;
+    private byte? selectedType;
+    private bool isSearchActive;
+    private bool isRelatedActive;
+
+    private async Task SearchKeyDown(KeyboardEventArgs e)
+        {
+            if (e.Key == "Enter")
+            {
+                isSearchActive = !string.IsNullOrWhiteSpace(searchText);
+                await OnSearchChanged.InvokeAsync(searchText);
+            }
+        }
+
+    private async Task CategoryChanged(ChangeEventArgs e)
+        {
+            int? categoryId = int.TryParse(e.Value?.ToString(), out var id)
+                ? id
+                : null;
+            
+            selectedCategoryId = categoryId;
+
+            await OnCategoryFilterChanged.InvokeAsync(categoryId);
+        }
+
+    private async Task ClearFilters()
+        {
+            selectedCategoryId = null;
+            selectedType = null;
+            searchText = null;
+            isSearchActive = false;
+            isRelatedActive = false;
+
+            await OnClearFilters.InvokeAsync();
+        }
+
+    private async Task SelectType(byte type)
+        {
+            selectedType = selectedType == type ? null : type;
+            await OnTypeFilterChanged.InvokeAsync(selectedType);
+        }
+
+
+    private async Task SearchInputChanged(ChangeEventArgs e)
+        {
+            searchText = e.Value?.ToString();
+
+            if (string.IsNullOrWhiteSpace(searchText) && isSearchActive)
+            {
+                isSearchActive = false;
+                await OnSearchChanged.InvokeAsync(null);
+            }
+        }
+
+    private async Task RelatedFilterClicked()
+        {
+            isRelatedActive = true;
+            await OnRelatedFilter.InvokeAsync();
+        }
+    
+    protected override void OnParametersSet()
+        {
+            if (!HasSelectedTopPart)
+            {
+                isRelatedActive = false;
+            }
+        }
+
 }

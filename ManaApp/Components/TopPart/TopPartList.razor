@@ -11,18 +11,14 @@
         
             <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>Kods</th>
+                    <th></th>
                     <th>TopPart</th>
+                    <th>Kods</th>
                     <th>Tips</th>
                     <th>Kategorija</th>
-                    <th>Statuss</th>
-                    <th>Plānots</th>
-                    <th>Procesā</th>
-                    <th>Pabeigts</th>
-                    <th>Atlikums</th>
-                    <th>Rezervēts</th>
-                    <th>Iztrūkst</th>
+                    <th>Versija</th>
+                    <th>Pēd. izmaiņas</th>
+                    
                 </tr>
             
         </thead>
@@ -33,9 +29,24 @@
                     <tr class="@(SelectedTopPartId == topPart.Id ? "selected" : "")"
                             @onclick="() => SelectTopPart(topPart)">
 
-                        <td>@topPart.Id</td>
-                        <td>@topPart.TopPartCode</td>
+                        <td class="flow-status-cell">
+                            @if (topPart.FlowStatus == 2)
+                            {
+                                <span class="flow-status flow-status-ready">✓</span>
+                            }
+                            else if (topPart.FlowStatus == 1)
+                            {
+                                <span class="flow-status flow-status-warning">▲</span>
+                            }
+                            else
+                            {
+                                <span class="flow-status flow-status-error">■</span>
+                            }
+                        </td>
+                        
                         <td>@topPart.TopPartName</td>
+                        <td>@topPart.TopPartCode</td>
+
                         <td>
                             @(topPart.TopPartType switch
                             {
@@ -49,16 +60,17 @@
                             @(categories.FirstOrDefault(x => x.Id == topPart.TopPartCategoryID)?.CategoryName ?? "—")
                         </td>
                         <td>
-                            <span class="status-badge status-not-started">
-                                Nav iesākts
-                            </span>
+                            @(topPart.ReleasedVersion.HasValue
+                                ? $"V{topPart.ReleasedVersion.Value}"
+                                : "—")
                         </td>
-                        <td>—</td>
-                        <td>—</td>
-                        <td>—</td>
-                        <td>—</td>
-                        <td>—</td>
-                        <td>—</td>
+
+                        <td>
+                            @(topPart.ReleasedDate.HasValue
+                                ? topPart.ReleasedDate.Value.ToString("dd.MM.yyyy")
+                                : "—")
+                        </td>
+                        
                     </tr>
                 }
         </tbody>
@@ -77,9 +89,18 @@
             categories = await TopPartService.GetCategoriesAsync();
         }
 
-    public async Task<TopPartListItemDto?> ReloadAsync(int? selectedTopPartId = null)
+    public async Task<TopPartListItemDto?> ReloadAsync(
+        int? selectedTopPartId = null,
+        byte? typeFilter = null,
+        int? categoryFilter = null,
+        string? searchFilter = null,
+        uint? relatedTopPartId = null)
             {
-                topParts = await TopPartService.GetAllAsync();
+                topParts = await TopPartService.GetAllAsync(
+                    typeFilter,
+                    categoryFilter,
+                    searchFilter,
+                    relatedTopPartId);
 
                 return selectedTopPartId.HasValue
                     ? topParts.FirstOrDefault(x => x.Id == selectedTopPartId.Value)
@@ -91,6 +112,18 @@
 
     [Parameter]
     public int? SelectedTopPartId { get; set; }
+
+    [Parameter]
+    public byte? TopPartTypeFilter { get; set; }
+
+    [Parameter]
+    public int? TopPartCategoryFilter { get; set; }
+
+    [Parameter]
+    public string? TopPartSearchFilter { get; set; }
+
+    [Parameter]
+    public uint? RelatedTopPartId { get; set; }
 
     private async Task SelectTopPart(TopPartListItemDto topPart)
         {

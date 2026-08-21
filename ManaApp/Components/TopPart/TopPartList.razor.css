@@ -23,7 +23,7 @@
 .toppart-list td {
     padding: 8px 6px;
     text-align: left;
-    white-space: normal;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
@@ -31,13 +31,17 @@
 .toppart-list thead th {
     position: sticky;
     top: 0;
-    z-index: 1;
-    background: #f5f6f8;
+    z-index: 10;
+
+    background: #e9edf2;
+    border-bottom: 2px solid #c5ccd5;
 }
 
 .toppart-list th:nth-child(1),
 .toppart-list td:nth-child(1) {
-    width: 55px;
+    width: 28px;
+    padding-left: 4px;
+    padding-right: 4px;
 }
 
 .toppart-list th:nth-child(2),
@@ -89,4 +93,74 @@
 
 .toppart-list tbody tr.selected:hover {
     background: #e8f1ff;
+}
+
+.flow-status-cell {
+    width: 36px;
+    text-align: center;
+}
+
+.flow-status {
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.flow-status-ready {
+    color: #198754;
+}
+
+.flow-status-warning {
+    color: #f0ad00;
+}
+
+.flow-status-error {
+    color: #dc3545;
+}
+
+/* TopPart nosaukums — nedalām rindās */
+.toppart-list th:nth-child(2),
+.toppart-list td:nth-child(2) {
+    width: auto;
+    white-space: nowrap;
+}
+
+/* Pēdējās 5 kolonnas — kompaktas */
+.toppart-list th:nth-child(n+8),
+.toppart-list td:nth-child(n+8) {
+    width: 62px;
+    padding-left: 4px;
+    padding-right: 4px;
+    white-space: nowrap;
+}
+
+.toppart-list th,
+.toppart-list td {
+    border-right: 1px solid #e3e7eb;
+}
+
+.toppart-list th:last-child,
+.toppart-list td:last-child {
+    border-right: none;
+}
+
+/* Versija */
+.toppart-list th:nth-child(6),
+.toppart-list td:nth-child(6) {
+    width: 52px;
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
+/* Pēdējās izmaiņas */
+.toppart-list th:nth-child(7),
+.toppart-list td:nth-child(7) {
+    width: 78px;
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
+/* Datums kompaktāks */
+.toppart-list td:nth-child(7) {
+    font-size: 11px;
+    white-space: nowrap;
 }

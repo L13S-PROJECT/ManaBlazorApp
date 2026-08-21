@@ -26,6 +26,9 @@ namespace ManiApi.Models
         [Column("TopPartCategoryID")]
         public int? TopPartCategoryID { get; set; }
 
+        [Column("CategoryID")]
+        public int? CategoryID { get; set; }
+
         [Column("Description")]
         public string? Description { get; set; }
 

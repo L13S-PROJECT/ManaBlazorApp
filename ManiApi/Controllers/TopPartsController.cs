@@ -28,12 +28,105 @@ namespace ManiApi.Controllers
 
         // GET: api/topparts
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(
+            [FromQuery] TopPartType? type = null,
+            [FromQuery] int? categoryId = null,
+            [FromQuery] string? search = null,
+            [FromQuery] uint? relatedTopPartId = null)
         {
-            var rows = await _db.TopParts
-                .Where(x => x.IsActive)
-                .OrderBy(x => x.Stage)
-                .ThenBy(x => x.TopPartName)
+            var query = _db.TopParts
+                .Where(x => x.IsActive);
+
+                if (type.HasValue)
+                    {
+                        query = query.Where(x => x.TopPartType == type.Value);
+                    }
+
+                if (categoryId.HasValue)
+                    {
+                        query = query.Where(x => x.TopPartCategoryID == categoryId.Value);
+                    }
+
+                if (!string.IsNullOrWhiteSpace(search))
+                    {
+                        search = search.Trim();
+
+                        query = query.Where(x =>
+                            x.TopPartName.Contains(search) ||
+                            x.TopPartCode.Contains(search));
+                    }
+
+            var releasedWorkflows = _db.Workflows
+                .Where(w =>
+                    w.Status == WorkflowStatus.Released &&
+                    w.IsCurrent &&
+                    w.IsActive);
+
+            var releasedWorkflowIds = await releasedWorkflows
+                .Select(w => w.Id)
+                .ToListAsync();
+
+            var topPartRelations = await _db.WorkflowComponents
+                .Where(c =>
+                    c.IsActive &&
+                    c.TopPartId.HasValue &&
+                    releasedWorkflowIds.Contains(c.WorkflowId))
+                .Select(c => new
+                {
+                    c.WorkflowId,
+                    TopPartId = c.TopPartId!.Value
+                })
+                .Distinct()
+                .ToListAsync();
+
+            var workflowTopPartMap = await releasedWorkflows
+                .Where(w => w.TopPartId.HasValue)
+                .Select(w => new
+                {
+                    WorkflowId = w.Id,
+                    TopPartId = w.TopPartId!.Value
+                })
+                .ToDictionaryAsync(
+                    x => x.WorkflowId,
+                    x => x.TopPartId);
+
+            var topPartLinks = topPartRelations
+                .Where(x => workflowTopPartMap.ContainsKey(x.WorkflowId))
+                .Select(x => new
+                {
+                    FromTopPartId = workflowTopPartMap[x.WorkflowId],
+                    ToTopPartId = x.TopPartId
+                })
+                .Where(x => x.FromTopPartId != x.ToTopPartId)
+                .Distinct()
+                .ToList();
+            
+            var relatedTopPartIds = new HashSet<uint>();
+
+                if (relatedTopPartId.HasValue)
+                {
+                    var pending = new Stack<uint>();
+                    pending.Push(relatedTopPartId.Value);
+
+                    while (pending.Count > 0)
+                    {
+                        var currentId = pending.Pop();
+
+                        if (!relatedTopPartIds.Add(currentId))
+                            continue;
+
+                        foreach (var link in topPartLinks)
+                        {
+                            if (link.FromTopPartId == currentId)
+                                pending.Push(link.ToTopPartId);
+
+                            if (link.ToTopPartId == currentId)
+                                pending.Push(link.FromTopPartId);
+                        }
+                    }
+                }
+
+            var rows = await query
                 .Select(x => new TopPartListItemDto
                 {
                     Id = x.Id,
@@ -41,6 +134,7 @@ namespace ManiApi.Controllers
                     TopPartCode = x.TopPartCode,
                     TopPartType = (byte)x.TopPartType,
                     TopPartCategoryID = x.TopPartCategoryID,
+                    CategoryID = x.CategoryID,
                     Description = x.Description,
                     DraftCreatedDate = _db.Workflows
                         .Where(w =>
@@ -49,10 +143,12 @@ namespace ManiApi.Controllers
                             w.IsActive)
                         .Select(w => w.CreatedDate)
                         .FirstOrDefault(),
+
                     ReleasedVersion = _db.Workflows
                         .Where(w =>
                             w.TopPartId == x.Id &&
                             w.Status == WorkflowStatus.Released &&
+                            w.IsCurrent &&
                             w.IsActive)
                         .OrderByDescending(w => w.WorkflowVersion)
                         .Select(w => (int?)w.WorkflowVersion)
@@ -62,6 +158,7 @@ namespace ManiApi.Controllers
                         .Where(w =>
                             w.TopPartId == x.Id &&
                             w.Status == WorkflowStatus.Released &&
+                            w.IsCurrent &&
                             w.IsActive)
                         .OrderByDescending(w => w.WorkflowVersion)
                         .Select(w => w.ReleasedDate)
@@ -74,11 +171,81 @@ namespace ManiApi.Controllers
                             w.IsActive)
                         .OrderByDescending(w => w.WorkflowVersion)
                         .Select(w => w.Description)
-                        .FirstOrDefault()
-                })
+                        .FirstOrDefault(),
+                    
+                    FlowStatus =
+                        _db.Workflows.Any(w =>
+                            w.TopPartId == x.Id &&
+                            w.Status == WorkflowStatus.Released &&
+                            w.IsCurrent &&
+                            w.IsActive)
+                            ? (_db.Workflows.Any(w =>
+                                w.TopPartId == x.Id &&
+                                w.Status == WorkflowStatus.Draft &&
+                                w.IsActive)
+                                    ? (byte)1
+                                    : (byte)2)
+                            : (byte)0})
                 .ToListAsync();
 
-            return Ok(rows);
+            if (relatedTopPartId.HasValue)
+                {
+                    rows = rows
+                        .Where(x => relatedTopPartIds.Contains((uint)x.Id))
+                        .ToList();
+                }
+            
+            var rowById = rows.ToDictionary(
+                x => (uint)x.Id,
+                x => x);
+
+            var linkedTopPartIds = topPartLinks
+                .Where(x => rowById.ContainsKey(x.FromTopPartId))
+                .Select(x => x.ToTopPartId)
+                .ToHashSet();
+
+            var rootTopParts = rows
+                .Where(x => !linkedTopPartIds.Contains((uint)x.Id))
+                .OrderBy(x => x.TopPartType switch
+                    {
+                        1 => 0, // Product
+                        0 => 1, // Part
+                        2 => 2, // SparePart
+                        _ => 3
+                    })
+                .ThenBy(x => x.TopPartName)
+                .ToList();
+
+            var orderedRows = new List<TopPartListItemDto>();
+            var visitedTopPartIds = new HashSet<uint>();
+
+            void AddTopPartRecursive(uint topPartId)
+                {
+                    if (!visitedTopPartIds.Add(topPartId))
+                        return;
+
+                    if (!rowById.TryGetValue(topPartId, out var topPart))
+                        return;
+
+                    orderedRows.Add(topPart);
+
+                    var linkedIds = topPartLinks
+                        .Where(x => x.FromTopPartId == topPartId)
+                        .Select(x => x.ToTopPartId)
+                        .Distinct();
+
+                    foreach (var linkedId in linkedIds)
+                    {
+                        AddTopPartRecursive(linkedId);
+                    }
+                }
+
+            foreach (var root in rootTopParts)
+                {
+                    AddTopPartRecursive((uint)root.Id);
+                }
+
+            return Ok(orderedRows);
         }
 
         // POST: api/topparts
@@ -98,9 +265,27 @@ public async Task<IActionResult> Create([FromBody] CreateTopPartDto dto)
 
     if (dto.TopPartCategoryID is null)
         return BadRequest("Kategorija ir obligāta.");
+
+    if (dto.CategoryID.HasValue)
+        {
+            var categoryExists = await _db.Categories
+                .AnyAsync(x => x.Id == dto.CategoryID.Value && x.IsActive);
+
+            if (!categoryExists)
+                return BadRequest("Izvēlētā preču grupa neeksistē vai nav aktīva.");
+        }
     
     if (dto.TopPartType is null)
         return BadRequest("Tips ir obligāts.");
+
+    if (dto.TopPartType == (byte)TopPartType.Part)
+        {
+            dto.CategoryID = null;
+        }
+    else if (dto.CategoryID is null)
+        {
+            return BadRequest("Kategorija ir obligāta.");
+        }
 
     var exists = await _db.TopParts
         .AnyAsync(x => x.TopPartCode == dto.TopPartCode);
@@ -116,6 +301,7 @@ public async Task<IActionResult> Create([FromBody] CreateTopPartDto dto)
             TopPartCode = dto.TopPartCode,
             TopPartType = (TopPartType)dto.TopPartType!.Value,
             TopPartCategoryID = dto.TopPartCategoryID,
+            CategoryID = dto.CategoryID,
             Description = dto.Description,
             Stage = 1,
             IsActive = true
@@ -147,6 +333,9 @@ public async Task<IActionResult> Create([FromBody] CreateTopPartDto dto)
             if (string.IsNullOrWhiteSpace(dto.TopPartCode))
                 return BadRequest("Kods ir obligāts.");
 
+            if (dto.TopPartCategoryID is null)
+                return BadRequest("Kategorija ir obligāta.");
+
             dto.TopPartName = dto.TopPartName.Trim();
             dto.TopPartCode = dto.TopPartCode.Trim().ToUpper();
 
@@ -162,6 +351,7 @@ public async Task<IActionResult> Create([FromBody] CreateTopPartDto dto)
 
             row.TopPartName = dto.TopPartName;
             row.TopPartCode = dto.TopPartCode;
+            row.TopPartCategoryID = dto.TopPartCategoryID;
             row.Description = dto.Description?.Trim();
 
             await _db.SaveChangesAsync();
@@ -173,6 +363,7 @@ public async Task<IActionResult> Create([FromBody] CreateTopPartDto dto)
                     TopPartCode = row.TopPartCode,
                     TopPartType = (byte)row.TopPartType,
                     TopPartCategoryID = row.TopPartCategoryID,
+                    CategoryID = row.CategoryID,
                     Description = row.Description
                 });
 

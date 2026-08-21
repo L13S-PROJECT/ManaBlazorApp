@@ -118,10 +118,6 @@ app.MapGet("/weatherforecast", () =>
 
 app.MapGet("/dbcheck", async (ManiApi.Data.AppDbContext db) => await db.Categories.CountAsync());
 
-app.MapGet("/api/categories", async (AppDbContext db)
-    => await db.Categories.AsNoTracking()
-                          .OrderBy(c => c.CategoryName)
-                          .ToListAsync());
 
 app.MapControllers();
 

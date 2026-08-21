@@ -51,10 +51,87 @@ namespace ManiApi.Data
         public DbSet<WorkflowProcessComponent> WorkflowProcessComponents { get; set; }
 
         public DbSet<ProductTopPartItem> ProductTopPartItems { get; set; }
+
+        public DbSet<ProductionBatch> ProductionBatches { get; set; }
+        public DbSet<ProductionBatchTopPart> ProductionBatchTopParts { get; set; }
+        public DbSet<StockMovementNew> StockMovementsNew { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         
 {
     base.OnModelCreating(modelBuilder);
+    modelBuilder.Entity<ProductionBatch>()
+        .ToTable("production_batches");
+
+    modelBuilder.Entity<ProductionBatchTopPart>()
+        .ToTable("production_batch_topparts");
+
+    modelBuilder.Entity<StockMovementNew>()
+        .ToTable("stock_movements_new");
+
+    modelBuilder.Entity<ProductionBatch>()
+    .HasKey(x => x.ID);
+
+    modelBuilder.Entity<ProductionBatchTopPart>()
+        .HasKey(x => x.ID);
+
+    modelBuilder.Entity<StockMovementNew>()
+        .HasKey(x => x.ID);
+
+    modelBuilder.Entity<ProductionBatchTopPart>()
+    .HasOne(x => x.Batch)
+    .WithMany()
+    .HasForeignKey(x => x.Batch_ID)
+    .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionBatchTopPart>()
+        .HasOne(x => x.TopPart)
+        .WithMany()
+        .HasForeignKey(x => x.TopPart_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionBatchTopPart>()
+        .HasOne(x => x.Workflow)
+        .WithMany()
+        .HasForeignKey(x => x.Workflow_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+    
+    modelBuilder.Entity<StockMovementNew>()
+    .HasOne(x => x.TopPart)
+    .WithMany()
+    .HasForeignKey(x => x.TopPart_ID)
+    .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<StockMovementNew>()
+        .HasOne(x => x.ProductionBatchTopPart)
+        .WithMany()
+        .HasForeignKey(x => x.ProductionBatchTopPart_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<StockMovementNew>()
+        .HasOne(x => x.RalColor)
+        .WithMany()
+        .HasForeignKey(x => x.RAL_Color_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<StockMovementNew>()
+        .HasOne(x => x.SourceMovement)
+        .WithMany()
+        .HasForeignKey(x => x.SourceMovement_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<StockMovementNew>()
+        .HasOne(x => x.ConsumedByBatch)
+        .WithMany()
+        .HasForeignKey(x => x.ConsumedByBatch_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<StockMovementNew>()
+        .HasOne(x => x.WorkflowNode)
+        .WithMany()
+        .HasForeignKey(x => x.WorkflowNode_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
     modelBuilder.Entity<EmployeeWorkLog>().ToTable("employee_work_log");
     modelBuilder.Entity<EmployeeAvailability>().ToTable("employee_availability");
     // <- PIESPIED tabulas nosaukumu ar underscore

@@ -55,7 +55,11 @@
                         </div>
 
                         <div class="toppart-flow-version-current">
-                            @if (version.IsCurrent)
+                            @if (version.Status == 1)
+                            {
+                                <span class="toppart-flow-draft-warning">⚠</span>
+                            }
+                            else if (version.IsCurrent)
                             {
                                 <span>Aktuālā</span>
                             }
@@ -70,12 +74,12 @@
                                 </button>
                             }
                             else
-                                {
-                                    <button type="button"
-                                            @onclick="() => SelectVersion(version.Id)">
-                                        Apskatīt
-                                    </button>
-                                }
+                            {
+                                <button type="button"
+                                        @onclick="() => SelectVersion(version.Id)">
+                                    Apskatīt
+                                </button>
+                            }
                         </div>
 
                     </div>
@@ -89,8 +93,9 @@
 @if (showVersionDetails && selectedVersionId.HasValue)
 {
     <TopPartFlowViewModal
-        WorkflowId="selectedVersionId.Value"
-        OnClose="CloseVersionDetails" />
+            WorkflowId="selectedVersionId.Value"
+            OnClose="CloseVersionDetails"
+            OnTopPartOpenRequested="OnTopPartOpenRequested" />
 }
 
 @code {
@@ -111,6 +116,9 @@
 
     [Parameter]
     public EventCallback<int> OnEditRequested { get; set; }
+
+    [Parameter]
+    public EventCallback<uint> OnTopPartOpenRequested { get; set; }
 
     protected override async Task OnParametersSetAsync()
 {

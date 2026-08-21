@@ -348,5 +348,19 @@ namespace ManaApp.Services
             return true;
         }
 
+        public async Task<List<WorkCenterOptionDto>> GetWorkCentersAsync()
+            {
+                return await _http.GetFromJsonAsync<List<WorkCenterOptionDto>>(
+                    "api/TopPartWorkflow/workcenters")
+                    ?? new();
+            }
+
+        public async Task<List<StepTypeOptionDto>> GetStepTypesAsync()
+            {
+                return await _http.GetFromJsonAsync<List<StepTypeOptionDto>>(
+                    "api/TopPartWorkflow/steptypes")
+                    ?? new();
+            }
+
     }
 }

@@ -20,6 +20,12 @@ namespace ManaApp.Services
                 return await _http.GetFromJsonAsync<List<TopPartCategoryDto>>(
                     "api/TopPartCategories") ?? new List<TopPartCategoryDto>();
             }
+
+        public async Task<List<TopPartGroupCategoryDto>> GetGroupCategoriesAsync()
+            {
+                return await _http.GetFromJsonAsync<List<TopPartGroupCategoryDto>>(
+                    "api/Categories") ?? new List<TopPartGroupCategoryDto>();
+            }
         
         public async Task<TopPartListItemDto?> CreateAsync(CreateTopPartDto model)
             {
@@ -36,10 +42,32 @@ namespace ManaApp.Services
                 return await response.Content.ReadFromJsonAsync<TopPartListItemDto>();
             }
 
-        public async Task<List<TopPartListItemDto>> GetAllAsync()
+        public async Task<List<TopPartListItemDto>> GetAllAsync(
+            byte? type = null,
+            int? categoryId = null,
+            string? search = null,
+            uint? relatedTopPartId = null)
             {
-                return await _http.GetFromJsonAsync<List<TopPartListItemDto>>(
-                    "api/TopParts") ?? new List<TopPartListItemDto>();
+                var parameters = new List<string>();
+
+                    if (type.HasValue)
+                        parameters.Add($"type={type.Value}");
+
+                    if (categoryId.HasValue)
+                        parameters.Add($"categoryId={categoryId.Value}");
+                    
+                    if (!string.IsNullOrWhiteSpace(search))
+                        parameters.Add($"search={Uri.EscapeDataString(search.Trim())}");
+
+                    if (relatedTopPartId.HasValue)
+                        parameters.Add($"relatedTopPartId={relatedTopPartId.Value}");
+
+                var url = parameters.Count > 0
+                    ? $"api/TopParts?{string.Join("&", parameters)}"
+                    : "api/TopParts";
+
+                return await _http.GetFromJsonAsync<List<TopPartListItemDto>>(url)
+                    ?? new List<TopPartListItemDto>();
             }
 
         public async Task<TopPartListItemDto?> UpdateAsync(UpdateTopPartDto model)

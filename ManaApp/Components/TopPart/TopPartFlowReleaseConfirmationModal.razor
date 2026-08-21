@@ -57,6 +57,9 @@
     [Parameter]
     public string? ErrorMessage { get; set; }
 
+    [Parameter]
+    public string? InitialDescription { get; set; } 
+
     private string description = "";
     private Task Confirm()
     {
@@ -67,4 +70,12 @@
     {
         return OnCancel.InvokeAsync();
     }
+
+    protected override void OnParametersSet()
+        {
+            if (IsVisible)
+            {
+                description = InitialDescription ?? "";
+            }
+        }
 }

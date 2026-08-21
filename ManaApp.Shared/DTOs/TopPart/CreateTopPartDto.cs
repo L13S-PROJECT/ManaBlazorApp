@@ -6,6 +6,7 @@ namespace ManaApp.Shared.DTOs.TopPart
         public string TopPartCode { get; set; } = "";
         public byte? TopPartType { get; set; }
         public int? TopPartCategoryID { get; set; }
+        public int? CategoryID { get; set; }
         public string? Description { get; set; }
     }
 }

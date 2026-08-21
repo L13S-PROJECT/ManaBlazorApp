@@ -158,6 +158,11 @@ namespace ManiApi.Controllers
 
             if (workflow == null)
                 return NotFound("TopPart Workflow nav atrasts.");
+            
+            var topPartName = await _db.TopParts
+                .Where(x => x.Id == workflow.TopPartId)
+                .Select(x => x.TopPartName)
+                .FirstOrDefaultAsync() ?? string.Empty;
 
             var nodes = await _db.WorkflowNodes
                 .Where(x =>
@@ -186,6 +191,20 @@ namespace ManiApi.Controllers
                         Name = node.Name,
                         TopPartId = node.TopPartId,
                         WorkCenterId = node.WorkCenterId,
+                        WorkCenterName = node.WorkCenterId.HasValue
+                            ? _db.WorkCenters
+                                .Where(x => x.Id == node.WorkCenterId.Value)
+                                .Select(x => x.WorkCentr_Name)
+                                .FirstOrDefault()
+                            : null,
+                        StepTypeId = node.StepTypeId,
+
+                        StepTypeName = node.StepTypeId.HasValue
+                            ? _db.StepTypes
+                                .Where(x => x.Id == node.StepTypeId.Value)
+                                .Select(x => x.StepTypeName)
+                                .FirstOrDefault()
+                            : null,
                         EstimatedMinutes = node.EstimatedMinutes,
                         Comments = node.Comments,
                         SortOrder = node.SortOrder
@@ -237,6 +256,7 @@ namespace ManiApi.Controllers
 
             return Ok(new
                 {
+                    TopPartName = topPartName,
                     Workflow = new
                     {
                         workflow.Id,
@@ -371,6 +391,7 @@ namespace ManiApi.Controllers
                         Name = dto.ProcessName,
                         TopPartId = workflow.TopPartId,
                         WorkCenterId = dto.WorkCenterId,
+                        StepTypeId = dto.StepTypeId,
                         EstimatedMinutes = dto.EstimatedMinutes,
                         SortOrder = sortAnchorNode.SortOrder + 10,
                         IsActive = true
@@ -408,10 +429,6 @@ namespace ManiApi.Controllers
                         _db.WorkflowNodeConnections.RemoveRange(consumedWipConnections);
                     }
 
-                // if (!isMerge && existingOutgoingConnections.Count > 0)
-                //     {
-                //         _db.WorkflowNodeConnections.RemoveRange(existingOutgoingConnections);
-                //     }
 
                 if (!isMerge)
                     {
@@ -457,24 +474,6 @@ namespace ManiApi.Controllers
                         }
                     }
 
-                // if (!isMerge)
-                //     {
-                //         var finishNode = await _db.WorkflowNodes
-                //             .FirstOrDefaultAsync(x =>
-                //                 x.WorkflowId == workflow.Id &&
-                //                 x.NodeType == (byte)WorkflowNodeType.Finish &&
-                //                 x.IsActive);
-
-                //         if (finishNode == null)
-                //             return BadRequest("FINISH mezgls nav atrasts.");
-
-                //         _db.WorkflowNodeConnections.Add(
-                //             new WorkflowNodeConnection
-                //             {
-                //                 FromNodeId = wipNode.Id,
-                //                 ToNodeId = finishNode.Id
-                //             });
-                //     }
 
                 await _db.SaveChangesAsync();
 
@@ -595,6 +594,7 @@ namespace ManiApi.Controllers
 
                 processNode.Name = dto.ProcessName;
                 processNode.WorkCenterId = dto.WorkCenterId;
+                processNode.StepTypeId = dto.StepTypeId;
                 processNode.EstimatedMinutes = dto.EstimatedMinutes;
                 wipNode.Name = dto.WipName.Trim();
 
@@ -1270,6 +1270,7 @@ namespace ManiApi.Controllers
                         ParentWorkflowId = sourceWorkflow.Id,
                         VersionId = sourceWorkflow.VersionId,
                         ParentNodeId = sourceWorkflow.ParentNodeId,
+                        Description = sourceWorkflow.Description,
                         Name = $"{sourceWorkflow.Name.Split(" - V")[0]} - V{nextVersion}",
                         CreatedDate = DateTime.Now,
                         IsCurrent = false,
@@ -2518,6 +2519,39 @@ namespace ManiApi.Controllers
 
                 return NoContent();
             }
+
+        [HttpGet("workcenters")]
+        public async Task<IActionResult> GetWorkCenters()
+        {
+            var workCenters = await _db.WorkCenters
+                .Where(x => x.IsActive)
+                .OrderBy(x => x.WorkCenter_Order)
+                .Select(x => new WorkCenterOptionDto
+                {
+                    Id = x.Id,
+                    Name = x.WorkCentr_Name,
+                    Code = x.WorkCentr_Code
+                })
+                .ToListAsync();
+
+            return Ok(workCenters);
+        }
+
+        [HttpGet("steptypes")]
+        public async Task<IActionResult> GetStepTypes()
+        {
+            var stepTypes = await _db.StepTypes
+                .Where(x => x.IsActive)
+                .OrderBy(x => x.Id)
+                .Select(x => new StepTypeOptionDto
+                {
+                    Id = (uint)x.Id,
+                    Name = x.StepTypeName
+                })
+                .ToListAsync();
+
+            return Ok(stepTypes);
+        }
 
     }
 }

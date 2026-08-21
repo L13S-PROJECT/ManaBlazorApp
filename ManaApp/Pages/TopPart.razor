@@ -10,19 +10,28 @@
 
 <div class="toppart-page">
 
-    <h3>TopPart</h3>
-
     <div class="toppart-layout">
 
         <section class="toppart-main">
 
-            <TopPartToolbar 
-                OnNewTopPart="OpenNewTopPartModal" />
+            <TopPartToolbar
+                Categories="categories"
+                HasSelectedTopPart="@(selectedTopPart is not null)"
+                OnNewTopPart="OpenNewTopPartModal"
+                OnTypeFilterChanged="TypeFilterChanged"
+                OnCategoryFilterChanged="CategoryFilterChanged"
+                OnSearchChanged="SearchChanged"
+                OnRelatedFilter="RelatedFilter"
+                OnClearFilters="ClearFilters" />
 
             <TopPartList
                 @ref="topPartList"
                 OnSelected="SelectTopPart"
-                SelectedTopPartId="selectedTopPart?.Id" />
+                SelectedTopPartId="selectedTopPart?.Id"
+                TopPartTypeFilter="topPartTypeFilter"
+                TopPartCategoryFilter="topPartCategoryFilter"
+                TopPartSearchFilter="@topPartSearchFilter"
+                RelatedTopPartId="relatedTopPartId" />
 
         </section>
 
@@ -48,12 +57,12 @@
 
             <section class="toppart-flow-section">
 
-
                 <TopPartFlow
                     @ref="topPartFlow"
                     TopPart="selectedTopPart"
                     OnFlowChanged="FlowChanged"
-                    OnEditRequested="OpenFlowEditModal" />
+                    OnEditRequested="OpenFlowEditModal"
+                    OnTopPartOpenRequested="OpenTopPartFromFlow" />
 
             </section>
 
@@ -80,35 +89,33 @@
 }
 
 @if (showSavedConfirmation)
-    {
-        <div class="save-confirm-backdrop">
-            <div class="save-confirm-modal">
+{
+    <div class="save-confirm-backdrop">
+        <div class="save-confirm-modal">
 
-                <div class="save-confirm-icon">
-                    ✓
-                </div>
-
-                <div class="save-confirm-content">
-                    <div class="save-confirm-title">
-                        Saglabāts
-                    </div>
-
-                    <div class="save-confirm-text">
-                        Izmaiņas veiksmīgi saglabātas.
-                    </div>
-                </div>
-
-                <div class="save-confirm-actions">
-                    <button type="button"
-                            class="save-confirm-button"
-                            @onclick="ConfirmSaved">
-                        OK
-                    </button>
-                </div>
-
+            <div class="save-confirm-icon">
+                ✓
             </div>
+
+            <div class="save-confirm-content">
+                <div class="save-confirm-title">
+                    Saglabāts
+                </div>
+
+                <div class="save-confirm-text">
+                    Izmaiņas veiksmīgi saglabātas.
+                </div>
+
+                <button type="button"
+                        class="save-confirm-button"
+                        @onclick="ConfirmSaved">
+                    OK
+                </button>
+            </div>
+
         </div>
-    }
+    </div>
+}
 
 @code {
     private bool showTopPartModal = false;
@@ -119,6 +126,10 @@
     private TopPartBom? topPartBom;
     private bool showFlowEditModal;
     private int? editingWorkflowId;
+    private string? topPartSearchFilter;
+    private byte? topPartTypeFilter;
+    private int? topPartCategoryFilter;
+    private uint? relatedTopPartId;
     
     private void OpenNewTopPartModal()
         {
@@ -133,14 +144,27 @@
     
     private TopPartListItemDto? selectedTopPart;
 
-   private Task SelectTopPart(TopPartListItemDto? topPart)
+   private async Task SelectTopPart(TopPartListItemDto? topPart)
         {
             selectedTopPart = topPart;
-            return Task.CompletedTask;
+
+            if (topPart is null)
+            {
+                relatedTopPartId = null;
+
+                if (topPartList is not null)
+                {
+                    await topPartList.ReloadAsync(
+                        typeFilter: topPartTypeFilter,
+                        categoryFilter: topPartCategoryFilter,
+                        searchFilter: topPartSearchFilter);
+                }
+            }
         }
 
     private List<TopPartCategoryDto> categories = new();
-
+        
+    
     protected override async Task OnInitializedAsync()
     {
         categories = await TopPartService.GetCategoriesAsync();
@@ -227,6 +251,85 @@
             if (topPartBom is not null)
             {
                 await topPartBom.ReloadAsync();
+            }
+        }
+
+    private async Task OpenTopPartFromFlow(uint topPartId)
+        {
+            showFlowEditModal = false;
+
+            if (topPartList is not null)
+            {
+                selectedTopPart = await topPartList.ReloadAsync((int)topPartId);
+            }
+        }
+
+    private async Task TypeFilterChanged(byte? type)
+        {
+            topPartTypeFilter = type;
+            selectedTopPart = null;
+
+            if (topPartList is not null)
+            {
+                await topPartList.ReloadAsync(typeFilter: type);
+            }
+        }
+
+    private async Task CategoryFilterChanged(int? categoryId)
+        {
+            topPartCategoryFilter = categoryId;
+            selectedTopPart = null;
+
+            if (topPartList is not null)
+            {
+                await topPartList.ReloadAsync(
+                    typeFilter: topPartTypeFilter,
+                    categoryFilter: categoryId);
+            }
+        }
+
+    private async Task SearchChanged(string? search)
+        {
+            topPartSearchFilter = search;
+            selectedTopPart = null;
+
+            if (topPartList is not null)
+            {
+                await topPartList.ReloadAsync(
+                    typeFilter: topPartTypeFilter,
+                    categoryFilter: topPartCategoryFilter,
+                    searchFilter: search);
+            }
+        }
+
+    private async Task ClearFilters()
+        {
+            topPartTypeFilter = null;
+            topPartCategoryFilter = null;
+            topPartSearchFilter = null;
+            selectedTopPart = null;
+
+            if (topPartList is not null)
+            {
+                await topPartList.ReloadAsync(
+                    typeFilter: null,
+                    categoryFilter: null,
+                    searchFilter: null);
+            }
+        }
+
+    private async Task RelatedFilter()
+        {
+            if (selectedTopPart is null)
+                return;
+
+            relatedTopPartId = (uint)selectedTopPart.Id;
+
+            if (topPartList is not null)
+            {
+                await topPartList.ReloadAsync(
+                    selectedTopPartId: selectedTopPart.Id,
+                    relatedTopPartId: relatedTopPartId);
             }
         }
 

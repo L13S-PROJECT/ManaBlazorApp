@@ -241,3 +241,22 @@
     background: #eceff3;
 }
 
+.toppart-flow-draft-action {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+}
+
+.toppart-flow-draft-warning {
+    justify-self: center;
+    color: #d9af06;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.toppart-flow-version-warning {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+

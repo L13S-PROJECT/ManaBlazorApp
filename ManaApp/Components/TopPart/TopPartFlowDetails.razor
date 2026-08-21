@@ -49,6 +49,27 @@
 
         <div class="info-row info-row-pair">
             <div class="info-field">
+                <label>Veids</label>
+                <span>
+                    @(TopPart?.CategoryID is int groupCategoryId
+                        ? groupCategories.FirstOrDefault(x =>
+                            x.Id == groupCategories.FirstOrDefault(c => c.Id == groupCategoryId)?.ParentId)?.CategoryName ?? "—"
+                        : "—")
+                </span>
+            </div>
+
+            <div class="info-field">
+                <label>Preču grupa</label>
+                <span>
+                    @(TopPart?.CategoryID is int productGroupId
+                        ? groupCategories.FirstOrDefault(x => x.Id == productGroupId)?.CategoryName ?? "—"
+                        : "—")
+                </span>
+            </div>
+        </div>
+
+        <div class="info-row info-row-pair">
+            <div class="info-field">
                 <label>Kods</label>
                 <span>@(TopPart?.TopPartCode ?? "—")</span>
             </div>
@@ -179,6 +200,7 @@
         }
 
     private TopPartUsageDto usage = new();
+    private List<TopPartGroupCategoryDto> groupCategories = new();
 
     protected override async Task OnParametersSetAsync()
         {
@@ -189,6 +211,11 @@
             }
 
             usage = await TopPartService.GetUsageAsync(TopPart.Id);
+        }
+
+    protected override async Task OnInitializedAsync()
+        {
+            groupCategories = await TopPartService.GetGroupCategoriesAsync();
         }
 
     private IEnumerable<TopPartUsageItemDto> UsageProducts =>

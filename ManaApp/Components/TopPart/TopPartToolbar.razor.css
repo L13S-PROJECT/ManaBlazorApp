@@ -5,8 +5,14 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    min-height: 48px;
-    padding: 0 12px;
+    min-height: 72px;
+    padding: 12px;
+    gap: 12px;
+
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    margin-bottom: 10px;
 }
 
 .toppart-toolbar-left {
@@ -19,3 +25,158 @@
     align-items: center;
     gap: 8px;
 }
+
+.toppart-type-filter {
+    min-width: 72px;
+    height: 28px;
+    padding: 0 10px;
+
+    background: #f8f9fa;
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+
+    font-size: 11px;
+    font-weight: 500;
+    color: #212529;
+
+    cursor: pointer;
+    transition: background-color 0.15s ease,
+                border-color 0.15s ease,
+                box-shadow 0.15s ease;
+}
+
+.toppart-type-filter:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+}
+
+.toppart-type-filter.active {
+    background: #495057;
+    border-color: #495057;
+    color: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.toppart-category-filter {
+    height: 28px;
+    padding: 0 28px 0 10px;
+
+    background: #f8f9fa;
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+
+    font-size: 11px;
+    font-style: italic;
+    color: #9aa0a6;
+
+    cursor: pointer;
+    outline: none;
+}
+
+.toppart-category-filter option {
+    background: #fff;
+    color: #212529;
+    font-style: normal;
+}
+
+.toppart-category-filter.active {
+    background: #495057;
+    border-color: #495057;
+    color: #fff;
+    font-style: normal;
+}
+
+.toppart-search-filter {
+    height: 28px;
+    padding: 0 10px;
+
+    background: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+
+    font-size: 11px;
+    color: #212529;
+
+    outline: none;
+}
+
+.toppart-search-filter::placeholder {
+    color: #9aa0a6;
+    font-style: italic;
+}
+
+.toppart-search-filter.active {
+    background: #fff8e1;
+    border-color: #d6a84b;
+    box-shadow: 0 0 0 2px rgba(214, 168, 75, 0.12);
+}
+
+.toppart-clear-filter,
+.toppart-related-filter {
+    min-width: 72px;
+    height: 28px;
+    padding: 0 10px;
+
+    background: #f8f9fa;
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+
+    font-size: 11px;
+    font-weight: 500;
+    color: #212529;
+
+    cursor: pointer;
+}
+
+/* SAISTĪTIE — pieejama, bet nav aktīva */
+.toppart-related-filter:not(:disabled):not(.active) {
+    background: #f8f9fa;
+    border-color: #6c9bcf;
+    color: #356a9f;
+}
+
+/* SAISTĪTIE — hover */
+.toppart-related-filter:not(:disabled):not(.active):hover {
+    background: #edf4fb;
+    border-color: #4f86bd;
+}
+
+/* SAISTĪTIE — filtrs aktīvs */
+.toppart-related-filter.active:not(:disabled) {
+    background: #356a9f;
+    border-color: #356a9f;
+    color: #fff;
+}
+
+/* SAISTĪTIE — nav pieejama */
+.toppart-related-filter:disabled {
+    background: #f8f9fa;
+    border-color: #dee2e6;
+    color: #adb5bd;
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+.toppart-toolbar-actions button {
+    height: 28px;
+    padding: 0 12px;
+
+    background: #4f7f68;
+    border: 1px solid #4f7f68;
+    border-radius: 5px;
+
+    font-size: 11px;
+    font-weight: 500;
+    color: #fff;
+
+    cursor: pointer;
+    transition: background-color 0.15s ease,
+                border-color 0.15s ease;
+}
+
+.toppart-toolbar-actions button:hover {
+    background: #416b57;
+    border-color: #416b57;
+}
+

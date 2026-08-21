@@ -3,13 +3,22 @@
 @using ManaApp.Shared.DTOs.TopPart
 @using ManaApp.Services
 @inject TopPartWorkflowService TopPartWorkflowService
-@inject IJSRuntime JS
-@using Microsoft.JSInterop
 
 <div class="modal-backdrop">
     <div class="modal-content">
 
-        <h3>Flow apskate</h3>
+        <div class="flow-view-modal-header">
+            <h3>Flow apskate</h3>
+
+            <button type="button"
+                    class="flow-view-close"
+                    title="Aizvērt"
+                    aria-label="Aizvērt"
+                    @onclick="Close">
+                ✕
+            </button>
+        </div>
+
 
         @if (workflow is null)
             {
@@ -17,86 +26,60 @@
             }
         else
             {
-                <div class="flow-edit-title">
-                    <h3>@workflow.Workflow.Name</h3>
-                </div>
+                <div class="flow-view-header">
 
-                <div class="flow-graph"
-                    id="workflow-graph-@WorkflowId">
-
-                    <svg class="workflow-connections"
-                        id="workflow-connections-@WorkflowId">
-                    </svg>
-
-                    @foreach (var level in workflow.Nodes
-                        .GroupBy(x => x.GraphLevel)
-                        .OrderBy(x => x.Key))
+                    @if (workflowHistory.Count > 0)
                     {
-                        <div class="flow-graph-level"
-                            style="grid-template-columns: repeat(@((int)Math.Round(workflow.Nodes.Max(x => x.GraphColumn) * 2) + 2), minmax(90px, 1fr));">
-
-                            @foreach (var node in level.OrderBy(x => x.GraphColumn))
-                            {
-                                <div class="flow-graph-node"
-                                    id="workflow-node-@node.Id"
-                                    data-node-id="@node.Id"
-                                    style="grid-column: @(node.NodeType == 1 || node.NodeType == 4
-                                        ? "1 / -1"
-                                        : $"{(int)Math.Round(node.GraphColumn * 2) + 1} / span 2");">
-
-                                    @if (node.NodeType == 1)
-                                    {
-                                        <div class="flow-node flow-node-toppart">
-                                            <span class="flow-node-icon flow-node-icon-toppart">◆</span>
-                                            <span class="flow-node-name">@node.Name</span>
-                                        </div>
-                                    }
-                                    else if (node.NodeType == 2)
-                                    {
-                                        <div class="flow-node flow-node-process">
-                                            <span class="flow-node-icon flow-node-icon-process">⚙</span>
-
-                                            <div class="flow-node-text">
-                                                <span class="flow-node-label">Process</span>
-                                                <span class="flow-node-name">@node.Name</span>
-                                            </div>
-                                        </div>
-                                    }
-                                    else if (node.NodeType == 3)
-                                    {
-                                        <div class="flow-node flow-node-wip">
-                                            <span class="flow-node-icon flow-node-icon-wip">●</span>
-
-                                            <div class="flow-node-text">
-                                                <span class="flow-node-label">Rezultāts (WIP)</span>
-                                                <span class="flow-node-name">@node.Name</span>
-                                            </div>
-                                        </div>
-                                    }
-                                    else if (node.NodeType == 4)
-                                    {
-                                        <div class="flow-node flow-node-finish">
-                                            <span class="flow-node-icon flow-node-icon-finish">⚑</span>
-
-                                            <span class="flow-node-name">
-                                                Pabeigts @workflow.Workflow.Name?.Split(" - V")[0]
-                                            </span>
-                                        </div>
-                                    }
-
-                                </div>
-                            }
-
-                        </div>
+                        <button type="button"
+                                class="flow-view-back"
+                                @onclick="GoBack">
+                            ← Atpakaļ
+                        </button>
                     }
 
-                </div>
-            }
+                    <div class="flow-view-breadcrumb">
 
-        <button type="button"
-                @onclick="Close">
-            Aizvērt
-        </button>
+                        @for (var i = 0; i < workflowPath.Count; i++)
+                        {
+                            var item = workflowPath[i];
+
+                            @if (i > 0)
+                            {
+                                <span class="flow-view-breadcrumb-separator">›</span>
+                            }
+
+                            <span class="@(i == 0
+                                ? "flow-view-breadcrumb-root"
+                                : i == workflowPath.Count - 1
+                                    ? "flow-view-breadcrumb-current"
+                                    : "flow-view-breadcrumb-item")">
+
+                                @item.Name
+
+                                @if (i == workflowPath.Count - 1 && item.TopPartId.HasValue)
+                                {
+                                    <button type="button"
+                                            class="flow-view-open"
+                                            @onclick="OpenTopPart">
+                                        Atvērt
+                                    </button>
+                                }
+
+                            </span>
+                        }
+
+                    </div>
+
+                </div>
+
+                <TopPartFlowGraph
+                    Workflow="workflow"
+                    WorkflowId="WorkflowId"
+                    Bom="bom"
+                    ReadOnly="true"
+                    OnWorkflowOpenRequested="OpenWorkflow" />
+
+            }
 
     </div>
 </div>
@@ -108,36 +91,87 @@
     [Parameter]
     public EventCallback OnClose { get; set; }
 
+    [Parameter]
+    public EventCallback<uint> OnTopPartOpenRequested { get; set; }
+
     private Task Close()
         {
             return OnClose.InvokeAsync();
         }
 
-    private bool redrawGraph;
-
-    private void RequestGraphRedraw()
+    private async Task OpenTopPart()
         {
-            redrawGraph = true;
-        }
+            var current = workflowPath.LastOrDefault();
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-        {
-            if (!redrawGraph || workflow is null)
+            if (current?.TopPartId is null)
                 return;
 
-            redrawGraph = false;
-
-            await JS.InvokeVoidAsync(
-                "workflowGraph.drawAfterLayout",
-                WorkflowId,
-                workflow.Connections);
+            await OnTopPartOpenRequested.InvokeAsync(current.TopPartId.Value);
+            await OnClose.InvokeAsync();
         }
 
+    private async Task OpenWorkflow((int WorkflowId, uint? TopPartId) request)
+        {
+            workflowHistory.Push(workflow!.Workflow.Id);
+
+            workflow = await TopPartWorkflowService.GetWorkflowAsync(request.WorkflowId);
+            bom = await TopPartWorkflowService.GetBomAsync(request.WorkflowId);
+
+            if (workflow is not null)
+            {
+                workflowPath.Add(new WorkflowNavigationItem
+                {
+                    WorkflowId = workflow.Workflow.Id,
+                    TopPartId = request.TopPartId,
+                    Name = workflow.Workflow.Name ?? string.Empty
+                });
+            }
+        }
+
+    private readonly Stack<int> workflowHistory = new();
+
     private TopPartWorkflowDto? workflow;
+    private List<TopPartWorkflowBomDto> bom = new();
 
     protected override async Task OnParametersSetAsync()
         {
             workflow = await TopPartWorkflowService.GetWorkflowAsync(WorkflowId);
-            RequestGraphRedraw();
+            bom = await TopPartWorkflowService.GetBomAsync(WorkflowId);
+
+            workflowPath.Clear();
+
+            if (workflow is not null)
+            {
+                workflowPath.Add(new WorkflowNavigationItem
+                {
+                    WorkflowId = workflow.Workflow.Id,
+                    Name = workflow.Workflow.Name ?? string.Empty
+                });
+            }
         }
+    private async Task GoBack()
+            {
+                if (workflowHistory.Count == 0)
+                    return;
+
+                var workflowId = workflowHistory.Pop();
+
+                workflow = await TopPartWorkflowService.GetWorkflowAsync(workflowId);
+                bom = await TopPartWorkflowService.GetBomAsync(workflowId);
+
+                if (workflowPath.Count > 1)
+                {
+                    workflowPath.RemoveAt(workflowPath.Count - 1);
+                }
+            }
+
+    private class WorkflowNavigationItem
+        {
+            public int WorkflowId { get; set; }
+            public string Name { get; set; } = string.Empty;
+            public uint? TopPartId { get; set; }
+        }
+
+    private readonly List<WorkflowNavigationItem> workflowPath = new();
+
 }

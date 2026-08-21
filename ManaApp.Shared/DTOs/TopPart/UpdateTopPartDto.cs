@@ -8,6 +8,8 @@ namespace ManaApp.Shared.DTOs.TopPart
 
         public string TopPartCode { get; set; } = "";
 
+        public int? TopPartCategoryID { get; set; }
+
         public string? Description { get; set; }
     }
 }

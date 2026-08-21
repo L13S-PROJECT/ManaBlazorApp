@@ -50,19 +50,86 @@
                 <div class="field-error">@typeError</div>
             }
 
-            <select class="@(typeError is not null ? "input-error" : "")"
-                    disabled="@IsEditMode"
-                    @bind="model.TopPartType"
-                    @bind:after="OnTypeChanged">
+            @if (IsEditMode)
+                {
+                    <input type="text"
+                        value="@(model.TopPartType switch
+                        {
+                            0 => "Part",
+                            1 => "Product",
+                            2 => "SparePart",
+                            _ => ""
+                        })"
+                        disabled />
+                }
+            else
+                {
+                    <select class="@(typeError is not null ? "input-error" : "")"
+                            @bind="model.TopPartType"
+                            @bind:after="OnTypeChanged">
 
-                <option value="">—</option>
-                <option value="0">Part</option>
-                <option value="1">Product</option>
-                <option value="2">SparePart</option>
-            </select>
+                        <option value="">—</option>
+                        <option value="0">Part</option>
+                        <option value="1">Product</option>
+                        <option value="2">SparePart</option>
+                    </select>
+                }
         </div>
 
     </div>
+    
+
+    @if (model.TopPartType is 1 or 2)
+        {
+            <div class="form-row">
+                <label>Veids</label>
+
+                <div class="form-field">
+                    @foreach (var parent in groupCategories.Where(x => x.ParentId is null))
+                    {
+                        <label style="margin-right: 20px;">
+                            <input type="radio"
+                                name="parentCategory"
+                                value="@parent.Id"
+                                checked="@(selectedParentCategoryId == parent.Id)"
+                                disabled="@IsEditMode"
+                                @onchange="@(() => ParentCategoryChanged(parent.Id))" />
+                            @parent.CategoryName
+                        </label>
+                    }
+                </div>
+            </div>
+
+            <div class="form-row">
+                <label>Preču grupa</label>
+
+                <div class="form-field">
+                    @if (groupCategoryError is not null)
+                    {
+                        <div class="field-error">@groupCategoryError</div>
+                    }
+
+                    @if (IsEditMode)
+                        {
+                            <input type="text"
+                                value="@groupCategories.FirstOrDefault(x => x.Id == model.CategoryID)?.CategoryName"
+                                disabled />
+                        }
+                    else
+                        {
+                            <select @bind="model.CategoryID">
+                                <option value="">—</option>
+
+                                @foreach (var category in groupCategories
+                                    .Where(x => x.ParentId == selectedParentCategoryId))
+                                {
+                                    <option value="@category.Id">@category.CategoryName</option>
+                                }
+                            </select>
+                        }
+                </div>
+            </div>
+        }
 
     <div class="form-row">
         <label>Kategorija</label>
@@ -74,7 +141,6 @@
             }
 
             <select class="@(categoryError is not null ? "input-error" : "")"
-                    disabled="@IsEditMode"
                     @bind="model.TopPartCategoryID"
                     @bind:after="OnCategoryChanged">
 
@@ -85,6 +151,7 @@
                     <option value="@category.Id">@category.CategoryName</option>
                 }
             </select>
+                
         </div>
 
     </div>
@@ -141,12 +208,16 @@
     private string? codeError;
     private string? typeError;
     private string? categoryError;
+    private string? groupCategoryError;
     private List<TopPartCategoryDto> categories = new();
+    private List<TopPartGroupCategoryDto> groupCategories = new();
+    private int? selectedParentCategoryId;
     private CreateTopPartDto model = new();
 
     protected override async Task OnInitializedAsync()
         {
             categories = await TopPartService.GetCategoriesAsync();
+            groupCategories = await TopPartService.GetGroupCategoriesAsync();
         }
     
     private async Task SaveAsync()
@@ -163,6 +234,7 @@
                         Id = TopPart!.Id,
                         TopPartName = model.TopPartName,
                         TopPartCode = model.TopPartCode,
+                        TopPartCategoryID = model.TopPartCategoryID,
                         Description = model.Description
                     };
 
@@ -218,6 +290,11 @@
             typeError = model.TopPartType is null
                 ? "Tips ir obligāts."
                 : null;
+            
+            groupCategoryError =
+                model.TopPartType is 1 or 2 && model.CategoryID is null
+                    ? "Preču grupa ir obligāta."
+                    : null;
 
             categoryError = model.TopPartCategoryID is null
                 ? "Kategorija ir obligāta."
@@ -226,7 +303,8 @@
             return nameError is null
                 && codeError is null
                 && typeError is null
-                && categoryError is null;
+                && categoryError is null
+                && groupCategoryError is null;
         }
 
         private void OnNameInput(ChangeEventArgs e)
@@ -241,6 +319,13 @@
             {
                 if (model.TopPartType is not null)
                     typeError = null;
+
+                if (model.TopPartType == 0)
+                    {
+                        model.CategoryID = null;
+                        selectedParentCategoryId = null;
+                        groupCategoryError = null;
+                    }
             }
 
         private void OnCategoryChanged()
@@ -258,7 +343,20 @@
                 model.TopPartCode = TopPart.TopPartCode;
                 model.TopPartType = TopPart.TopPartType;
                 model.TopPartCategoryID = TopPart.TopPartCategoryID;
+                model.CategoryID = TopPart.CategoryID;
+                if (model.CategoryID.HasValue)
+                    {
+                        selectedParentCategoryId = groupCategories
+                            .FirstOrDefault(x => x.Id == model.CategoryID.Value)
+                            ?.ParentId;
+                    }
                 model.Description = TopPart.Description;
+            }
+
+        private void ParentCategoryChanged(int parentId)
+            {
+                selectedParentCategoryId = parentId;
+                model.CategoryID = null;
             }
 
 }

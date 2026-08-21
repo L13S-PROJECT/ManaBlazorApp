@@ -13,6 +13,13 @@
         <div class="flow-edit-title">
             <h3>Flow labošana</h3>
 
+            @if (workflow is not null)
+                {
+                    <div class="flow-edit-toppart-name">
+                        @workflow.TopPartName
+                    </div>
+                }
+
             @if (!string.IsNullOrWhiteSpace(errorMessage))
             {
                 <span class="flow-edit-warning">
@@ -43,67 +50,85 @@
                     @(editingProcessNodeId.HasValue ? "flow-process-form-editing" : "")
                     @(!editingProcessNodeId.HasValue && !CanAddProcess ? "flow-process-form-disabled" : "")">
 
-                    <div class="flow-process-form-title">
-                        @(editingProcessNodeId.HasValue ? "Labot procesu" : "Pievienot procesu")
+                    <div class="flow-process-form-header">
+                        <div class="flow-process-form-title">
+                            @(editingProcessNodeId.HasValue ? "Labot procesu" : "Pievienot procesu")
+                        </div>
+
+                        <div class="flow-process-submit">
+                            @if (editingProcessNodeId.HasValue)
+                            {
+                                <button type="button"
+                                        class="flow-process-save"
+                                        @onclick="UpdateProcess">
+                                    Saglabāt izmaiņas
+                                </button>
+
+                                <button type="button"
+                                        @onclick="CancelProcessEdit">
+                                    Atcelt
+                                </button>
+                            }
+                            else
+                            {
+                                <button type="button"
+                                        class="flow-process-save"
+                                        disabled="@(!CanAddProcess)"
+                                        @onclick="AddProcess">
+                                    + Process
+                                </button>
+                            }
+                        </div>
                     </div>
 
-                    <div class="flow-process-field">
-                        <label>Procesa nosaukums</label>
-                        <input @bind="processName"
-                        disabled="@(!editingProcessNodeId.HasValue && !CanAddProcess)" />
+                    <div class="flow-process-fields">
+                        <div class="flow-process-field">
+                            <label>Procesa nosaukums</label>
+                            <input @bind="processName"
+                                disabled="@(!editingProcessNodeId.HasValue && !CanAddProcess)" />
+                        </div>
+
+                        <div class="flow-process-field">
+                            <label>Rezultāts (WIP)</label>
+                            <input @bind="wipName"
+                                disabled="@(!editingProcessNodeId.HasValue && !CanAddProcess)" />
+                        </div>
+
+                        <div class="flow-process-field">
+                            <label>Darba centrs</label>
+                            <select @bind="workCenterId"
+                                    disabled="@(!editingProcessNodeId.HasValue && !CanAddProcess)">
+                                <option value="0">— izvēlies darba centru —</option>
+                                @foreach (var workCenter in workCenters)
+                                {
+                                    <option value="@workCenter.Id">
+                                        @workCenter.Name
+                                    </option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="flow-process-field">
+                            <label>Laiks (min)</label>
+                            <input type="number"
+                                @bind="estimatedMinutes"
+                                disabled="@(!editingProcessNodeId.HasValue && !CanAddProcess)" />
+                        </div>
+
+                        <div class="flow-process-field">
+                            <label>Stage</label>
+                            <select @bind="stepTypeId"
+                                    disabled="@(!editingProcessNodeId.HasValue && !CanAddProcess)">
+                                <option value="">— izvēlies —</option>
+                                @foreach (var stepType in stepTypes)
+                                {
+                                    <option value="@stepType.Id">
+                                        @stepType.Name
+                                    </option>
+                                }
+                            </select>
+                        </div>
                     </div>
-
-                    <div class="flow-process-field">
-                        <label>Rezultāts (WIP)</label>
-                        <input @bind="wipName"
-                        disabled="@(!editingProcessNodeId.HasValue && !CanAddProcess)" />
-                    </div>
-
-                    <div class="flow-process-field">
-                        <label>Darba centrs</label>
-                        <input type="number"
-                            @bind="workCenterId"
-                            disabled="@(!editingProcessNodeId.HasValue && !CanAddProcess)" />
-                    </div>
-
-                    <div class="flow-process-field">
-                        <label>Laiks (min)</label>
-                        <input type="number"
-                            @bind="estimatedMinutes"
-                            disabled="@(!editingProcessNodeId.HasValue && !CanAddProcess)" />
-                    </div>
-
-                    <div class="flow-process-field">
-                        <label>Stage</label>
-                        <select disabled>
-                            <option>—</option>
-                        </select>
-                    </div>
-
-                    <div class="flow-process-submit">
-                        @if (editingProcessNodeId.HasValue)
-                        {
-                            <button type="button"
-                                    @onclick="UpdateProcess">
-                                Saglabāt izmaiņas
-                            </button>
-
-                            <button type="button"
-                                    @onclick="CancelProcessEdit">
-                                Atcelt
-                            </button>
-
-                        }
-                        else
-                        {
-                            <button type="button"
-                                    disabled="@(!CanAddProcess)"
-                                    @onclick="AddProcess">
-                                + Process
-                            </button>
-                        }
-                    </div>
-
                 </div>
 
                 <div class="flow-graph"
@@ -209,46 +234,57 @@
 
                                             <div class="flow-node flow-node-process 
                                                 @(editingProcessNodeId == node.Id ? "flow-node-process-selected" : "")
-                                                @(selectedProcessNodeId == node.Id ? "flow-node-process-bom-selected" : "")">
+                                                @(selectedProcessNodeId == node.Id ? "flow-node-process-bom-selected" : "")
+                                                @GetStageClass(node.StepTypeName)">
 
-                                                    <span class="flow-node-icon flow-node-icon-process">
-                                                        ⚙
-                                                    </span>
+                                                    <div class="flow-node-process-header">
 
-                                                    <div class="flow-node-text">
-                                                        <span class="flow-node-label">Process</span>
-                                                        <span class="flow-node-name">@node.Name</span>
+                                                        <div class="flow-node-process-label">
+                                                            <span class="flow-node-icon flow-node-icon-process">⚙</span>
+                                                            <span class="flow-node-label">
+                                                                @(string.IsNullOrWhiteSpace(node.WorkCenterName)
+                                                                    ? "Process"
+                                                                    : node.EstimatedMinutes.HasValue
+                                                                        ? $"{node.WorkCenterName} ({node.EstimatedMinutes} min)"
+                                                                        : node.WorkCenterName)
+                                                            </span>
+                                                        </div>
+
+                                                        <div class="flow-node-actions">
+
+                                                            <button type="button"
+                                                                    class="flow-action-button"
+                                                                    title="Labot procesu"
+                                                                    disabled="@selectedProcessNodeId.HasValue"
+                                                                    @onclick="@(() => SelectProcessForEdit(node))">
+                                                                ✎
+                                                            </button>
+
+                                                            <button type="button"
+                                                                    class="flow-action-button"
+                                                                    title="Pievienot / labot BOM"
+                                                                    disabled="@editingProcessNodeId.HasValue"
+                                                                    @onclick="@(() => selectedProcessNodeId =
+                                                                        selectedProcessNodeId == node.Id ? null : node.Id)">
+                                                                ◈
+                                                            </button>
+
+                                                            <button type="button"
+                                                                    class="flow-action-button flow-action-delete"
+                                                                    title="Dzēst procesu"
+                                                                    disabled="@(editingProcessNodeId.HasValue ||
+                                                                        selectedProcessNodeId.HasValue ||
+                                                                        !CanDeleteProcess(node.Id))"
+                                                                    @onclick="() => DeleteProcess(node.Id)">
+                                                                ×
+                                                            </button>
+
+                                                        </div>
+
                                                     </div>
 
-                                                    <div class="flow-node-actions">
-
-                                                        <button type="button"
-                                                                class="flow-action-button"
-                                                                title="Labot procesu"
-                                                                disabled="@selectedProcessNodeId.HasValue"
-                                                                @onclick="@(() => SelectProcessForEdit(node))">
-                                                            ✎
-                                                        </button>
-
-                                                        <button type="button"
-                                                                class="flow-action-button"
-                                                                title="Pievienot / labot BOM"
-                                                                disabled="@editingProcessNodeId.HasValue"
-                                                                @onclick="@(() => selectedProcessNodeId =
-                                                                selectedProcessNodeId == node.Id ? null : node.Id)">
-                                                            ◈
-                                                        </button>
-
-                                                        <button type="button"
-                                                                class="flow-action-button flow-action-delete"
-                                                                title="Dzēst procesu"
-                                                                disabled="@(editingProcessNodeId.HasValue ||
-                                                                    selectedProcessNodeId.HasValue ||
-                                                                    !CanDeleteProcess(node.Id))"
-                                                                @onclick="() => DeleteProcess(node.Id)">
-                                                            ×
-                                                        </button>
-
+                                                    <div class="flow-node-process-name">
+                                                        @node.Name
                                                     </div>
 
                                     @if (processBom.Count > 0)
@@ -391,8 +427,12 @@ else
                                     <span></span>
                                 </div>
 
-                                @foreach (var link in workflow.ProcessComponents
-                                        .Where(x => x.ProcessNodeId == selectedProcessNodeId.Value))
+                               @foreach (var link in workflow.ProcessComponents
+                                    .Where(x =>
+                                        x.ProcessNodeId == selectedProcessNodeId.Value &&
+                                        bom.Any(c =>
+                                            c.Id == x.WorkflowComponentId &&
+                                            c.ComponentType == 1)))
                                     {
                                         var component = bom.FirstOrDefault(x =>
                                             x.Id == link.WorkflowComponentId);
@@ -807,6 +847,7 @@ else
 
 <TopPartFlowReleaseConfirmationModal
     IsVisible="showReleaseConfirmation"
+    InitialDescription="@workflow?.Workflow.Description"
     ErrorMessage="@errorMessage"
     OnConfirm="ConfirmRelease"
     OnCancel="@(() => showReleaseConfirmation = false)" />
@@ -821,10 +862,14 @@ else
     [Parameter]
     public EventCallback OnWorkflowChanged { get; set; }
 
+    private List<WorkCenterOptionDto> workCenters = new();
+    private List<StepTypeOptionDto> stepTypes = new();
+
     private string processName = "";
     private string wipName = "";
     private int workCenterId;
     private int estimatedMinutes;
+    private uint? stepTypeId;
     private int? editingProcessNodeId;
     private TopPartWorkflowDto? workflow;
     private List<int> selectedNodeIds = new();
@@ -958,6 +1003,9 @@ else
             
             bom =
                 await TopPartWorkflowService.GetBomAsync(WorkflowId);
+            
+            workCenters = await TopPartWorkflowService.GetWorkCentersAsync();
+            stepTypes = await TopPartWorkflowService.GetStepTypesAsync();
 
             RequestGraphRedraw();
 
@@ -980,6 +1028,7 @@ else
                 ProcessName = processName,
                 WipName = wipName,
                 WorkCenterId = workCenterId,
+                StepTypeId = stepTypeId,
                 EstimatedMinutes = estimatedMinutes
             };
 
@@ -1002,6 +1051,7 @@ else
             wipName = "";
             workCenterId = 0;
             estimatedMinutes = 0;
+            stepTypeId = null;
             selectedNodeIds.Clear();
         }
 
@@ -1040,6 +1090,7 @@ else
             wipName = node.OutputWipName ?? "";
 
             workCenterId = node.WorkCenterId ?? 0;
+            stepTypeId = node.StepTypeId;
             estimatedMinutes = node.EstimatedMinutes ?? 0;
         }
 
@@ -1055,6 +1106,7 @@ else
                 ProcessName = processName,
                 WipName = wipName,
                 WorkCenterId = workCenterId,
+                StepTypeId = stepTypeId,
                 EstimatedMinutes = estimatedMinutes
             };
 
@@ -1075,8 +1127,10 @@ else
 
             editingProcessNodeId = null;
             processName = "";
+            wipName = "";
             workCenterId = 0;
             estimatedMinutes = 0;
+            stepTypeId = null;
         }
 
     private void ReleaseFlow()
@@ -1177,6 +1231,7 @@ else
             wipName = "";
             workCenterId = 0;
             estimatedMinutes = 0;
+            stepTypeId = null;
         }
 
         private async Task FlowPartBomSaved()
@@ -1267,6 +1322,17 @@ else
                     workflow.Nodes.Any(node =>
                         node.Id == connection.ToNodeId &&
                         node.NodeType == 2));
+            }
+
+        private static string GetStageClass(string? stepTypeName)
+            {
+                return stepTypeName switch
+                {
+                    "Detail" => "flow-stage-detail",
+                    "Assembly" => "flow-stage-assembly",
+                    "Finishing" => "flow-stage-finishing",
+                    _ => ""
+                };
             }
 
 }

@@ -7,6 +7,7 @@ public class CreateTopPartProcessRequest
     public string ProcessName { get; set; } = "";
     public int WorkCenterId { get; set; }
     public int EstimatedMinutes { get; set; }
+    public uint? StepTypeId { get; set; }
 
     public string WipName { get; set; } = "";
 }
@@ -18,5 +19,6 @@ public class UpdateTopPartProcessRequest
     public string ProcessName { get; set; } = "";
     public string WipName { get; set; } = "";
     public int WorkCenterId { get; set; }
+    public uint? StepTypeId { get; set; }
     public int EstimatedMinutes { get; set; }
 }

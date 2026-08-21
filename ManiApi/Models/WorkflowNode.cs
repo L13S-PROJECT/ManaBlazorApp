@@ -31,6 +31,9 @@ namespace ManiApi.Models
         [Column("WorkCenter_ID")]
         public int? WorkCenterId { get; set; }
 
+        [Column("StepType_ID")]
+        public uint? StepTypeId { get; set; }
+
         [Column("EstimatedMinutes")]
         public int? EstimatedMinutes { get; set; }
 
