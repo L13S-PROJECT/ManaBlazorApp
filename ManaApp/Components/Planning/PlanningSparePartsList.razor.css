@@ -1,0 +1,233 @@
+/* PlanningSparePartsList.razor.css */
+
+.planning-products-list {
+    width: 100%;
+    background: #fff;
+}
+
+.planning-products-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.planning-products-table th {
+    padding: 10px 12px;
+    text-align: center;
+    border: 1px solid #d8e0e7;
+
+    font-size: 12px;
+    font-weight: 600;
+    color: #4b5563;
+}
+
+.planning-products-table td {
+    padding: 5px 10px;
+    text-align: center;
+}
+
+.product-group-row td {
+    height: 24px;
+    padding: 4px 12px;
+    text-align: left !important;
+    color: #35566c;
+    background: #edf6fc;
+    border: 1px solid #c3d6e3;
+    font-size: 12px;
+}
+
+.product-group-row strong {
+    color: #174d72;
+    font-weight: 700;
+}
+
+.product-row td {
+    background-color: #fff;
+    border: 1px solid #d8e0e7;
+}
+
+.product-row.is-striped td {
+    background-color: #f1f5f8;
+}
+
+/* Aktīvā preces rinda */
+
+.product-row.is-expanded td {
+    background-color: #eef7ff;
+    border-top-color: #9fbed3;
+    border-bottom-color: #9fbed3;
+}
+
+.product-row.is-expanded td:first-child {
+    border-left: 3px solid #78a7c7;
+}
+
+.product-row.is-expanded td:last-child {
+    border-right: 1px solid #9fbed3;
+}
+
+.product-row.is-expanded .planning-group,
+.product-row.is-expanded .production-group {
+    background-color: #eef7ff;
+}
+
+
+.planning-products-table td {
+    font-size: 13px;
+}
+
+.planning-products-table th:first-child,
+.planning-products-table td:first-child {
+    text-align: left;
+}
+
+.details-column {
+    width: 32px;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+}
+
+
+.planning-group {
+    background: #f3f5f7;
+}
+
+.planning-group-start {
+    box-shadow: inset 8px 0 10px -10px rgba(0, 0, 0, 0.45);
+}
+
+.planning-group-end {
+    box-shadow: inset -8px 0 10px -10px rgba(0, 0, 0, 0.45);
+}
+
+.production-group {
+    background: #f8f9fa;
+}
+
+.production-group-start {
+    box-shadow: inset 8px 0 10px -10px rgba(0, 0, 0, 0.35);
+}
+
+.production-group-end {
+    box-shadow: inset -8px 0 10px -10px rgba(0, 0, 0, 0.35);
+}
+
+.planning-products-table thead th {
+    padding-top: 6px;
+    padding-bottom: 6px;
+    background: #405867;
+    color: #fff;
+    font-weight: 600;
+    border-color: #607582;
+}
+
+/* Atvērtā produkta rinda */
+
+.product-row {
+    transition: background-color 140ms ease;
+}
+
+.product-row.is-expanded td {
+    background-color: #eef7ff;
+    border-bottom-color: transparent;
+}
+
+.product-row.is-expanded td:first-child {
+    border-left: 3px solid #2878b5;
+}
+
+/*
+ Esošajām grupu kolonnām jau ir savs pelēks fons.
+ Aktīvajā rindā šo fonu pārņem vienotais zilais akcents.
+*/
+.product-row.is-expanded .planning-group,
+.product-row.is-expanded .production-group {
+    background-color: #eef7ff;
+}
+
+/* Atvērtā bultiņas poga */
+
+.details-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: #4b5563;
+    line-height: 1;
+    transition:
+        color 140ms ease,
+        border-color 140ms ease,
+        background-color 140ms ease;
+}
+
+.details-button:hover {
+    background: #edf2f7;
+    color: #1f5f8b;
+}
+
+.details-button.is-open {
+    color: #fff;
+    background: #2878b5;
+    border-color: #1f669b;
+}
+
+/* Detalizācijas turpinājums */
+
+/* Aktīvajai rindai piesaistītā detalizācija */
+
+.product-details-row td.product-details-cell {
+    padding: 0;
+    text-align: left;
+    background: #fff;
+    border-top: 1px solid #c3d6e3;
+    border-right: 1px solid #9fbed3;
+    border-bottom: 1px solid #9fbed3;
+    border-left: 3px solid #78a7c7;
+}
+
+.details-context {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 24px;
+    padding: 3px 10px;
+    color: #35566c;
+    background: #edf6fc;
+    border-bottom: 1px solid #d9e9f4;
+    font-size: 12px;
+}
+
+.details-context strong {
+    color: #174d72;
+    font-weight: 700;
+}
+
+.details-context-label {
+    color: #60798a;
+}
+
+/* Kategorijas atdalošā rinda */
+
+.category-row td {
+    height: 26px;
+    padding: 4px 12px;
+    text-align: center !important;
+    background: #dce7ee;
+    border-top: 1px solid #b7ccd8;
+    border-bottom: 1px solid #b7ccd8;
+}
+
+.category-name {
+    color: #274c60;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.category-group + .category-group .category-row td {
+    border-top-width: 2px;
+}

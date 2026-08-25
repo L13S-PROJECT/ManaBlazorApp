@@ -8,5 +8,7 @@ namespace ManaApp.Shared.DTOs.TopPart
         public int? TopPartCategoryID { get; set; }
         public int? CategoryID { get; set; }
         public string? Description { get; set; }
+        public List<TopPartSparePartSelectionDto> Selections { get; set; } = [];
+
     }
 }

@@ -79,7 +79,7 @@
     </div>
     
 
-    @if (model.TopPartType is 1 or 2)
+    @if (model.TopPartType == 1)
         {
             <div class="form-row">
                 <label>Veids</label>
@@ -127,6 +127,49 @@
                                 }
                             </select>
                         }
+                </div>
+            </div>
+        }
+
+    @if (model.TopPartType == 2)
+        {
+            <div class="form-row">
+                <label>Saistītās preces</label>
+
+                <div class="form-field">
+                    <div class="spare-product-toolbar">
+                        <span class="spare-product-count">
+                            Izvēlētas: @SelectedProductOptions.Count()
+                        </span>
+
+                        <button type="button"
+                                class="spare-product-select"
+                                @onclick="OpenProductModal">
+                            Izvēlēties Product
+                        </button>
+                    </div>
+
+                    <div class="spare-product-selection-list">
+                        @foreach (var product in SelectedProductOptions)
+                        {
+                            <div class="spare-product-selection-row">
+                                <span>
+                                    @product.ProductCode — @product.ProductName
+                                </span>
+
+                                <span>
+                                    Versija v.@product.WorkflowVersion
+                                </span>
+
+                                <button type="button"
+                                        class="spare-product-delete"
+                                        @onclick="@(() => RemoveProduct(
+                                            product.ProductTopPartId))">
+                                    Dzēst
+                                </button>
+                            </div>
+                        }
+                    </div>
                 </div>
             </div>
         }
@@ -191,6 +234,14 @@
 
 </div>
 
+@if (showProductModal)
+{
+    <TopPartSparePartProductModal
+        ProductOptions="@productOptions"
+        OnCancel="CancelProductModal"
+        OnSave="SaveProductSelection" />
+}
+
 @code {
 
     [Parameter]
@@ -212,12 +263,27 @@
     private List<TopPartCategoryDto> categories = new();
     private List<TopPartGroupCategoryDto> groupCategories = new();
     private int? selectedParentCategoryId;
+    private List<TopPartSparePartProductOptionDto> productOptions = [];
+    
+    private IEnumerable<TopPartSparePartProductOptionDto>
+    SelectedProductOptions =>
+        productOptions
+            .Where(x => x.IsSelected)
+            .OrderBy(x => x.ProductName);
+
+    private bool showProductModal;
     private CreateTopPartDto model = new();
 
     protected override async Task OnInitializedAsync()
         {
             categories = await TopPartService.GetCategoriesAsync();
             groupCategories = await TopPartService.GetGroupCategoriesAsync();
+
+            productOptions =
+                await TopPartService.GetSparePartProductOptionsAsync(
+                    TopPart?.TopPartType == 2
+                        ? TopPart.Id
+                        : null);
         }
     
     private async Task SaveAsync()
@@ -226,6 +292,23 @@
 
             if (!ValidateForm())
                 return;
+
+            var selectedOptions = model.TopPartType == 2
+                ? productOptions
+                    .Where(x => x.IsSelected)
+                    .ToList()
+                : [];
+
+
+            var selections = selectedOptions
+                .Select(x => new TopPartSparePartSelectionDto
+                {
+                    ProductTopPartId = x.ProductTopPartId,
+                    WorkflowId = x.WorkflowId
+                })
+                .ToList();
+
+            model.Selections = selections;
             
             if (IsEditMode)
                 {
@@ -235,7 +318,8 @@
                         TopPartName = model.TopPartName,
                         TopPartCode = model.TopPartCode,
                         TopPartCategoryID = model.TopPartCategoryID,
-                        Description = model.Description
+                        Description = model.Description,
+                        Selections = selections
                     };
 
                     var updatedTopPart = await TopPartService.UpdateAsync(updateModel);
@@ -292,7 +376,7 @@
                 : null;
             
             groupCategoryError =
-                model.TopPartType is 1 or 2 && model.CategoryID is null
+                model.TopPartType == 1 && model.CategoryID is null
                     ? "Preču grupa ir obligāta."
                     : null;
 
@@ -320,7 +404,7 @@
                 if (model.TopPartType is not null)
                     typeError = null;
 
-                if (model.TopPartType == 0)
+                if (model.TopPartType != 1)
                     {
                         model.CategoryID = null;
                         selectedParentCategoryId = null;
@@ -357,6 +441,65 @@
             {
                 selectedParentCategoryId = parentId;
                 model.CategoryID = null;
+            }
+
+        private void ToggleProduct(int productTopPartId, ChangeEventArgs e)
+            {
+                var options = productOptions
+                    .Where(x => x.ProductTopPartId == productTopPartId)
+                    .ToList();
+
+                foreach (var option in options)
+                    option.IsSelected = false;
+
+                if (e.Value is bool isSelected && isSelected)
+                {
+                    var workflow = options.FirstOrDefault(x => x.IsCurrent)
+                        ?? options.FirstOrDefault();
+
+                    if (workflow is not null)
+                        workflow.IsSelected = true;
+                }
+            }
+
+        private void ChangeProductWorkflow(
+            int productTopPartId,
+            ChangeEventArgs e)
+            {
+                if (!int.TryParse(e.Value?.ToString(), out var workflowId))
+                    return;
+
+                foreach (var option in productOptions.Where(x =>
+                    x.ProductTopPartId == productTopPartId))
+                {
+                    option.IsSelected = option.WorkflowId == workflowId;
+                }
+            }
+
+        private void OpenProductModal()
+            {
+                showProductModal = true;
+            }
+
+        private void CancelProductModal()
+            {
+                showProductModal = false;
+            }
+
+        private void SaveProductSelection(
+                List<TopPartSparePartProductOptionDto> options)
+            {
+                productOptions = options;
+                showProductModal = false;
+            }
+
+        private void RemoveProduct(int productTopPartId)
+            {
+                foreach (var option in productOptions.Where(x =>
+                    x.ProductTopPartId == productTopPartId))
+                {
+                    option.IsSelected = false;
+                }
             }
 
 }

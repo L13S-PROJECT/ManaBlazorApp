@@ -362,5 +362,13 @@ namespace ManaApp.Services
                     ?? new();
             }
 
+        public async Task<List<TopPartWorkflowNodeOptionDto>> GetWorkflowOutputNodesAsync(
+                int workflowId)
+            {
+                return await _http.GetFromJsonAsync<List<TopPartWorkflowNodeOptionDto>>(
+                    $"api/TopPartWorkflow/{workflowId}/output-nodes")
+                    ?? new();
+            }
+
     }
 }

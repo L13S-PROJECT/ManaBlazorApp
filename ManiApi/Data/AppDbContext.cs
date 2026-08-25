@@ -55,6 +55,7 @@ namespace ManiApi.Data
         public DbSet<ProductionBatch> ProductionBatches { get; set; }
         public DbSet<ProductionBatchTopPart> ProductionBatchTopParts { get; set; }
         public DbSet<StockMovementNew> StockMovementsNew { get; set; }
+        public DbSet<TopPartSparePart> TopPartSpareParts { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         

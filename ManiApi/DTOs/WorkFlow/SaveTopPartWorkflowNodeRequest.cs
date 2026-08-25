@@ -4,6 +4,8 @@ public class SaveTopPartWorkflowNodeRequest
 {
     public int Id { get; set; }
 
+    public int? ParentNodeId { get; set; }
+
     public byte NodeType { get; set; }
 
     public string? Name { get; set; }

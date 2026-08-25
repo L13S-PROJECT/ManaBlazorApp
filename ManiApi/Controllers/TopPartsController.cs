@@ -248,6 +248,198 @@ namespace ManiApi.Controllers
             return Ok(orderedRows);
         }
 
+        [HttpGet("planning/spare-parts")]
+            public async Task<IActionResult> GetPlanningSpareParts()
+            {
+                var rows = await (
+                    from product in _db.TopParts.AsNoTracking()
+
+                    join category in _db.Categories.AsNoTracking()
+                        on product.CategoryID equals category.Id
+
+                    join link in _db.TopPartSpareParts.AsNoTracking()
+                        on (uint)product.Id equals link.ProductTopPartId
+                    
+                    join workflow in _db.Workflows.AsNoTracking()
+                        on link.WorkflowId equals workflow.Id
+
+                    join sparePart in _db.TopParts.AsNoTracking()
+                        on link.SparePartTopPartId equals (uint)sparePart.Id
+
+                    where product.TopPartType == TopPartType.Product
+                        && product.IsActive
+                        && category.IsActive
+                        && link.IsActive
+                        && sparePart.TopPartType == TopPartType.SparePart
+                        && sparePart.IsActive
+                        && workflow.Status == WorkflowStatus.Released
+                        && workflow.IsActive
+
+                    select new
+                    {
+                        CategoryId = category.Id,
+                        category.CategoryName,
+                        ProductId = product.Id,
+                        ProductName = product.TopPartName,
+                        ProductCode = product.TopPartCode,
+                        WorkflowId = workflow.Id,
+                        WorkflowVersion = workflow.WorkflowVersion,
+                        IsCurrent = workflow.IsCurrent,
+                        SparePartId = sparePart.Id,
+                        SparePartName = sparePart.TopPartName,
+                        SparePartCode = sparePart.TopPartCode
+                    })
+                    .ToListAsync();
+
+                var result = rows
+                    .GroupBy(x => new { x.CategoryId, x.CategoryName })
+                    .Select(category => new PlanningSparePartGroupDto
+                    {
+                        CategoryId = category.Key.CategoryId,
+                        CategoryName = category.Key.CategoryName,
+                        Products = category
+                            .GroupBy(x => new
+                            {
+                                x.ProductId,
+                                x.ProductName,
+                                x.ProductCode
+                            })
+                            .Select(product => new PlanningSparePartProductDto
+                            {
+                                ProductId = product.Key.ProductId,
+                                ProductName = product.Key.ProductName,
+                                ProductCode = product.Key.ProductCode,
+                                SpareParts = product
+                                    .GroupBy(x => x.SparePartId)
+                                    .Select(sparePart =>
+                                    {
+                                        var row = sparePart.First();
+
+                                        return new PlanningSparePartDto
+                                        {
+                                            Id = row.SparePartId,
+                                            Name = row.SparePartName,
+                                            Code = row.SparePartCode
+                                        };
+                                    })
+                                    .OrderBy(x => x.Name)
+                                    .ToList(),
+                                Workflows = product
+                                    .GroupBy(x => new
+                                    {
+                                        x.WorkflowId,
+                                        x.WorkflowVersion,
+                                        x.IsCurrent
+                                    })
+                                    .Select(workflowGroup => new PlanningSparePartWorkflowDto
+                                    {
+                                        WorkflowId = workflowGroup.Key.WorkflowId,
+                                        WorkflowVersion = workflowGroup.Key.WorkflowVersion,
+                                        IsCurrent = workflowGroup.Key.IsCurrent,
+                                        SpareParts = workflowGroup
+                                            .GroupBy(x => x.SparePartId)
+                                            .Select(sparePart =>
+                                            {
+                                                var row = sparePart.First();
+
+                                                return new PlanningSparePartDto
+                                                {
+                                                    Id = row.SparePartId,
+                                                    Name = row.SparePartName,
+                                                    Code = row.SparePartCode
+                                                };
+                                            })
+                                            .OrderBy(x => x.Name)
+                                            .ToList()
+                                    })
+                                    .OrderByDescending(x => x.IsCurrent)
+                                    .ThenByDescending(x => x.WorkflowVersion)
+                                    .ToList()
+                            })
+                            .OrderBy(x => x.ProductName)
+                            .ToList()
+                    })
+                    .OrderBy(x => x.CategoryName)
+                    .ToList();
+
+                return Ok(result);
+            }
+
+        [HttpGet("spare-part/product-options")]
+            public async Task<IActionResult> GetSparePartProductOptions(
+                [FromQuery] int? sparePartId = null)
+            {
+                if (sparePartId.HasValue)
+                {
+                    var sparePartExists = await _db.TopParts
+                        .AsNoTracking()
+                        .AnyAsync(x =>
+                            x.Id == sparePartId.Value &&
+                            x.TopPartType == TopPartType.SparePart &&
+                            x.IsActive);
+
+                    if (!sparePartExists)
+                        return NotFound("Spare Part nav atrasta.");
+                }
+
+                var selectedLinks = sparePartId.HasValue
+                    ? await _db.TopPartSpareParts
+                        .AsNoTracking()
+                        .Where(x =>
+                            x.SparePartTopPartId == (uint)sparePartId.Value &&
+                            x.IsActive)
+                        .Select(x => new TopPartSparePartSelectionDto
+                        {
+                            ProductTopPartId = (int)x.ProductTopPartId,
+                            WorkflowId = x.WorkflowId
+                        })
+                        .ToListAsync()
+                    : [];
+
+                var products = await (
+                    from product in _db.TopParts.AsNoTracking()
+
+                    join category in _db.Categories.AsNoTracking()
+                        on product.CategoryID equals category.Id
+
+                    join workflow in _db.Workflows.AsNoTracking()
+                        on (uint?)product.Id equals workflow.TopPartId
+
+                    where product.TopPartType == TopPartType.Product
+                        && product.IsActive
+                        && category.IsActive
+                        && workflow.Status == WorkflowStatus.Released
+                        && workflow.IsActive
+
+                    orderby category.CategoryName,
+                        product.TopPartName,
+                        workflow.WorkflowVersion descending
+
+                    select new TopPartSparePartProductOptionDto
+                    {
+                        ProductTopPartId = product.Id,
+                        ProductName = product.TopPartName,
+                        ProductCode = product.TopPartCode,
+                        WorkflowId = workflow.Id,
+                        WorkflowVersion = workflow.WorkflowVersion,
+                        ReleasedDate = workflow.ReleasedDate,
+                        IsCurrent = workflow.IsCurrent,
+                        CategoryId = category.Id,
+                        CategoryName = category.CategoryName
+                    })
+                    .ToListAsync();
+
+                foreach (var product in products)
+                {
+                    product.IsSelected = selectedLinks.Any(x =>
+                        x.ProductTopPartId == product.ProductTopPartId &&
+                        x.WorkflowId == product.WorkflowId);
+                }
+
+                return Ok(products);
+            }
+
+
         // POST: api/topparts
 [HttpPost]
 public async Task<IActionResult> Create([FromBody] CreateTopPartDto dto)
@@ -278,14 +470,81 @@ public async Task<IActionResult> Create([FromBody] CreateTopPartDto dto)
     if (dto.TopPartType is null)
         return BadRequest("Tips ir obligāts.");
 
-    if (dto.TopPartType == (byte)TopPartType.Part)
+    if (dto.TopPartType is (byte)TopPartType.Part
+            or (byte)TopPartType.SparePart)
         {
             dto.CategoryID = null;
         }
     else if (dto.CategoryID is null)
         {
-            return BadRequest("Kategorija ir obligāta.");
+            return BadRequest("Preču grupa ir obligāta.");
         }
+
+    dto.Selections = dto.Selections
+    .GroupBy(x => new
+    {
+        x.ProductTopPartId,
+        x.WorkflowId
+    })
+    .Select(x => x.First())
+    .ToList();
+
+    if (dto.TopPartType != (byte)TopPartType.SparePart &&
+        dto.Selections.Count > 0)
+    {
+        return BadRequest(
+            "Saistītās preces drīkst norādīt tikai Spare Part.");
+    }
+
+    if (dto.Selections.Any(x =>
+        x.ProductTopPartId <= 0 || x.WorkflowId <= 0))
+    {
+        return BadRequest("Nederīga preces vai flow versijas izvēle.");
+    }
+
+    if (dto.Selections
+        .GroupBy(x => x.ProductTopPartId)
+        .Any(x => x.Count() > 1))
+    {
+        return BadRequest(
+            "Vienai precei drīkst izvēlēties tikai vienu flow versiju.");
+    }
+
+    var productIds = dto.Selections
+        .Select(x => x.ProductTopPartId)
+        .ToList();
+
+    var workflowIds = dto.Selections
+        .Select(x => x.WorkflowId)
+        .ToList();
+
+    var validSelections = await (
+        from product in _db.TopParts
+        from workflow in _db.Workflows
+
+        where productIds.Contains(product.Id)
+            && workflowIds.Contains(workflow.Id)
+            && product.TopPartType == TopPartType.Product
+            && product.IsActive
+            && workflow.TopPartId == (uint)product.Id
+            && workflow.Status == WorkflowStatus.Released
+            && workflow.IsActive
+
+        select new
+        {
+            ProductTopPartId = product.Id,
+            WorkflowId = workflow.Id
+        })
+        .ToListAsync();
+
+    if (dto.Selections.Any(selection =>
+        !validSelections.Any(valid =>
+            valid.ProductTopPartId == selection.ProductTopPartId &&
+            valid.WorkflowId == selection.WorkflowId)))
+    {
+        return BadRequest(
+            "Izvēlētā prece vai tās flow versija nav derīga.");
+    }
 
     var exists = await _db.TopParts
         .AnyAsync(x => x.TopPartCode == dto.TopPartCode);
@@ -309,6 +568,22 @@ public async Task<IActionResult> Create([FromBody] CreateTopPartDto dto)
 
     _db.TopParts.Add(topPart);
     await _db.SaveChangesAsync();
+
+    if (topPart.TopPartType == TopPartType.SparePart)
+        {
+            _db.TopPartSpareParts.AddRange(
+                dto.Selections.Select(selection =>
+                    new TopPartSparePart
+                    {
+                        ProductTopPartId =
+                            (uint)selection.ProductTopPartId,
+                        SparePartTopPartId = (uint)topPart.Id,
+                        WorkflowId = selection.WorkflowId,
+                        IsActive = true
+                    }));
+
+            await _db.SaveChangesAsync();
+        }
 
     await _topPartWorkflowService.CreateInitialWorkflowAsync(
         topPart.Id,
@@ -348,6 +623,108 @@ public async Task<IActionResult> Create([FromBody] CreateTopPartDto dto)
 
             if (string.IsNullOrWhiteSpace(dto.TopPartName))
                 return BadRequest("Nosaukums ir obligāts.");
+
+            dto.Selections = dto.Selections
+                .GroupBy(x => new
+                {
+                    x.ProductTopPartId,
+                    x.WorkflowId
+                })
+                .Select(x => x.First())
+                .ToList();
+
+            if (row.TopPartType != TopPartType.SparePart &&
+                dto.Selections.Count > 0)
+            {
+                return BadRequest(
+                    "Saistītās preces drīkst norādīt tikai Spare Part.");
+            }
+
+            if (dto.Selections.Any(x =>
+                x.ProductTopPartId <= 0 || x.WorkflowId <= 0))
+            {
+                return BadRequest("Nederīga preces vai flow versijas izvēle.");
+            }
+
+            if (dto.Selections
+                .GroupBy(x => x.ProductTopPartId)
+                .Any(x => x.Count() > 1))
+            {
+                return BadRequest(
+                    "Vienai precei drīkst izvēlēties tikai vienu flow versiju.");
+            }
+
+            if (row.TopPartType == TopPartType.SparePart)
+            {
+                var productIds = dto.Selections
+                    .Select(x => x.ProductTopPartId)
+                    .ToList();
+
+                var workflowIds = dto.Selections
+                    .Select(x => x.WorkflowId)
+                    .ToList();
+
+                var validSelections = await (
+                    from product in _db.TopParts
+                    from workflow in _db.Workflows
+
+                    where productIds.Contains(product.Id)
+                        && workflowIds.Contains(workflow.Id)
+                        && product.TopPartType == TopPartType.Product
+                        && product.IsActive
+                        && workflow.TopPartId == (uint)product.Id
+                        && workflow.Status == WorkflowStatus.Released
+                        && workflow.IsActive
+
+                    select new
+                    {
+                        ProductTopPartId = product.Id,
+                        WorkflowId = workflow.Id
+                    })
+                    .ToListAsync();
+
+                if (dto.Selections.Any(selection =>
+                    !validSelections.Any(valid =>
+                        valid.ProductTopPartId == selection.ProductTopPartId &&
+                        valid.WorkflowId == selection.WorkflowId)))
+                {
+                    return BadRequest(
+                        "Izvēlētā prece vai tās flow versija nav derīga.");
+                }
+
+                var existingLinks = await _db.TopPartSpareParts
+                    .Where(x =>
+                        x.SparePartTopPartId == (uint)row.Id)
+                    .ToListAsync();
+
+                foreach (var link in existingLinks)
+                {
+                    link.IsActive = dto.Selections.Any(selection =>
+                        selection.ProductTopPartId ==
+                            (int)link.ProductTopPartId &&
+                        selection.WorkflowId == link.WorkflowId);
+                }
+
+                foreach (var selection in dto.Selections)
+                {
+                    if (existingLinks.Any(x =>
+                        x.ProductTopPartId ==
+                            (uint)selection.ProductTopPartId &&
+                        x.WorkflowId == selection.WorkflowId))
+                    {
+                        continue;
+                    }
+
+                    _db.TopPartSpareParts.Add(new TopPartSparePart
+                    {
+                        ProductTopPartId =
+                            (uint)selection.ProductTopPartId,
+                        SparePartTopPartId = (uint)row.Id,
+                        WorkflowId = selection.WorkflowId,
+                        IsActive = true
+                    });
+                }
+            }
 
             row.TopPartName = dto.TopPartName;
             row.TopPartCode = dto.TopPartCode;
@@ -1140,6 +1517,35 @@ public async Task<IActionResult> GetWorkflowTopParts()
 
                 if (topPart == null)
                     return NotFound("TopPart nav atrasts.");
+
+                if (topPart.TopPartType == TopPartType.SparePart)
+                {
+                    var sparePartItems = await (
+                        from relation in _db.TopPartSpareParts.AsNoTracking()
+                        join product in _db.TopParts.AsNoTracking()
+                            on relation.ProductTopPartId equals (uint)product.Id
+                        where
+                            relation.SparePartTopPartId == (uint)topPartId &&
+                            relation.IsActive &&
+                            product.IsActive &&
+                            product.TopPartType == TopPartType.Product
+                        select new TopPartUsageItemDto
+                        {
+                            TopPartId = product.Id,
+                            TopPartCode = product.TopPartCode,
+                            TopPartName = product.TopPartName,
+                            TopPartType = (byte)product.TopPartType
+                        })
+                        .Distinct()
+                        .OrderBy(x => x.TopPartName)
+                        .ToListAsync();
+
+                    return Ok(new TopPartUsageDto
+                    {
+                        Count = sparePartItems.Count,
+                        Items = sparePartItems
+                    });
+                }
 
                 if (topPart.TopPartType != TopPartType.Part)
                 {

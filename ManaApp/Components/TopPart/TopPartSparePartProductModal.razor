@@ -1,0 +1,186 @@
+@* ToppartSparePartProductModal.razor *@
+
+@using ManaApp.Shared.DTOs.TopPart
+
+<div class="spare-product-modal-backdrop">
+    <div class="spare-product-modal">
+
+        <div class="spare-product-modal-header">
+            <span>Saistītās preces</span>
+
+            <button type="button"
+                    class="spare-product-modal-close"
+                    @onclick="Cancel">
+                ×
+            </button>
+        </div>
+
+        <div class="spare-product-modal-search">
+            <input type="text"
+                   placeholder="Meklēt pēc Product koda vai nosaukuma..."
+                   @bind="searchText"
+                   @bind:event="oninput" />
+        </div>
+
+        <div class="spare-product-modal-list">
+            @foreach (var productWorkflows in FilteredProducts)
+            {
+                var product = productWorkflows.First();
+                var selectedWorkflow =
+                    productWorkflows.FirstOrDefault(x => x.IsSelected);
+
+                <div class="spare-product-modal-row">
+                    <input type="checkbox"
+                           checked="@(selectedWorkflow is not null)"
+                           @onchange="@(e => ToggleProduct(
+                               product.ProductTopPartId, e))" />
+
+                    <span class="spare-product-modal-code">
+                        @product.ProductCode
+                    </span>
+
+                    <span class="spare-product-modal-name">
+                        @product.ProductName
+                    </span>
+
+                    <select disabled="@(selectedWorkflow is null)"
+                            value="@selectedWorkflow?.WorkflowId"
+                            @onchange="@(e => ChangeWorkflow(
+                                product.ProductTopPartId, e))">
+
+                        @foreach (var workflow in productWorkflows
+                            .OrderByDescending(x => x.WorkflowVersion))
+                        {
+                            <option value="@workflow.WorkflowId">
+                                Flow v.@workflow.WorkflowVersion
+                                @(workflow.IsCurrent ? " — aktuālā" : "")
+                            </option>
+                        }
+                    </select>
+                </div>
+            }
+        </div>
+
+        <div class="spare-product-modal-actions">
+            <button type="button" @onclick="Cancel">
+                Atcelt
+            </button>
+
+            <button type="button" @onclick="Save">
+                Saglabāt
+            </button>
+        </div>
+
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public List<TopPartSparePartProductOptionDto> ProductOptions { get; set; } = [];
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    [Parameter]
+    public EventCallback<List<TopPartSparePartProductOptionDto>> OnSave { get; set; }
+
+    private List<TopPartSparePartProductOptionDto> workingOptions = [];
+    private bool optionsInitialized;
+
+    private string searchText = "";
+
+    private IEnumerable<IGrouping<int, TopPartSparePartProductOptionDto>>
+        FilteredProducts =>
+            workingOptions
+                .GroupBy(x => x.ProductTopPartId)
+                .Where(group =>
+                {
+                    var product = group.First();
+
+                    return string.IsNullOrWhiteSpace(searchText) ||
+                        product.ProductCode.Contains(
+                            searchText,
+                            StringComparison.OrdinalIgnoreCase) ||
+                        product.ProductName.Contains(
+                            searchText,
+                            StringComparison.OrdinalIgnoreCase);
+                })
+                .OrderBy(group => group.First().ProductName);
+
+    protected override void OnParametersSet()
+        {
+            if (optionsInitialized)
+                return;
+
+            workingOptions = ProductOptions
+                .Select(x => new TopPartSparePartProductOptionDto
+                {
+                    ProductTopPartId = x.ProductTopPartId,
+                    ProductName = x.ProductName,
+                    ProductCode = x.ProductCode,
+                    WorkflowId = x.WorkflowId,
+                    WorkflowVersion = x.WorkflowVersion,
+                    ReleasedDate = x.ReleasedDate,
+                    IsCurrent = x.IsCurrent,
+                    CategoryId = x.CategoryId,
+                    CategoryName = x.CategoryName,
+                    IsSelected = x.IsSelected
+                })
+                .ToList();
+
+            optionsInitialized = true;
+        }
+
+    private void ToggleProduct(int productTopPartId, ChangeEventArgs e)
+        {
+            var productWorkflows = workingOptions
+                .Where(x => x.ProductTopPartId == productTopPartId)
+                .ToList();
+
+            var isSelected = e.Value is bool value && value;
+
+            if (!isSelected)
+            {
+                foreach (var workflow in productWorkflows)
+                    workflow.IsSelected = false;
+
+                return;
+            }
+
+            if (productWorkflows.Any(x => x.IsSelected))
+                return;
+
+            var defaultWorkflow = productWorkflows
+                .FirstOrDefault(x => x.IsCurrent)
+                ?? productWorkflows
+                    .OrderByDescending(x => x.WorkflowVersion)
+                    .First();
+
+            defaultWorkflow.IsSelected = true;
+        }
+
+    private void ChangeWorkflow(
+            int productTopPartId,
+            ChangeEventArgs e)
+        {
+            if (!int.TryParse(e.Value?.ToString(), out var workflowId))
+                return;
+
+            foreach (var workflow in workingOptions.Where(x =>
+                x.ProductTopPartId == productTopPartId))
+            {
+                workflow.IsSelected = workflow.WorkflowId == workflowId;
+            }
+        }
+
+    private Task Cancel()
+        {
+            return OnCancel.InvokeAsync();
+        }
+
+    private Task Save()
+        {
+            return OnSave.InvokeAsync(workingOptions);
+        }
+
+}

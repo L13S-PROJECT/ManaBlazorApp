@@ -1,0 +1,156 @@
+/* PlanningProductDetails.razor.css */
+
+.planning-product-details {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 4px 6px;
+    background: #fff;
+}
+
+.ral-details-card {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 4px 6px 6px;
+    background: #fff;
+    border: 1px solid #d9dde3;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(31, 41, 55, 0.07);
+}
+
+.ral-details-title {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #20242a;
+}
+
+.ral-details-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    color: #20242a;
+}
+
+.ral-details-table th,
+.ral-details-table td {
+    padding: 6px 0;
+    font-size: 12px;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.ral-details-table th {
+    padding-top: 0;
+    font-weight: 700;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.ral-details-table tbody td {
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.ral-details-table th:first-child,
+.ral-details-table td:first-child {
+    width: 32%;
+}
+
+.ral-details-table .number-column {
+    width: 17%;
+    padding-left: 5px;
+    padding-right: 5px;
+    text-align: center;
+}
+
+.ral-cell {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+}
+
+.ral-color {
+    display: inline-block;
+    flex: 0 0 18px;
+    width: 18px;
+    height: 18px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 4px;
+    box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.35);
+}
+
+.ral-7016 {
+    background: #29343a;
+}
+
+.ral-9005 {
+    background: #0a0a0a;
+}
+
+.ral-1020 {
+    background: #b5a88a;
+}
+
+.missing-value {
+    font-weight: 700;
+    color: #e3342f;
+}
+
+.process-value {
+    font-weight: 600;
+    color: #b7791f;
+}
+
+.ral-details-table tfoot td {
+    padding-top: 9px;
+    font-weight: 700;
+    border: 0;
+}
+
+.ral-details-table tfoot .missing-value {
+    color: #e3342f;
+}
+
+@media (max-width: 700px) {
+    .planning-product-details {
+        padding: 4px;
+    }
+
+    .ral-details-card {
+        width: 100%;
+        padding: 8px;
+    }
+
+    .ral-details-table th,
+    .ral-details-table td {
+        font-size: 12px;
+    }
+
+    .ral-details-table .number-column {
+        padding-left: 4px;
+        padding-right: 4px;
+    }
+
+    .ral-cell {
+        gap: 7px;
+    }
+
+    .ral-color {
+        flex-basis: 20px;
+        width: 20px;
+        height: 20px;
+    }
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 8px;
+    width: 100%;
+}
+
+@media (max-width: 900px) {
+    .details-grid {
+        grid-template-columns: 1fr;
+    }
+}

@@ -1,0 +1,79 @@
+@namespace ManaApp.Components.Planning
+
+<div class="planning-product-details">
+
+    <div class="details-grid">
+
+        <section class="ral-details-card">
+            <h3 class="ral-details-title">VAJADZĪBA PA RAL</h3>
+
+            <table class="ral-details-table">
+                <thead>
+                    <tr>
+                        <th>RAL</th>
+                        <th class="number-column">Order</th>
+                        <th class="number-column">InStock</th>
+                        <th class="number-column">Procesā</th>
+                        <th class="number-column">Trūkst</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <tr>
+                        <td>
+                            <div class="ral-cell">
+                                <span class="ral-color ral-7016"
+                                    aria-hidden="true"></span>
+                                <span>RAL 7016</span>
+                            </div>
+                        </td>
+                        <td class="number-column">50</td>
+                        <td class="number-column">10</td>
+                        <td class="number-column process-value">8</td>
+                        <td class="number-column missing-value">40</td>
+                    </tr>
+
+                    <tr>
+                        <td>
+                            <div class="ral-cell">
+                                <span class="ral-color ral-9005"
+                                    aria-hidden="true"></span>
+                                <span>RAL 9005</span>
+                            </div>
+                        </td>
+                        <td class="number-column">40</td>
+                        <td class="number-column">6</td>
+                        <td class="number-column process-value">5</td>
+                        <td class="number-column missing-value">34</td>
+                    </tr>
+
+                    <tr>
+                        <td>
+                            <div class="ral-cell">
+                                <span class="ral-color ral-1020"
+                                    aria-hidden="true"></span>
+                                <span>RAL 1020</span>
+                            </div>
+                        </td>
+                        <td class="number-column">30</td>
+                        <td class="number-column">4</td>
+                        <td class="number-column process-value">7</td>
+                        <td class="number-column missing-value">26</td>
+                    </tr>
+                </tbody>
+
+                <tfoot>
+                    <tr>
+                        <td>Kopā</td>
+                        <td class="number-column">120</td>
+                        <td class="number-column">20</td>
+                        <td class="number-column process-value">20</td>
+                        <td class="number-column missing-value">100</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </section>
+
+        <PlanningProductionFlow />
+    </div>
+</div>

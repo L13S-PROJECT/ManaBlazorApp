@@ -100,6 +100,15 @@
                                                     <span class="flow-component-name">
                                                         @part.Component!.TopPartCode - @part.Component.TopPartName
                                                     </span>
+
+                                                    @if (!string.IsNullOrWhiteSpace(
+                                                            part.Component.RequiredWorkflowNodeName))
+                                                        {
+                                                            <span class="flow-component-required-node"
+                                                                    title="Nepieciešamā stadija">
+                                                                ◎ : @part.Component.RequiredWorkflowNodeName
+                                                            </span>
+                                                        }
                                                     
 
                                                     <span class="flow-component-quantity">
@@ -145,7 +154,7 @@
                                 <span class="flow-node-icon flow-node-icon-wip">●</span>
 
                                 <div class="flow-node-text">
-                                    <span class="flow-node-label">Rezultāts (WIP)</span>
+                                    <span class="flow-node-label">Rezultāts (starprezultāts)</span>
                                     <span class="flow-node-name">@node.Name</span>
                                 </div>
                             </div>

@@ -13,6 +13,9 @@ namespace ManiApi.Models
         [Column("Workflow_ID")]
         public int WorkflowId { get; set; }
 
+        [Column("ParentNode_ID")]
+        public int? ParentNodeId { get; set; }
+
         [Column("NodeType")]
         public byte NodeType { get; set; }
 

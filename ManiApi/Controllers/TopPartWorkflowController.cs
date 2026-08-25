@@ -187,6 +187,7 @@ namespace ManiApi.Controllers
                     {
                         Id = node.Id,
                         WorkflowId = node.WorkflowId,
+                        ParentNodeId = node.ParentNodeId,
                         NodeType = node.NodeType,
                         Name = node.Name,
                         TopPartId = node.TopPartId,
@@ -990,9 +991,18 @@ namespace ManiApi.Controllers
                             }
 
                             if (component.ComponentType == 2 &&
-                                (component.TopPartId != null || component.ReferencedWorkflowId != null))
+                                (component.TopPartId != null ||
+                                component.ReferencedWorkflowId != null ||
+                                component.RequiredWorkflowNodeId != null))
                             {
                                 return BadRequest("Item komponentei nedrīkst būt TopPart vai Workflow reference.");
+                            }
+
+                        
+                        if (component.ComponentType == 1 &&
+                                (component.TopPartId == null || component.ReferencedWorkflowId == null))
+                            {
+                                return BadRequest("TopPart komponentei jānorāda TopPart un tā Workflow versija.");
                             }
 
 
@@ -1012,6 +1022,21 @@ namespace ManiApi.Controllers
                                 if (!referencedWorkflowExists)
                                     return BadRequest(
                                         "Norādītā Workflow versija nepieder izvēlētajam TopPart.");
+
+                                if (component.RequiredWorkflowNodeId.HasValue)
+                                    {
+                                        var requiredNodeExists = await _db.WorkflowNodes
+                                            .AnyAsync(x =>
+                                                x.Id == component.RequiredWorkflowNodeId.Value &&
+                                                x.WorkflowId == component.ReferencedWorkflowId &&
+                                                x.IsActive &&
+                                                (x.NodeType == (byte)WorkflowNodeType.Wip ||
+                                                x.NodeType == (byte)WorkflowNodeType.Finish));
+
+                                        if (!requiredNodeExists)
+                                            return BadRequest(
+                                                "Izvēlētais WIP/FINISH nepieder norādītajai Workflow versijai.");
+                                    }
 
                                 var createsCycle = await CreatesWorkflowCycle(
                                     sourceWorkflow.TopPartId!.Value,
@@ -1134,6 +1159,7 @@ namespace ManiApi.Controllers
                     var newNode = new WorkflowNode
                     {
                         WorkflowId = sourceWorkflow.Id,
+                        ParentNodeId = draftNode.ParentNodeId,
                         NodeType = draftNode.NodeType,
                         Name = draftNode.Name,
                         TopPartId = draftNode.TopPartId,
@@ -1182,6 +1208,7 @@ namespace ManiApi.Controllers
                         TopPartId = draftComponent.TopPartId,
                         ItemId = draftComponent.ItemId,
                         ReferencedWorkflowId = draftComponent.ReferencedWorkflowId,
+                        RequiredWorkflowNodeId = draftComponent.RequiredWorkflowNodeId,
                         Quantity = draftComponent.Quantity,
                         IsActive = true
                     };
@@ -1299,6 +1326,7 @@ namespace ManiApi.Controllers
                     var newNode = new WorkflowNode
                     {
                         WorkflowId = draftWorkflow.Id,
+                        ParentNodeId = sourceNode.Id,
                         NodeType = sourceNode.NodeType,
                         Name = sourceNode.Name,
                         TopPartId = sourceNode.TopPartId,
@@ -1350,6 +1378,7 @@ namespace ManiApi.Controllers
                         TopPartId = sourceComponent.TopPartId,
                         ItemId = sourceComponent.ItemId,
                         ReferencedWorkflowId = sourceComponent.ReferencedWorkflowId,
+                        RequiredWorkflowNodeId = sourceComponent.RequiredWorkflowNodeId,
                         Quantity = sourceComponent.Quantity,
                         IsActive = true
                     };
@@ -1532,6 +1561,7 @@ namespace ManiApi.Controllers
                                 parent.TopPartId == current.TopPartId &&
                                 parent.ItemId == current.ItemId &&
                                 parent.ReferencedWorkflowId == current.ReferencedWorkflowId &&
+                                parent.RequiredWorkflowNodeId == current.RequiredWorkflowNodeId &&
                                 parent.Quantity == current.Quantity))
                     );
 
@@ -1692,6 +1722,7 @@ namespace ManiApi.Controllers
                             parentComponent.TopPartId == currentComponent.TopPartId &&
                             parentComponent.ItemId == currentComponent.ItemId &&
                             parentComponent.ReferencedWorkflowId == currentComponent.ReferencedWorkflowId &&
+                            parentComponent.RequiredWorkflowNodeId == currentComponent.RequiredWorkflowNodeId &&
                             parentLink.Quantity == currentLink.Quantity;
                     });
                  })
@@ -1720,6 +1751,34 @@ namespace ManiApi.Controllers
                 workflow.Status = WorkflowStatus.Released;
                 workflow.ReleasedDate = DateTime.Now;
                 workflow.IsCurrent = true;
+
+                if (parentWorkflow != null)
+                    {
+                        var sourceSparePartLinks = await _db.TopPartSpareParts
+                            .AsNoTracking()
+                            .Where(x =>
+                                x.WorkflowId == parentWorkflow.Id &&
+                                x.IsActive)
+                            .ToListAsync();
+
+                        var existingSparePartIds = await _db.TopPartSpareParts
+                            .Where(x =>
+                                x.WorkflowId == workflow.Id &&
+                                x.IsActive)
+                            .Select(x => x.SparePartTopPartId)
+                            .ToListAsync();
+
+                        _db.TopPartSpareParts.AddRange(
+                            sourceSparePartLinks
+                                .Where(x => !existingSparePartIds.Contains(x.SparePartTopPartId))
+                                .Select(x => new TopPartSparePart
+                                {
+                                    ProductTopPartId = x.ProductTopPartId,
+                                    SparePartTopPartId = x.SparePartTopPartId,
+                                    WorkflowId = workflow.Id,
+                                    IsActive = true
+                                }));
+                    }
 
                 await _db.SaveChangesAsync();
 
@@ -1931,6 +1990,7 @@ namespace ManiApi.Controllers
                             TopPartId = component.TopPartId,
                             ItemId = component.ItemId,
                             ReferencedWorkflowId = component.ReferencedWorkflowId,
+                            RequiredWorkflowNodeId = component.RequiredWorkflowNodeId,
                             Quantity = component.Quantity,
 
                             UsedQuantity = _db.WorkflowProcessComponents
@@ -1961,9 +2021,30 @@ namespace ManiApi.Controllers
                     .AsNoTracking()
                     .Where(x => topPartIds.Contains(x.Id))
                     .ToDictionaryAsync(x => x.Id);
+                
+                var requiredWorkflowNodeIds = rows
+                    .Where(x => x.RequiredWorkflowNodeId.HasValue)
+                    .Select(x => x.RequiredWorkflowNodeId!.Value)
+                    .Distinct()
+                    .ToList();
+
+                var requiredWorkflowNodes = await _db.WorkflowNodes
+                    .AsNoTracking()
+                    .Where(x =>
+                        requiredWorkflowNodeIds.Contains(x.Id) &&
+                        x.IsActive)
+                    .ToDictionaryAsync(x => x.Id);
 
                 foreach (var row in rows)
                 {
+                    if (row.RequiredWorkflowNodeId.HasValue &&
+                            requiredWorkflowNodes.TryGetValue(
+                                row.RequiredWorkflowNodeId.Value,
+                                out var requiredNode))
+                        {
+                            row.RequiredWorkflowNodeName = requiredNode.Name;
+                        }
+
                     if (row.ComponentType != 1 || !row.TopPartId.HasValue)
                         continue;
 
@@ -2060,16 +2141,26 @@ namespace ManiApi.Controllers
                 return BadRequest("Workflow nevar izmantot pats savu TopPart kā komponenti.");
 
             var releasedWorkflow = await _db.Workflows
-                .Where(x =>
+                .FirstOrDefaultAsync(x =>
+                    x.Id == dto.WorkflowId &&
                     x.TopPartId == dto.TopPartId &&
                     x.Status == WorkflowStatus.Released &&
-                    x.IsCurrent &&
-                    x.IsActive)
-                .FirstOrDefaultAsync();
+                    x.IsActive);
 
             if (releasedWorkflow == null)
                 return BadRequest("Izvēlētajam TopPart nav aktuāla RELEASED Workflow.");
-            
+            var requiredNodeExists = await _db.WorkflowNodes
+                .AnyAsync(x =>
+                    x.Id == dto.RequiredWorkflowNodeId &&
+                    x.WorkflowId == releasedWorkflow.Id &&
+                    x.IsActive &&
+                    (x.NodeType == (byte)WorkflowNodeType.Wip ||
+                    x.NodeType == (byte)WorkflowNodeType.Finish));
+
+            if (!requiredNodeExists)
+                return BadRequest(
+                    "Izvēlētais WIP/FINISH nepieder norādītajai Workflow versijai.");
+
             var createsCycle = await CreatesWorkflowCycle(
                 workflow.TopPartId!.Value,
                 releasedWorkflow.Id);
@@ -2094,6 +2185,7 @@ namespace ManiApi.Controllers
                 TopPartId = (uint)dto.TopPartId,
                 ItemId = null,
                 ReferencedWorkflowId = releasedWorkflow.Id,
+                RequiredWorkflowNodeId = dto.RequiredWorkflowNodeId,
                 Quantity = dto.Quantity,
                 IsActive = true
             };
@@ -2183,7 +2275,8 @@ namespace ManiApi.Controllers
                     .AsNoTracking()
                     .Where(x =>
                         x.IsActive &&
-                        x.TopPartType == TopPartType.Part &&
+                        (x.TopPartType == TopPartType.Part ||
+                        x.TopPartType == TopPartType.SparePart) &&
                         x.Id != workflow.TopPartId &&
                         _db.Workflows.Any(w =>
                             w.TopPartId == x.Id &&
@@ -2230,6 +2323,7 @@ namespace ManiApi.Controllers
                             TopPartName = x.TopPartName,
                             ReleasedWorkflowId = x.ReleasedWorkflowId,
                             ReleasedWorkflowVersion = x.ReleasedWorkflowVersion,
+                            RequiredWorkflowNodeId = existing?.RequiredWorkflowNodeId,
                             IsSelected = existing != null,
                             Quantity = existing?.Quantity ?? 1,
                             CanEdit = workflow.Status == WorkflowStatus.Draft
@@ -2282,7 +2376,10 @@ namespace ManiApi.Controllers
                             existing.TopPartId == (uint)x.TopPartId);
 
                         return part == null ||
-                            existing.Quantity != part.Quantity;
+                            existing.Quantity != part.Quantity ||
+                            existing.ReferencedWorkflowId != part.WorkflowId ||
+                            existing.RequiredWorkflowNodeId != part.RequiredWorkflowNodeId;
+                    
                     });
 
                 // Noņemam PART, kurus lietotājs izķeksējis.
@@ -2316,10 +2413,12 @@ namespace ManiApi.Controllers
                         x.TopPartId == (uint)part.TopPartId);
 
                     if (existing != null)
-                    {
-                        existing.Quantity = part.Quantity;
-                        continue;
-                    }
+                        {
+                            existing.Quantity = part.Quantity;
+                            existing.ReferencedWorkflowId = part.WorkflowId;
+                            existing.RequiredWorkflowNodeId = part.RequiredWorkflowNodeId;
+                            continue;
+                        }
 
                     if (workflow.TopPartId == (uint)part.TopPartId)
                         return BadRequest(
@@ -2327,14 +2426,26 @@ namespace ManiApi.Controllers
 
                     var releasedWorkflow = await _db.Workflows
                         .FirstOrDefaultAsync(x =>
+                            x.Id == part.WorkflowId &&
                             x.TopPartId == part.TopPartId &&
                             x.Status == WorkflowStatus.Released &&
-                            x.IsCurrent &&
                             x.IsActive);
 
                     if (releasedWorkflow == null)
                         return BadRequest(
                             "Izvēlētajam TopPart nav aktuāla RELEASED Workflow.");
+                    
+                    var requiredNodeExists = await _db.WorkflowNodes
+                        .AnyAsync(x =>
+                            x.Id == part.RequiredWorkflowNodeId &&
+                            x.WorkflowId == releasedWorkflow.Id &&
+                            x.IsActive &&
+                            (x.NodeType == (byte)WorkflowNodeType.Wip ||
+                            x.NodeType == (byte)WorkflowNodeType.Finish));
+
+                    if (!requiredNodeExists)
+                        return BadRequest(
+                            "Izvēlētais WIP/FINISH nepieder norādītajai Workflow versijai.");
 
                     var createsCycle = await CreatesWorkflowCycle(
                         workflow.TopPartId!.Value,
@@ -2351,6 +2462,7 @@ namespace ManiApi.Controllers
                         TopPartId = (uint)part.TopPartId,
                         ItemId = null,
                         ReferencedWorkflowId = releasedWorkflow.Id,
+                        RequiredWorkflowNodeId = part.RequiredWorkflowNodeId,
                         Quantity = part.Quantity,
                         IsActive = true
                     });
@@ -2551,6 +2663,41 @@ namespace ManiApi.Controllers
                 .ToListAsync();
 
             return Ok(stepTypes);
+        }
+
+    
+        [HttpGet("{workflowId}/output-nodes")]
+        public async Task<IActionResult> GetWorkflowOutputNodes(int workflowId)
+        {
+            var nodes = await _db.WorkflowNodes
+                .AsNoTracking()
+                .Where(x =>
+                    x.WorkflowId == workflowId &&
+                    x.IsActive &&
+                    (
+                        x.NodeType == (byte)WorkflowNodeType.Finish ||
+                        (
+                            x.NodeType == (byte)WorkflowNodeType.Wip &&
+                            !_db.WorkflowNodeConnections.Any(connection =>
+                                connection.FromNodeId == x.Id &&
+                                _db.WorkflowNodes.Any(finish =>
+                                    finish.Id == connection.ToNodeId &&
+                                    finish.WorkflowId == workflowId &&
+                                    finish.NodeType == (byte)WorkflowNodeType.Finish &&
+                                    finish.IsActive))
+                        )
+                    ))
+                .OrderBy(x => x.SortOrder)
+                .Select(x => new TopPartWorkflowNodeOptionDto
+                {
+                    Id = x.Id,
+                    NodeType = x.NodeType,
+                    Name = x.Name ?? "",
+                    SortOrder = x.SortOrder
+                })
+                .ToListAsync();
+
+            return Ok(nodes);
         }
 
     }

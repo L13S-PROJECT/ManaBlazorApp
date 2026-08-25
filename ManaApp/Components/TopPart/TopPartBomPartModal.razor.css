@@ -94,6 +94,7 @@
 .bom-modal-part {
     min-width: 0;
     display: flex;
+    align-items: center;
     gap: 8px;
 }
 
@@ -104,9 +105,24 @@
 }
 
 .bom-modal-name {
+    flex: 1 1 auto;
     min-width: 0;
     color: #111827;
     overflow-wrap: anywhere;
+}
+
+.bom-modal-output {
+    flex: 0 1 220px;
+    min-width: 160px;
+    max-width: 220px;
+    box-sizing: border-box;
+    padding: 3px 5px;
+
+    border: 1px solid #c7cdd4;
+    border-radius: 4px;
+    background: #fff;
+
+    font-size: 12px;
 }
 
 .bom-modal-quantity {

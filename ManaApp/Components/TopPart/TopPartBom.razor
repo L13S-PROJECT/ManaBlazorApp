@@ -1,22 +1,12 @@
 @* TopPartBom.razor *@
 
 @using ManaApp.Shared.DTOs.TopPart
-@using ManaApp.Shared.DTOs.Items
-@using ManaApp.Components.TopPart
 @using ManaApp.Services
 @inject TopPartWorkflowService TopPartWorkflowService
-@inject ItemService ItemService
 
 <div class="toppart-bom">
 
     <h4>BOM</h4>
-
-    @if (!string.IsNullOrWhiteSpace(errorMessage))
-        {
-            <div class="toppart-bom-error">
-                @errorMessage
-            </div>
-        }
 
     @if (TopPart is null)
         {
@@ -32,20 +22,20 @@
 
                     <div class="toppart-bom-column-header">
                         <span>PART</span>
-
-                        <button type="button"
-                                @onclick="OpenAddPart">
-                            + PART
-                        </button>
                     </div>
 
                     <div class="toppart-bom-list">
 
                         @foreach (var row in bom.Where(x => x.ComponentType == 1))
                         {
-                            <div class="toppart-bom-row">
-                                <span>@row.TopPartCode - @row.TopPartName</span>
-                                <span>@row.Quantity.ToString("0")</span>
+                            <div class="toppart-bom-row toppart-bom-part-row">
+                                <span class="toppart-bom-part-name">
+                                    @row.TopPartCode - @row.TopPartName
+                                </span>
+
+                                <span class="toppart-bom-part-quantity">
+                                    @row.Quantity.ToString("0")
+                                </span>
                             </div>
                         }
 
@@ -57,11 +47,6 @@
 
                     <div class="toppart-bom-column-header">
                         <span>ITEM</span>
-
-                        <button type="button"
-                                @onclick="OpenAddItem">
-                            + ITEM
-                        </button>
                     </div>
 
                     <div class="toppart-bom-list">
@@ -70,7 +55,9 @@
                         {
                             <div class="toppart-bom-row">
                                 <span>@row.ItemCode - @row.ItemName</span>
-                                <span>@row.Quantity</span>
+                                <span class="toppart-bom-item-quantity">
+                                    @row.Quantity.ToString("0.##") @row.ItemUnit
+                                </span>
                             </div>
                         }
 
@@ -82,66 +69,14 @@
         }
 
 </div>
-
-@if (showAddPart && workflowId.HasValue)
-{
-    <TopPartBomPartModal
-        WorkflowId="workflowId.Value"
-        OnClose="CloseAddPart"
-        OnSaved="PartBomSaved"
-        OnWorkflowChanged="OnWorkflowChanged" />
-
-    
-}
-
-@if (showAddItem && workflowId.HasValue)
-{
-    <TopPartBomItemModal
-        WorkflowId="workflowId.Value"
-        OnClose="CloseAddItem"
-        OnSaved="ItemBomSaved"
-        OnWorkflowChanged="OnWorkflowChanged" />
-}
-
-
-
 @code {
     [Parameter]
     public TopPartListItemDto? TopPart { get; set; }
-
-    [Parameter]
-    public EventCallback OnWorkflowChanged { get; set; }
 
     private List<TopPartWorkflowBomDto> bom = new();
     private int? loadedTopPartId;    
 
     private int? workflowId;
-    private bool showAddPart;
-    private string? errorMessage;
-
-    private async Task OpenAddPart()
-        {
-            if (!workflowId.HasValue)
-                return;
-
-            showAddPart = true;
-
-            await Task.CompletedTask;
-        }
-
-    private void OpenAddItem()
-        {
-            showAddItem = true;
-        }
-
-    private List<TopPartBomPartOptionDto> bomPartOptions = new();
-    private int? selectedBomTopPartId;
-    private decimal bomPartQuantity = 1;
-
-    private List<ItemSelectorDto> bomItemOptions = new();
-    private int? selectedBomItemId;
-    private decimal bomItemQuantity = 1;
-    private bool showAddItem;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -172,95 +107,6 @@
             loadedTopPartId = null;
             await OnParametersSetAsync();
             StateHasChanged();
-        }
-
-    private void CloseAddItem()
-        {
-            showAddItem = false;
-        }
-
-    private async Task ItemBomSaved()
-        {
-            showAddItem = false;
-            await ReloadAsync();
-        }
-
-    private async Task AddBomPart()
-        {
-            if (!workflowId.HasValue || !selectedBomTopPartId.HasValue)
-                return;
-
-            var request = new AddTopPartBomPartRequest
-            {
-                TopPartId = selectedBomTopPartId.Value,
-                Quantity = bomPartQuantity
-            };
-
-            var added = await TopPartWorkflowService.AddBomPartAsync(
-                workflowId.Value,
-                request);
-
-            if (!added)
-                {
-                    errorMessage = TopPartWorkflowService.LastError;
-                    return;
-                }
-
-            errorMessage = null;
-
-            selectedBomTopPartId = null;
-            bomPartQuantity = 1;
-            showAddPart = false;
-
-            await ReloadAsync();
-
-            if (workflowId.HasValue)
-                {
-                    bomPartOptions =
-                        await TopPartWorkflowService.GetBomPartOptionsAsync(workflowId.Value);
-                }
-        }
-
-
-        private async Task AddBomItem()
-            {
-                if (!workflowId.HasValue || !selectedBomItemId.HasValue)
-                    return;
-
-                var request = new AddTopPartBomItemRequest
-                {
-                    ItemId = selectedBomItemId.Value,
-                    Quantity = bomItemQuantity
-                };
-
-                var added = await TopPartWorkflowService.AddBomItemAsync(
-                    workflowId.Value,
-                    request);
-
-                if (!added)
-                {
-                    errorMessage = TopPartWorkflowService.LastError;
-                    return;
-                }
-
-                errorMessage = null;
-
-                selectedBomItemId = null;
-                bomItemQuantity = 1;
-                showAddItem = false;
-
-                await ReloadAsync();
-            }
-
-    private void CloseAddPart()
-        {
-            showAddPart = false;
-        }
-
-    private async Task PartBomSaved()
-        {
-            showAddPart = false;
-            await ReloadAsync();
         }
 
 }

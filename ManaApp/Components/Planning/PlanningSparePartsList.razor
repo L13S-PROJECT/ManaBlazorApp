@@ -1,0 +1,166 @@
+@* PlanningSparePartsList.razor priekš rezerves daļā *@
+
+@namespace ManaApp.Components.Planning
+@using ManaApp.Shared.DTOs.Planning
+@inject ManaApp.Services.TopPartService TopPartService
+
+<div class="planning-products-list">
+    <table class="planning-products-table">
+        <thead>
+            <tr>
+                <th class="details-column"></th>
+                <th>Prece</th>
+                <th>Kods</th>
+                <th>Order</th>
+                <th>InStock</th>
+                <th>Plan</th>
+                <th></th>
+                <th>Gaida</th>
+                <th>Ražošanā</th>
+                <th>WIP</th>
+                <th>Krāsošanā</th>
+            </tr>
+        </thead>
+
+        @if (isLoading)
+        {
+            <tbody>
+                <tr>
+                    <td colspan="11">Ielādē...</td>
+                </tr>
+            </tbody>
+        }
+        else if (groups.Count == 0)
+        {
+            <tbody>
+                <tr>
+                    <td colspan="11">Spare Parts nav atrastas.</td>
+                </tr>
+            </tbody>
+        }
+        else
+        {
+            @foreach (var group in groups)
+            {
+                <tbody class="category-group">
+                    <tr class="category-row">
+                        <td colspan="11">
+                            <span class="category-name">
+                                @group.CategoryName
+                            </span>
+                        </td>
+                    </tr>
+
+                    @foreach (var product in group.Products)
+                        {
+                            @foreach (var workflow in product.Workflows)
+                            {
+                                <tr class="product-group-row">
+                                    <td colspan="11">
+                                        <strong>@product.ProductName</strong>
+                                        <span> · @product.ProductCode</span>
+                                        <span> · V@(workflow.WorkflowVersion)</span>
+
+                                        @if (workflow.IsCurrent)
+                                        {
+                                            <span> (aktuālā versija)</span>
+                                        }
+                                    </td>
+                                </tr>
+
+                                @for (var index = 0;
+                                    index < workflow.SpareParts.Count;
+                                    index++)
+                                {
+                                    var sparePart = workflow.SpareParts[index];
+                                    var isOpen = openSparePartKey ==
+                                         (workflow.WorkflowId, sparePart.Id);
+
+                            <tr class="product-row
+                                @(index % 2 == 1 ? "is-striped" : null)
+                                @(isOpen ? "is-expanded" : null)">
+                                <td class="details-column">
+                                    <button type="button"
+                                            class="details-button @(isOpen ? "is-open" : null)"
+                                            aria-expanded="@isOpen"
+                                            title="@(isOpen ? "Aizvērt detalizāciju" : "Atvērt detalizāciju")"
+                                            @onclick="() => ToggleDetails(workflow.WorkflowId, sparePart.Id)">
+                                        <span aria-hidden="true">
+                                            @(isOpen ? "▼" : "▶")
+                                        </span>
+                                    </button>
+                                </td>
+                                <td>@sparePart.Name</td>
+                                <td>@sparePart.Code</td>
+                                <td class="planning-group planning-group-start"></td>
+                                <td class="planning-group"></td>
+                                <td class="planning-group planning-group-end"></td>
+                                <td>
+                                    <button type="button">+</button>
+                                </td>
+                                <td class="production-group production-group-start"></td>
+                                <td class="production-group"></td>
+                                <td class="production-group"></td>
+                                <td class="production-group production-group-end"></td>
+                            </tr>
+
+                            @if (isOpen)
+                                {
+                                    <tr class="product-details-row">
+                                        <td class="product-details-cell" colspan="11">
+                                            <div class="details-context">
+                                                <strong>@sparePart.Name</strong>
+
+                                                <span aria-hidden="true">·</span>
+
+                                                <span>@sparePart.Code</span>
+
+                                                <span class="details-context-label">
+                                                    — detalizācija
+                                                </span>
+                                            </div>
+
+                                            <PlanningSparePartDetails />
+                                        </td>
+                                    </tr>
+                                }
+                             }
+                        }
+                    }
+                </tbody>
+            }
+        }
+    </table>
+</div>
+
+@code {
+    private List<PlanningSparePartGroupDto> groups = [];
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        groups = await TopPartService.GetPlanningSparePartsAsync();
+        isLoading = false;
+    }
+
+    private string? openSparePartCode;
+
+    private void ToggleDetails(string sparePartCode)
+        {
+            openSparePartCode = openSparePartCode == sparePartCode
+                ? null
+                : sparePartCode;
+        }
+
+    private (int WorkflowId, int SparePartId)? openSparePartKey;
+
+    private void ToggleDetails(int workflowId, int sparePartId)
+        {
+            var key = (workflowId, sparePartId);
+
+            openSparePartKey = openSparePartKey == key
+                ? null
+                : key;
+        }
+
+}

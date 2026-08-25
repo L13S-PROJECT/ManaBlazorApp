@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using ManaApp.Shared.DTOs.TopPart;
+using ManaApp.Shared.DTOs.Planning;
 
 namespace ManaApp.Services
 {
@@ -90,6 +91,27 @@ namespace ManaApp.Services
                 return await _http.GetFromJsonAsync<TopPartUsageDto>(
                     $"api/TopParts/{topPartId}/usage")
                     ?? new TopPartUsageDto();
+            }
+
+        public async Task<List<PlanningSparePartGroupDto>>
+                GetPlanningSparePartsAsync()
+            {
+                return await _http.GetFromJsonAsync<
+                    List<PlanningSparePartGroupDto>>(
+                        "api/TopParts/planning/spare-parts")
+                    ?? [];
+            }
+
+        public async Task<List<TopPartSparePartProductOptionDto>>
+                GetSparePartProductOptionsAsync(int? sparePartId = null)
+            {
+                var url = sparePartId.HasValue
+                    ? $"api/TopParts/spare-part/product-options?sparePartId={sparePartId.Value}"
+                    : "api/TopParts/spare-part/product-options";
+
+                return await _http.GetFromJsonAsync<
+                    List<TopPartSparePartProductOptionDto>>(url)
+                    ?? [];
             }
 
     }

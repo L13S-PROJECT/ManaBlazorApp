@@ -9,6 +9,7 @@ namespace ManaApp.Shared.DTOs.TopPart
 
         public int ReleasedWorkflowId { get; set; }
         public int ReleasedWorkflowVersion { get; set; }
+        public int? RequiredWorkflowNodeId { get; set; }
         public bool IsSelected { get; set; }
         public decimal Quantity { get; set; }
         public bool CanEdit { get; set; }

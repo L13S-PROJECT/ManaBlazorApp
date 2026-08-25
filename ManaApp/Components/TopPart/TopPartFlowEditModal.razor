@@ -89,7 +89,7 @@
                         </div>
 
                         <div class="flow-process-field">
-                            <label>Rezultāts (WIP)</label>
+                            <label>Starprezultāts</label>
                             <input @bind="wipName"
                                 disabled="@(!editingProcessNodeId.HasValue && !CanAddProcess)" />
                         </div>
@@ -219,7 +219,7 @@
                                                 </span>
 
                                                 <div class="flow-node-text">
-                                                    <span class="flow-node-label">Rezultāts (WIP)</span>
+                                                    <span class="flow-node-label">Starprezultāts</span>
                                                     <span class="flow-node-name">@node.Name</span>
                                                 </div>
 
@@ -307,6 +307,15 @@
                                                                         @component.TopPartCode - @component.TopPartName
                                                                     </span>
 
+                                                                    @if (!string.IsNullOrWhiteSpace(
+                                                                            component.RequiredWorkflowNodeName))
+                                                                        {
+                                                                            <span class="flow-component-required-node"
+                                                                                title="Nepieciešamā stadija">
+                                                                                ◎: @component.RequiredWorkflowNodeName
+                                                                            </span>
+                                                                        }
+
                                                                     <span class="flow-component-quantity">
                                                                         @link.Quantity
                                                                     </span>
@@ -381,30 +390,41 @@
 else
 {
 
-                    <div class="flow-bom-header">
+                    <div class="flow-bom-header flow-bom-part-grid">
                         <span>Part</span>
-                        <span>Nepieciešams</span>
-                        <span>Izmantots</span>
-                        <span>Atlikums</span>
+                        <span>Vajag</span>
+                        <span>Izlietots</span>
+                        <span>Atlicis</span>
                     </div>
 
                     @foreach (var component in bom.Where(x => x.ComponentType == 1))
                         {
-                            <div class="flow-bom-row">
+                            <div class="flow-bom-row flow-bom-part-grid">
                                 <span class="flow-bom-part">
-                                    ◆ @component.TopPartCode - @component.TopPartName
+                                    <span>
+                                        ◆ @component.TopPartCode - @component.TopPartName
+                                    </span>
+
+                                    @if (!string.IsNullOrWhiteSpace(
+                                            component.RequiredWorkflowNodeName))
+                                    {
+                                        <span class="flow-bom-part-target"
+                                            title="Nepieciešamā stadija">
+                                            (@component.RequiredWorkflowNodeName)
+                                        </span>
+                                    }
                                 </span>
 
                                 <span class="flow-bom-qty">
-                                    @decimal.Truncate(component.Quantity)
+                                    @FormatPartQuantity(component.Quantity)
                                 </span>
 
                                 <span class="flow-bom-used">
-                                    @decimal.Truncate(component.UsedQuantity)
+                                    @FormatPartQuantity(component.UsedQuantity)
                                 </span>
 
                                 <span class="flow-bom-remaining">
-                                    @decimal.Truncate(component.RemainingQuantity)
+                                    @FormatPartQuantity(component.RemainingQuantity)
                                 </span>
                             </div>
                         }
@@ -442,6 +462,15 @@ else
                                             <div class="flow-process-part-row">
                                                 <span class="flow-process-part-name">
                                                     ◆ @component.TopPartCode - @component.TopPartName
+
+                                                    @if (!string.IsNullOrWhiteSpace(
+                                                            component.RequiredWorkflowNodeName))
+                                                    {
+                                                        <span class="flow-process-part-target"
+                                                            title="Nepieciešamā stadija">
+                                                            (@component.RequiredWorkflowNodeName)
+                                                        </span>
+                                                    }
                                                 </span>
 
                                                 <span class="flow-process-part-quantity">
@@ -513,7 +542,7 @@ else
 
                                 @if (bom.Any(x => x.ComponentType == 1 && x.RemainingQuantity > 0))
                                     {
-                                        <div class="flow-process-add-header">
+                                        <div class="flow-process-add-header flow-process-add-part-grid">
                                             <span>Part</span>
                                             <span>Atlikums</span>
                                             <span></span>
@@ -535,7 +564,7 @@ else
                                             x.ProcessNodeId == selectedProcessNodeId.Value &&
                                             x.WorkflowComponentId == component.Id);
 
-                                        <div class="flow-process-add-row">
+                                        <div class="flow-process-add-row flow-process-add-part-grid @(selectedWorkflowComponentId == component.Id ? "flow-process-add-row-selected" : "")">
                                             @if (component.ComponentType == 1)
                                             {
                                                 <span>@component.TopPartCode - @component.TopPartName</span>
@@ -554,7 +583,7 @@ else
                                                 <button type="button"
                                                         class="flow-process-add-button"
                                                         title="Pievienot Part procesam"
-                                                        @onclick="@(() => selectedWorkflowComponentId = component.Id)">
+                                                        @onclick="@(() => BeginAddProcessComponent(component.Id))">
                                                     Pievienot
                                                 </button>
                                             }
@@ -565,11 +594,21 @@ else
                                                     <input type="number"
                                                         min="1"
                                                         step="1"
-                                                        @bind="processComponentQuantity" />
+                                                        value="@decimal.Truncate(processComponentQuantity)"
+                                                        @onchange="@(e => processComponentQuantity =
+                                                            decimal.TryParse(e.Value?.ToString(), out var value)
+                                                                ? decimal.Truncate(value)
+                                                                : 1)" />
 
                                                     <button type="button"
                                                             @onclick="AddProcessComponent">
                                                         Apstiprināt
+                                                    </button>
+
+                                                    <button type="button"
+                                                            class="flow-process-add-cancel"
+                                                            @onclick="CancelAddProcessComponent">
+                                                        Atcelt
                                                     </button>
                                                 </div>
                                             }
@@ -609,17 +648,17 @@ else
                                 else
                                 {
                         
-                                    <div class="flow-bom-header">
+                                    <div class="flow-bom-header flow-bom-item-grid">
                                         <span>Item</span>
-                                        <span>Nepieciešams</span>
-                                        <span>Izmantots</span>
-                                        <span>Atlikums</span>
+                                        <span>Vajag</span>
+                                        <span>Izlietots</span>
+                                        <span>Atlicis</span>
                                     </div>
                                
 
                                  @foreach (var component in bom.Where(x => x.ComponentType == 2))
                                     {
-                                        <div class="flow-bom-row @(selectedProcessNodeId.HasValue ? "" : "flow-bom-row-summary")">
+                                        <div class="flow-bom-row flow-bom-item-grid @(selectedProcessNodeId.HasValue ? "" : "flow-bom-row-summary")">
                                             <span class="flow-bom-part">
                                                 ■ @component.ItemCode - @component.ItemName
                                             </span>
@@ -629,17 +668,31 @@ else
                                             </span>
 
                                             <span class="flow-bom-used">
-                                                @component.UsedQuantity.ToString("0.##", new System.Globalization.CultureInfo("lv-LV")) @component.ItemUnit
+                                                @if (component.UsedQuantity == 0)
+                                                {
+                                                    <text>-</text>
+                                                }
+                                                else
+                                                {
+                                                    @component.UsedQuantity.ToString("0.##", new System.Globalization.CultureInfo("lv-LV"))
+                                                    <text> @component.ItemUnit</text>
+                                                }
                                             </span>
 
                                             <span class="flow-bom-remaining">
-                                                @component.RemainingQuantity @component.ItemUnit
+                                                @if (component.RemainingQuantity == 0)
+                                                {
+                                                    <text>-</text>
+                                                }
+                                                else
+                                                {
+                                                    @component.RemainingQuantity.ToString("0.##", new System.Globalization.CultureInfo("lv-LV"))
+                                                    <text> @component.ItemUnit</text>
+                                                }
                                             </span>
 
                                         </div>
                                     }
-                                }
-
                                 @if (selectedProcessNodeId.HasValue)
                                     {
                                         <div class="flow-process-components">
@@ -662,8 +715,6 @@ else
                                     }
                                     
 
-                            </div>
-
                             @foreach (var link in workflow.ProcessComponents
                                 .Where(x => x.ProcessNodeId == selectedProcessNodeId))
                             {
@@ -672,7 +723,7 @@ else
 
                                 if (component is not null && component.ComponentType == 2)
                                 {
-                                    <div class="flow-process-part-row">
+                                    <div class="flow-process-part-row flow-process-item-row">
                                         <span class="flow-process-part-name">
                                             ■ @component.ItemCode - @component.ItemName
                                         </span>
@@ -766,7 +817,7 @@ else
                                         x.ProcessNodeId == selectedProcessNodeId &&
                                         x.WorkflowComponentId == component.Id);
 
-                                    <div class="flow-process-add-row">
+                                    <div class="flow-process-add-row @(selectedWorkflowComponentId == component.Id ? "flow-process-add-row-selected" : "")">
                                         <span>
                                             @component.ItemCode - @component.ItemName
                                         </span>
@@ -780,7 +831,7 @@ else
                                                 <button type="button"
                                                         class="flow-process-add-button"
                                                         title="Pievienot Item procesam"
-                                                        @onclick="@(() => selectedWorkflowComponentId = component.Id)">
+                                                        @onclick="@(() => BeginAddProcessComponent(component.Id))">
                                                     Pievienot
                                                 </button>
 
@@ -788,13 +839,20 @@ else
                                                     {
                                                         <div class="flow-process-add-quantity">
                                                             <input type="number"
-                                                                min="0"
+                                                                min="0.01"
+                                                                max="@component.RemainingQuantity"
                                                                 step="any"
                                                                 @bind="processComponentQuantity" />
 
                                                             <button type="button"
                                                                     @onclick="AddProcessComponent">
                                                                 Apstiprināt
+                                                            </button>
+
+                                                            <button type="button"
+                                                                    class="flow-process-add-cancel"
+                                                                    @onclick="CancelAddProcessComponent">
+                                                                Atcelt
                                                             </button>
                                                         </div>
                                                     }
@@ -803,6 +861,9 @@ else
                                 }
 
                             }
+                        }
+
+                            </div>
 
                         </section>
 
@@ -1153,6 +1214,22 @@ else
             var component = bom.FirstOrDefault(x =>
                 x.Id == selectedWorkflowComponentId.Value);
 
+            if (component is null)
+                return;
+
+            if (processComponentQuantity <= 0)
+            {
+                errorMessage = "Pievienojamajam daudzumam jābūt lielākam par 0.";
+                return;
+            }
+
+            if (processComponentQuantity > component.RemainingQuantity)
+            {
+                errorMessage =
+                    $"Pievienojamais daudzums nedrīkst pārsniegt atlikumu {component.RemainingQuantity:0.##}.";
+                return;
+            }
+
             if (component?.ComponentType == 1 &&
                 processComponentQuantity != decimal.Truncate(processComponentQuantity))
             {
@@ -1187,6 +1264,31 @@ else
 
             selectedWorkflowComponentId = null;
             processComponentQuantity = 1;
+        }
+
+    private void BeginAddProcessComponent(int workflowComponentId)
+        {
+            selectedWorkflowComponentId = workflowComponentId;
+
+            var component = bom.FirstOrDefault(x =>
+                x.Id == workflowComponentId);
+
+            processComponentQuantity = component?.RemainingQuantity ?? 1;
+            errorMessage = null;
+        }
+
+    private void CancelAddProcessComponent()
+        {
+            selectedWorkflowComponentId = null;
+            processComponentQuantity = 1;
+            errorMessage = null;
+        }
+
+    private static string FormatPartQuantity(decimal quantity)
+        {
+            return quantity == 0
+                ? "-"
+                : decimal.Truncate(quantity).ToString("0");
         }
 
         private void ToggleSelectedNode(int nodeId)

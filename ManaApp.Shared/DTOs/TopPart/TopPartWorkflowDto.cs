@@ -25,6 +25,7 @@ public class TopPartWorkflowNodeDto
 {
     public int Id { get; set; }
     public int WorkflowId { get; set; }
+    public int? ParentNodeId { get; set; }
     public byte NodeType { get; set; }
     public string? Name { get; set; }
     public int? OutputWipNodeId { get; set; }
@@ -77,6 +78,7 @@ public class TopPartWorkflowComponentDto
     public uint? TopPartId { get; set; }
     public int? ItemId { get; set; }
     public int? ReferencedWorkflowId { get; set; }
+    public int? RequiredWorkflowNodeId { get; set; }
     public decimal Quantity { get; set; }
 }
 

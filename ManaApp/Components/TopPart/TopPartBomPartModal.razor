@@ -55,6 +55,25 @@
                         <span class="bom-modal-name">
                             @part.TopPartName
                         </span>
+
+                        @if (part.IsSelected &&
+                                outputNodesByWorkflowId.TryGetValue(
+                                    part.ReleasedWorkflowId,
+                                    out var outputNodes))
+                            {
+                                <select class="bom-modal-output"
+                                        @bind="part.RequiredWorkflowNodeId"
+                                        disabled="@(!CanEdit)">
+                                    <option value="">— izvēlies STARPREZULTĀTU/GATAVS —</option>
+
+                                    @foreach (var node in outputNodes)
+                                    {
+                                        <option value="@node.Id">
+                                            @(node.NodeType == 4 ? $"FINISH — {node.Name}" : $"WIP — {node.Name}")
+                                        </option>
+                                    }
+                                </select>
+                            }
                     </div>
 
                     <input type="number"
@@ -141,6 +160,9 @@
     public EventCallback OnWorkflowChanged { get; set; }
 
     private List<TopPartBomPartSelectorDto> parts = new();
+    
+    private readonly Dictionary<int, List<TopPartWorkflowNodeOptionDto>>
+    outputNodesByWorkflowId = new();
     private string searchText = "";
 
     private string? errorMessage;
@@ -160,6 +182,9 @@
     {
         parts = await TopPartWorkflowService
             .GetBomPartSelectorAsync(WorkflowId);
+        
+        await LoadSelectedOutputNodesAsync();
+
     }
 
     private Task Close()
@@ -169,15 +194,26 @@
 
     private async Task Save()
     {
+        if (parts.Any(x =>
+                x.IsSelected &&
+                !x.RequiredWorkflowNodeId.HasValue))
+            {
+                errorMessage =
+                    "Katrai izvēlētajai PART jānorāda nepieciešamais Starprezultāts/Gatavs.";
+                return;
+            }
+        
         var request = new SaveTopPartBomPartsRequest
         {
             Parts = parts
                 .Where(x => x.IsSelected)
                 .Select(x => new SaveTopPartBomPartDto
-                {
-                    TopPartId = x.TopPartId,
-                    Quantity = x.Quantity
-                })
+                    {
+                        TopPartId = x.TopPartId,
+                        WorkflowId = x.ReleasedWorkflowId,
+                        RequiredWorkflowNodeId = x.RequiredWorkflowNodeId!.Value,
+                        Quantity = x.Quantity
+                    })
                 .ToList()
         };
 
@@ -195,16 +231,43 @@
         await OnSaved.InvokeAsync();
     }
 
-    private void PartSelectionChanged(
+    private async Task LoadOutputNodesAsync(
+        TopPartBomPartSelectorDto part)
+        {
+            if (outputNodesByWorkflowId.ContainsKey(part.ReleasedWorkflowId))
+                return;
+
+            outputNodesByWorkflowId[part.ReleasedWorkflowId] =
+                await TopPartWorkflowService.GetWorkflowOutputNodesAsync(
+                    part.ReleasedWorkflowId);
+        }
+
+    private async Task LoadSelectedOutputNodesAsync()
+        {
+            var selectedParts = parts
+                .Where(x => x.IsSelected)
+                .ToList();
+
+            await Task.WhenAll(
+                selectedParts.Select(LoadOutputNodesAsync));
+        }
+
+    private async Task PartSelectionChanged(
             TopPartBomPartSelectorDto part,
             ChangeEventArgs e)
         {
             part.IsSelected = e.Value is bool value && value;
 
-            if (part.IsSelected && part.Quantity <= 0)
+            if (!part.IsSelected)
             {
-                part.Quantity = 1;
+                part.RequiredWorkflowNodeId = null;
+                return;
             }
+
+            if (part.Quantity <= 0)
+                part.Quantity = 1;
+
+            await LoadOutputNodesAsync(part);
         }
 
     private bool CanEdit =>
@@ -236,6 +299,9 @@
 
             parts = await TopPartWorkflowService
                 .GetBomPartSelectorAsync(WorkflowId);
+
+            outputNodesByWorkflowId.Clear();
+                await LoadSelectedOutputNodesAsync();
 
             await OnWorkflowChanged.InvokeAsync();
         }

@@ -1,0 +1,215 @@
+@* PlanningProductsList.razor saraksts priekš precēm *@
+
+@namespace ManaApp.Components.Planning
+
+<div class="planning-products-list">
+
+    <table class="planning-products-table">
+        <thead>
+            <tr>
+                
+                <th class="details-column"></th>
+                <th>Prece</th>
+                <th>Kods</th>
+
+                <th>Order</th>
+                <th>InStock</th>
+                <th>Plan</th>
+                <th></th>
+
+                <th>Gaida</th>
+                <th>Ražošanā</th>
+                <th>WIP</th>
+                <th>Krāsošanā</th>
+            </tr>
+        </thead>
+
+        @foreach (var category in testCategories)
+            {
+                <tbody class="category-group">
+                    <tr class="category-row">
+                        <td colspan="11">
+                            <span class="category-name">
+                                @category.Name
+                            </span>
+                        </td>
+                    </tr>
+
+                    @for (var productIndex = 0;
+                        productIndex < category.Products.Count;
+                        productIndex++)
+                    {
+                        var product = category.Products[productIndex];
+                        var isOpen = openProductCode == product.Code;
+                        var isStriped = productIndex % 2 == 1;
+
+                        <tr class="product-row
+                                @(isStriped ? "is-striped" : null)
+                                @(isOpen ? "is-expanded" : null)">
+                            <td class="details-column">
+                                <button type="button"
+                                        class="details-button @(isOpen ? "is-open" : null)"
+                                        aria-expanded="@isOpen"
+                                        title="@(isOpen ? "Aizvērt detalizāciju" : "Atvērt detalizāciju")"
+                                        @onclick="() => ToggleDetails(product.Code)">
+                                    <span aria-hidden="true">
+                                        @(isOpen ? "▼" : "▶")
+                                    </span>
+                                </button>
+                            </td>
+
+                            <td>@product.Name</td>
+                            <td>@product.Code</td>
+
+                            <td class="planning-group planning-group-start">
+                                @product.Order
+                            </td>
+
+                            <td class="planning-group">
+                                @product.InStock
+                            </td>
+
+                            <td class="planning-group planning-group-end">
+                                @product.Plan
+                            </td>
+
+                            <td>
+                                <button type="button">+</button>
+                            </td>
+
+                            <td class="production-group production-group-start">
+                                @product.Waiting
+                            </td>
+
+                            <td class="production-group">
+                                @product.InProduction
+                            </td>
+
+                            <td class="production-group">
+                                @product.Wip
+                            </td>
+
+                            <td class="production-group production-group-end">
+                                @product.Painting
+                            </td>
+                        </tr>
+
+                        @if (isOpen)
+                        {
+                            <tr class="product-details-row">
+                                <td class="product-details-cell" colspan="11">
+                                    <div class="details-context">
+                                        <strong>@product.Name</strong>
+
+                                        <span aria-hidden="true">·</span>
+
+                                        <span>@product.Code</span>
+
+                                        <span class="details-context-label">
+                                            — detalizācija
+                                        </span>
+                                    </div>
+
+                                    <PlanningProductDetails />
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            }
+    </table>
+
+</div>
+
+@code {
+    private string? openProductCode;
+
+    private void ToggleDetails(string productCode)
+    {
+        openProductCode = openProductCode == productCode
+            ? null
+            : productCode;
+    }
+
+    private readonly List<TestCategoryGroup> testCategories =
+    [
+        new()
+        {
+            Name = "ĀRA MĒBELES",
+            Products =
+            [
+                new()
+                {
+                    Name = "DGE20",
+                    Code = "E20",
+                    Order = 120,
+                    InStock = 20,
+                    Plan = 30,
+                    Waiting = 0,
+                    InProduction = 15,
+                    Wip = 8,
+                    Painting = 7
+                },
+                new()
+                {
+                    Name = "DGE30",
+                    Code = "E30",
+                    Order = 80,
+                    InStock = 12,
+                    Plan = 20,
+                    Waiting = 2,
+                    InProduction = 10,
+                    Wip = 5,
+                    Painting = 3
+                }
+            ]
+        },
+        new()
+        {
+            Name = "IEKŠTELPU MĒBELES",
+            Products =
+            [
+                new()
+                {
+                    Name = "DGK10",
+                    Code = "K10",
+                    Order = 60,
+                    InStock = 15,
+                    Plan = 10,
+                    Waiting = 0,
+                    InProduction = 6,
+                    Wip = 4,
+                    Painting = 2
+                }
+            ]
+        }
+    ];
+
+    private sealed class TestCategoryGroup
+    {
+        public string Name { get; set; } = "";
+
+        public List<TestProductRow> Products { get; set; } = [];
+    }
+
+    private sealed class TestProductRow
+    {
+        public string Name { get; set; } = "";
+
+        public string Code { get; set; } = "";
+
+        public int Order { get; set; }
+
+        public int InStock { get; set; }
+
+        public int Plan { get; set; }
+
+        public int Waiting { get; set; }
+
+        public int InProduction { get; set; }
+
+        public int Wip { get; set; }
+
+        public int Painting { get; set; }
+    }
+}

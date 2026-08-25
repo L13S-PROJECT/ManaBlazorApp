@@ -1,0 +1,21 @@
+@* ProductioPlanning.razor lapa - ražošanas plānošanai *@
+
+@using ManaApp.Components.Planning
+
+@page "/production-planning"
+
+<PageTitle>Ražošanas plānošana</PageTitle>
+
+<div class="planning-layout">
+
+    <div class="planning-left">
+        <ManaApp.Components.Planning.PlanningToolbar />
+
+        <PlanningList />
+    </div>
+
+    <div class="planning-right">
+        <PlanningDraft />
+    </div>
+
+</div>

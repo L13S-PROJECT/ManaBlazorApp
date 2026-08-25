@@ -25,6 +25,9 @@ namespace ManiApi.Models
         [Column("ReferencedWorkflow_ID")]
         public int? ReferencedWorkflowId { get; set; }
 
+        [Column("RequiredWorkflowNode_ID")]
+        public int? RequiredWorkflowNodeId { get; set; }
+
         [Column("Quantity")]
         public decimal Quantity { get; set; }
 

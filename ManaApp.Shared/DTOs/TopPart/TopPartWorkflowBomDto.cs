@@ -12,6 +12,10 @@ public class TopPartWorkflowBomDto
 
     public int? ReferencedWorkflowId { get; set; }
 
+    public int? RequiredWorkflowNodeId { get; set; }
+
+    public string? RequiredWorkflowNodeName { get; set; }
+
     public decimal Quantity { get; set; }
     public decimal UsedQuantity { get; set; }
 

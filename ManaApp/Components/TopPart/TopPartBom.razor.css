@@ -82,26 +82,6 @@
     color: #374151;
 }
 
-.toppart-bom-column-header button {
-    padding: 2px 7px;
-
-    border: 1px solid #c7cdd4;
-    border-radius: 4px;
-
-    background: #fff;
-    color: #374151;
-
-    font-size: 12px;
-    font-weight: 500;
-
-    cursor: pointer;
-}
-
-.toppart-bom-column-header button:hover {
-    background: #eceff3;
-    border-color: #9ca3af;
-}
-
 .toppart-bom-list {
     flex: 1;
     min-height: 0;
@@ -129,6 +109,28 @@
 .toppart-bom-row span:first-child {
     min-width: 0;
     overflow-wrap: anywhere;
+}
+
+.toppart-bom-part-row {
+    grid-template-columns: minmax(0, 1fr) max-content;
+    align-items: center;
+}
+
+.toppart-bom-part-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.toppart-bom-part-quantity {
+    justify-self: end;
+    font-weight: 700;
+}
+
+.toppart-bom-item-quantity {
+    justify-self: end;
+    white-space: nowrap;
+    font-weight: 700;
 }
 
 .toppart-bom-empty {

@@ -7,7 +7,9 @@
     <div class="toppart-modal">
 
         <div class="toppart-modal-header">
-            <span>@(TopPart is null ? "TopPart" : "Rediģēt TopPart")</span>
+            <span>@(TopPart is null
+                ? "TopPart"
+                : $"Rediģēt TopPart — {TopPart.TopPartName}")</span>
         </div>
 
         <div class="toppart-modal-body">

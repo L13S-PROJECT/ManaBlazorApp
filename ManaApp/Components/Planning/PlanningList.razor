@@ -1,0 +1,67 @@
+@* PlanningList.razor priekš saraksa karkasa *@
+
+@namespace ManaApp.Components.Planning
+
+<div class="planning-list">
+
+    <div class="planning-list-tabs">
+        <button type="button" @onclick="() => activeView = 0">
+            Products
+        </button>
+
+        <button type="button" @onclick="() => activeView = 1">
+            Parts
+        </button>
+
+        <button type="button" @onclick="() => activeView = 2">
+            Spare Parts
+        </button>
+    </div>
+
+        @if (activeView == 0)
+            {
+                <div class="product-parent-tabs">
+                    <button type="button"
+                            class="parent-tab @(selectedParentCategory == ParentCategory.Kauss ? "is-active" : null)"
+                            @onclick="() => selectedParentCategory = ParentCategory.Kauss">
+                        KAUSS
+                    </button>
+
+                    <button type="button"
+                            class="parent-tab @(selectedParentCategory == ParentCategory.Adapteris ? "is-active" : null)"
+                            @onclick="() => selectedParentCategory = ParentCategory.Adapteris">
+                        ADAPTERIS
+                    </button>
+                </div>
+            }
+
+    <div class="planning-list-content">
+        @switch (activeView)
+        {
+            case 0:
+                <PlanningProductsList />
+                break;
+
+            case 1:
+                <PlanningPartsList />
+                break;
+
+            case 2:
+                <PlanningSparePartsList />
+                break;
+        }
+    </div>
+
+</div>
+
+@code {
+    private int activeView = 0;
+
+    private ParentCategory? selectedParentCategory;
+
+    private enum ParentCategory
+    {
+        Kauss,
+        Adapteris
+    }
+}

@@ -159,6 +159,7 @@ namespace ManiApi.Services.TopParts
                                 var newNode = new WorkflowNode
                                 {
                                     WorkflowId = newWorkflow.Id,
+                                    ParentNodeId = sourceNode.Id,
                                     NodeType = sourceNode.NodeType,
                                     Name = sourceNode.Name,
                                     TopPartId = sourceNode.TopPartId,
@@ -206,6 +207,28 @@ namespace ManiApi.Services.TopParts
 
                     foreach (var sourceComponent in sourceComponents)
                     {
+                        int? requiredWorkflowNodeId = sourceComponent.RequiredWorkflowNodeId;
+
+                        if (sourceComponent.ReferencedWorkflowId == releasedWorkflow.ParentWorkflowId &&
+                            sourceComponent.RequiredWorkflowNodeId.HasValue)
+                        {
+                            requiredWorkflowNodeId = await _db.WorkflowNodes
+                                .Where(x =>
+                                    x.WorkflowId == releasedWorkflow.Id &&
+                                    x.ParentNodeId == sourceComponent.RequiredWorkflowNodeId.Value &&
+                                    x.IsActive)
+                                .Select(x => (int?)x.Id)
+                                .FirstOrDefaultAsync();
+                        }
+
+                        if (sourceComponent.ComponentType == 1 &&
+                                sourceComponent.RequiredWorkflowNodeId.HasValue &&
+                                requiredWorkflowNodeId == null)
+                            {
+                                throw new InvalidOperationException(
+                                    "Jaunajā Workflow versijā nav atrasts atbilstošais WIP/FINISH mezgls.");
+                            }
+                        
                         var newComponent = new WorkflowComponent
                         {
                             WorkflowId = newWorkflow.Id,
@@ -216,6 +239,7 @@ namespace ManiApi.Services.TopParts
                                 sourceComponent.ReferencedWorkflowId == releasedWorkflow.ParentWorkflowId
                                     ? releasedWorkflow.Id
                                     : sourceComponent.ReferencedWorkflowId,
+                            RequiredWorkflowNodeId = requiredWorkflowNodeId,
                             Quantity = sourceComponent.Quantity,
                             IsActive = true
                         };

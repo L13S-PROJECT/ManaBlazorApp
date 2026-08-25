@@ -12,5 +12,7 @@ public class SaveTopPartWorkflowComponentRequest
 
     public int? ReferencedWorkflowId { get; set; }
 
+    public int? RequiredWorkflowNodeId { get; set; }
+
     public decimal Quantity { get; set; }
 }

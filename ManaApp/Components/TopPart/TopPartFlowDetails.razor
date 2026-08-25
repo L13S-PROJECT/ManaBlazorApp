@@ -162,6 +162,39 @@
 
                     </span>
                 }
+                else if (TopPart?.TopPartType == 2 && usage.Count > 0)
+                {
+                    <span class="usage-container">
+
+                        <span>
+                            Šī rezerves daļa ir iesaistīta @usage.Count
+                            @(usage.Count == 1 ? "precē" : "precēs")
+                        </span>
+
+                        <span class="usage-info">
+
+                            <span class="usage-info-icon">i</span>
+
+                            <span class="usage-tooltip">
+
+                                <span class="usage-tooltip-title">
+                                    Preces
+                                </span>
+
+                                @foreach (var item in usage.Items
+                                    .OrderBy(x => x.TopPartName))
+                                {
+                                    <span class="usage-tooltip-item">
+                                        @item.TopPartCode — @item.TopPartName
+                                    </span>
+                                }
+
+                            </span>
+
+                        </span>
+
+                    </span>
+                }
                 else
                 {
                     <span>—</span>

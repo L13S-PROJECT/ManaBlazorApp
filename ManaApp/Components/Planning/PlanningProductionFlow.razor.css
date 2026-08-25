@@ -1,0 +1,139 @@
+/* PlanningProductionFlow.razor.css */
+
+.production-flow-card {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 10px 12px 12px;
+    background: #fff;
+    border: 1px solid #d9dde3;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(31, 41, 55, 0.07);
+}
+
+.production-flow-title {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #20242a;
+}
+
+.flow-table-wrapper,
+.painting-table-wrapper {
+    overflow: hidden;
+    border: 1px solid #e1e4e8;
+    border-radius: 4px;
+}
+
+.flow-table,
+.painting-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    color: #20242a;
+}
+
+.flow-table th,
+.flow-table td,
+.painting-table th,
+.painting-table td {
+    height: 30px;
+    padding: 5px 8px;
+    font-size: 12px;
+    vertical-align: middle;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.flow-table th,
+.painting-table th {
+    font-weight: 700;
+    background: #f5f6f7;
+}
+
+.flow-table th:not(:last-child),
+.flow-table td:not(:last-child),
+.painting-table th:not(:last-child),
+.painting-table td:not(:last-child) {
+    border-right: 1px solid #e5e7eb;
+}
+
+.flow-table tbody tr:last-child td,
+.painting-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.flow-table .batch-column {
+    width: 22%;
+    text-align: left;
+}
+
+.flow-table .workflow-column {
+    width: 18%;
+    text-align: left;
+}
+
+.flow-table th:not(.batch-column):not(.workflow-column),
+.flow-table td:not(.batch-column):not(.workflow-column) {
+    text-align: center;
+}
+
+.painting-section {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #d9dde3;
+}
+
+.painting-title {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #20242a;
+}
+
+.painting-table th:first-child,
+.painting-table td:first-child {
+    text-align: left;
+}
+
+.quantity-column {
+    width: 42%;
+    text-align: center;
+}
+
+.ral-cell {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+}
+
+.ral-color {
+    display: inline-block;
+    flex: 0 0 18px;
+    width: 18px;
+    height: 18px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 4px;
+}
+
+.ral-7016 {
+    background: #29343a;
+}
+
+.ral-9005 {
+    background: #0a0a0a;
+}
+
+@media (max-width: 700px) {
+    .production-flow-card {
+        padding: 8px;
+    }
+
+    .flow-table th,
+    .flow-table td,
+    .painting-table th,
+    .painting-table td {
+        padding-left: 4px;
+        padding-right: 4px;
+        font-size: 11px;
+    }
+}
