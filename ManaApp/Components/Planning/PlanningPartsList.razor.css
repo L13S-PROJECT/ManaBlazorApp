@@ -1,0 +1,114 @@
+/* PlanningPartsList.razor.css */
+
+.planning-parts-list {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    background: #fff;
+}
+
+.planning-parts-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.planning-parts-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 6px 12px;
+    text-align: center;
+    background: #405867;
+    color: #fff;
+    border: 1px solid #607582;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.planning-parts-table th:first-child {
+    text-align: left;
+}
+
+.planning-parts-table {
+    table-layout: fixed;
+}
+
+.planning-parts-table th:first-child,
+.planning-parts-table td:first-child {
+    width: 32%;
+    text-align: left;
+}
+
+.planning-parts-table th:nth-child(2),
+.planning-parts-table td:nth-child(2) {
+    width: 12%;
+}
+
+.planning-parts-table .flow-column {
+    width: 44px;
+}
+
+.planning-parts-table th:nth-child(n + 4),
+.planning-parts-table td:nth-child(n + 4) {
+    width: 9%;
+}
+
+.planning-parts-table td {
+    padding: 5px 10px;
+    text-align: center;
+    border: 1px solid #d8e0e7;
+    background: #fff;
+    font-size: 13px;
+}
+
+.part-row.is-striped td {
+    background: #f1f5f8;
+}
+
+.category-row td {
+    height: 26px;
+    padding: 4px 12px;
+    text-align: center !important;
+    background: #dce7ee;
+    border-top: 1px solid #b7ccd8;
+    border-bottom: 1px solid #b7ccd8;
+}
+
+.category-name {
+    color: #274c60;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+/* Neitrālā Planning List palete */
+.planning-parts-table th {
+    background: #495057;
+    border-color: #636b72;
+}
+
+.planning-parts-table td {
+    border-color: #e1e5e8;
+}
+
+.part-row:nth-of-type(even) td {
+    background: #fafbfc;
+}
+
+.category-row td {
+    background: #cbd1d5;
+    border-color: #b5bdc2;
+}
+
+.category-name {
+    color: #343a40;
+}
+
+/* Kompaktākas satura rindas; galvenes un kategorijas netiek mainītas. */
+.part-row td {
+    padding-top: 3px;
+    padding-bottom: 3px;
+    font-size: 12px;
+}

@@ -1,21 +1,50 @@
 @* PlanningSparePartsList.razor priekš rezerves daļā *@
 
-@namespace ManaApp.Components.Planning
+@using ManaApp.Services.TopPartPlanning
+@inject TopPartPlanningService PlanningService
+
 @using ManaApp.Shared.DTOs.Planning
 @inject ManaApp.Services.TopPartService TopPartService
 
+@namespace ManaApp.Components.Planning
+
 <div class="planning-products-list">
     <table class="planning-products-table">
+        <colgroup>
+            <col class="column-details" />
+            <col class="column-name" />
+            <col class="column-code" />
+            <col class="column-metric" span="3" />
+            <col class="column-add" />
+            <col class="column-metric" span="4" />
+        </colgroup>
         <thead>
             <tr>
                 <th class="details-column"></th>
-                <th>Prece</th>
+                <th class="category-filter-header">
+                    <div class="category-filter-control">
+                        <button type="button" class="category-filter-button @(selectedCategoryId.HasValue ? "is-active" : null)" @onclick="ToggleCategoryMenu">Prece</button>
+                        @if (selectedCategoryId.HasValue)
+                        {
+                            <button type="button" class="category-filter-clear" title="Noņemt kategorijas atlasi" aria-label="Noņemt kategorijas atlasi" @onclick="ClearCategoryFilter">×</button>
+                        }
+                    </div>
+                    @if (isCategoryMenuOpen)
+                    {
+                        <div class="category-filter-menu">
+                            @foreach (var category in AvailableCategories())
+                            {
+                                <button type="button" class="@(selectedCategoryId == category.CategoryId ? "is-selected" : null)" @onclick="() => SelectCategory(category.CategoryId)">@category.CategoryName</button>
+                            }
+                        </div>
+                    }
+                </th>
                 <th>Kods</th>
                 <th>Order</th>
                 <th>InStock</th>
-                <th>Plan</th>
+                <th class="filter-header"><button type="button" class="@(activeFilters.Contains(SparePartFilter.Plan) ? "is-active" : null)" @onclick="() => ToggleFilter(SparePartFilter.Plan)">Plan</button></th>
                 <th></th>
-                <th>Gaida</th>
+                <th class="filter-header"><button type="button" class="@(activeFilters.Contains(SparePartFilter.Waiting) ? "is-active" : null)" @onclick="() => ToggleFilter(SparePartFilter.Waiting)">Gaida</button></th>
                 <th>Ražošanā</th>
                 <th>WIP</th>
                 <th>Krāsošanā</th>
@@ -42,6 +71,9 @@
         {
             @foreach (var group in groups)
             {
+                if (!GroupHasVisibleRows(group))
+                    continue;
+
                 <tbody class="category-group">
                     <tr class="category-row">
                         <td colspan="11">
@@ -53,8 +85,18 @@
 
                     @foreach (var product in group.Products)
                         {
+                            if (!ProductHasVisibleRows(product))
+                                continue;
+
                             @foreach (var workflow in product.Workflows)
                             {
+                                var visibleSpareParts = workflow.SpareParts
+                                    .Where(ShouldShowSparePart)
+                                    .ToList();
+
+                                if (visibleSpareParts.Count == 0)
+                                    continue;
+
                                 <tr class="product-group-row">
                                     <td colspan="11">
                                         <strong>@product.ProductName</strong>
@@ -69,12 +111,17 @@
                                 </tr>
 
                                 @for (var index = 0;
-                                    index < workflow.SpareParts.Count;
+                                    index < visibleSpareParts.Count;
                                     index++)
                                 {
-                                    var sparePart = workflow.SpareParts[index];
+                                    var sparePart = visibleSpareParts[index];
                                     var isOpen = openSparePartKey ==
                                          (workflow.WorkflowId, sparePart.Id);
+                                    var isInCurrentPlan = IsCorrectionMode
+                                        ? CorrectionBatch!.Items.Any(x =>
+                                            x.TopPartId == sparePart.Id &&
+                                            x.WorkflowId == workflow.WorkflowId)
+                                        : sparePart.PlanQty > 0;
 
                             <tr class="product-row
                                 @(index % 2 == 1 ? "is-striped" : null)
@@ -94,11 +141,23 @@
                                 <td>@sparePart.Code</td>
                                 <td class="planning-group planning-group-start"></td>
                                 <td class="planning-group"></td>
-                                <td class="planning-group planning-group-end"></td>
-                                <td>
-                                    <button type="button">+</button>
+                                <td class="planning-group planning-group-end">
+                                    @sparePart.PlanQty
                                 </td>
-                                <td class="production-group production-group-start"></td>
+                                <td class="draft-add-cell">
+                                    <button type="button"
+                                            class="draft-add-button @(isInCurrentPlan ? "is-in-draft" : null)"
+                                            disabled="@(IsCorrectionMode && isInCurrentPlan)"
+                                            title="@(IsCorrectionMode && isInCurrentPlan
+                                                ? "Šī rezerves daļa ar šo Flow jau ir pievienota"
+                                                : "Pievienot ražošanas plānam")"
+                                            @onclick="() => OpenAddDialog(group, product, workflow, sparePart)">
+                                        +
+                                    </button>
+                                </td>
+                                <td class="production-group production-group-start">
+                                    @sparePart.WaitingQty
+                                </td>
                                 <td class="production-group"></td>
                                 <td class="production-group"></td>
                                 <td class="production-group production-group-end"></td>
@@ -133,15 +192,129 @@
     </table>
 </div>
 
+@if (isAddDialogOpen && selectedSparePart is not null)
+{
+    <PlanningAddSparePartDialog
+         SparePart="selectedSparePart"
+         Workflows="selectedSparePartWorkflows"
+         InitialPlannedQty="dialogInitialPlannedQty"
+         InitialWorkflowId="dialogInitialWorkflowId"
+         IsEditMode="isDialogEditMode"
+         OnSave="SaveDraftItemAsync"
+        OnCancel="CloseAddDialog" />
+}
+
 @code {
     private List<PlanningSparePartGroupDto> groups = [];
     private bool isLoading = true;
+    private readonly HashSet<SparePartFilter> activeFilters = [];
+    private int? selectedCategoryId;
+    private bool isCategoryMenuOpen;
+    private string selectedParentCategoryName = "";
+    private PlanningCorrectionBatchItemDto? selectedCorrectionItem;
 
-    protected override async Task OnInitializedAsync()
+    [Parameter]
+    public PlanningCorrectionBatchDto? CorrectionBatch { get; set; }
+
+    [Parameter]
+    public EventCallback<PlanningCorrectionBatchItemDto>
+        OnCorrectionItemSaved { get; set; }
+
+private bool IsCorrectionMode => CorrectionBatch is not null;
+
+    private IEnumerable<(int CategoryId, string CategoryName)> AvailableCategories()
     {
-        groups = await TopPartService.GetPlanningSparePartsAsync();
-        isLoading = false;
+        return groups.Where(GroupMatchesParentCategory)
+            .Select(x => (x.CategoryId, x.CategoryName))
+            .Distinct()
+            .OrderBy(x => x.CategoryName);
     }
+
+    private bool GroupMatchesParentCategory(PlanningSparePartGroupDto group)
+    {
+        return SelectedParentCategory switch
+        {
+            0 => string.Equals(group.ParentCategoryName, "Kauss", StringComparison.OrdinalIgnoreCase),
+            1 => string.Equals(group.ParentCategoryName, "Adapteri", StringComparison.OrdinalIgnoreCase),
+            _ => true
+        };
+    }
+
+    private void ToggleCategoryMenu() => isCategoryMenuOpen = !isCategoryMenuOpen;
+
+    private void SelectCategory(int categoryId)
+    {
+        selectedCategoryId = categoryId;
+        isCategoryMenuOpen = false;
+    }
+
+    private void ClearCategoryFilter()
+    {
+        selectedCategoryId = null;
+        isCategoryMenuOpen = false;
+    }
+
+    private enum SparePartFilter
+    {
+        Plan,
+        Waiting
+    }
+
+    private void ToggleFilter(SparePartFilter filter)
+    {
+        if (!activeFilters.Add(filter))
+            activeFilters.Remove(filter);
+    }
+
+    private bool ShouldShowSparePart(PlanningSparePartDto sparePart)
+    {
+        var searchMatches = string.IsNullOrWhiteSpace(SearchText) ||
+            sparePart.Name.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
+            sparePart.Code.Contains(SearchText, StringComparison.OrdinalIgnoreCase);
+
+        if (!searchMatches)
+            return false;
+
+        return activeFilters.Count == 0 ||
+            (activeFilters.Contains(SparePartFilter.Plan) && sparePart.PlanQty > 0) ||
+            (activeFilters.Contains(SparePartFilter.Waiting) && sparePart.WaitingQty > 0);
+    }
+
+    private bool ProductHasVisibleRows(PlanningSparePartProductDto product)
+    {
+        return product.Workflows.Any(workflow =>
+            workflow.SpareParts.Any(ShouldShowSparePart));
+    }
+
+    private bool GroupHasVisibleRows(PlanningSparePartGroupDto group)
+    {
+        var categoryMatches = GroupMatchesParentCategory(group) &&
+            (!selectedCategoryId.HasValue || group.CategoryId == selectedCategoryId.Value);
+
+        if (!categoryMatches)
+            return false;
+
+        return group.Products.Any(ProductHasVisibleRows);
+    }
+
+    [Parameter]
+    public int RefreshVersion { get; set; }
+
+    [Parameter]
+    public int? SelectedParentCategory { get; set; }
+
+    [Parameter]
+    public string SearchText { get; set; } = "";
+
+    [Parameter]
+    public EventCallback OnDraftChanged { get; set; }
+
+   protected override async Task OnParametersSetAsync()
+        {
+            isLoading = true;
+            groups = await TopPartService.GetPlanningSparePartsAsync();
+            isLoading = false;
+        }
 
     private string? openSparePartCode;
 
@@ -162,5 +335,113 @@
                 ? null
                 : key;
         }
+
+    private PlanningSparePartDto? selectedSparePart;
+     private List<PlanningSparePartWorkflowDto> selectedSparePartWorkflows = [];
+     private bool isAddDialogOpen;
+     private int dialogInitialPlannedQty = 1;
+     private int? dialogInitialWorkflowId;
+     private bool isDialogEditMode;
+
+     private void OpenAddDialog(
+        PlanningSparePartGroupDto group,
+        PlanningSparePartProductDto product,
+        PlanningSparePartWorkflowDto workflow,
+        PlanningSparePartDto sparePart)
+    {
+        selectedParentCategoryName = group.ParentCategoryName;
+
+        selectedSparePart = sparePart;
+
+         selectedSparePartWorkflows = product.Workflows
+             .Where(workflow => workflow.SpareParts.Any(x => x.Id == sparePart.Id))
+             .ToList();
+
+         if (IsCorrectionMode)
+            {
+                selectedCorrectionItem = null;
+
+                var existingWorkflowIds = CorrectionBatch!.Items
+                    .Where(x => x.TopPartId == sparePart.Id)
+                    .Select(x => x.WorkflowId)
+                    .ToHashSet();
+
+                selectedSparePartWorkflows = selectedSparePartWorkflows
+                    .Where(x => !existingWorkflowIds.Contains(x.WorkflowId))
+                    .ToList();
+
+                dialogInitialPlannedQty = 1;
+
+                dialogInitialWorkflowId =
+                    selectedSparePartWorkflows.Any(x =>
+                        x.WorkflowId == workflow.WorkflowId)
+                            ? workflow.WorkflowId
+                            : selectedSparePartWorkflows
+                                .FirstOrDefault()?.WorkflowId;
+
+                isDialogEditMode = false;
+            }
+        else
+            {
+                dialogInitialPlannedQty =
+                    sparePart.PlanQty > 0 ? sparePart.PlanQty : 1;
+
+                dialogInitialWorkflowId = workflow.WorkflowId;
+                isDialogEditMode = sparePart.PlanQty > 0;
+            }
+
+        isAddDialogOpen = true;
+    }
+
+    private async Task SaveDraftItemAsync(
+    SavePlanningDraftItemRequest request)
+        {
+            if (IsCorrectionMode)
+            {
+                var workflow = selectedSparePartWorkflows
+                    .First(x => x.WorkflowId == request.WorkflowId);
+
+                var item = selectedCorrectionItem
+                    ?? new PlanningCorrectionBatchItemDto
+                    {
+                        TopPartId = selectedSparePart!.Id,
+                        TopPartType = 2,
+                        ProductName = selectedSparePart.Name,
+                        ProductCode = selectedSparePart.Code,
+                        ParentCategoryName =
+                            selectedParentCategoryName,
+                        CanEdit = true
+                    };
+
+                item.WorkflowId = workflow.WorkflowId;
+                item.WorkflowVersion = workflow.WorkflowVersion;
+                item.IsWorkflowCurrent = workflow.IsCurrent;
+                item.PlannedQty = request.PlannedQty;
+
+                await OnCorrectionItemSaved.InvokeAsync(item);
+
+                CloseAddDialog();
+                return;
+            }
+
+            await PlanningService.SaveDraftItemAsync(request);
+
+            CloseAddDialog();
+
+            await OnDraftChanged.InvokeAsync();
+        }
+
+    private void CloseAddDialog()
+    {
+        isAddDialogOpen = false;
+         selectedSparePart = null;
+         selectedSparePartWorkflows = [];
+         dialogInitialPlannedQty = 1;
+         dialogInitialWorkflowId = null;
+         isDialogEditMode = false;
+         selectedCorrectionItem = null;
+        selectedParentCategoryName = "";
+
+    }
 
 }

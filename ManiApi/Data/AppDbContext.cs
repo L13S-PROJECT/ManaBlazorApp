@@ -56,6 +56,8 @@ namespace ManiApi.Data
         public DbSet<ProductionBatchTopPart> ProductionBatchTopParts { get; set; }
         public DbSet<StockMovementNew> StockMovementsNew { get; set; }
         public DbSet<TopPartSparePart> TopPartSpareParts { get; set; }
+        public DbSet<ProductionPlanningDraft> ProductionPlanningDrafts { get; set; }
+        public DbSet<ProductionPlanningDraftItem> ProductionPlanningDraftItems { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         
@@ -71,7 +73,12 @@ namespace ManiApi.Data
         .ToTable("stock_movements_new");
 
     modelBuilder.Entity<ProductionBatch>()
-    .HasKey(x => x.ID);
+        .HasKey(x => x.ID);
+
+    modelBuilder.Entity<ProductionBatch>()
+        .HasIndex(x => x.Batch_Code)
+        .IsUnique()
+        .HasDatabaseName("UX_production_batches_code");
 
     modelBuilder.Entity<ProductionBatchTopPart>()
         .HasKey(x => x.ID);
@@ -132,6 +139,43 @@ namespace ManiApi.Data
         .WithMany()
         .HasForeignKey(x => x.WorkflowNode_ID)
         .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionPlanningDraft>()
+        .ToTable("production_planning_drafts");
+
+    modelBuilder.Entity<ProductionPlanningDraft>()
+        .HasKey(x => x.ID);
+
+    modelBuilder.Entity<ProductionPlanningDraftItem>()
+        .ToTable("production_planning_draft_items");
+
+    modelBuilder.Entity<ProductionPlanningDraftItem>()
+        .HasKey(x => x.ID);
+
+    modelBuilder.Entity<ProductionPlanningDraftItem>()
+        .HasOne(x => x.Draft)
+        .WithMany()
+        .HasForeignKey(x => x.Draft_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionPlanningDraftItem>()
+        .HasOne(x => x.TopPart)
+        .WithMany()
+        .HasForeignKey(x => x.TopPart_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionPlanningDraftItem>()
+        .HasOne(x => x.Workflow)
+        .WithMany()
+        .HasForeignKey(x => x.Workflow_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionPlanningDraft>()
+        .HasOne(x => x.SourceBatch)
+        .WithMany()
+        .HasForeignKey(x => x.Source_Batch_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
 
     modelBuilder.Entity<EmployeeWorkLog>().ToTable("employee_work_log");
     modelBuilder.Entity<EmployeeAvailability>().ToTable("employee_availability");

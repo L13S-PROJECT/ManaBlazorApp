@@ -1,13 +1,776 @@
 @* PlanningDraft.razor priekš melnraksta *@
 
+@using ManaApp.Shared.DTOs.Planning
+@using ManaApp.Services.TopPartPlanning
+@inject TopPartPlanningService PlanningService
+@inject ManaApp.Services.TopPartService TopPartService
+@inject IJSRuntime JS
+
 @namespace ManaApp.Components.Planning
 
 <div class="planning-draft">
     <div class="planning-draft-header">
-        <strong>Draft</strong>
+        <div class="planning-draft-title">
+            <strong>RAŽOŠANAS PLĀNS</strong>
+            <span class="@(IsCorrectionMode ? "planning-mode-correction" : null)">
+                [@(IsCorrectionMode ? "KOREKCIJA" : "Melnraksts")]
+            </span>
+
+            <label class="planning-draft-date">
+                <span>Datums</span>
+                <input type="date"
+                    value="@(IsCorrectionMode
+                        ? CorrectionBatch!.StartDate?.ToString("yyyy-MM-dd") ?? ""
+                        : DateTime.Today.ToString("yyyy-MM-dd"))"
+                    readonly />
+            </label>
+        </div>
+
+        <div class="planning-draft-controls">
+            <label>
+                <span>Batch-Nr.</span>
+                <input type="text"
+                    maxlength="50"
+                    @bind="batchCode"
+                    disabled="@isBusy" />
+            </label>
+
+            <button type="button"
+                    class="draft-action draft-action-save"
+                    disabled="@isBusy"
+                    @onclick="SaveDraftAsync">
+                Saglabāt
+            </button>
+
+            <button type="button"
+                    class="draft-action draft-action-delete"
+                    disabled="@isBusy"
+                    @onclick="DeleteDraftAsync">
+                Dzēst
+            </button>
+        </div>
     </div>
 
-    <div class="planning-draft-content">
-        <span>Nav pievienotu ierakstu</span>
-    </div>
+    <section class="draft-section draft-section-part">
+        <h3>PART</h3>
+
+        <div class="draft-empty-message">
+            Nav pievienots neviens PART
+        </div>
+    </section>
+
+    <section class="draft-section draft-section-kausi">
+        <h3>KAUSI</h3>
+
+        <div class="draft-subsection draft-subsection-kausi">
+            @{
+                var kaussItems = VisibleItems
+                    .Where(x =>
+                        x.TopPartType == 1 &&
+                        string.Equals(
+                            x.ParentCategoryName,
+                            "Kauss",
+                            StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+
+            @if (kaussItems.Count == 0)
+            {
+                <div class="draft-empty-message">
+                    Nav pievienots neviens KAUSS
+                </div>
+            }
+            else
+            {
+                <div class="draft-items-table" role="table" aria-label="Kausi">
+                    <div class="draft-item draft-item-header" role="row">
+                        <span>Nr.</span>
+                        <span>Nosaukums</span>
+                        <span></span>
+                        <span>Flow</span>
+                        <span>Apjoms</span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    @for (var index = 0; index < kaussItems.Count; index++)
+                    {
+                        var item = kaussItems[index];
+ 
+                        <div class="draft-item" role="row">
+                            <span class="draft-item-number">@(index + 1).</span>
+                            <span class="draft-item-name">@item.ProductName</span>
+                            <span class="draft-item-version-status">
+                                @if (item.IsWorkflowCurrent is false)
+                                {
+                                    <span class="draft-version-warning"
+                                          title="Izvēlētā Flow versija nav aktuālā"
+                                          aria-label="Neaktuāla Flow versija">!</span>
+                                }
+                            </span>
+                            <span class="draft-item-flow">@($"V{item.WorkflowVersion}")</span>
+                            <span class="draft-item-quantity">@item.PlannedQty</span>
+
+                             <button type="button"
+                                    disabled="@isBusy"
+                                    @onclick="() => OpenEditDialogAsync(item)">
+                                Labot
+                            </button>
+
+                            <button type="button"
+                                    disabled="@isBusy"
+                                    @onclick="() => DeleteDraftItemAsync(item)">
+                                Dzēst
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="draft-subsection draft-subsection-kausi-spare-parts">
+            <h4>KAUSI – Rezerves daļas</h4>
+
+            @{
+                var kaussSparePartItems = VisibleItems
+                    .Where(x =>
+                        x.TopPartType == 2 &&
+                        string.Equals(
+                            x.ParentCategoryName,
+                            "Kauss",
+                            StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+
+            @if (kaussSparePartItems.Count == 0)
+            {
+                <div class="draft-empty-message">
+                    Nav pievienota neviena KAUSA rezerves daļa
+                </div>
+            }
+            else
+            {
+                <div class="draft-items-table" role="table" aria-label="Kausu rezerves daļas">
+                    <div class="draft-item draft-item-header" role="row">
+                        <span>Nr.</span>
+                        <span>Nosaukums</span>
+                        <span></span>
+                        <span>Flow</span>
+                        <span>Apjoms</span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    @for (var index = 0; index < kaussSparePartItems.Count; index++)
+                    {
+                        var item = kaussSparePartItems[index];
+ 
+                        <div class="draft-item" role="row">
+                            <span class="draft-item-number">@(index + 1).</span>
+                            <span class="draft-item-name">@item.ProductName</span>
+                            <span class="draft-item-version-status">
+                                @if (item.IsWorkflowCurrent is false)
+                                {
+                                    <span class="draft-version-warning"
+                                          title="Izvēlētā Flow versija nav aktuālā"
+                                          aria-label="Neaktuāla Flow versija">!</span>
+                                }
+                            </span>
+                            <span class="draft-item-flow">@($"V{item.WorkflowVersion}")</span>
+                            <span class="draft-item-quantity">@item.PlannedQty</span>
+ 
+                             <button type="button"
+                                     disabled="@isBusy"
+                                     @onclick="() => OpenSparePartEditDialogAsync(item)">
+                                 Labot
+                             </button>
+ 
+                             <button type="button"
+                                    disabled="@isBusy"
+                                    @onclick="() => DeleteDraftItemAsync(item)">
+                                Dzēst
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+
+        </div>
+    </section>
+
+    <section class="draft-section draft-section-adapteri">
+        <h3>ADAPTERI</h3>
+
+        <div class="draft-subsection draft-subsection-adapteri">
+            @{
+                var adapterItems = VisibleItems
+                    .Where(x =>
+                        x.TopPartType == 1 &&
+                        string.Equals(
+                            x.ParentCategoryName,
+                            "Adapteri",
+                            StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+
+            @if (adapterItems.Count == 0)
+            {
+                <div class="draft-empty-message">
+                    Nav pievienots neviens ADAPTERIS
+                </div>
+            }
+            else
+            {
+                <div class="draft-items-table" role="table" aria-label="Adapteri">
+                    <div class="draft-item draft-item-header" role="row">
+                        <span>Nr.</span>
+                        <span>Nosaukums</span>
+                        <span></span>
+                        <span>Flow</span>
+                        <span>Apjoms</span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    @for (var index = 0; index < adapterItems.Count; index++)
+                    {
+                        var item = adapterItems[index];
+ 
+                        <div class="draft-item" role="row">
+                            <span class="draft-item-number">@(index + 1).</span>
+                            <span class="draft-item-name">@item.ProductName</span>
+                            <span class="draft-item-version-status">
+                                @if (item.IsWorkflowCurrent is false)
+                                {
+                                    <span class="draft-version-warning"
+                                          title="Izvēlētā Flow versija nav aktuālā"
+                                          aria-label="Neaktuāla Flow versija">!</span>
+                                }
+                            </span>
+                            <span class="draft-item-flow">@($"V{item.WorkflowVersion}")</span>
+                            <span class="draft-item-quantity">@item.PlannedQty</span>
+
+                            <button type="button"
+                                    disabled="@isBusy"
+                                    @onclick="() => OpenEditDialogAsync(item)">
+                                Labot
+                            </button>
+
+                            <button type="button"
+                                    disabled="@isBusy"
+                                    @onclick="() => DeleteDraftItemAsync(item)">
+                                Dzēst
+                            </button>
+
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="draft-subsection draft-subsection-adapteri-spare-parts">
+            <h4>ADAPTERI – Rezerves daļas</h4>
+
+            @{
+                var adapterSparePartItems = VisibleItems
+                    .Where(x =>
+                        x.TopPartType == 2 &&
+                        string.Equals(
+                            x.ParentCategoryName,
+                            "Adapteri",
+                            StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+
+            @if (adapterSparePartItems.Count == 0)
+            {
+                <div class="draft-empty-message">
+                    Nav pievienota neviena ADAPTERA rezerves daļa
+                </div>
+            }
+            else
+            {
+                <div class="draft-items-table" role="table" aria-label="Adapteru rezerves daļas">
+                    <div class="draft-item draft-item-header" role="row">
+                        <span>Nr.</span>
+                        <span>Nosaukums</span>
+                        <span></span>
+                        <span>Flow</span>
+                        <span>Apjoms</span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    @for (var index = 0; index < adapterSparePartItems.Count; index++)
+                    {
+                        var item = adapterSparePartItems[index];
+ 
+                        <div class="draft-item" role="row">
+                            <span class="draft-item-number">@(index + 1).</span>
+                            <span class="draft-item-name">@item.ProductName</span>
+                            <span class="draft-item-version-status">
+                                @if (item.IsWorkflowCurrent is false)
+                                {
+                                    <span class="draft-version-warning"
+                                          title="Izvēlētā Flow versija nav aktuālā"
+                                          aria-label="Neaktuāla Flow versija">!</span>
+                                }
+                            </span>
+                            <span class="draft-item-flow">@($"V{item.WorkflowVersion}")</span>
+                            <span class="draft-item-quantity">@item.PlannedQty</span>
+ 
+                             <button type="button"
+                                     disabled="@isBusy"
+                                     @onclick="() => OpenSparePartEditDialogAsync(item)">
+                                 Labot
+                             </button>
+
+                             <button type="button"
+                                    disabled="@isBusy"
+                                    @onclick="() => DeleteDraftItemAsync(item)">
+                                Dzēst
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+
+        </div>
+    </section>
+
+
 </div>
+
+@if (isEditDialogOpen &&
+    editingDraftItem is not null &&
+    editingProduct is not null)
+{
+     <PlanningAddProductDialog
+        Product="editingProduct"
+        Workflows="editingWorkflows"
+        InitialPlannedQty="editingDraftItem.PlannedQty"
+        InitialWorkflowId="editingDraftItem.WorkflowId"
+        IsEditMode="true"
+        OnSave="UpdateDraftItemAsync"
+         OnCancel="CloseEditDialog" />
+ }
+
+@if (isSparePartEditDialogOpen &&
+    editingDraftItem is not null &&
+    editingSparePart is not null)
+{
+    <PlanningAddSparePartDialog
+        SparePart="editingSparePart"
+        Workflows="editingSparePartWorkflows"
+        InitialPlannedQty="editingDraftItem.PlannedQty"
+        InitialWorkflowId="editingDraftItem.WorkflowId"
+        IsEditMode="true"
+        OnSave="UpdateDraftItemAsync"
+        OnCancel="CloseSparePartEditDialog" />
+}
+
+@code {
+    [Parameter]
+    public PlanningCorrectionBatchDto? CorrectionBatch { get; set; }
+
+    [Parameter]
+    public EventCallback OnDraftChanged { get; set; }
+
+    private string batchCode = "";
+    private bool isBusy;
+    private bool IsCorrectionMode => CorrectionBatch is not null;
+    private IReadOnlyList<PlanningDraftItemDto> VisibleItems =>
+    IsCorrectionMode
+        ? CorrectionBatch!.Items
+        : draftItems;
+
+    [Parameter]
+    public int RefreshVersion { get; set; }
+
+    [Parameter]
+    public EventCallback OnCorrectionClosed { get; set; }
+
+    private List<PlanningDraftItemDto> draftItems = [];
+
+    private uint? loadedCorrectionBatchId;
+    private string draftBatchCode = "";
+    private int draftLoadVersion;
+
+protected override async Task OnParametersSetAsync()
+    {
+        if (CorrectionBatch is not null)
+            {
+                if (loadedCorrectionBatchId != CorrectionBatch.BatchId)
+                {
+                    draftLoadVersion++;
+                    draftBatchCode = batchCode;
+                    loadedCorrectionBatchId = CorrectionBatch.BatchId;
+                    batchCode = CorrectionBatch.BatchCode;
+                }
+
+                return;
+            }
+
+        if (loadedCorrectionBatchId.HasValue)
+            {
+                loadedCorrectionBatchId = null;
+                batchCode = draftBatchCode;
+            }
+
+        var loadVersion = ++draftLoadVersion;
+        var loadedDraftItems =
+            await PlanningService.GetDraftItemsAsync();
+
+        if (loadVersion != draftLoadVersion || IsCorrectionMode)
+            return;
+
+        draftItems = loadedDraftItems;
+    }
+    private async Task SaveDraftAsync()
+        {
+            if (string.IsNullOrWhiteSpace(batchCode))
+            {
+                await JS.InvokeVoidAsync(
+                    "alert",
+                    "Ievadi Batch-Nr.");
+
+                return;
+            }
+
+            if (IsCorrectionMode)
+                {
+                    var confirmed = await JS.InvokeAsync<bool>(
+                        "confirm",
+                        "Vai saglabāt izmaiņas?");
+
+                    if (!confirmed)
+                    {
+                        await OnCorrectionClosed.InvokeAsync();
+                        return;
+                    }
+
+                    isBusy = true;
+
+                    try
+                    {
+                        await PlanningService.UpdateCorrectionBatchAsync(
+                            CorrectionBatch!.BatchId,
+                            new UpdatePlanningCorrectionBatchRequest
+                            {
+                                BatchCode = batchCode,
+                                Items = CorrectionBatch.Items
+                                    .Select(item =>
+                                        new UpdatePlanningCorrectionBatchItemRequest
+                                        {
+                                            BatchTopPartId = item.BatchTopPartId,
+                                            TopPartId = item.TopPartId,
+                                            WorkflowId = item.WorkflowId,
+                                            PlannedQty = item.PlannedQty
+                                        })
+                                    .ToList()
+                            });
+
+                        await OnCorrectionClosed.InvokeAsync();
+
+                        await JS.InvokeVoidAsync(
+                            "alert",
+                            "Dati saglabāti");
+                    }
+                    catch (HttpRequestException)
+                    {
+                        await JS.InvokeVoidAsync(
+                            "alert",
+                            "Datus neizdevās saglabāt.");
+                    }
+                    finally
+                    {
+                        isBusy = false;
+                    }
+
+                    return;
+                }
+
+            isBusy = true;
+
+            try
+            {
+                await PlanningService.SaveDraftAsync(
+                    new SavePlanningDraftRequest
+                    {
+                        BatchCode = batchCode
+                    });
+
+                batchCode = "";
+
+                await OnDraftChanged.InvokeAsync();
+
+                await JS.InvokeVoidAsync(
+                    "alert",
+                    "Dati saglabāti");
+            }
+            catch (HttpRequestException)
+            {
+                await JS.InvokeVoidAsync(
+                    "alert",
+                    "Datus neizdevās saglabāt.");
+            }
+            finally
+            {
+                isBusy = false;
+            }
+        }
+
+    private async Task DeleteDraftAsync()
+        {
+            if (IsCorrectionMode)
+                {
+                    var correctionConfirmed = await JS.InvokeAsync<bool>(
+                        "confirm",
+                        "Vai tiešām dzēst?");
+
+                    if (!correctionConfirmed)
+                    {
+                        await OnCorrectionClosed.InvokeAsync();
+                        return;
+                    }
+
+                    isBusy = true;
+
+                    try
+                    {
+                        await PlanningService.DeleteCorrectionBatchAsync(
+                            CorrectionBatch!.BatchId);
+
+                        await OnCorrectionClosed.InvokeAsync();
+                    }
+                    catch (HttpRequestException)
+                    {
+                        await JS.InvokeVoidAsync(
+                            "alert",
+                            "Datus neizdevās dzēst.");
+                    }
+                    finally
+                    {
+                        isBusy = false;
+                    }
+
+                    return;
+                }
+            
+            var confirmed = await JS.InvokeAsync<bool>(
+                "confirm",
+                "Vai tiešām dzēst?");
+
+            if (!confirmed)
+                return;
+
+            isBusy = true;
+
+            try
+            {
+                await PlanningService.DeleteDraftAsync();
+
+                batchCode = "";
+
+                await OnDraftChanged.InvokeAsync();
+            }
+            catch (HttpRequestException)
+            {
+                await JS.InvokeVoidAsync(
+                    "alert",
+                    "Datus neizdevās dzēst.");
+            }
+            finally
+            {
+                isBusy = false;
+            }
+        }
+
+    private async Task DeleteDraftItemAsync(PlanningDraftItemDto item)
+        {
+            var confirmed = await JS.InvokeAsync<bool>(
+                "confirm",
+                IsCorrectionMode
+                    ? "Vai tiešām dzēst šo preci no korekcijas?"
+                    : "Vai tiešām dzēst šo preci no melnraksta?");
+
+            if (!confirmed)
+                return;
+
+           if (IsCorrectionMode)
+            {
+                if (item is PlanningCorrectionBatchItemDto correctionItem)
+                    CorrectionBatch!.Items.Remove(correctionItem);
+
+                return;
+            }
+
+            isBusy = true;
+
+            try
+            {
+                await PlanningService.DeleteDraftItemAsync(item.DraftItemId);
+
+                draftItems.Remove(item);
+
+                await OnDraftChanged.InvokeAsync();
+            }
+            catch (HttpRequestException)
+            {
+                await JS.InvokeVoidAsync(
+                    "alert",
+                    "Preci neizdevās dzēst.");
+            }
+            finally
+            {
+                isBusy = false;
+            }
+        }
+
+        private PlanningDraftItemDto? editingDraftItem;
+
+        private PlanningProductListItemDto? editingProduct;
+
+        private List<PlanningWorkflowOptionDto> editingWorkflows = [];
+
+         private bool isEditDialogOpen;
+
+         private PlanningSparePartDto? editingSparePart;
+
+         private List<PlanningSparePartWorkflowDto> editingSparePartWorkflows = [];
+
+         private bool isSparePartEditDialogOpen;
+
+        private async Task OpenEditDialogAsync(PlanningDraftItemDto item)
+            {
+                editingDraftItem = item;
+
+                editingProduct = new PlanningProductListItemDto
+                {
+                    TopPartId = item.TopPartId,
+                    ProductName = item.ProductName,
+                    ProductCode = item.ProductCode
+                };
+
+                editingWorkflows =
+                    await PlanningService.GetWorkflowsAsync(item.TopPartId);
+
+                 isEditDialogOpen = true;
+             }
+
+         private async Task OpenSparePartEditDialogAsync(PlanningDraftItemDto item)
+             {
+                 editingDraftItem = item;
+                 editingSparePart = new PlanningSparePartDto
+                 {
+                     Id = item.TopPartId,
+                     Name = item.ProductName,
+                     Code = item.ProductCode,
+                     PlanQty = item.PlannedQty
+                 };
+
+                 var groups = await TopPartService.GetPlanningSparePartsAsync();
+
+                 editingSparePartWorkflows = groups
+                     .SelectMany(group => group.Products)
+                     .Where(product => product.Workflows.Any(workflow =>
+                         workflow.WorkflowId == item.WorkflowId &&
+                         workflow.SpareParts.Any(sparePart =>
+                             sparePart.Id == item.TopPartId)))
+                     .SelectMany(product => product.Workflows)
+                     .Where(workflow => workflow.SpareParts.Any(sparePart =>
+                         sparePart.Id == item.TopPartId))
+                     .GroupBy(workflow => workflow.WorkflowId)
+                     .Select(group => group.First())
+                     .ToList();
+
+                 if (editingSparePartWorkflows.Count == 0)
+                 {
+                     editingSparePartWorkflows =
+                     [
+                         new PlanningSparePartWorkflowDto
+                         {
+                             WorkflowId = item.WorkflowId,
+                             WorkflowVersion = item.WorkflowVersion,
+                             SpareParts = [editingSparePart!]
+                         }
+                     ];
+                 }
+
+                 isSparePartEditDialogOpen = true;
+             }
+
+         private void CloseEditDialog()
+            {
+                isEditDialogOpen = false;
+                editingDraftItem = null;
+                editingProduct = null;
+                 editingWorkflows = [];
+             }
+
+         private void CloseSparePartEditDialog()
+             {
+                 isSparePartEditDialogOpen = false;
+                 editingDraftItem = null;
+                 editingSparePart = null;
+                 editingSparePartWorkflows = [];
+             }
+
+        private async Task UpdateDraftItemAsync(
+                SavePlanningDraftItemRequest request)
+            {
+                if (editingDraftItem is null)
+                    return;
+
+                if (IsCorrectionMode)
+                    {
+                        var selectedWorkflow = editingWorkflows
+                            .FirstOrDefault(x => x.WorkflowId == request.WorkflowId);
+
+                        var selectedSparePartWorkflow = editingSparePartWorkflows
+                            .FirstOrDefault(x => x.WorkflowId == request.WorkflowId);
+
+                        editingDraftItem.WorkflowId = request.WorkflowId;
+                        editingDraftItem.WorkflowVersion =
+                            selectedWorkflow?.WorkflowVersion
+                            ?? selectedSparePartWorkflow?.WorkflowVersion
+                            ?? editingDraftItem.WorkflowVersion;
+                        editingDraftItem.IsWorkflowCurrent =
+                            selectedWorkflow?.IsCurrent
+                            ?? selectedSparePartWorkflow?.IsCurrent;
+                        editingDraftItem.PlannedQty = request.PlannedQty;
+
+                        CloseEditDialog();
+                        CloseSparePartEditDialog();
+
+                        return;
+                    }
+
+                isBusy = true;
+
+                try
+                {
+                    await PlanningService.UpdateDraftItemAsync(
+                        editingDraftItem.DraftItemId,
+                        new UpdatePlanningDraftItemRequest
+                        {
+                            WorkflowId = request.WorkflowId,
+                            PlannedQty = request.PlannedQty
+                        });
+
+                     draftItems = await PlanningService.GetDraftItemsAsync();
+ 
+                     CloseEditDialog();
+                     CloseSparePartEditDialog();
+
+                    await OnDraftChanged.InvokeAsync();
+                }
+                catch (HttpRequestException)
+                {
+                    await JS.InvokeVoidAsync(
+                        "alert",
+                        "Datus neizdevās labot.");
+                }
+                finally
+                {
+                    isBusy = false;
+                }
+            }
+
+}

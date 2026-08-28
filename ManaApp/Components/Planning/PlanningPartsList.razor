@@ -1,8 +1,93 @@
 @* PlanningPartsList.razor - prieks sastāvdaļām *@
 
+@inject ManaApp.Services.TopPartService TopPartService
+
 @namespace ManaApp.Components.Planning
 
 <div class="planning-parts-list">
-    <span>Parts</span>
+
+    <table class="planning-parts-table">
+
+        <thead>
+
+            <tr>
+                <th>Nosaukums</th>
+                <th>Kods</th>
+                <th class="flow-column">Flow</th>
+                <th>Noliktavā</th>
+                <th>Pieejams</th>
+                <th>Rezervēts</th>
+                <th>Trūkst</th>
+                <th>Ražošanā</th>
+            </tr>
+
+        </thead>
+
+        @foreach (var category in categories.Where(CategoryHasVisibleParts))
+            {
+                <tbody class="category-group">
+                    <tr class="category-row">
+                        <td colspan="8">
+                            <span class="category-name">
+                                @category.CategoryName
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+
+                @foreach (var part in parts.Where(x =>
+                        x.TopPartCategoryID == category.Id &&
+                        x.ReleasedVersion.HasValue &&
+                        MatchesSearch(x)))
+                    {
+                        <tr class="part-row">
+                            <td>@part.TopPartName</td>
+                            <td>@part.TopPartCode</td>
+                            <td class="flow-column">@part.ReleasedVersion</td>
+                            <td>0</td>
+                            <td>0</td>
+                            <td>0</td>
+                            <td>0</td>
+                            <td>0</td>
+                        </tr>
+                    }
+            }
+
+    </table>
+
 </div>
 
+@code {
+    private List<ManaApp.Shared.DTOs.TopPart.TopPartCategoryDto> categories = [];
+    private List<ManaApp.Shared.DTOs.TopPart.TopPartListItemDto> parts = [];
+
+    [Parameter]
+    public string SearchText { get; set; } = "";
+
+    private bool MatchesSearch(ManaApp.Shared.DTOs.TopPart.TopPartListItemDto part)
+    {
+        return string.IsNullOrWhiteSpace(SearchText) ||
+            part.TopPartName.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
+            part.TopPartCode.Contains(SearchText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool CategoryHasVisibleParts(
+        ManaApp.Shared.DTOs.TopPart.TopPartCategoryDto category)
+    {
+        return parts.Any(x =>
+            x.TopPartCategoryID == category.Id &&
+            x.ReleasedVersion.HasValue &&
+            MatchesSearch(x));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var categoriesTask = TopPartService.GetCategoriesAsync();
+        var partsTask = TopPartService.GetAllAsync(type: 0);
+
+        await Task.WhenAll(categoriesTask, partsTask);
+
+        categories = await categoriesTask;
+        parts = await partsTask;
+    }
+}

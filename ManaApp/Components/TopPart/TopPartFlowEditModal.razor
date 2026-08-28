@@ -305,16 +305,16 @@
 
                                                                     <span class="flow-component-name">
                                                                         @component.TopPartCode - @component.TopPartName
-                                                                    </span>
 
-                                                                    @if (!string.IsNullOrWhiteSpace(
-                                                                            component.RequiredWorkflowNodeName))
+                                                                        @if (!string.IsNullOrWhiteSpace(
+                                                                                component.RequiredWorkflowNodeName))
                                                                         {
-                                                                            <span class="flow-component-required-node"
+                                                                            <span class="flow-component-target-inline"
                                                                                 title="Nepieciešamā stadija">
-                                                                                ◎: @component.RequiredWorkflowNodeName
+                                                                                (@component.RequiredWorkflowNodeName)
                                                                             </span>
                                                                         }
+                                                                    </span>
 
                                                                     <span class="flow-component-quantity">
                                                                         @link.Quantity

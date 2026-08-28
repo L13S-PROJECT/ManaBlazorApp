@@ -1,0 +1,128 @@
+.planning-dialog-backdrop {
+    position: fixed;
+    z-index: 1000;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: rgb(25 34 40 / 38%);
+}
+
+.planning-dialog {
+    width: min(320px, 100%);
+    padding: 14px;
+    background: #fff;
+    border: 1px solid #cbd5dd;
+    border-radius: 6px;
+    box-shadow: 0 12px 28px rgb(26 40 50 / 20%);
+}
+
+.planning-dialog h3 {
+    margin: 0 0 12px;
+    color: #26333d;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.planning-dialog-field {
+    display: grid;
+    gap: 5px;
+    margin-bottom: 12px;
+    color: #44515b;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.planning-dialog-product {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 32px;
+    padding: 7px 9px;
+    background: #f7f9fa;
+    border: 1px solid #d5dde3;
+    border-radius: 3px;
+    color: #26333d;
+}
+
+.planning-dialog-product strong {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 12px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.planning-dialog-product small {
+    flex: none;
+    color: #66727c;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.planning-dialog input,
+.planning-dialog select {
+    width: 100%;
+    height: 32px;
+    padding: 4px 8px;
+    background: #fff;
+    border: 1px solid #aebbc5;
+    border-radius: 3px;
+    color: #26333d;
+    font: inherit;
+    font-weight: 400;
+}
+
+.planning-dialog input:focus,
+.planning-dialog select:focus {
+    border-color: #2563eb;
+    outline: 2px solid rgb(37 99 235 / 14%);
+    outline-offset: 0;
+}
+
+.planning-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.planning-dialog-button {
+    min-width: 78px;
+    height: 30px;
+    padding: 4px 12px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.planning-dialog-button-secondary {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #1d4ed8;
+}
+
+.planning-dialog-button-secondary:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
+}
+
+.planning-dialog-button-primary {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #fff;
+}
+
+.planning-dialog-button-primary:hover:not(:disabled) {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+}
+
+.planning-dialog-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}

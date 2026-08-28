@@ -1,0 +1,99 @@
+@* PlanningCorrectionBatchDialog.razor *@
+
+@namespace ManaApp.Components.Planning
+@using ManaApp.Shared.DTOs.Planning
+
+<div class="planning-dialog-backdrop">
+    <div class="planning-dialog"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="planning-correction-title">
+        <h3 id="planning-correction-title">Izvēlēties koriģējamo plānu</h3>
+
+        @if (Batches.Count == 0)
+        {
+            <p class="planning-dialog-empty">
+                Nav neviena koriģējama ražošanas plāna.
+            </p>
+        }
+        else
+        {
+            <div class="planning-batch-list">
+                <div class="planning-batch-list-header" aria-hidden="true">
+                    <span>Plāns</span>
+                    <span>Apstiprināts</span>
+                </div>
+
+                @foreach (var batch in Batches)
+                {
+                    <label class="planning-batch-option">
+                        <input type="checkbox"
+                               checked="@(selectedBatchId == batch.BatchId)"
+                               @onchange="_ => SelectBatch(batch.BatchId)" />
+
+                        <span class="planning-batch-name">
+                            <strong>@batch.BatchCode</strong>
+                            <small>@($"{batch.DoneQty}/{batch.PlannedQty} pabeigts")</small>
+                        </span>
+
+                        <span class="planning-batch-date">
+                            @(batch.StartDate?.ToString("dd.MM.yyyy") ?? "—")
+                        </span>
+                    </label>
+                }
+            </div>
+        }
+
+        <div class="planning-dialog-actions">
+            <button type="button"
+                    class="planning-dialog-button planning-dialog-button-secondary"
+                    @onclick="CancelAsync">
+                Atcelt
+            </button>
+
+            <button type="button"
+                    class="planning-dialog-button planning-dialog-button-primary"
+                    disabled="@(selectedBatchId == 0)"
+                    @onclick="SelectAsync">
+                Labi
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<PlanningCorrectionBatchOptionDto> Batches { get; set; }
+        = [];
+
+    [Parameter]
+    public EventCallback<uint> OnSelect { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private uint selectedBatchId;
+
+    protected override void OnParametersSet()
+    {
+        if (selectedBatchId == 0)
+            selectedBatchId = Batches.FirstOrDefault()?.BatchId ?? 0;
+    }
+
+    private void SelectBatch(uint batchId)
+    {
+        selectedBatchId = selectedBatchId == batchId
+            ? 0
+            : batchId;
+    }
+
+    private Task SelectAsync()
+    {
+        return OnSelect.InvokeAsync(selectedBatchId);
+    }
+
+    private Task CancelAsync()
+    {
+        return OnCancel.InvokeAsync();
+    }
+}

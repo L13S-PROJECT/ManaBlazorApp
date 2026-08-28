@@ -347,6 +347,13 @@
     padding: 3px 0;
 }
 
+.flow-component-target-inline {
+    margin-left: 4px;
+    color: #6b7280;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
 .flow-component-icon {
     text-align: center;
     font-size: 12px;

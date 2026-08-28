@@ -1,47 +1,86 @@
 @* PlanningProductsList.razor saraksts priekš precēm *@
 
+@using ManaApp.Shared.DTOs.Planning
+@using ManaApp.Services.TopPartPlanning
+@inject IJSRuntime JS
+@inject TopPartPlanningService PlanningService
+
 @namespace ManaApp.Components.Planning
 
 <div class="planning-products-list">
 
     <table class="planning-products-table">
+        <colgroup>
+            <col class="column-details" />
+            <col class="column-name" />
+            <col class="column-code" />
+            <col class="column-metric" span="3" />
+            <col class="column-add" />
+            <col class="column-metric" span="4" />
+        </colgroup>
         <thead>
             <tr>
                 
                 <th class="details-column"></th>
-                <th>Prece</th>
+                <th class="category-filter-header">
+                    <div class="category-filter-control">
+                        <button type="button" class="category-filter-button @(selectedCategoryId.HasValue ? "is-active" : null)" @onclick="ToggleCategoryMenu">Prece</button>
+                        @if (selectedCategoryId.HasValue)
+                        {
+                            <button type="button" class="category-filter-clear" title="Noņemt kategorijas atlasi" aria-label="Noņemt kategorijas atlasi" @onclick="ClearCategoryFilter">×</button>
+                        }
+                    </div>
+                    @if (isCategoryMenuOpen)
+                    {
+                        <div class="category-filter-menu">
+                            @foreach (var category in AvailableCategories())
+                            {
+                                <button type="button" class="@(selectedCategoryId == category.CategoryId ? "is-selected" : null)" @onclick="() => SelectCategory(category.CategoryId)">@category.CategoryName</button>
+                            }
+                        </div>
+                    }
+                </th>
                 <th>Kods</th>
 
-                <th>Order</th>
-                <th>InStock</th>
-                <th>Plan</th>
+                <th class="filter-header"><button type="button" class="@(activeFilters.Contains(ProductFilter.Order) ? "is-active" : null)" @onclick="() => ToggleFilter(ProductFilter.Order)">Order</button></th>
+                <th class="filter-header"><button type="button" class="@(activeFilters.Contains(ProductFilter.InStock) ? "is-active" : null)" @onclick="() => ToggleFilter(ProductFilter.InStock)">InStock</button></th>
+                <th class="filter-header"><button type="button" class="@(activeFilters.Contains(ProductFilter.Plan) ? "is-active" : null)" @onclick="() => ToggleFilter(ProductFilter.Plan)">Plan</button></th>
                 <th></th>
 
-                <th>Gaida</th>
-                <th>Ražošanā</th>
-                <th>WIP</th>
-                <th>Krāsošanā</th>
+                <th class="filter-header"><button type="button" class="@(activeFilters.Contains(ProductFilter.Waiting) ? "is-active" : null)" @onclick="() => ToggleFilter(ProductFilter.Waiting)">Gaida</button></th>
+                <th class="filter-header"><button type="button" class="@(activeFilters.Contains(ProductFilter.InProduction) ? "is-active" : null)" @onclick="() => ToggleFilter(ProductFilter.InProduction)">Ražošanā</button></th>
+                <th class="filter-header"><button type="button" class="@(activeFilters.Contains(ProductFilter.Wip) ? "is-active" : null)" @onclick="() => ToggleFilter(ProductFilter.Wip)">WIP</button></th>
+                <th class="filter-header"><button type="button" class="@(activeFilters.Contains(ProductFilter.Painting) ? "is-active" : null)" @onclick="() => ToggleFilter(ProductFilter.Painting)">Krāsošanā</button></th>
             </tr>
         </thead>
 
-        @foreach (var category in testCategories)
+        @foreach (var category in FilterProducts(products)
+                .GroupBy(x => new { x.CategoryId, x.CategoryName })
+                .OrderBy(x => x.Key.CategoryName))
             {
+                var categoryProducts = category.ToList();
                 <tbody class="category-group">
                     <tr class="category-row">
                         <td colspan="11">
                             <span class="category-name">
-                                @category.Name
+                                @(string.IsNullOrWhiteSpace(category.Key.CategoryName)
+                                    ? "BEZ KATEGORIJAS"
+                                    : category.Key.CategoryName.ToUpper())
                             </span>
                         </td>
                     </tr>
 
                     @for (var productIndex = 0;
-                        productIndex < category.Products.Count;
+                        productIndex < categoryProducts.Count;
                         productIndex++)
                     {
-                        var product = category.Products[productIndex];
-                        var isOpen = openProductCode == product.Code;
+                        var product = categoryProducts[productIndex];
+                        var isOpen = openProductCode == product.ProductCode;
                         var isStriped = productIndex % 2 == 1;
+                        var isInCurrentPlan = IsCorrectionMode
+                            ? CorrectionBatch!.Items.Any(x =>
+                                x.TopPartId == product.TopPartId)
+                            : product.PlanQty > 0;
 
                         <tr class="product-row
                                 @(isStriped ? "is-striped" : null)
@@ -51,46 +90,51 @@
                                         class="details-button @(isOpen ? "is-open" : null)"
                                         aria-expanded="@isOpen"
                                         title="@(isOpen ? "Aizvērt detalizāciju" : "Atvērt detalizāciju")"
-                                        @onclick="() => ToggleDetails(product.Code)">
+                                        @onclick="() => ToggleDetails(product.ProductCode)">
                                     <span aria-hidden="true">
                                         @(isOpen ? "▼" : "▶")
                                     </span>
                                 </button>
                             </td>
 
-                            <td>@product.Name</td>
-                            <td>@product.Code</td>
+                            <td>@product.ProductName</td>
+                            <td>@product.ProductCode</td>
 
                             <td class="planning-group planning-group-start">
-                                @product.Order
+                                @product.OrderQty
                             </td>
 
                             <td class="planning-group">
-                                @product.InStock
+                                @product.InStockQty
                             </td>
 
                             <td class="planning-group planning-group-end">
-                                @product.Plan
+                                @product.PlanQty
                             </td>
 
-                            <td>
-                                <button type="button">+</button>
+                            <td class="draft-add-cell">
+                                <button type="button"
+                                        class="draft-add-button @(isInCurrentPlan ? "is-in-draft" : null)"
+                                        title="@(isInCurrentPlan ? "Labot draftā pievienoto apjomu" : "Pievienot draftam")"
+                                        @onclick="() => OpenAddDialogAsync(product)">
+                                    +
+                                </button>
                             </td>
 
                             <td class="production-group production-group-start">
-                                @product.Waiting
+                                @product.WaitingQty
                             </td>
 
                             <td class="production-group">
-                                @product.InProduction
+                                @product.InProductionQty
                             </td>
 
                             <td class="production-group">
-                                @product.Wip
+                                @product.WipQty
                             </td>
 
                             <td class="production-group production-group-end">
-                                @product.Painting
+                                @product.PaintingQty
                             </td>
                         </tr>
 
@@ -99,11 +143,11 @@
                             <tr class="product-details-row">
                                 <td class="product-details-cell" colspan="11">
                                     <div class="details-context">
-                                        <strong>@product.Name</strong>
+                                        <strong>@product.ProductName</strong>
 
                                         <span aria-hidden="true">·</span>
 
-                                        <span>@product.Code</span>
+                                        <span>@product.ProductCode</span>
 
                                         <span class="details-context-label">
                                             — detalizācija
@@ -121,8 +165,126 @@
 
 </div>
 
+@if (isAddDialogOpen && selectedProduct is not null)
+{
+    <PlanningAddProductDialog
+        Product="selectedProduct"
+        Workflows="selectedProductWorkflows"
+        InitialPlannedQty="dialogInitialPlannedQty"
+        InitialWorkflowId="dialogInitialWorkflowId"
+        IsEditMode="isDialogEditMode"
+        OnSave="SaveDraftItemAsync"
+        OnCancel="CloseAddDialog" />
+}
+
 @code {
     private string? openProductCode;
+    private readonly HashSet<ProductFilter> activeFilters = [];
+    private int? selectedCategoryId;
+    private bool isCategoryMenuOpen;
+    private PlanningCorrectionBatchItemDto? selectedCorrectionItem;
+    
+    [Parameter]
+    public PlanningCorrectionBatchDto? CorrectionBatch { get; set; }
+
+    [Parameter]
+    public EventCallback<PlanningCorrectionBatchItemDto>
+        OnCorrectionItemSaved { get; set; }
+
+    private bool IsCorrectionMode => CorrectionBatch is not null;
+
+    private IEnumerable<(int CategoryId, string CategoryName)> AvailableCategories()
+    {
+        var source = SelectedParentCategory switch
+        {
+            0 => products.Where(x => string.Equals(x.ParentCategoryName, "Kauss", StringComparison.OrdinalIgnoreCase)),
+            1 => products.Where(x => string.Equals(x.ParentCategoryName, "Adapteri", StringComparison.OrdinalIgnoreCase)),
+            _ => products
+        };
+
+        return source.Where(x => x.CategoryId.HasValue)
+            .GroupBy(x => new { x.CategoryId, x.CategoryName })
+            .Select(x => (x.Key.CategoryId!.Value, x.Key.CategoryName))
+            .OrderBy(x => x.CategoryName);
+    }
+
+    private void ToggleCategoryMenu() => isCategoryMenuOpen = !isCategoryMenuOpen;
+
+    private void SelectCategory(int categoryId)
+    {
+        selectedCategoryId = categoryId;
+        isCategoryMenuOpen = false;
+    }
+
+    private void ClearCategoryFilter()
+    {
+        selectedCategoryId = null;
+        isCategoryMenuOpen = false;
+    }
+
+    private enum ProductFilter
+    {
+        Order,
+        InStock,
+        Plan,
+        Waiting,
+        InProduction,
+        Wip,
+        Painting
+    }
+
+    private void ToggleFilter(ProductFilter filter)
+    {
+        if (!activeFilters.Add(filter))
+            activeFilters.Remove(filter);
+    }
+
+    private IEnumerable<PlanningProductListItemDto> FilterProducts(
+        IEnumerable<PlanningProductListItemDto> source)
+    {
+        source = SelectedParentCategory switch
+        {
+            0 => source.Where(x => string.Equals(
+                x.ParentCategoryName, "Kauss", StringComparison.OrdinalIgnoreCase)),
+            1 => source.Where(x => string.Equals(
+                x.ParentCategoryName, "Adapteri", StringComparison.OrdinalIgnoreCase)),
+            _ => source
+        };
+
+        if (!string.IsNullOrWhiteSpace(SearchText))
+        {
+            source = source.Where(x =>
+                x.ProductName.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
+                x.ProductCode.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (selectedCategoryId.HasValue)
+            source = source.Where(x => x.CategoryId == selectedCategoryId.Value);
+
+        if (activeFilters.Count == 0)
+            return source;
+
+        return source.Where(x =>
+            (activeFilters.Contains(ProductFilter.Order) && x.OrderQty > 0) ||
+            (activeFilters.Contains(ProductFilter.InStock) && x.InStockQty > 0) ||
+            (activeFilters.Contains(ProductFilter.Plan) && x.PlanQty > 0) ||
+            (activeFilters.Contains(ProductFilter.Waiting) && x.WaitingQty > 0) ||
+            (activeFilters.Contains(ProductFilter.InProduction) && x.InProductionQty > 0) ||
+            (activeFilters.Contains(ProductFilter.Wip) && x.WipQty > 0) ||
+            (activeFilters.Contains(ProductFilter.Painting) && x.PaintingQty > 0));
+    }
+    
+    [Parameter]
+    public int RefreshVersion { get; set; }
+
+    [Parameter]
+    public int? SelectedParentCategory { get; set; }
+
+    [Parameter]
+    public string SearchText { get; set; } = "";
+
+    [Parameter]
+    public EventCallback OnDraftChanged { get; set; }
 
     private void ToggleDetails(string productCode)
     {
@@ -131,85 +293,130 @@
             : productCode;
     }
 
-    private readonly List<TestCategoryGroup> testCategories =
-    [
-        new()
+    private List<PlanningProductListItemDto> products = [];
+
+    protected override async Task OnParametersSetAsync()
         {
-            Name = "ĀRA MĒBELES",
-            Products =
-            [
-                new()
-                {
-                    Name = "DGE20",
-                    Code = "E20",
-                    Order = 120,
-                    InStock = 20,
-                    Plan = 30,
-                    Waiting = 0,
-                    InProduction = 15,
-                    Wip = 8,
-                    Painting = 7
-                },
-                new()
-                {
-                    Name = "DGE30",
-                    Code = "E30",
-                    Order = 80,
-                    InStock = 12,
-                    Plan = 20,
-                    Waiting = 2,
-                    InProduction = 10,
-                    Wip = 5,
-                    Painting = 3
-                }
-            ]
-        },
-        new()
-        {
-            Name = "IEKŠTELPU MĒBELES",
-            Products =
-            [
-                new()
-                {
-                    Name = "DGK10",
-                    Code = "K10",
-                    Order = 60,
-                    InStock = 15,
-                    Plan = 10,
-                    Waiting = 0,
-                    InProduction = 6,
-                    Wip = 4,
-                    Painting = 2
-                }
-            ]
+            products = await PlanningService.GetProductsAsync();
         }
-    ];
 
-    private sealed class TestCategoryGroup
+    private PlanningProductListItemDto? selectedProduct;
+
+    private List<PlanningWorkflowOptionDto> selectedProductWorkflows = [];
+
+    private bool isAddDialogOpen;
+
+    private int dialogInitialPlannedQty = 1;
+    private int? dialogInitialWorkflowId;
+    private bool isDialogEditMode;
+
+    private async Task OpenAddDialogAsync(
+            PlanningProductListItemDto product)
+        {
+            selectedProduct = product;
+
+            selectedProductWorkflows =
+                await PlanningService.GetWorkflowsAsync(product.TopPartId);
+
+            if (IsCorrectionMode)
+                {
+                    selectedCorrectionItem = null;
+
+                    var existingWorkflowIds = CorrectionBatch!.Items
+                        .Where(x => x.TopPartId == product.TopPartId)
+                        .Select(x => x.WorkflowId)
+                        .ToHashSet();
+
+                    selectedProductWorkflows = selectedProductWorkflows
+                        .Where(x => !existingWorkflowIds.Contains(x.WorkflowId))
+                        .ToList();
+
+                    if (selectedProductWorkflows.Count == 0)
+                    {
+                        selectedProduct = null;
+
+                        await JS.InvokeVoidAsync(
+                            "alert",
+                            "Visi pieejamie Flow šim produktam jau ir pievienoti.");
+
+                        return;
+                    }
+
+                    dialogInitialPlannedQty = 1;
+                    dialogInitialWorkflowId =
+                        selectedProductWorkflows
+                            .FirstOrDefault(x => x.IsCurrent)?.WorkflowId
+                        ?? selectedProductWorkflows.First().WorkflowId;
+
+                    isDialogEditMode = false;
+                }
+            else
+                {
+                    var existingDraftItem =
+                        (await PlanningService.GetDraftItemsAsync())
+                        .FirstOrDefault(x => x.TopPartId == product.TopPartId);
+
+                    dialogInitialPlannedQty =
+                        existingDraftItem?.PlannedQty ?? 1;
+
+                    dialogInitialWorkflowId =
+                        existingDraftItem?.WorkflowId;
+
+                    isDialogEditMode = existingDraftItem is not null;
+                }
+
+            isAddDialogOpen = true;
+        }
+
+    private async Task SaveDraftItemAsync(
+    SavePlanningDraftItemRequest request)
+        {
+            if (IsCorrectionMode)
+            {
+                var workflow = selectedProductWorkflows
+                    .First(x => x.WorkflowId == request.WorkflowId);
+
+                var item = selectedCorrectionItem
+                    ?? new PlanningCorrectionBatchItemDto
+                    {
+                        TopPartId = selectedProduct!.TopPartId,
+                        TopPartType = 1,
+                        ProductName = selectedProduct.ProductName,
+                        ProductCode = selectedProduct.ProductCode,
+                        ParentCategoryName =
+                            selectedProduct.ParentCategoryName,
+                        CanEdit = true
+                    };
+
+                item.WorkflowId = workflow.WorkflowId;
+                item.WorkflowVersion = workflow.WorkflowVersion;
+                item.IsWorkflowCurrent = workflow.IsCurrent;
+                item.PlannedQty = request.PlannedQty;
+
+                await OnCorrectionItemSaved.InvokeAsync(item);
+
+                CloseAddDialog();
+                return;
+            }
+
+            await PlanningService.SaveDraftItemAsync(request);
+
+            products = await PlanningService.GetProductsAsync();
+
+            await OnDraftChanged.InvokeAsync();
+
+            CloseAddDialog();
+        }
+
+    private void CloseAddDialog()
     {
-        public string Name { get; set; } = "";
-
-        public List<TestProductRow> Products { get; set; } = [];
+        isAddDialogOpen = false;
+        selectedProduct = null;
+        selectedProductWorkflows = [];
+        dialogInitialPlannedQty = 1;
+        dialogInitialWorkflowId = null;
+        isDialogEditMode = false;
+        selectedCorrectionItem = null;
     }
 
-    private sealed class TestProductRow
-    {
-        public string Name { get; set; } = "";
-
-        public string Code { get; set; } = "";
-
-        public int Order { get; set; }
-
-        public int InStock { get; set; }
-
-        public int Plan { get; set; }
-
-        public int Waiting { get; set; }
-
-        public int InProduction { get; set; }
-
-        public int Wip { get; set; }
-
-        public int Painting { get; set; }
-    }
 }

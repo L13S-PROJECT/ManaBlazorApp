@@ -1,0 +1,160 @@
+.planning-dialog-backdrop {
+    position: fixed;
+    z-index: 1000;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: rgb(25 34 40 / 38%);
+}
+
+.planning-dialog {
+    width: min(430px, 100%);
+    max-height: min(560px, calc(100dvh - 32px));
+    padding: 14px;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid #cbd5dd;
+    border-radius: 6px;
+    box-shadow: 0 12px 28px rgb(26 40 50 / 20%);
+}
+
+.planning-dialog h3 {
+    margin: 0 0 12px;
+    color: #26333d;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.planning-dialog-empty {
+    margin: 0;
+    padding: 16px 10px;
+    color: #66727c;
+    font-size: 12px;
+    text-align: center;
+}
+
+.planning-batch-list {
+    max-height: 390px;
+    overflow-y: auto;
+    border: 1px solid #d5dde3;
+    border-radius: 3px;
+}
+
+.planning-batch-list-header,
+.planning-batch-option {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 96px;
+    align-items: center;
+}
+
+.planning-batch-list-header {
+    position: sticky;
+    z-index: 1;
+    top: 0;
+    padding: 7px 10px 7px 34px;
+    background: #f3f6f8;
+    border-bottom: 1px solid #d5dde3;
+    color: #66727c;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.planning-batch-option {
+    position: relative;
+    min-height: 46px;
+    padding: 7px 10px 7px 34px;
+    cursor: pointer;
+}
+
+.planning-batch-option + .planning-batch-option {
+    border-top: 1px solid #e1e6ea;
+}
+
+.planning-batch-option:hover {
+    background: #f7faff;
+}
+
+.planning-batch-option:has(input:checked) {
+    background: #eff6ff;
+}
+
+.planning-batch-option input {
+    position: absolute;
+    left: 10px;
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    accent-color: #2563eb;
+}
+
+.planning-batch-name {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.planning-batch-name strong {
+    overflow: hidden;
+    color: #26333d;
+    font-size: 12px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.planning-batch-name small {
+    color: #71808b;
+    font-size: 10px;
+}
+
+.planning-batch-date {
+    color: #44515b;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.planning-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.planning-dialog-button {
+    min-width: 78px;
+    height: 30px;
+    padding: 4px 12px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.planning-dialog-button-secondary {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #1d4ed8;
+}
+
+.planning-dialog-button-secondary:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
+}
+
+.planning-dialog-button-primary {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #fff;
+}
+
+.planning-dialog-button-primary:hover:not(:disabled) {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+}
+
+.planning-dialog-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}

@@ -4,6 +4,7 @@ public sealed class PlanningSparePartGroupDto
 {
     public int CategoryId { get; set; }
     public string CategoryName { get; set; } = "";
+    public string ParentCategoryName { get; set; } = "";
     public List<PlanningSparePartProductDto> Products { get; set; } = [];
 }
 
@@ -21,6 +22,9 @@ public sealed class PlanningSparePartDto
     public int Id { get; set; }
     public string Name { get; set; } = "";
     public string Code { get; set; } = "";
+
+    public int PlanQty { get; set; }
+    public int WaitingQty { get; set; }
 }
 
 public sealed class PlanningSparePartWorkflowDto

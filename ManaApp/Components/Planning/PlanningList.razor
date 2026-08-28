@@ -1,53 +1,39 @@
 @* PlanningList.razor priekš saraksa karkasa *@
 
+@using ManaApp.Shared.DTOs.Planning
+
 @namespace ManaApp.Components.Planning
 
 <div class="planning-list">
-
-    <div class="planning-list-tabs">
-        <button type="button" @onclick="() => activeView = 0">
-            Products
-        </button>
-
-        <button type="button" @onclick="() => activeView = 1">
-            Parts
-        </button>
-
-        <button type="button" @onclick="() => activeView = 2">
-            Spare Parts
-        </button>
-    </div>
-
-        @if (activeView == 0)
-            {
-                <div class="product-parent-tabs">
-                    <button type="button"
-                            class="parent-tab @(selectedParentCategory == ParentCategory.Kauss ? "is-active" : null)"
-                            @onclick="() => selectedParentCategory = ParentCategory.Kauss">
-                        KAUSS
-                    </button>
-
-                    <button type="button"
-                            class="parent-tab @(selectedParentCategory == ParentCategory.Adapteris ? "is-active" : null)"
-                            @onclick="() => selectedParentCategory = ParentCategory.Adapteris">
-                        ADAPTERIS
-                    </button>
-                </div>
-            }
-
     <div class="planning-list-content">
-        @switch (activeView)
+        @switch (ActiveView)
         {
             case 0:
-                <PlanningProductsList />
+                <PlanningProductsList
+                    @key="FilterResetVersion"
+                    SelectedParentCategory="SelectedParentCategory"
+                    SearchText="@SearchText"
+                    RefreshVersion="RefreshVersion"
+                    CorrectionBatch="CorrectionBatch"
+                    OnCorrectionItemSaved="OnCorrectionItemSaved"
+                    OnDraftChanged="OnDraftChanged" />
                 break;
 
             case 1:
-                <PlanningPartsList />
+                <PlanningPartsList
+                    @key="FilterResetVersion"
+                    SearchText="@SearchText" />
                 break;
 
             case 2:
-                <PlanningSparePartsList />
+                <PlanningSparePartsList
+                    @key="FilterResetVersion"
+                    SelectedParentCategory="SelectedParentCategory"
+                    SearchText="@SearchText"
+                    RefreshVersion="RefreshVersion"
+                    CorrectionBatch="CorrectionBatch"
+                    OnCorrectionItemSaved="OnCorrectionItemSaved"
+                    OnDraftChanged="OnDraftChanged" />
                 break;
         }
     </div>
@@ -55,13 +41,29 @@
 </div>
 
 @code {
-    private int activeView = 0;
+    [Parameter]
+    public int ActiveView { get; set; }
 
-    private ParentCategory? selectedParentCategory;
+    [Parameter]
+    public int? SelectedParentCategory { get; set; }
 
-    private enum ParentCategory
-    {
-        Kauss,
-        Adapteris
-    }
+    [Parameter]
+    public string SearchText { get; set; } = "";
+
+    [Parameter]
+    public int FilterResetVersion { get; set; }
+
+    [Parameter]
+    public int RefreshVersion { get; set; }
+
+    [Parameter]
+    public EventCallback OnDraftChanged { get; set; }
+
+    [Parameter]
+    public PlanningCorrectionBatchDto? CorrectionBatch { get; set; }
+
+    [Parameter]
+    public EventCallback<PlanningCorrectionBatchItemDto>
+    OnCorrectionItemSaved { get; set; }
+
 }

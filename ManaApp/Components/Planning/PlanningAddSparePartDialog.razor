@@ -1,0 +1,123 @@
+@* PlanningAddSparePartDialog.razor *@
+
+@namespace ManaApp.Components.Planning
+@using ManaApp.Shared.DTOs.Planning
+
+<div class="planning-dialog-backdrop">
+    <div class="planning-dialog"
+         role="dialog"
+         aria-modal="true">
+
+        <h3>
+            @(IsEditMode
+                ? "Labot rezerves daļas ražošanas plānu"
+                : "Pievienot rezerves daļu ražošanas plānam")
+        </h3>
+
+        <div class="planning-dialog-field">
+            <span>Nosaukums</span>
+            <div class="planning-dialog-product">
+                <strong>@SparePart.Name</strong>
+                <small>@SparePart.Code</small>
+            </div>
+        </div>
+
+        <label class="planning-dialog-field">
+            <span>Daudzums</span>
+            <input type="number"
+                   min="1"
+                   @bind="plannedQty" />
+        </label>
+
+        <label class="planning-dialog-field">
+            <span>Flow</span>
+            <select @bind="selectedWorkflowId">
+                @foreach (var workflow in Workflows)
+                {
+                    <option value="@workflow.WorkflowId">
+                        @($"V{workflow.WorkflowVersion}{(workflow.IsCurrent ? " — aktuāls" : "")}")
+                    </option>
+                }
+            </select>
+        </label>
+
+        <div class="planning-dialog-actions">
+            <button type="button"
+                    class="planning-dialog-button planning-dialog-button-secondary"
+                    @onclick="CancelAsync">
+                Atcelt
+            </button>
+
+            <button type="button"
+                    class="planning-dialog-button planning-dialog-button-primary"
+                    disabled="@(plannedQty <= 0 || selectedWorkflowId == 0)"
+                    @onclick="SaveAsync">
+                @(IsEditMode ? "Saglabāt" : "Pievienot")
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public PlanningSparePartDto SparePart { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<PlanningSparePartWorkflowDto> Workflows { get; set; }
+        = [];
+
+    [Parameter]
+    public EventCallback<SavePlanningDraftItemRequest> OnSave { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private int plannedQty = 1;
+    private int selectedWorkflowId;
+
+    [Parameter]
+    public int InitialPlannedQty { get; set; } = 1;
+
+    [Parameter]
+    public int? InitialWorkflowId { get; set; }
+
+    [Parameter]
+    public bool IsEditMode { get; set; }
+
+    private bool isInitialized;
+
+    protected override void OnParametersSet()
+    {
+        if (isInitialized)
+            return;
+
+        isInitialized = true;
+
+        plannedQty = InitialPlannedQty > 0
+            ? InitialPlannedQty
+            : 1;
+
+        selectedWorkflowId =
+            InitialWorkflowId.HasValue &&
+            Workflows.Any(x => x.WorkflowId == InitialWorkflowId.Value)
+                ? InitialWorkflowId.Value
+                : Workflows.FirstOrDefault(x => x.IsCurrent)?.WorkflowId
+                    ?? Workflows.FirstOrDefault()?.WorkflowId
+                    ?? 0;
+    }
+
+    private Task SaveAsync()
+    {
+        return OnSave.InvokeAsync(new SavePlanningDraftItemRequest
+        {
+            TopPartId = SparePart.Id,
+            WorkflowId = selectedWorkflowId,
+            PlannedQty = plannedQty
+        });
+    }
+
+    private Task CancelAsync()
+    {
+        return OnCancel.InvokeAsync();
+    }
+}

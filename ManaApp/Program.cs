@@ -48,6 +48,8 @@ builder.Services.AddScoped<TopPartService>();
 builder.Services.AddScoped<TopPartWorkflowService>();
 builder.Services.AddScoped<ItemService>();
 
+builder.Services.AddScoped<ManaApp.Services.TopPartPlanning.TopPartPlanningService>();
+
 
 builder.Services.AddScoped<LookupService>();
 

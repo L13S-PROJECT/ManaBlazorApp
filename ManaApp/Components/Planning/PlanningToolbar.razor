@@ -3,5 +3,131 @@
 @namespace ManaApp.Components.Planning
 
 <div class="planning-toolbar">
-    <span>Planning Toolbar</span>
+    <button type="button"
+            class="planning-action-button planning-view-button planning-main-view @(ActiveView == 0 ? "is-active" : null)"
+            @onclick="() => SelectViewAsync(0)">
+        Products
+    </button>
+
+    <button type="button"
+            class="planning-action-button planning-view-button planning-main-view @(ActiveView == 2 ? "is-active" : null)"
+            @onclick="() => SelectViewAsync(2)">
+        Spare Parts
+    </button>
+
+    <button type="button"
+            class="planning-action-button planning-category-button @(SelectedParentCategory == 0 ? "is-active" : null)"
+            disabled="@(!CategoryFilterEnabled)"
+            aria-pressed="@(SelectedParentCategory == 0)"
+            @onclick="() => SelectParentCategoryAsync(0)">
+        KAUSS
+    </button>
+
+    <button type="button"
+            class="planning-action-button planning-category-button @(SelectedParentCategory == 1 ? "is-active" : null)"
+            disabled="@(!CategoryFilterEnabled)"
+            aria-pressed="@(SelectedParentCategory == 1)"
+            @onclick="() => SelectParentCategoryAsync(1)">
+        ADAPTERIS
+    </button>
+
+    <button type="button"
+            class="planning-clear-button"
+            title="Notīrīt filtrus"
+            aria-label="Notīrīt filtrus"
+            @onclick="OnClearFilters">
+        ×
+    </button>
+
+    <input type="search"
+           placeholder="Meklēt..."
+           aria-label="Meklēt"
+           @bind="searchInput"
+           @bind:event="oninput"
+           @onkeydown="HandleSearchKeyDown" />
+
+    <button type="button"
+            class="planning-action-button planning-view-button planning-parts-view @(ActiveView == 1 ? "is-active" : null)"
+            @onclick="() => SelectViewAsync(1)">
+        Parts
+    </button>
+
+    <button type="button"
+            class="planning-action-button planning-correction-button @(IsCorrectionMode ? "is-cancel" : null)"
+            @onclick="HandleCorrectionClickAsync">
+        @(IsCorrectionMode
+            ? "Atcelt korekciju"
+            : "Veikt korekciju")
+    </button>
+
 </div>
+
+@code {
+    [Parameter]
+    public EventCallback OnCorrectionRequested { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnViewChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<int?> OnParentCategoryChanged { get; set; }
+
+    [Parameter]
+    public int ActiveView { get; set; }
+
+    [Parameter]
+    public int? SelectedParentCategory { get; set; }
+
+    [Parameter]
+    public string SearchText { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> OnSearchChanged { get; set; }
+
+    [Parameter]
+    public EventCallback OnClearFilters { get; set; }
+
+    private string searchInput = "";
+
+    private bool CategoryFilterEnabled => ActiveView is 0 or 2;
+
+    private Task SelectViewAsync(int view)
+    {
+        return OnViewChanged.InvokeAsync(view);
+    }
+
+    private Task SelectParentCategoryAsync(int category)
+    {
+        int? nextCategory = SelectedParentCategory == category
+            ? null
+            : category;
+
+        return OnParentCategoryChanged.InvokeAsync(nextCategory);
+    }
+
+    protected override void OnParametersSet()
+    {
+        searchInput = SearchText;
+    }
+
+    private Task HandleSearchKeyDown(KeyboardEventArgs args)
+    {
+        return args.Key == "Enter"
+            ? OnSearchChanged.InvokeAsync(searchInput.Trim())
+            : Task.CompletedTask;
+    }
+
+    [Parameter]
+    public bool IsCorrectionMode { get; set; }
+
+    [Parameter]
+    public EventCallback OnCorrectionCancelRequested { get; set; }
+
+    private Task HandleCorrectionClickAsync()
+        {
+            return IsCorrectionMode
+                ? OnCorrectionCancelRequested.InvokeAsync()
+                : OnCorrectionRequested.InvokeAsync();
+        }
+
+}

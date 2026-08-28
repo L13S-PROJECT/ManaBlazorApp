@@ -257,6 +257,11 @@ namespace ManiApi.Controllers
                     join category in _db.Categories.AsNoTracking()
                         on product.CategoryID equals category.Id
 
+                    join parentCategory in _db.Categories.AsNoTracking()
+                        on category.ParentId equals (int?)parentCategory.Id
+                        into parentCategoryGroup
+                    from parentCategory in parentCategoryGroup.DefaultIfEmpty()
+
                     join link in _db.TopPartSpareParts.AsNoTracking()
                         on (uint)product.Id equals link.ProductTopPartId
                     
@@ -279,6 +284,9 @@ namespace ManiApi.Controllers
                     {
                         CategoryId = category.Id,
                         category.CategoryName,
+                        ParentCategoryName = parentCategory == null
+                            ? category.CategoryName
+                            : parentCategory.CategoryName,
                         ProductId = product.Id,
                         ProductName = product.TopPartName,
                         ProductCode = product.TopPartCode,
@@ -287,16 +295,40 @@ namespace ManiApi.Controllers
                         IsCurrent = workflow.IsCurrent,
                         SparePartId = sparePart.Id,
                         SparePartName = sparePart.TopPartName,
-                        SparePartCode = sparePart.TopPartCode
+                        SparePartCode = sparePart.TopPartCode,
+
+                        PlanQty = _db.ProductionPlanningDraftItems
+                            .Where(item =>
+                                item.TopPart_ID == sparePart.Id &&
+                                item.Workflow_ID == workflow.Id &&
+                                item.IsActive &&
+                                item.Draft.IsActive &&
+                                item.Draft.Status == ProductionPlanningDraftStatus.Draft)
+                            .Sum(item => (int?)item.Planned_Qty) ?? 0,
+
+                        WaitingQty = _db.ProductionBatchTopParts
+                            .Where(item =>
+                                item.TopPart_ID == sparePart.Id &&
+                                item.Workflow_ID == workflow.Id &&
+                                item.IsActive &&
+                                item.Batch!.IsActive)
+                            .Sum(item => (int?)item.Planned_Qty) ?? 0
+
                     })
                     .ToListAsync();
 
                 var result = rows
-                    .GroupBy(x => new { x.CategoryId, x.CategoryName })
+                    .GroupBy(x => new
+                    {
+                        x.CategoryId,
+                        x.CategoryName,
+                        x.ParentCategoryName
+                    })
                     .Select(category => new PlanningSparePartGroupDto
                     {
                         CategoryId = category.Key.CategoryId,
                         CategoryName = category.Key.CategoryName,
+                        ParentCategoryName = category.Key.ParentCategoryName,
                         Products = category
                             .GroupBy(x => new
                             {
@@ -319,7 +351,9 @@ namespace ManiApi.Controllers
                                         {
                                             Id = row.SparePartId,
                                             Name = row.SparePartName,
-                                            Code = row.SparePartCode
+                                            Code = row.SparePartCode,
+                                            PlanQty = row.PlanQty,
+                                            WaitingQty = row.WaitingQty
                                         };
                                     })
                                     .OrderBy(x => x.Name)
@@ -346,7 +380,9 @@ namespace ManiApi.Controllers
                                                 {
                                                     Id = row.SparePartId,
                                                     Name = row.SparePartName,
-                                                    Code = row.SparePartCode
+                                                    Code = row.SparePartCode,
+                                                    PlanQty = row.PlanQty,
+                                                    WaitingQty = row.WaitingQty
                                                 };
                                             })
                                             .OrderBy(x => x.Name)

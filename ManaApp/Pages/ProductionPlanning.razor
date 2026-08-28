@@ -1,21 +1,147 @@
 @* ProductioPlanning.razor lapa - ražošanas plānošanai *@
 
-@using ManaApp.Components.Planning
-
 @page "/production-planning"
 
+@using ManaApp.Components.Planning
+@using ManaApp.Services.TopPartPlanning
+@using ManaApp.Shared.DTOs.Planning
+@inject IJSRuntime JS
+@inject TopPartPlanningService PlanningService
+
 <PageTitle>Ražošanas plānošana</PageTitle>
+
+@if (isCorrectionDialogOpen)
+{
+    <PlanningCorrectionBatchDialog
+        Batches="correctionBatches"
+        OnSelect="SelectCorrectionBatchAsync"
+        OnCancel="CloseCorrectionDialog" />
+}
 
 <div class="planning-layout">
 
     <div class="planning-left">
-        <ManaApp.Components.Planning.PlanningToolbar />
+        <ManaApp.Components.Planning.PlanningToolbar
+            ActiveView="activePlanningView"
+            SelectedParentCategory="selectedParentCategory"
+            SearchText="@ActiveSearchText"
+            OnViewChanged="SelectPlanningView"
+            OnParentCategoryChanged="SelectParentCategory"
+            OnSearchChanged="ApplySearch"
+            OnClearFilters="ClearAllFilters"
+            IsCorrectionMode="@(selectedCorrectionBatch is not null)"
+            OnCorrectionCancelRequested="CancelCorrectionAsync"
+            OnCorrectionRequested="OpenCorrectionDialogAsync" />
 
-        <PlanningList />
+        <PlanningList
+            ActiveView="activePlanningView"
+            SelectedParentCategory="selectedParentCategory"
+            SearchText="@ActiveSearchText"
+            FilterResetVersion="filterResetVersion"
+            RefreshVersion="productsRefreshVersion"
+            CorrectionBatch="selectedCorrectionBatch"
+            OnCorrectionItemSaved="SaveCorrectionItemLocally"
+            OnDraftChanged="RefreshProducts" />
     </div>
 
     <div class="planning-right">
-        <PlanningDraft />
+        <PlanningDraft
+            CorrectionBatch="selectedCorrectionBatch"
+            RefreshVersion="productsRefreshVersion"
+            OnCorrectionClosed="CloseCorrection"
+            OnDraftChanged="RefreshProducts" />
     </div>
 
 </div>
+
+
+
+@code {
+    private List<PlanningCorrectionBatchOptionDto> correctionBatches = [];
+
+    private PlanningCorrectionBatchDto? selectedCorrectionBatch;
+    private bool isCorrectionDialogOpen;
+    private int activePlanningView;
+    private int? selectedParentCategory;
+    private readonly string[] searchTexts = ["", "", ""];
+    private string ActiveSearchText => searchTexts[activePlanningView];
+    private int filterResetVersion;
+
+    private void SelectPlanningView(int view)
+        {
+            activePlanningView = view;
+        }
+
+    private void SelectParentCategory(int? category)
+        {
+            selectedParentCategory = category;
+        }
+
+    private void ApplySearch(string searchText)
+        {
+            searchTexts[activePlanningView] = searchText;
+        }
+
+    private void CloseCorrection()
+        {
+            selectedCorrectionBatch = null;
+            RefreshProducts();
+        }
+
+    private void ClearAllFilters()
+        {
+            Array.Fill(searchTexts, "");
+            selectedParentCategory = null;
+            activePlanningView = 0;
+            filterResetVersion++;
+        }
+
+    private async Task OpenCorrectionDialogAsync()
+        {
+            correctionBatches =
+                await PlanningService.GetCorrectionBatchesAsync();
+
+            isCorrectionDialogOpen = true;
+        }
+
+    private int productsRefreshVersion;
+
+    private void RefreshProducts()
+        {
+            productsRefreshVersion++;
+        }
+
+    private async Task SelectCorrectionBatchAsync(uint batchId)
+        {
+            selectedCorrectionBatch =
+                await PlanningService.GetCorrectionBatchAsync(batchId);
+
+            CloseCorrectionDialog();
+        }
+
+    private void CloseCorrectionDialog()
+        {
+            isCorrectionDialogOpen = false;
+        }
+
+    private void SaveCorrectionItemLocally(
+        PlanningCorrectionBatchItemDto item)
+        {
+            if (selectedCorrectionBatch is null)
+                return;
+
+            if (!selectedCorrectionBatch.Items.Contains(item))
+                selectedCorrectionBatch.Items.Add(item);
+        }
+
+    private async Task CancelCorrectionAsync()
+        {
+            var confirmed = await JS.InvokeAsync<bool>(
+                "confirm",
+                "Vai tiešām atcelt korekciju?");
+
+            if (confirmed)
+                CloseCorrection();
+        }
+
+}
