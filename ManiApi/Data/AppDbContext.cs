@@ -58,8 +58,13 @@ namespace ManiApi.Data
         public DbSet<TopPartSparePart> TopPartSpareParts { get; set; }
         public DbSet<ProductionPlanningDraft> ProductionPlanningDrafts { get; set; }
         public DbSet<ProductionPlanningDraftItem> ProductionPlanningDraftItems { get; set; }
+        public DbSet<ProductionExecution> ProductionExecutions { get; set; }
+        public DbSet<ProductionRequirement> ProductionRequirements { get; set; }
+        public DbSet<ProductionReservation> ProductionReservations { get; set; }
+        public DbSet<TaskNew> TasksNew { get; set; }
+        public DbSet<TaskNewStatusHistory> TaskNewStatusHistories { get; set; }
 
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
+protected override void OnModelCreating(ModelBuilder modelBuilder)
         
 {
     base.OnModelCreating(modelBuilder);
@@ -71,6 +76,15 @@ namespace ManiApi.Data
 
     modelBuilder.Entity<StockMovementNew>()
         .ToTable("stock_movements_new");
+    
+    modelBuilder.Entity<StockMovementNew>()
+        .Property(x => x.Movement_Type)
+        .HasConversion<string>();
+
+    modelBuilder.Entity<StockMovementNew>()
+        .HasIndex(x => x.SourceMovement_ID)
+        .IsUnique()
+        .HasDatabaseName("UX_stock_source_movement");
 
     modelBuilder.Entity<ProductionBatch>()
         .HasKey(x => x.ID);
@@ -139,6 +153,17 @@ namespace ManiApi.Data
         .WithMany()
         .HasForeignKey(x => x.WorkflowNode_ID)
         .OnDelete(DeleteBehavior.Restrict);
+    
+    modelBuilder.Entity<StockMovementNew>()
+        .HasOne(x => x.TaskNew)
+        .WithMany()
+        .HasForeignKey(x => x.TaskNew_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+    
+    modelBuilder.Entity<StockMovementNew>()
+        .HasIndex(x => x.TaskNew_ID)
+        .IsUnique()
+        .HasDatabaseName("UX_stock_movements_new_task");
 
     modelBuilder.Entity<ProductionPlanningDraft>()
         .ToTable("production_planning_drafts");
@@ -175,6 +200,271 @@ namespace ManiApi.Data
         .WithMany()
         .HasForeignKey(x => x.Source_Batch_ID)
         .OnDelete(DeleteBehavior.Restrict);
+    
+    modelBuilder.Entity<ProductionExecution>()
+    .ToTable("production_executions");
+
+    modelBuilder.Entity<ProductionExecution>()
+        .HasKey(x => x.ID);
+
+    modelBuilder.Entity<ProductionExecution>()
+        .Property(x => x.Status)
+        .HasConversion<string>();
+
+    modelBuilder.Entity<ProductionExecution>()
+    .HasOne(x => x.ProductionBatchTopPart)
+    .WithMany()
+    .HasForeignKey(x => x.ProductionBatchTopPart_ID)
+    .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionExecution>()
+        .HasOne(x => x.TopPart)
+        .WithMany()
+        .HasForeignKey(x => x.TopPart_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionExecution>()
+        .HasOne(x => x.Workflow)
+        .WithMany()
+        .HasForeignKey(x => x.Workflow_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+    
+    modelBuilder.Entity<ProductionExecution>()
+        .HasIndex(x => x.ProductionBatchTopPart_ID)
+        .HasDatabaseName("IX_production_executions_batch_toppart");
+
+    modelBuilder.Entity<ProductionExecution>()
+        .HasIndex(x => x.TopPart_ID)
+        .HasDatabaseName("IX_production_executions_top_part");
+
+    modelBuilder.Entity<ProductionExecution>()
+        .HasIndex(x => x.Workflow_ID)
+        .HasDatabaseName("IX_production_executions_workflow");
+
+    modelBuilder.Entity<ProductionExecution>()
+        .HasIndex(x => new { x.Status, x.IsActive })
+        .HasDatabaseName("IX_production_executions_status");
+
+    modelBuilder.Entity<ProductionExecution>()
+        .HasOne(x => x.ProductionRequirement)
+        .WithMany()
+        .HasForeignKey(x => x.ProductionRequirement_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionExecution>()
+        .HasIndex(x => x.ProductionRequirement_ID)
+        .HasDatabaseName("IX_production_executions_requirement");
+
+    modelBuilder.Entity<ProductionRequirement>()
+        .ToTable("production_requirements");
+
+    modelBuilder.Entity<ProductionRequirement>()
+        .HasKey(x => x.ID);
+
+    modelBuilder.Entity<ProductionRequirement>()
+        .Property(x => x.SourceType)
+        .HasConversion<string>();
+
+    modelBuilder.Entity<ProductionRequirement>()
+        .HasOne(x => x.ProductionPlanningDraftItem)
+        .WithMany()
+        .HasForeignKey(x => x.ProductionPlanningDraftItem_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionRequirement>()
+        .HasOne(x => x.ProductionBatchTopPart)
+        .WithMany()
+        .HasForeignKey(x => x.ProductionBatchTopPart_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionRequirement>()
+        .HasOne(x => x.SourceTopPart)
+        .WithMany()
+        .HasForeignKey(x => x.SourceTopPart_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionRequirement>()
+        .HasOne(x => x.RequiredTopPart)
+        .WithMany()
+        .HasForeignKey(x => x.RequiredTopPart_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionRequirement>()
+        .HasOne(x => x.ParentRequirement)
+        .WithMany(x => x.ChildRequirements)
+        .HasForeignKey(x => x.ParentRequirement_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionRequirement>()
+        .HasIndex(x => x.ProductionPlanningDraftItem_ID)
+        .HasDatabaseName("IX_production_requirements_draft_item");
+
+    modelBuilder.Entity<ProductionRequirement>()
+        .HasIndex(x => x.ProductionBatchTopPart_ID)
+        .HasDatabaseName("IX_production_requirements_batch_toppart");
+
+    modelBuilder.Entity<ProductionRequirement>()
+        .HasIndex(x => new { x.RequiredTopPart_ID, x.IsActive })
+        .HasDatabaseName("IX_production_requirements_required");
+
+    modelBuilder.Entity<ProductionRequirement>()
+        .HasIndex(x => new { x.Priority, x.Created_At })
+        .HasDatabaseName("IX_production_requirements_priority");
+
+    modelBuilder.Entity<ProductionRequirement>()
+        .HasIndex(x => x.ParentRequirement_ID)
+        .HasDatabaseName("IX_production_requirements_parent");
+    
+    modelBuilder.Entity<ProductionRequirement>()
+        .HasIndex(x => x.SourceTopPart_ID)
+        .HasDatabaseName("IX_production_requirements_source");
+
+    modelBuilder.Entity<ProductionReservation>()
+        .ToTable("production_reservations");
+
+    modelBuilder.Entity<ProductionReservation>()
+        .HasKey(x => x.ID);
+
+    modelBuilder.Entity<ProductionReservation>()
+        .Property(x => x.Status)
+        .HasConversion<string>();
+
+    modelBuilder.Entity<ProductionReservation>()
+        .Ignore(x => x.RemainingQuantity);
+    
+    modelBuilder.Entity<ProductionReservation>()
+        .HasOne(x => x.ProductionRequirement)
+        .WithMany()
+        .HasForeignKey(x => x.ProductionRequirement_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionReservation>()
+        .HasOne(x => x.TopPart)
+        .WithMany()
+        .HasForeignKey(x => x.TopPart_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionReservation>()
+        .HasOne(x => x.SourceMovement)
+        .WithMany()
+        .HasForeignKey(x => x.SourceMovement_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionReservation>()
+        .HasOne(x => x.SourceWorkflow)
+        .WithMany()
+        .HasForeignKey(x => x.SourceWorkflow_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionReservation>()
+        .HasOne(x => x.SourceWorkflowNode)
+        .WithMany()
+        .HasForeignKey(x => x.SourceWorkflowNode_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionReservation>()
+        .HasIndex(x => x.ProductionRequirement_ID)
+        .HasDatabaseName("IX_production_reservations_requirement");
+
+    modelBuilder.Entity<ProductionReservation>()
+        .HasIndex(x => new { x.TopPart_ID, x.Status, x.IsActive })
+        .HasDatabaseName("IX_production_reservations_top_part");
+
+    modelBuilder.Entity<ProductionReservation>()
+        .HasIndex(x => new { x.SourceMovement_ID, x.Status, x.IsActive })
+        .HasDatabaseName("IX_production_reservations_source");
+
+    modelBuilder.Entity<ProductionReservation>()
+        .HasIndex(x => new { x.SourceWorkflow_ID, x.SourceWorkflowNode_ID })
+        .HasDatabaseName("IX_production_reservations_workflow_node");
+    
+    modelBuilder.Entity<TaskNew>()
+    .ToTable("tasks_new");
+
+    modelBuilder.Entity<TaskNew>()
+        .HasKey(x => x.ID);
+
+    modelBuilder.Entity<TaskNew>()
+        .Property(x => x.Status)
+        .HasConversion<string>();
+    
+    modelBuilder.Entity<TaskNew>()
+    .HasOne(x => x.ProductionExecution)
+    .WithMany()
+    .HasForeignKey(x => x.ProductionExecution_ID)
+    .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<TaskNew>()
+        .HasOne(x => x.WorkflowNode)
+        .WithMany()
+        .HasForeignKey(x => x.WorkflowNode_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<TaskNew>()
+        .HasOne(x => x.Employee)
+        .WithMany()
+        .HasForeignKey(x => x.Employee_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<TaskNew>()
+        .HasOne(x => x.WorkCenter)
+        .WithMany()
+        .HasForeignKey(x => x.WorkCenter_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+    
+    modelBuilder.Entity<TaskNew>()
+        .HasIndex(x => new
+        {
+            x.ProductionExecution_ID,
+            x.WorkflowNode_ID
+        })
+        .HasDatabaseName("IX_tasks_new_execution_node");
+
+    modelBuilder.Entity<TaskNew>()
+        .HasIndex(x => new { x.Employee_ID, x.Status, x.IsActive })
+        .HasDatabaseName("IX_tasks_new_employee_status");
+
+    modelBuilder.Entity<TaskNew>()
+        .HasIndex(x => new { x.WorkCenter_ID, x.Status, x.IsActive })
+        .HasDatabaseName("IX_tasks_new_workcenter_status");
+    
+    modelBuilder.Entity<TaskNewStatusHistory>()
+        .ToTable("tasks_new_status_history");
+
+    modelBuilder.Entity<TaskNewStatusHistory>()
+        .HasKey(x => x.ID);
+
+    modelBuilder.Entity<TaskNewStatusHistory>()
+        .Property(x => x.FromStatus)
+        .HasConversion<string>();
+
+    modelBuilder.Entity<TaskNewStatusHistory>()
+        .Property(x => x.ToStatus)
+        .HasConversion<string>();
+
+    modelBuilder.Entity<TaskNewStatusHistory>()
+        .Property(x => x.Comment)
+        .HasMaxLength(500);
+    
+    modelBuilder.Entity<TaskNewStatusHistory>()
+        .HasOne(x => x.TaskNew)
+        .WithMany()
+        .HasForeignKey(x => x.TaskNew_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<TaskNewStatusHistory>()
+        .HasOne(x => x.ChangedByEmployee)
+        .WithMany()
+        .HasForeignKey(x => x.ChangedByEmployee_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+    
+    modelBuilder.Entity<TaskNewStatusHistory>()
+        .HasIndex(x => new { x.TaskNew_ID, x.Changed_At })
+        .HasDatabaseName("IX_tasks_new_status_history_task");
+
+    modelBuilder.Entity<TaskNewStatusHistory>()
+        .HasIndex(x => x.ChangedByEmployee_ID)
+        .HasDatabaseName("IX_tasks_new_status_history_employee");
 
 
     modelBuilder.Entity<EmployeeWorkLog>().ToTable("employee_work_log");

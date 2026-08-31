@@ -67,6 +67,7 @@ builder.Services.AddScoped<WorkflowValidator>();
 builder.Services.AddScoped<WorkflowAnalyzerFactory>();
 builder.Services.AddScoped<TopPartWorkflowService>();
 builder.Services.AddScoped<TopPartWorkflowGraphService>();
+builder.Services.AddScoped<ManiApi.Services.Planning.PlanningPartRequirementService>();
 
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

@@ -3,6 +3,7 @@ using ManiApi.Data;
 using ManiApi.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ManiApi.Services.Planning;
 
 namespace ManiApi.Controllers
 {
@@ -11,10 +12,14 @@ namespace ManiApi.Controllers
     public class ProductionPlanningController : ControllerBase
     {
         private readonly AppDbContext _db;
+        private readonly PlanningPartRequirementService _partRequirementService;
 
-        public ProductionPlanningController(AppDbContext db)
+        public ProductionPlanningController(
+            AppDbContext db,
+            PlanningPartRequirementService partRequirementService)
         {
             _db = db;
+            _partRequirementService = partRequirementService;
         }
 
         [HttpPost("draft/items")]
@@ -116,6 +121,48 @@ namespace ManiApi.Controllers
                 item.Workflow_ID,
                 item.Planned_Qty
             });
+        }
+
+        [HttpGet("parts")]
+        public async Task<ActionResult<List<PlanningPartListItemDto>>> GetParts()
+        {
+            Dictionary<int, int> plannedQuantities;
+
+            try
+            {
+                plannedQuantities =
+                    await _partRequirementService
+                        .CalculateDraftPartQuantitiesAsync();
+            }
+            catch (InvalidOperationException exception)
+            {
+                return UnprocessableEntity(exception.Message);
+            }
+
+            var partIds = plannedQuantities
+                .Where(row => row.Value > 0)
+                .Select(row => row.Key)
+                .ToList();
+
+            var rows = await _db.TopParts
+                .AsNoTracking()
+                .Where(topPart =>
+                    topPart.IsActive &&
+                    topPart.TopPartType == TopPartType.Part &&
+                    partIds.Contains(topPart.Id))
+                .OrderBy(topPart => topPart.TopPartName)
+                .Select(topPart => new PlanningPartListItemDto
+                {
+                    TopPartId = topPart.Id,
+                    PartName = topPart.TopPartName,
+                    PartCode = topPart.TopPartCode
+                })
+                .ToListAsync();
+
+            foreach (var row in rows)
+                row.PlanQty = plannedQuantities[row.TopPartId];
+
+            return Ok(rows);
         }
 
         [HttpGet("products")]
@@ -433,9 +480,95 @@ namespace ManiApi.Controllers
                         Done_Qty = 0,
                         IsPriority = false,
                         IsActive = true
-                    });
+                   }).ToList();
 
                 _db.ProductionBatchTopParts.AddRange(batchItems);
+                await _db.SaveChangesAsync();
+
+                var executions = batchItems
+                    .Select(batchItem => new ProductionExecution
+                    {
+                        ProductionBatchTopPart_ID = batchItem.ID,
+                        ProductionRequirement_ID = null,
+                        TopPart_ID = batchItem.TopPart_ID,
+                        Workflow_ID = batchItem.Workflow_ID,
+                        Quantity = (int)batchItem.Planned_Qty,
+                        Status = ProductionExecutionStatus.WAITING,
+                        Created_At = DateTime.UtcNow,
+                        IsActive = true
+                    })
+                    .ToList();
+
+                _db.ProductionExecutions.AddRange(executions);
+
+                await _db.SaveChangesAsync();
+
+                var workflowIds = executions
+                    .Select(x => x.Workflow_ID)
+                    .Distinct()
+                    .ToList();
+
+                var processNodes = await _db.WorkflowNodes
+                    .AsNoTracking()
+                    .Where(x =>
+                        workflowIds.Contains(x.WorkflowId) &&
+                        x.NodeType == (byte)WorkflowNodeType.Process &&
+                        x.IsActive)
+                    .ToListAsync();
+
+                var workflowWithoutProcess = workflowIds
+                    .FirstOrDefault(workflowId =>
+                        !processNodes.Any(node =>
+                            node.WorkflowId == workflowId));
+
+                if (workflowWithoutProcess != 0)
+                    return BadRequest(
+                        $"Workflow ID {workflowWithoutProcess} nav neviena aktīva PROCESS mezgla.");
+
+                var processWithoutWorkCenter = processNodes
+                    .FirstOrDefault(x => !x.WorkCenterId.HasValue);
+
+                if (processWithoutWorkCenter != null)
+                    return BadRequest(
+                        $"PROCESS mezglam ID {processWithoutWorkCenter.Id} nav norādīts darba centrs.");
+
+                var taskCreatedAt = DateTime.UtcNow;
+
+                var tasks = executions
+                    .SelectMany(execution => processNodes
+                        .Where(node =>
+                            node.WorkflowId == execution.Workflow_ID)
+                        .Select(node => new TaskNew
+                        {
+                            ProductionExecution_ID = execution.ID,
+                            WorkflowNode_ID = node.Id,
+                            Employee_ID = null,
+                            WorkCenter_ID = node.WorkCenterId!.Value,
+                            Quantity = execution.Quantity,
+                            Status = TaskNewStatus.WAITING,
+                            Created_At = taskCreatedAt,
+                            IsActive = true
+                        }))
+                    .ToList();
+
+                _db.TasksNew.AddRange(tasks);
+
+                await _db.SaveChangesAsync();
+
+                var taskHistories = tasks
+                    .Select(task => new TaskNewStatusHistory
+                    {
+                        TaskNew_ID = task.ID,
+                        FromStatus = null,
+                        ToStatus = TaskNewStatus.WAITING,
+                        Changed_At = taskCreatedAt,
+                        Comment = "Task automātiski izveidots, apstiprinot ražošanas plānu."
+                    })
+                    .ToList();
+
+                _db.TaskNewStatusHistories.AddRange(taskHistories);
+
+                await _db.SaveChangesAsync();
 
                 draft.Batch_Code = batchCode;
                 draft.Plan_Date = DateOnly.FromDateTime(today);

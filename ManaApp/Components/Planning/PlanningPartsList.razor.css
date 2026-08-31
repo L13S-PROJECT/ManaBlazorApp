@@ -11,6 +11,7 @@
 .planning-parts-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
 }
 
 .planning-parts-table th {
@@ -30,28 +31,26 @@
     text-align: left;
 }
 
-.planning-parts-table {
-    table-layout: fixed;
-}
-
 .planning-parts-table th:first-child,
 .planning-parts-table td:first-child {
-    width: 32%;
+    width: 36%;
     text-align: left;
 }
 
 .planning-parts-table th:nth-child(2),
 .planning-parts-table td:nth-child(2) {
-    width: 12%;
+    width: 8%;
 }
 
 .planning-parts-table .flow-column {
-    width: 44px;
+    width: clamp(38px, 5vw, 56px);
 }
 
-.planning-parts-table th:nth-child(n + 4),
-.planning-parts-table td:nth-child(n + 4) {
-    width: 9%;
+.planning-parts-table .quantity-column {
+    width: clamp(42px, 7vw, 76px);
+    padding-left: 4px;
+    padding-right: 4px;
+    white-space: nowrap;
 }
 
 .planning-parts-table td {
@@ -69,7 +68,7 @@
 .category-row td {
     height: 26px;
     padding: 4px 12px;
-    text-align: center !important;
+    text-align: left !important;
     background: #dce7ee;
     border-top: 1px solid #b7ccd8;
     border-bottom: 1px solid #b7ccd8;
@@ -111,4 +110,49 @@
     padding-top: 3px;
     padding-bottom: 3px;
     font-size: 12px;
+    border-color: #d3d9de;
+}
+
+/* Plānošanas bloks: Plān. + Pl. scrap */
+.planning-parts-table th:nth-child(4),
+.planning-parts-table th:nth-child(5) {
+    background: #59656c;
+}
+
+.planning-parts-table .part-row td:nth-child(4),
+.planning-parts-table .part-row td:nth-child(5) {
+    background: #eef2f4;
+}
+
+.planning-parts-table th:nth-child(4),
+.planning-parts-table .part-row td:nth-child(4) {
+    border-left: 2px solid #626a70;
+}
+
+.planning-parts-table th:nth-child(5),
+.planning-parts-table .part-row td:nth-child(5) {
+    border-right: 2px solid #626a70;
+}
+
+/* Noliktavas bloks: Nolikt. + Rez. + Brīvs */
+.planning-parts-table th:nth-child(8),
+.planning-parts-table th:nth-child(9),
+.planning-parts-table th:nth-child(10) {
+    background: #626159;
+}
+
+.planning-parts-table .part-row td:nth-child(8),
+.planning-parts-table .part-row td:nth-child(9),
+.planning-parts-table .part-row td:nth-child(10) {
+    background: #f3f1ea;
+}
+
+.planning-parts-table th:nth-child(8),
+.planning-parts-table .part-row td:nth-child(8) {
+    border-left: 2px solid #626a70;
+}
+
+.planning-parts-table th:nth-child(10),
+.planning-parts-table .part-row td:nth-child(10) {
+    border-right: 2px solid #626a70;
 }

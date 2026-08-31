@@ -14,11 +14,13 @@
                 <th>Nosaukums</th>
                 <th>Kods</th>
                 <th class="flow-column">Flow</th>
-                <th>Noliktavā</th>
-                <th>Pieejams</th>
-                <th>Rezervēts</th>
-                <th>Trūkst</th>
-                <th>Ražošanā</th>
+                <th class="quantity-column" title="Plānots">Plān.</th>
+                <th class="quantity-column" title="Plānotais scrap">Pl. scrap</th>
+                <th class="quantity-column">Gaida</th>
+                <th class="quantity-column" title="Ražošanā">Ražo.</th>
+                <th class="quantity-column" title="Noliktavā">Nolikt.</th>
+                <th class="quantity-column" title="Rezervēts">Rez.</th>
+                <th class="quantity-column">Brīvs</th>
             </tr>
 
         </thead>
@@ -27,7 +29,7 @@
             {
                 <tbody class="category-group">
                     <tr class="category-row">
-                        <td colspan="8">
+                        <td colspan="10">
                             <span class="category-name">
                                 @category.CategoryName
                             </span>
@@ -44,11 +46,13 @@
                             <td>@part.TopPartName</td>
                             <td>@part.TopPartCode</td>
                             <td class="flow-column">@part.ReleasedVersion</td>
-                            <td>0</td>
-                            <td>0</td>
-                            <td>0</td>
-                            <td>0</td>
-                            <td>0</td>
+                            <td class="quantity-column">0</td>
+                            <td class="quantity-column">0</td>
+                            <td class="quantity-column">0</td>
+                            <td class="quantity-column">0</td>
+                            <td class="quantity-column">0</td>
+                            <td class="quantity-column">0</td>
+                            <td class="quantity-column">0</td>
                         </tr>
                     }
             }

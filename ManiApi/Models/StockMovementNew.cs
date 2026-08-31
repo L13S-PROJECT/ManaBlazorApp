@@ -8,11 +8,13 @@ namespace ManiApi.Models
 
         public uint? ProductionBatchTopPart_ID { get; set; }
 
+        public uint? TaskNew_ID { get; set; }
+
         public int? WorkflowNode_ID { get; set; }
 
         public int? RAL_Color_ID { get; set; }
 
-        public string Movement_Type { get; set; } = string.Empty;
+        public StockMovementType Movement_Type { get; set; }
 
         public int Quantity { get; set; }
 
@@ -35,6 +37,7 @@ namespace ManiApi.Models
         public StockMovementNew? SourceMovement { get; set; }
 
         public ProductionBatch? ConsumedByBatch { get; set; }
+        public TaskNew? TaskNew { get; set; }
 
     }
 }
