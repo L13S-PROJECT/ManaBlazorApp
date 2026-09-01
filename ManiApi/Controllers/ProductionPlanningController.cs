@@ -4,6 +4,7 @@ using ManiApi.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ManiApi.Services.Planning;
+using ManiApi.Services.Tasks;
 
 namespace ManiApi.Controllers
 {
@@ -13,13 +14,16 @@ namespace ManiApi.Controllers
     {
         private readonly AppDbContext _db;
         private readonly PlanningPartRequirementService _partRequirementService;
+        private readonly TaskNewDependencyService _taskDependencyService;
 
         public ProductionPlanningController(
             AppDbContext db,
-            PlanningPartRequirementService partRequirementService)
+            PlanningPartRequirementService partRequirementService,
+            TaskNewDependencyService taskDependencyService)
         {
             _db = db;
             _partRequirementService = partRequirementService;
+            _taskDependencyService = taskDependencyService;
         }
 
         [HttpPost("draft/items")]
@@ -531,6 +535,50 @@ namespace ManiApi.Controllers
                 if (processWithoutWorkCenter != null)
                     return BadRequest(
                         $"PROCESS mezglam ID {processWithoutWorkCenter.Id} nav norādīts darba centrs.");
+                
+                var processNodeIds = processNodes
+                    .Select(x => x.Id)
+                    .ToList();
+
+                var processComponents = await (
+                    from processComponent in _db.WorkflowProcessComponents.AsNoTracking()
+
+                    join workflowComponent in _db.WorkflowComponents.AsNoTracking()
+                        on processComponent.WorkflowComponentId equals workflowComponent.Id
+
+                    where processNodeIds.Contains(processComponent.ProcessNodeId)
+                        && workflowComponent.ComponentType == 1
+                        && workflowComponent.IsActive
+
+                    select processComponent
+                ).ToListAsync();
+
+                var workflowIdByProcessNodeId = processNodes
+                    .ToDictionary(
+                        x => x.Id,
+                        x => x.WorkflowId);
+
+                var componentStagings = executions
+                    .SelectMany(execution => processComponents
+                        .Where(processComponent =>
+                            workflowIdByProcessNodeId[processComponent.ProcessNodeId]
+                                == execution.Workflow_ID)
+                        .Select(processComponent => new ProductionComponentStaging
+                        {
+                            ProductionExecution_ID = execution.ID,
+                            WorkflowProcessComponent_ID = processComponent.Id,
+                            RequiredQuantity =
+                                processComponent.Quantity * execution.Quantity,
+                            StagedQuantity = 0,
+                            StagedByEmployee_ID = null,
+                            Staged_At = null,
+                            IsActive = true
+                        }))
+                    .ToList();
+
+                _db.ProductionComponentStagings.AddRange(componentStagings);
+
+                await _db.SaveChangesAsync();
 
                 var taskCreatedAt = DateTime.UtcNow;
 
@@ -555,7 +603,17 @@ namespace ManiApi.Controllers
 
                 await _db.SaveChangesAsync();
 
+                foreach (var execution in executions)
+                    {
+                        await _taskDependencyService.CreateForExecutionAsync(
+                            execution.ID,
+                            execution.Workflow_ID);
+                    }
+
+                await _db.SaveChangesAsync();
+
                 var taskHistories = tasks
+
                     .Select(task => new TaskNewStatusHistory
                     {
                         TaskNew_ID = task.ID,

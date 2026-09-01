@@ -63,6 +63,9 @@ namespace ManiApi.Data
         public DbSet<ProductionReservation> ProductionReservations { get; set; }
         public DbSet<TaskNew> TasksNew { get; set; }
         public DbSet<TaskNewStatusHistory> TaskNewStatusHistories { get; set; }
+        public DbSet<TaskNewDependency> TaskNewDependencies { get; set; }
+
+        public DbSet<ProductionComponentStaging> ProductionComponentStagings { get; set; }
 
 protected override void OnModelCreating(ModelBuilder modelBuilder)
         
@@ -83,8 +86,18 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 
     modelBuilder.Entity<StockMovementNew>()
         .HasIndex(x => x.SourceMovement_ID)
+        .HasDatabaseName("IX_stock_source_movement");
+
+    modelBuilder.Entity<StockMovementNew>()
+        .HasOne(x => x.ReversalOfMovement)
+        .WithMany()
+        .HasForeignKey(x => x.ReversalOfMovement_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<StockMovementNew>()
+        .HasIndex(x => x.ReversalOfMovement_ID)
         .IsUnique()
-        .HasDatabaseName("UX_stock_source_movement");
+        .HasDatabaseName("UX_stock_reversal_movement");
 
     modelBuilder.Entity<ProductionBatch>()
         .HasKey(x => x.ID);
@@ -162,8 +175,19 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
     
     modelBuilder.Entity<StockMovementNew>()
         .HasIndex(x => x.TaskNew_ID)
+        .HasDatabaseName("IX_stock_movements_new_task");
+
+    modelBuilder.Entity<StockMovementNew>()
+        .HasOne(x => x.ProductionReservation)
+        .WithMany()
+        .HasForeignKey(x => x.ProductionReservation_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<StockMovementNew>()
+        .HasIndex(x => x.ProductionReservation_ID)
         .IsUnique()
-        .HasDatabaseName("UX_stock_movements_new_task");
+        .HasDatabaseName("UX_stock_movements_new_reservation");
+
 
     modelBuilder.Entity<ProductionPlanningDraft>()
         .ToTable("production_planning_drafts");
@@ -316,6 +340,16 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
         .HasDatabaseName("IX_production_requirements_parent");
     
     modelBuilder.Entity<ProductionRequirement>()
+        .HasOne(x => x.WorkflowProcessComponent)
+        .WithMany()
+        .HasForeignKey(x => x.WorkflowProcessComponent_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionRequirement>()
+        .HasIndex(x => x.WorkflowProcessComponent_ID)
+        .HasDatabaseName("IX_production_requirements_process_component");
+    
+    modelBuilder.Entity<ProductionRequirement>()
         .HasIndex(x => x.SourceTopPart_ID)
         .HasDatabaseName("IX_production_requirements_source");
 
@@ -465,6 +499,78 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
     modelBuilder.Entity<TaskNewStatusHistory>()
         .HasIndex(x => x.ChangedByEmployee_ID)
         .HasDatabaseName("IX_tasks_new_status_history_employee");
+    
+    modelBuilder.Entity<TaskNewDependency>()
+        .ToTable("tasks_new_dependencies");
+
+    modelBuilder.Entity<TaskNewDependency>()
+        .HasKey(x => x.ID);
+
+    modelBuilder.Entity<TaskNewDependency>()
+        .HasOne(x => x.TaskNew)
+        .WithMany()
+        .HasForeignKey(x => x.TaskNew_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<TaskNewDependency>()
+        .HasOne(x => x.DependsOnTaskNew)
+        .WithMany()
+        .HasForeignKey(x => x.DependsOnTaskNew_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<TaskNewDependency>()
+        .HasIndex(x => new
+        {
+            x.TaskNew_ID,
+            x.DependsOnTaskNew_ID
+        })
+        .IsUnique()
+        .HasDatabaseName("UX_tasks_new_dependencies_pair");
+
+    modelBuilder.Entity<TaskNewDependency>()
+        .HasIndex(x => x.DependsOnTaskNew_ID)
+        .HasDatabaseName("IX_tasks_new_dependencies_depends_on");
+
+    modelBuilder.Entity<ProductionComponentStaging>()
+        .ToTable("production_component_staging");
+
+    modelBuilder.Entity<ProductionComponentStaging>()
+        .HasKey(x => x.ID);
+
+    modelBuilder.Entity<ProductionComponentStaging>()
+        .Property(x => x.RequiredQuantity)
+        .HasPrecision(18, 3);
+
+    modelBuilder.Entity<ProductionComponentStaging>()
+        .Property(x => x.StagedQuantity)
+        .HasPrecision(18, 3);
+
+    modelBuilder.Entity<ProductionComponentStaging>()
+        .HasOne(x => x.ProductionExecution)
+        .WithMany()
+        .HasForeignKey(x => x.ProductionExecution_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionComponentStaging>()
+        .HasOne(x => x.WorkflowProcessComponent)
+        .WithMany()
+        .HasForeignKey(x => x.WorkflowProcessComponent_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionComponentStaging>()
+        .HasOne(x => x.StagedByEmployee)
+        .WithMany()
+        .HasForeignKey(x => x.StagedByEmployee_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<ProductionComponentStaging>()
+        .HasIndex(x => new
+        {
+            x.ProductionExecution_ID,
+            x.WorkflowProcessComponent_ID
+        })
+        .IsUnique()
+        .HasDatabaseName("UX_component_staging_execution_process_component");
 
 
     modelBuilder.Entity<EmployeeWorkLog>().ToTable("employee_work_log");

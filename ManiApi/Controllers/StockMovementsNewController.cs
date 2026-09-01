@@ -68,7 +68,7 @@ namespace ManiApi.Controllers
                 return NotFound("Stock movement not found.");
 
             var alreadyReversed = await _db.StockMovementsNew
-                .AnyAsync(x => x.SourceMovement_ID == source.ID);
+                .AnyAsync(x => x.ReversalOfMovement_ID == source.ID);
 
             if (alreadyReversed)
                 return Conflict("Stock movement is already reversed.");
@@ -81,7 +81,8 @@ namespace ManiApi.Controllers
                 RAL_Color_ID = source.RAL_Color_ID,
                 Movement_Type = StockMovementType.REVERSAL,
                 Quantity = -source.Quantity,
-                SourceMovement_ID = source.ID,
+                SourceMovement_ID = source.SourceMovement_ID,
+                ReversalOfMovement_ID = source.ID,
                 ConsumedByBatch_ID = source.ConsumedByBatch_ID,
                 Created_At = DateTime.UtcNow,
                 IsActive = true
@@ -97,7 +98,7 @@ namespace ManiApi.Controllers
                 {
                     var reversalNowExists = await _db.StockMovementsNew
                         .AsNoTracking()
-                        .AnyAsync(x => x.SourceMovement_ID == source.ID);
+                        .AnyAsync(x => x.ReversalOfMovement_ID == source.ID);
 
                     if (reversalNowExists)
                         return Conflict("Stock movement is already reversed.");

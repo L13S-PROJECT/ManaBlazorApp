@@ -136,16 +136,6 @@ a) @page "/planning"
 
 
 @*
-@if (isMinusOpen && minusRow is not null)
-{
-    <SalesMinusDialog
-        ProductName="@minusRow.productName"
-        VersionName="@minusRow.versionName"
-        MaxQty="@minusRow.InStock"
-        OnConfirm="OnMinusConfirmed"
-        OnCancel="CloseMinusDialog" />
-} *@
-
 @if (isSellPopupOpen)
 {
 <SalesAllocateDialog

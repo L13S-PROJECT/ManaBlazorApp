@@ -16,6 +16,8 @@ namespace ManiApi.Models
 
         public uint? ParentRequirement_ID { get; set; }
 
+        public int WorkflowProcessComponent_ID { get; set; }
+
         public int GrossQuantity { get; set; }
 
         public int StockCoveredQuantity { get; set; }
@@ -42,6 +44,8 @@ namespace ManiApi.Models
 
         public ICollection<ProductionRequirement> ChildRequirements { get; set; }
             = new List<ProductionRequirement>();
+
+        public WorkflowProcessComponent? WorkflowProcessComponent { get; set; }
 
     }
 }

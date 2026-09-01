@@ -21,6 +21,7 @@ namespace ManaApp.Shared.DTOs.Tasks
         public int Quantity { get; set; }
 
         public int Status { get; set; }
+        public bool CanStart { get; set; }
 
         public DateTime CreatedAt { get; set; }
 

@@ -10,6 +10,8 @@ namespace ManiApi.Models
 
         public uint? TaskNew_ID { get; set; }
 
+        public uint? ProductionReservation_ID { get; set; }
+
         public int? WorkflowNode_ID { get; set; }
 
         public int? RAL_Color_ID { get; set; }
@@ -19,6 +21,8 @@ namespace ManiApi.Models
         public int Quantity { get; set; }
 
         public uint? SourceMovement_ID { get; set; }
+
+        public uint? ReversalOfMovement_ID { get; set; }
 
         public uint? ConsumedByBatch_ID { get; set; }
 
@@ -37,7 +41,12 @@ namespace ManiApi.Models
         public StockMovementNew? SourceMovement { get; set; }
 
         public ProductionBatch? ConsumedByBatch { get; set; }
+
         public TaskNew? TaskNew { get; set; }
+
+        public ProductionReservation? ProductionReservation { get; set; }
+
+        public StockMovementNew? ReversalOfMovement { get; set; }
 
     }
 }

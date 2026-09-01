@@ -69,6 +69,8 @@ builder.Services.AddScoped<TopPartWorkflowService>();
 builder.Services.AddScoped<TopPartWorkflowGraphService>();
 builder.Services.AddScoped<ManiApi.Services.Planning.PlanningPartRequirementService>();
 
+builder.Services.AddScoped<TaskNewDependencyService>();
+
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();

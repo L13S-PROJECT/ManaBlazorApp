@@ -100,6 +100,62 @@ namespace ManiApi.Controllers
                 "Pirms Task sākšanas tam jāpiešķir darbinieks.");
         }
 
+        if (newStatus == TaskNewStatus.STARTED)
+            {
+                var hasIncompleteDependencies = await (
+                    from dependency in _db.TaskNewDependencies
+                    join previousTask in _db.TasksNew
+                        on dependency.DependsOnTaskNew_ID equals previousTask.ID
+                    where dependency.TaskNew_ID == task.ID &&
+                        (
+                            !previousTask.IsActive ||
+                            previousTask.Status != TaskNewStatus.COMPLETED
+                        )
+                    select dependency.ID
+                ).AnyAsync();
+
+                if (hasIncompleteDependencies)
+                {
+                    return BadRequest(
+                        "Task nevar sākt, kamēr nav pabeigti visi iepriekšējie procesi.");
+                }
+                
+            }
+        
+        if (newStatus == TaskNewStatus.STARTED)
+            {
+                var hasIncompleteComponents = await (
+                        from processComponent in
+                            _db.WorkflowProcessComponents.AsNoTracking()
+
+                        join workflowComponent in
+                            _db.WorkflowComponents.AsNoTracking()
+                            on processComponent.WorkflowComponentId
+                            equals workflowComponent.Id
+
+                        where
+                            processComponent.ProcessNodeId ==
+                                task.WorkflowNode_ID &&
+                            workflowComponent.IsActive &&
+                            workflowComponent.ComponentType == 1 &&
+                            !_db.ProductionComponentStagings.Any(staging =>
+                                staging.ProductionExecution_ID ==
+                                    task.ProductionExecution_ID &&
+                                staging.WorkflowProcessComponent_ID ==
+                                    processComponent.Id &&
+                                staging.IsActive &&
+                                staging.StagedQuantity >= staging.RequiredQuantity)
+
+                        select processComponent.Id
+                    ).AnyAsync();
+
+                if (hasIncompleteComponents)
+                {
+                    return BadRequest(
+                        "Task nevar sākt, kamēr nav sakomplektētas visas procesa komponentes.");
+                }
+            }
+
         if (dto.Comment?.Trim().Length > 500)
             return BadRequest(
                 "Komentārs nedrīkst pārsniegt 500 rakstzīmes.");
@@ -190,6 +246,56 @@ namespace ManiApi.Controllers
                 .OrderBy(x => x.Status)
                 .ThenBy(x => x.Created_At)
                 .ToListAsync();
+            
+            var taskIds = tasks
+                .Select(x => x.ID)
+                .ToList();
+
+            var blockedTaskIds = (await (
+                from dependency in _db.TaskNewDependencies.AsNoTracking()
+                join previousTask in _db.TasksNew.AsNoTracking()
+                    on dependency.DependsOnTaskNew_ID equals previousTask.ID
+                where taskIds.Contains(dependency.TaskNew_ID) &&
+                    (
+                        !previousTask.IsActive ||
+                        previousTask.Status != TaskNewStatus.COMPLETED
+                    )
+                select dependency.TaskNew_ID
+            )
+            .Distinct()
+            .ToListAsync())
+            .ToHashSet();
+        
+            var incompleteComponentTaskIds = (await (
+                from task in _db.TasksNew.AsNoTracking()
+
+                from processComponent in
+                    _db.WorkflowProcessComponents.AsNoTracking()
+
+                join workflowComponent in
+                    _db.WorkflowComponents.AsNoTracking()
+                    on processComponent.WorkflowComponentId
+                    equals workflowComponent.Id
+
+                where
+                    taskIds.Contains(task.ID) &&
+                    processComponent.ProcessNodeId ==
+                        task.WorkflowNode_ID &&
+                    workflowComponent.IsActive &&
+                    workflowComponent.ComponentType == 1 &&
+                    !_db.ProductionComponentStagings.Any(staging =>
+                        staging.ProductionExecution_ID ==
+                            task.ProductionExecution_ID &&
+                        staging.WorkflowProcessComponent_ID ==
+                            processComponent.Id &&
+                        staging.IsActive &&
+                        staging.StagedQuantity >= staging.RequiredQuantity)
+
+                select task.ID
+            )
+            .Distinct()
+            .ToListAsync())
+            .ToHashSet();
 
             var rows = tasks
                 .Select(x => new TaskNewListItemDto
@@ -204,6 +310,13 @@ namespace ManiApi.Controllers
                     WorkCenterName = x.WorkCenter?.WorkCentr_Name ?? "",
                     Quantity = x.Quantity,
                     Status = (int)x.Status,
+                    CanStart =
+                        (
+                            x.Status == TaskNewStatus.WAITING ||
+                            x.Status == TaskNewStatus.PAUSED
+                        ) &&
+                        !blockedTaskIds.Contains(x.ID) &&
+                        !incompleteComponentTaskIds.Contains(x.ID),
                     CreatedAt = x.Created_At,
                     StartedAt = x.Started_At,
                     PausedAt = x.Paused_At,
@@ -278,6 +391,51 @@ namespace ManiApi.Controllers
 
             if (row == null)
                 return NotFound("Task nav atrasts.");
+            
+            var hasIncompleteDependencies = await (
+                from dependency in _db.TaskNewDependencies.AsNoTracking()
+                join previousTask in _db.TasksNew.AsNoTracking()
+                    on dependency.DependsOnTaskNew_ID equals previousTask.ID
+                where dependency.TaskNew_ID == row.Id &&
+                    (
+                        !previousTask.IsActive ||
+                        previousTask.Status != TaskNewStatus.COMPLETED
+                    )
+                select dependency.ID
+            ).AnyAsync();
+
+            var hasIncompleteComponents = await (
+                from processComponent in
+                    _db.WorkflowProcessComponents.AsNoTracking()
+
+                join workflowComponent in
+                    _db.WorkflowComponents.AsNoTracking()
+                    on processComponent.WorkflowComponentId
+                    equals workflowComponent.Id
+
+                where
+                    processComponent.ProcessNodeId ==
+                        row.WorkflowNodeId &&
+                    workflowComponent.IsActive &&
+                    workflowComponent.ComponentType == 1 &&
+                    !_db.ProductionComponentStagings.Any(staging =>
+                        staging.ProductionExecution_ID ==
+                            row.ProductionExecutionId &&
+                        staging.WorkflowProcessComponent_ID ==
+                            processComponent.Id &&
+                        staging.IsActive &&
+                        staging.StagedQuantity >= staging.RequiredQuantity)
+
+                select processComponent.Id
+            ).AnyAsync();
+
+            row.CanStart =
+                (
+                    row.Status == (int)TaskNewStatus.WAITING ||
+                    row.Status == (int)TaskNewStatus.PAUSED
+                ) &&
+                !hasIncompleteDependencies &&
+                !hasIncompleteComponents;
 
             row.StatusHistory = await _db.TaskNewStatusHistories
                 .AsNoTracking()
@@ -359,6 +517,16 @@ namespace ManiApi.Controllers
             if (dto.Parts.Sum(x => x.Quantity) != task.Quantity)
                 return BadRequest(
                     "Task daļu daudzumu summai jāsakrīt ar sākotnējo daudzumu.");
+            
+            var incomingDependencies = await _db.TaskNewDependencies
+                .AsNoTracking()
+                .Where(x => x.TaskNew_ID == task.ID)
+                .ToListAsync();
+
+            var downstreamDependencies = await _db.TaskNewDependencies
+                .AsNoTracking()
+                .Where(x => x.DependsOnTaskNew_ID == task.ID)
+                .ToListAsync();
 
             var now = DateTime.UtcNow;
             var firstPart = dto.Parts[0];
@@ -386,6 +554,20 @@ namespace ManiApi.Controllers
 
                 _db.TasksNew.Add(newTask);
                 await _db.SaveChangesAsync();
+
+                _db.TaskNewDependencies.AddRange(
+                    incomingDependencies.Select(x => new TaskNewDependency
+                    {
+                        TaskNew_ID = newTask.ID,
+                        DependsOnTaskNew_ID = x.DependsOnTaskNew_ID
+                    }));
+
+                _db.TaskNewDependencies.AddRange(
+                    downstreamDependencies.Select(x => new TaskNewDependency
+                    {
+                        TaskNew_ID = x.TaskNew_ID,
+                        DependsOnTaskNew_ID = newTask.ID
+                    }));
 
                 _db.TaskNewStatusHistories.Add(new TaskNewStatusHistory
                 {

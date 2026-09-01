@@ -302,17 +302,6 @@
 
         }
 
-@if (isEditSalesOpen && editingSalesItem is not null)
-{
-    <SalesMinusDialog
-        ProductName="@editingSalesItem.ProductName"
-        VersionName="@editingSalesItem.VersionName"
-        InitialQty="@editingSalesItem.Qty"
-        MaxQty="@editingSalesItem.InStock"
-        OnConfirm="OnEditSalesConfirmed"
-        OnCancel="CloseEditSalesDialog" />
-}
-
 @code {
 
 [Inject] private HttpClient Http { get; set; } = default!;
@@ -744,54 +733,6 @@ private async Task OnSoldClicked()
 {
     if (OnSold.HasDelegate)
         await OnSold.InvokeAsync();
-}
-
-// pievienot pogu Pārdošanas panelī pardošanas rindai
-private void EditSalesItem(SalesCartItem item)
-{
-    editingSalesItem = new SalesCartItem
-{
-    VersionId   = item.VersionId,
-    ProductName = item.ProductName,
-    VersionName = item.VersionName,
-    Qty         = item.Qty,
-    InStock     = item.InStock,
-    IsAssembly  = item.IsAssembly,
-
-    Batches = item.Batches
-        .Select(b => new SalesBatchItem
-        {
-            BatchProductId = b.BatchProductId,
-            BatchCode      = b.BatchCode,
-            Qty            = b.Qty,
-            AvailableQty   = b.AvailableQty
-        })
-        .ToList()
-};
-
-    isEditSalesOpen = true;
-    StateHasChanged();
-}
-
-private bool isEditSalesOpen = false;
-private SalesCartItem? editingSalesItem;
-
-private void CloseEditSalesDialog()
-{
-    isEditSalesOpen = false;
-    editingSalesItem = null;
-}
-
-private void OnEditSalesConfirmed(int qty)
-{
-    if (editingSalesItem != null)
-{
-    // Qty vienmēr rēķinām no batchiem
-    editingSalesItem.Qty = editingSalesItem.Batches.Sum(b => b.Qty);
-}
-
-    CloseEditSalesDialog();
-    StateHasChanged();
 }
 
 private async Task DeleteSalesItem(SalesCartItem item)
