@@ -10,6 +10,8 @@ namespace ManiApi.Models
 
         public uint? TaskNew_ID { get; set; }
 
+        public uint? ProducedByTaskNew_ID { get; set; }
+
         public uint? ProductionReservation_ID { get; set; }
 
         public int? WorkflowNode_ID { get; set; }
@@ -47,6 +49,8 @@ namespace ManiApi.Models
         public ProductionReservation? ProductionReservation { get; set; }
 
         public StockMovementNew? ReversalOfMovement { get; set; }
+
+        public TaskNew? ProducedByTaskNew { get; set; }
 
     }
 }

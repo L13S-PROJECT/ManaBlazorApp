@@ -3,6 +3,7 @@ using ManiApi.Data;
 using Microsoft.AspNetCore.Mvc;
 using ManiApi.Models;
 using Microsoft.EntityFrameworkCore;
+using ManiApi.Services.Planning;
 
 namespace ManiApi.Controllers
 {
@@ -11,10 +12,14 @@ namespace ManiApi.Controllers
     public class TasksNewController : ControllerBase
     {
         private readonly AppDbContext _db;
+        private readonly ProductionRequirementService _productionRequirementService;
 
-        public TasksNewController(AppDbContext db)
+        public TasksNewController(
+            AppDbContext db,
+            ProductionRequirementService productionRequirementService)
         {
             _db = db;
+            _productionRequirementService = productionRequirementService;
         }
 
         
@@ -65,8 +70,13 @@ namespace ManiApi.Controllers
 
         var newStatus = (TaskNewStatus)dto.Status;
 
+        await using var transaction =
+            await _db.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable);
+
         var task = await _db.TasksNew
             .Include(x => x.ProductionExecution)
+                .ThenInclude(x => x!.ProductionBatchTopPart)
             .FirstOrDefaultAsync(x =>
                 x.ID == (uint)taskId &&
                 x.IsActive);
@@ -187,6 +197,27 @@ namespace ManiApi.Controllers
                 "Pabeigtas vai norakstītas izpildes vienības Task mainīt nedrīkst.");
         }
 
+        if (newStatus == TaskNewStatus.STARTED &&
+                task.Status == TaskNewStatus.WAITING)
+            {
+                var consumptionError =
+                    await _productionRequirementService
+                        .ConsumeForTaskAsync(task);
+
+                if (consumptionError != null)
+                    return BadRequest(consumptionError);
+            }
+        
+        if (newStatus == TaskNewStatus.COMPLETED)
+            {
+                var productionError =
+                    await _productionRequirementService
+                        .ProduceTaskOutputsAsync(task);
+
+                if (productionError != null)
+                    return BadRequest(productionError);
+            }
+
         var previousStatus = task.Status;
         var now = DateTime.UtcNow;
 
@@ -219,6 +250,33 @@ namespace ManiApi.Controllers
                 break;
         }
 
+        if (newStatus == TaskNewStatus.COMPLETED)
+            {
+                var hasOtherIncompleteTasks = await _db.TasksNew
+                    .AnyAsync(x =>
+                        x.ProductionExecution_ID == task.ProductionExecution_ID &&
+                        x.ID != task.ID &&
+                        x.IsActive &&
+                        x.Status != TaskNewStatus.COMPLETED);
+
+                if (!hasOtherIncompleteTasks &&
+                    task.ProductionExecution.Status !=
+                        ProductionExecutionStatus.COMPLETED)
+                {
+                    task.ProductionExecution.Status =
+                        ProductionExecutionStatus.COMPLETED;
+
+                    task.ProductionExecution.Completed_At = now;
+
+                    if (task.ProductionExecution.ProductionBatchTopPart_ID.HasValue &&
+                        task.ProductionExecution.ProductionBatchTopPart != null)
+                    {
+                        task.ProductionExecution.ProductionBatchTopPart.Done_Qty +=
+                            (uint)task.ProductionExecution.Quantity;
+                    }
+                }
+            }
+
         _db.TaskNewStatusHistories.Add(new TaskNewStatusHistory
         {
             TaskNew_ID = task.ID,
@@ -230,6 +288,7 @@ namespace ManiApi.Controllers
         });
 
         await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         return NoContent();
     }
@@ -584,6 +643,40 @@ namespace ManiApi.Controllers
 
             return NoContent();
         }
+
+        [HttpGet("executions/{executionId:int}")]
+        public async Task<IActionResult> GetExecution(int executionId)
+            {
+                if (executionId <= 0)
+                    return BadRequest("ProductionExecution ID nav derīgs.");
+
+                var row = await _db.ProductionExecutions
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.ID == (uint)executionId &&
+                        x.IsActive)
+                    .Select(x => new
+                    {
+                        x.ID,
+                        Status = x.Status == ProductionExecutionStatus.WAITING ? 1
+                            : x.Status == ProductionExecutionStatus.IN_PRODUCTION ? 2
+                            : x.Status == ProductionExecutionStatus.COMPLETED ? 3
+                            : x.Status == ProductionExecutionStatus.SCRAPPED ? 4
+                            : 0,
+                        x.Quantity,
+                        x.Completed_At,
+                        x.ProductionBatchTopPart_ID,
+                        Done_Qty = x.ProductionBatchTopPart != null
+                            ? (uint?)x.ProductionBatchTopPart.Done_Qty
+                            : null
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (row == null)
+                    return NotFound("ProductionExecution nav atrasts.");
+
+                return Ok(row);
+            }
 
     }
 }

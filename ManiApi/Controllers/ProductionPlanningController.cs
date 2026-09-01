@@ -15,15 +15,18 @@ namespace ManiApi.Controllers
         private readonly AppDbContext _db;
         private readonly PlanningPartRequirementService _partRequirementService;
         private readonly TaskNewDependencyService _taskDependencyService;
+        private readonly ProductionRequirementService _productionRequirementService;
 
         public ProductionPlanningController(
             AppDbContext db,
             PlanningPartRequirementService partRequirementService,
-            TaskNewDependencyService taskDependencyService)
+            TaskNewDependencyService taskDependencyService,
+            ProductionRequirementService productionRequirementService)
         {
             _db = db;
             _partRequirementService = partRequirementService;
             _taskDependencyService = taskDependencyService;
+            _productionRequirementService = productionRequirementService;
         }
 
         [HttpPost("draft/items")]
@@ -461,7 +464,9 @@ namespace ManiApi.Controllers
 
                 var today = DateTime.Today;
 
-                await using var transaction = await _db.Database.BeginTransactionAsync();
+                await using var transaction =
+                    await _db.Database.BeginTransactionAsync(
+                        System.Data.IsolationLevel.Serializable);
 
                 var batch = new ProductionBatch
                 {
@@ -506,6 +511,12 @@ namespace ManiApi.Controllers
                 _db.ProductionExecutions.AddRange(executions);
 
                 await _db.SaveChangesAsync();
+
+                var incomingExecutions =
+                    await _productionRequirementService
+                        .CreateForExecutionsAsync(executions);
+
+                executions.AddRange(incomingExecutions);
 
                 var workflowIds = executions
                     .Select(x => x.Workflow_ID)

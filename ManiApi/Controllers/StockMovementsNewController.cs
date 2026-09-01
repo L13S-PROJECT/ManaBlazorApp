@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ManiApi.Data;
 using ManiApi.Models;
+using ManiApi.Services.Planning;
 
 namespace ManiApi.Controllers
 {
@@ -10,10 +11,14 @@ namespace ManiApi.Controllers
     public class StockMovementsNewController : ControllerBase
     {
         private readonly AppDbContext _db;
+        private readonly ProductionRequirementService _productionRequirementService;
 
-        public StockMovementsNewController(AppDbContext db)
+        public StockMovementsNewController(
+            AppDbContext db,
+            ProductionRequirementService productionRequirementService)
         {
             _db = db;
+            _productionRequirementService = productionRequirementService;
         }
 
         [HttpPost("production/{productionBatchTopPartId:int}")]
@@ -23,6 +28,10 @@ namespace ManiApi.Controllers
         {
             if (quantity <= 0)
                 return BadRequest("Quantity must be greater than 0.");
+            
+            await using var transaction =
+                await _db.Database.BeginTransactionAsync(
+                    System.Data.IsolationLevel.Serializable);
 
             var batchTopPart = await _db.ProductionBatchTopParts
                 .AsNoTracking()
@@ -46,13 +55,18 @@ namespace ManiApi.Controllers
             _db.StockMovementsNew.Add(movement);
             await _db.SaveChangesAsync();
 
+            await _productionRequirementService
+                .ReserveOutstandingAsync(movement.TopPart_ID);
+
+            await transaction.CommitAsync();
+
             return Ok(new
-            {
-                movement.ID,
-                movement.TopPart_ID,
-                movement.ProductionBatchTopPart_ID,
-                movement.Quantity
-            });
+                {
+                    movement.ID,
+                    movement.TopPart_ID,
+                    movement.ProductionBatchTopPart_ID,
+                    movement.Quantity
+                });
         }
 
         [HttpPost("reversal/{sourceMovementId:int}")]

@@ -184,10 +184,28 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
         .OnDelete(DeleteBehavior.Restrict);
 
     modelBuilder.Entity<StockMovementNew>()
-        .HasIndex(x => x.ProductionReservation_ID)
+        .HasIndex(x => new
+        {
+            x.TaskNew_ID,
+            x.ProductionReservation_ID
+        })
         .IsUnique()
-        .HasDatabaseName("UX_stock_movements_new_reservation");
+        .HasDatabaseName("UX_stock_movements_new_task_reservation");
 
+    modelBuilder.Entity<StockMovementNew>()
+        .HasOne(x => x.ProducedByTaskNew)
+        .WithMany()
+        .HasForeignKey(x => x.ProducedByTaskNew_ID)
+        .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<StockMovementNew>()
+        .HasIndex(x => new
+        {
+            x.ProducedByTaskNew_ID,
+            x.WorkflowNode_ID
+        })
+        .IsUnique()
+        .HasDatabaseName("UX_stock_movements_new_producer_output");
 
     modelBuilder.Entity<ProductionPlanningDraft>()
         .ToTable("production_planning_drafts");
@@ -284,6 +302,10 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 
     modelBuilder.Entity<ProductionRequirement>()
         .HasKey(x => x.ID);
+    
+    modelBuilder.Entity<ProductionRequirement>()
+        .Property(x => x.ID)
+        .ValueGeneratedOnAdd();
 
     modelBuilder.Entity<ProductionRequirement>()
         .Property(x => x.SourceType)
@@ -530,6 +552,16 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
     modelBuilder.Entity<TaskNewDependency>()
         .HasIndex(x => x.DependsOnTaskNew_ID)
         .HasDatabaseName("IX_tasks_new_dependencies_depends_on");
+    
+    modelBuilder.Entity<WorkflowProcessComponent>()
+        .Property(x => x.RequiresStaging)
+        .HasDefaultValue(true);
+    
+    modelBuilder.Entity<WorkflowProcessComponent>()
+        .HasOne(x => x.WorkflowComponent)
+        .WithMany()
+        .HasForeignKey(x => x.WorkflowComponentId)
+        .OnDelete(DeleteBehavior.Cascade);
 
     modelBuilder.Entity<ProductionComponentStaging>()
         .ToTable("production_component_staging");

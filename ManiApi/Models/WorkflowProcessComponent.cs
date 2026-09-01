@@ -19,5 +19,10 @@ namespace ManiApi.Models
         [Column("Quantity")]
         public decimal Quantity { get; set; }
 
+        [Column("RequiresStaging")]
+        public bool RequiresStaging { get; set; } = true;
+
+        public WorkflowComponent? WorkflowComponent { get; set; }
+
     }
 }
