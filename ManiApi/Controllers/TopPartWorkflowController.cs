@@ -760,11 +760,12 @@ namespace ManiApi.Controllers
                     return BadRequest("Pievienotais daudzums pārsniedz BOM atlikumu.");
 
                 var processComponent = new WorkflowProcessComponent
-                {
-                    ProcessNodeId = processNode.Id,
-                    WorkflowComponentId = component.Id,
-                    Quantity = dto.Quantity
-                };
+                    {
+                        ProcessNodeId = processNode.Id,
+                        WorkflowComponentId = component.Id,
+                        Quantity = dto.Quantity,
+                        RequiresStaging = dto.RequiresStaging
+                    };
 
                 _db.WorkflowProcessComponents.Add(processComponent);
                 await _db.SaveChangesAsync();
@@ -828,6 +829,7 @@ namespace ManiApi.Controllers
                     return BadRequest("Norādītais daudzums pārsniedz BOM atlikumu.");
 
                 processComponent.Quantity = dto.Quantity;
+                processComponent.RequiresStaging = dto.RequiresStaging;
 
                 await _db.SaveChangesAsync();
 
@@ -1237,11 +1239,12 @@ namespace ManiApi.Controllers
                             }
 
                             _db.WorkflowProcessComponents.Add(new WorkflowProcessComponent
-                            {
-                                ProcessNodeId = newProcessNodeId,
-                                WorkflowComponentId = newWorkflowComponentId,
-                                Quantity = processComponent.Quantity
-                            });
+                                {
+                                    ProcessNodeId = newProcessNodeId,
+                                    WorkflowComponentId = newWorkflowComponentId,
+                                    Quantity = processComponent.Quantity,
+                                    RequiresStaging = processComponent.RequiresStaging
+                                });
                         }
                     }
 
@@ -1400,7 +1403,8 @@ namespace ManiApi.Controllers
                     {
                         ProcessNodeId = nodeIdMap[sourceProcessComponent.ProcessNodeId],
                         WorkflowComponentId = componentIdMap[sourceProcessComponent.WorkflowComponentId],
-                        Quantity = sourceProcessComponent.Quantity
+                        Quantity = sourceProcessComponent.Quantity,
+                        RequiresStaging = sourceProcessComponent.RequiresStaging
                     });
                 }
 
@@ -1723,7 +1727,8 @@ namespace ManiApi.Controllers
                             parentComponent.ItemId == currentComponent.ItemId &&
                             parentComponent.ReferencedWorkflowId == currentComponent.ReferencedWorkflowId &&
                             parentComponent.RequiredWorkflowNodeId == currentComponent.RequiredWorkflowNodeId &&
-                            parentLink.Quantity == currentLink.Quantity;
+                            parentLink.Quantity == currentLink.Quantity &&
+                            parentLink.RequiresStaging == currentLink.RequiresStaging;
                     });
                  })
             );

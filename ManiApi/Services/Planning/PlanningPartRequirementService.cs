@@ -161,6 +161,166 @@ namespace ManiApi.Services.Planning
                 row => checked((int)row.Value));
         }
 
+        private async Task<Dictionary<uint, int>>
+            CalculateStartedQuantitiesAsync()
+        {
+            return await _db.TasksNew
+                .AsNoTracking()
+                .Where(task =>
+                    task.IsActive &&
+                    task.Started_At.HasValue &&
+                    !_db.TaskNewDependencies.Any(dependency =>
+                        dependency.TaskNew_ID == task.ID))
+                .GroupBy(task => task.ProductionExecution_ID)
+                .Select(group => new
+                {
+                    ExecutionId = group.Key,
+                    Quantity = group.Sum(task => task.Quantity)
+                })
+                .ToDictionaryAsync(
+                    row => row.ExecutionId,
+                    row => row.Quantity);
+        }
+
+        private async Task<Dictionary<uint, int>>
+            CalculateFinishedQuantitiesAsync()
+        {
+            return await (
+                from movement in _db.StockMovementsNew.AsNoTracking()
+
+                join task in _db.TasksNew.AsNoTracking()
+                    on movement.ProducedByTaskNew_ID equals (uint?)task.ID
+
+                join node in _db.WorkflowNodes.AsNoTracking()
+                    on movement.WorkflowNode_ID equals (int?)node.Id
+
+                where movement.IsActive &&
+                    movement.Movement_Type == StockMovementType.PRODUCTION &&
+                    movement.Quantity > 0 &&
+                    node.NodeType == (byte)WorkflowNodeType.Finish
+
+                group movement by task.ProductionExecution_ID
+                into executionGroup
+
+                select new
+                {
+                    ExecutionId = executionGroup.Key,
+                    Quantity = executionGroup.Sum(x => x.Quantity)
+                })
+                .ToDictionaryAsync(
+                    row => row.ExecutionId,
+                    row => row.Quantity);
+        }
+
+        public async Task<(
+            Dictionary<int, int> Waiting,
+            Dictionary<int, int> InProduction)>
+            CalculateApprovedPartProgressAsync()
+        {
+            var startedByExecution =
+                await CalculateStartedQuantitiesAsync();
+
+            var finishedByExecution =
+                await CalculateFinishedQuantitiesAsync();
+
+            var executions = await _db.ProductionExecutions
+                .AsNoTracking()
+                .Where(execution =>
+                    execution.IsActive &&
+                    execution.Status != ProductionExecutionStatus.SCRAPPED &&
+                    execution.TopPart!.TopPartType == TopPartType.Part)
+                .Select(execution => new
+                {
+                    execution.ID,
+                    execution.TopPart_ID,
+                    execution.Quantity
+                })
+                .ToListAsync();
+
+            var waiting = new Dictionary<int, int>();
+            var inProduction = new Dictionary<int, int>();
+
+            foreach (var execution in executions)
+            {
+                var started = Math.Clamp(
+                    startedByExecution.GetValueOrDefault(execution.ID),
+                    0,
+                    execution.Quantity);
+
+                var finished = Math.Clamp(
+                    finishedByExecution.GetValueOrDefault(execution.ID),
+                    0,
+                    started);
+
+                var waitingQuantity = execution.Quantity - started;
+                var inProductionQuantity = started - finished;
+
+                waiting[execution.TopPart_ID] =
+                    waiting.GetValueOrDefault(execution.TopPart_ID) +
+                    waitingQuantity;
+
+                inProduction[execution.TopPart_ID] =
+                    inProduction.GetValueOrDefault(execution.TopPart_ID) +
+                    inProductionQuantity;
+            }
+
+            return (waiting, inProduction);
+        }
+
+        public async Task<(
+            Dictionary<int, int> Stock,
+            Dictionary<int, int> Reserved,
+            Dictionary<int, int> Free)>
+            CalculateStockSummaryAsync()
+        {
+            var stock = await _db.StockMovementsNew
+                .AsNoTracking()
+                .Where(x =>
+                    x.IsActive &&
+                    x.TopPart!.TopPartType == TopPartType.Part)
+                .GroupBy(x => x.TopPart_ID)
+                .Select(group => new
+                {
+                    TopPartId = group.Key,
+                    Quantity = group.Sum(x => x.Quantity)
+                })
+                .ToDictionaryAsync(
+                    x => x.TopPartId,
+                    x => x.Quantity);
+
+            var reserved = await _db.ProductionReservations
+                .AsNoTracking()
+                .Where(x =>
+                    x.IsActive &&
+                    x.Status == ProductionReservationStatus.ACTIVE &&
+                    x.TopPart!.TopPartType == TopPartType.Part)
+                .GroupBy(x => x.TopPart_ID)
+                .Select(group => new
+                {
+                    TopPartId = group.Key,
+                    Quantity = group.Sum(x =>
+                        x.ReservedQuantity -
+                        x.ConsumedQuantity -
+                        x.ReleasedQuantity)
+                })
+                .ToDictionaryAsync(
+                    x => x.TopPartId,
+                    x => x.Quantity);
+
+            var topPartIds = stock.Keys
+                .Concat(reserved.Keys)
+                .Distinct();
+
+            var free = topPartIds.ToDictionary(
+                topPartId => topPartId,
+                topPartId => Math.Max(
+                    0,
+                    stock.GetValueOrDefault(topPartId) -
+                    reserved.GetValueOrDefault(topPartId)));
+
+            return (stock, reserved, free);
+        }
+
         private sealed class PartComponentRow
         {
             public int WorkflowId { get; set; }

@@ -18,6 +18,12 @@ namespace ManaApp.Services.TopPartPlanning
                 "api/production-planning/products") ?? [];
         }
 
+        public async Task<List<PlanningPartListItemDto>> GetPartsAsync()
+            {
+                return await _http.GetFromJsonAsync<List<PlanningPartListItemDto>>(
+                    "api/production-planning/parts") ?? [];
+            }
+
         public async Task<List<PlanningWorkflowOptionDto>> GetWorkflowsAsync(
                 int topPartId)
             {
@@ -57,7 +63,17 @@ namespace ManaApp.Services.TopPartPlanning
                     "api/production-planning/draft/save",
                     request);
 
-                response.EnsureSuccessStatusCode();
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorMessage = await response.Content.ReadAsStringAsync();
+
+                    throw new HttpRequestException(
+                        string.IsNullOrWhiteSpace(errorMessage)
+                            ? response.ReasonPhrase
+                            : errorMessage,
+                        null,
+                        response.StatusCode);
+                }
             }
 
         public async Task DeleteDraftAsync()
@@ -101,7 +117,17 @@ namespace ManaApp.Services.TopPartPlanning
                     $"api/production-planning/correction/batches/{batchId}",
                     request);
 
-                response.EnsureSuccessStatusCode();
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorMessage = await response.Content.ReadAsStringAsync();
+
+                    throw new HttpRequestException(
+                        string.IsNullOrWhiteSpace(errorMessage)
+                            ? response.ReasonPhrase
+                            : errorMessage,
+                        null,
+                        response.StatusCode);
+                }
             }
 
         public async Task DeleteCorrectionBatchAsync(uint batchId)
@@ -110,6 +136,15 @@ namespace ManaApp.Services.TopPartPlanning
                     $"api/production-planning/correction/batches/{batchId}");
 
                 response.EnsureSuccessStatusCode();
+            }
+
+        public async Task<List<PlanningProductionFlowItemDto>>
+                GetProductProductionFlowAsync(int topPartId)
+            {
+                return await _http.GetFromJsonAsync<
+                    List<PlanningProductionFlowItemDto>>(
+                        $"api/production-planning/products/{topPartId}/production-flow")
+                    ?? [];
             }
 
     }

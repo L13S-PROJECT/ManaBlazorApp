@@ -644,12 +644,50 @@
     border-color: #e8c85a;
 }
 
+.flow-staging-indicator {
+    display: inline-block;
+    margin-left: 5px;
+    color: #9ca3af;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;
+    vertical-align: -1px;
+}
+
+.flow-staging-indicator-active {
+    color: #6d28d9;
+}
+
+.flow-stage-detail .flow-staging-indicator {
+    color: #d6a514;
+}
+
+.flow-stage-detail .flow-staging-indicator-active {
+    color: #a86f00;
+}
+
 .flow-node-process.flow-stage-assembly {
     background: #fff0dc;
     border-color: #e9a34a;
 }
 
+.flow-stage-assembly .flow-staging-indicator {
+    color: #e9a34a;
+}
+
+.flow-stage-assembly .flow-staging-indicator-active {
+    color: #c65d08;
+}
+
 .flow-node-process.flow-stage-finishing {
     background: #eaf3ff;
     border-color: #75a7e8;
+}
+
+.flow-stage-finishing .flow-staging-indicator {
+    color: #75a7e8;
+}
+
+.flow-stage-finishing .flow-staging-indicator-active {
+    color: #2563b8;
 }

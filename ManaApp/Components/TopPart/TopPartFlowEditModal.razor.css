@@ -363,6 +363,44 @@
     color: #2563eb;
 }
 
+.flow-graph-staging-indicator {
+    display: inline-block;
+    margin-left: 5px;
+    color: #9ca3af;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;
+    vertical-align: -1px;
+}
+
+.flow-graph-staging-indicator-active {
+    color: #6d28d9;
+}
+
+.flow-stage-detail .flow-graph-staging-indicator {
+    color: #d6a514;
+}
+
+.flow-stage-detail .flow-graph-staging-indicator-active {
+    color: #a86f00;
+}
+
+.flow-stage-assembly .flow-graph-staging-indicator {
+    color: #e9a34a;
+}
+
+.flow-stage-assembly .flow-graph-staging-indicator-active {
+    color: #c65d08;
+}
+
+.flow-stage-finishing .flow-graph-staging-indicator {
+    color: #75a7e8;
+}
+
+.flow-stage-finishing .flow-graph-staging-indicator-active {
+    color: #2563b8;
+}
+
 .flow-component-item {
     color: #7c3aed;
 }
@@ -514,6 +552,20 @@
 
 .flow-process-part-name {
     min-width: 0;
+}
+
+.flow-staging-indicator {
+    display: inline-block;
+    margin-left: 5px;
+    color: #9ca3af;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;
+    vertical-align: -1px;
+}
+
+.flow-staging-indicator-active {
+    color: #6d28d9;
 }
 
 .flow-process-part-target {
@@ -675,6 +727,34 @@
     border-color: #9ca3af;
     background: #f5f6f8;
     color: #374151;
+}
+
+.flow-staging-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    margin: 0;
+    padding: 0 7px;
+    border: 1px solid #c4b5fd;
+    border-radius: 4px;
+    background: #f5f3ff;
+    color: #5b21b6;
+    font-size: 9px;
+    font-weight: 600;
+    line-height: 1.05;
+    cursor: pointer;
+    box-sizing: border-box;
+}
+
+.flow-staging-option input[type="checkbox"] {
+    width: 15px;
+    min-width: 15px;
+    height: 15px;
+    margin: 0;
+    padding: 0;
+    accent-color: #6d28d9;
+    cursor: pointer;
 }
 
 .flow-bom-title {

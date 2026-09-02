@@ -87,6 +87,7 @@ public class TopPartWorkflowProcessComponentDto
     public int ProcessNodeId { get; set; }
     public int WorkflowComponentId { get; set; }
     public decimal Quantity { get; set; }
+    public bool RequiresStaging { get; set; } = true;
 }
 
 public class AddTopPartFinishRequest

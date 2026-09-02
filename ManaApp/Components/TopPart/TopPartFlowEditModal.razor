@@ -306,6 +306,12 @@
                                                                     <span class="flow-component-name">
                                                                         @component.TopPartCode - @component.TopPartName
 
+                                                                        <span class="flow-graph-staging-indicator @(link.RequiresStaging ? "flow-graph-staging-indicator-active" : "")"
+                                                                              title="@(link.RequiresStaging ? "Nepieciešama komplektēšana" : "Komplektēšana nav nepieciešama")"
+                                                                              aria-label="@(link.RequiresStaging ? "Nepieciešama komplektēšana" : "Komplektēšana nav nepieciešama")">
+                                                                            @(link.RequiresStaging ? "☑" : "☐")
+                                                                        </span>
+
                                                                         @if (!string.IsNullOrWhiteSpace(
                                                                                 component.RequiredWorkflowNodeName))
                                                                         {
@@ -463,6 +469,12 @@ else
                                                 <span class="flow-process-part-name">
                                                     ◆ @component.TopPartCode - @component.TopPartName
 
+                                                    <span class="flow-staging-indicator @(link.RequiresStaging ? "flow-staging-indicator-active" : "")"
+                                                          title="@(link.RequiresStaging ? "Nepieciešama komplektēšana" : "Komplektēšana nav nepieciešama")"
+                                                          aria-label="@(link.RequiresStaging ? "Nepieciešama komplektēšana" : "Komplektēšana nav nepieciešama")">
+                                                        @(link.RequiresStaging ? "☑" : "☐")
+                                                    </span>
+
                                                     @if (!string.IsNullOrWhiteSpace(
                                                             component.RequiredWorkflowNodeName))
                                                     {
@@ -476,12 +488,19 @@ else
                                                 <span class="flow-process-part-quantity">
                                                     @if (editingWorkflowComponentId == component.Id)
                                                     {
+                                                        <label class="flow-staging-option">
+                                                            <input type="checkbox"
+                                                                   @bind="editingProcessComponentRequiresStaging" />
+                                                            <span>Nepieciešama<br />komplektēšana</span>
+                                                        </label>
+
                                                         <input type="number"
                                                             min="1"
                                                             step="1"
                                                             value="@decimal.Truncate(editingProcessComponentQuantity)"
                                                             @onchange="@(e => editingProcessComponentQuantity =
                                                                 decimal.TryParse(e.Value?.ToString(), out var value) ? value : 0)" />
+
                                                     }
                                                     else
                                                     {
@@ -518,6 +537,7 @@ else
                                                                 {
                                                                     editingWorkflowComponentId = component.Id;
                                                                     editingProcessComponentQuantity = link.Quantity;
+                                                                    editingProcessComponentRequiresStaging = link.RequiresStaging;
                                                                 })">
                                                             ✎
                                                         </button>
@@ -591,6 +611,12 @@ else
                                             @if (selectedWorkflowComponentId == component.Id)
                                             {
                                                 <div class="flow-process-add-quantity">
+                                                    <label class="flow-staging-option">
+                                                        <input type="checkbox"
+                                                               @bind="processComponentRequiresStaging" />
+                                                        <span>Nepieciešama<br />komplektēšana</span>
+                                                    </label>
+
                                                     <input type="number"
                                                         min="1"
                                                         step="1"
@@ -941,9 +967,11 @@ else
 
     private int? selectedWorkflowComponentId;
     private decimal processComponentQuantity = 1;
+    private bool processComponentRequiresStaging = true;
 
     private int? editingWorkflowComponentId;
-    private decimal editingProcessComponentQuantity;    
+    private decimal editingProcessComponentQuantity;
+    private bool editingProcessComponentRequiresStaging = true;  
     private List<TopPartWorkflowBomDto> bom = new();
     private bool showAddPart;
     private bool showAddItem;
@@ -995,11 +1023,12 @@ else
             }
 
             var request = new UpdateTopPartProcessComponentRequest
-            {
-                ProcessNodeId = selectedProcessNodeId.Value,
-                WorkflowComponentId = editingWorkflowComponentId.Value,
-                Quantity = editingProcessComponentQuantity
-            };
+                {
+                    ProcessNodeId = selectedProcessNodeId.Value,
+                    WorkflowComponentId = editingWorkflowComponentId.Value,
+                    Quantity = editingProcessComponentQuantity,
+                    RequiresStaging = editingProcessComponentRequiresStaging
+                };
 
             var updated = await TopPartWorkflowService.UpdateProcessComponentAsync(
                 WorkflowId,
@@ -1238,11 +1267,12 @@ else
             }
 
             var request = new AddTopPartProcessComponentRequest
-            {
-                ProcessNodeId = selectedProcessNodeId.Value,
-                WorkflowComponentId = selectedWorkflowComponentId.Value,
-                Quantity = processComponentQuantity
-            };
+                {
+                    ProcessNodeId = selectedProcessNodeId.Value,
+                    WorkflowComponentId = selectedWorkflowComponentId.Value,
+                    Quantity = processComponentQuantity,
+                    RequiresStaging = processComponentRequiresStaging
+                };
 
             var added = await TopPartWorkflowService.AddProcessComponentAsync(
                 WorkflowId,
@@ -1264,6 +1294,7 @@ else
 
             selectedWorkflowComponentId = null;
             processComponentQuantity = 1;
+            processComponentRequiresStaging = true;
         }
 
     private void BeginAddProcessComponent(int workflowComponentId)
@@ -1274,6 +1305,7 @@ else
                 x.Id == workflowComponentId);
 
             processComponentQuantity = component?.RemainingQuantity ?? 1;
+            processComponentRequiresStaging = true;
             errorMessage = null;
         }
 
@@ -1281,6 +1313,7 @@ else
         {
             selectedWorkflowComponentId = null;
             processComponentQuantity = 1;
+            processComponentRequiresStaging = true;
             errorMessage = null;
         }
 

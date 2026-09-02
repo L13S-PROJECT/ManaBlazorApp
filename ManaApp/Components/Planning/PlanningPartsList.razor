@@ -1,6 +1,7 @@
 @* PlanningPartsList.razor - prieks sastāvdaļām *@
 
 @inject ManaApp.Services.TopPartService TopPartService
+@inject ManaApp.Services.TopPartPlanning.TopPartPlanningService PlanningService
 
 @namespace ManaApp.Components.Planning
 
@@ -25,37 +26,45 @@
 
         </thead>
 
-        @foreach (var category in categories.Where(CategoryHasVisibleParts))
-            {
-                <tbody class="category-group">
-                    <tr class="category-row">
-                        <td colspan="10">
-                            <span class="category-name">
-                                @category.CategoryName
-                            </span>
-                        </td>
-                    </tr>
-                </tbody>
+        @foreach (var category in categories.Where(category =>
+            planningParts.Any(part =>
+                part.TopPartCategoryId == category.Id &&
+                HasVisibleQuantity(part) &&
+                (string.IsNullOrWhiteSpace(SearchText) ||
+                part.PartName.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
+                part.PartCode.Contains(SearchText, StringComparison.OrdinalIgnoreCase)))))
+        {
+            <tbody class="category-group">
+                <tr class="category-row">
+                    <td colspan="10">
+                        <span class="category-name">
+                            @category.CategoryName
+                        </span>
+                    </td>
+                </tr>
 
-                @foreach (var part in parts.Where(x =>
-                        x.TopPartCategoryID == category.Id &&
-                        x.ReleasedVersion.HasValue &&
-                        MatchesSearch(x)))
-                    {
-                        <tr class="part-row">
-                            <td>@part.TopPartName</td>
-                            <td>@part.TopPartCode</td>
-                            <td class="flow-column">@part.ReleasedVersion</td>
-                            <td class="quantity-column">0</td>
-                            <td class="quantity-column">0</td>
-                            <td class="quantity-column">0</td>
-                            <td class="quantity-column">0</td>
-                            <td class="quantity-column">0</td>
-                            <td class="quantity-column">0</td>
-                            <td class="quantity-column">0</td>
-                        </tr>
-                    }
-            }
+                @foreach (var part in planningParts.Where(part =>
+                    part.TopPartCategoryId == category.Id &&
+                    HasVisibleQuantity(part) &&
+                    (string.IsNullOrWhiteSpace(SearchText) ||
+                    part.PartName.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
+                    part.PartCode.Contains(SearchText, StringComparison.OrdinalIgnoreCase))))
+                {
+                    <tr class="part-row">
+                        <td>@part.PartName</td>
+                        <td>@part.PartCode</td>
+                        <td class="flow-column"></td>
+                        <td class="quantity-column">@part.PlanQty</td>
+                        <td class="quantity-column">0</td>
+                        <td class="quantity-column">@part.WaitingQty</td>
+                        <td class="quantity-column">@part.InProductionQty</td>
+                        <td class="quantity-column">@part.StockQty</td>
+                        <td class="quantity-column">@part.ReservedQty</td>
+                        <td class="quantity-column">@part.FreeQty</td>
+                    </tr>
+                }
+            </tbody>
+        }
 
     </table>
 
@@ -63,35 +72,42 @@
 
 @code {
     private List<ManaApp.Shared.DTOs.TopPart.TopPartCategoryDto> categories = [];
-    private List<ManaApp.Shared.DTOs.TopPart.TopPartListItemDto> parts = [];
+
+    private List<ManaApp.Shared.DTOs.Planning.PlanningPartListItemDto>
+        planningParts = [];
 
     [Parameter]
     public string SearchText { get; set; } = "";
 
-    private bool MatchesSearch(ManaApp.Shared.DTOs.TopPart.TopPartListItemDto part)
-    {
-        return string.IsNullOrWhiteSpace(SearchText) ||
-            part.TopPartName.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
-            part.TopPartCode.Contains(SearchText, StringComparison.OrdinalIgnoreCase);
-    }
+    [Parameter]
+    public int RefreshVersion { get; set; }
 
-    private bool CategoryHasVisibleParts(
-        ManaApp.Shared.DTOs.TopPart.TopPartCategoryDto category)
-    {
-        return parts.Any(x =>
-            x.TopPartCategoryID == category.Id &&
-            x.ReleasedVersion.HasValue &&
-            MatchesSearch(x));
-    }
+    private int loadedRefreshVersion = -1;
 
-    protected override async Task OnInitializedAsync()
-    {
-        var categoriesTask = TopPartService.GetCategoriesAsync();
-        var partsTask = TopPartService.GetAllAsync(type: 0);
+    private static bool HasVisibleQuantity(
+            ManaApp.Shared.DTOs.Planning.PlanningPartListItemDto part)
+        {
+            return part.PlanQty > 0 ||
+                part.WaitingQty > 0 ||
+                part.InProductionQty > 0 ||
+                part.StockQty > 0 ||
+                part.ReservedQty > 0;
+        }
 
-        await Task.WhenAll(categoriesTask, partsTask);
+    protected override async Task OnParametersSetAsync()
+        {
+            if (loadedRefreshVersion == RefreshVersion)
+                return;
 
-        categories = await categoriesTask;
-        parts = await partsTask;
-    }
+            var categoriesTask = TopPartService.GetCategoriesAsync();
+            var planningPartsTask = PlanningService.GetPartsAsync();
+
+            await Task.WhenAll(
+                categoriesTask,
+                planningPartsTask);
+
+            categories = await categoriesTask;
+            planningParts = await planningPartsTask;
+            loadedRefreshVersion = RefreshVersion;
+        }
 }

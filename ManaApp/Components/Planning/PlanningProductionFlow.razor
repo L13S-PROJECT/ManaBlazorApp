@@ -1,3 +1,7 @@
+@using ManaApp.Shared.DTOs.Planning
+@using ManaApp.Services.TopPartPlanning
+@inject TopPartPlanningService PlanningService
+
 @namespace ManaApp.Components.Planning
 
 <section class="production-flow-card">
@@ -16,22 +20,31 @@
             </thead>
 
             <tbody>
-                <tr>
-                    <td class="batch-column">B-001</td>
-                    <td class="workflow-column">V1</td>
-                    <td>5</td>
-                    <td>5</td>
-                    <td>3</td>
-                </tr>
-
-                <tr>
-                    <td class="batch-column">B-002</td>
-                    <td class="workflow-column">V2</td>
-                    <td>10</td>
-                    <td>10</td>
-                    <td>5</td>
-                </tr>
-
+                @if (isLoading)
+                {
+                    <tr>
+                        <td colspan="5">Ielādē...</td>
+                    </tr>
+                }
+                else if (flowItems.Count == 0)
+                {
+                    <tr>
+                        <td colspan="5">Ražošanas plūsmas nav.</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var item in flowItems)
+                    {
+                        <tr>
+                            <td class="batch-column">@item.BatchCode</td>
+                            <td class="workflow-column">V@(item.WorkflowVersion)</td>
+                            <td>@item.PlannedQty</td>
+                            <td>@item.InProductionQty</td>
+                            <td></td>
+                        </tr>
+                    }
+                }
             </tbody>
         </table>
     </div>
@@ -75,3 +88,21 @@
         </div>
     </div>
 </section>
+
+@code {
+    [Parameter]
+    public int TopPartId { get; set; }
+
+    private List<PlanningProductionFlowItemDto> flowItems = [];
+    private bool isLoading;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+
+        flowItems = await PlanningService
+            .GetProductProductionFlowAsync(TopPartId);
+
+        isLoading = false;
+    }
+}

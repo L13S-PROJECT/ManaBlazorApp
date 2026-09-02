@@ -101,31 +101,56 @@ namespace ManiApi.Controllers
                 .Distinct()
                 .ToList();
             
-            var relatedTopPartIds = new HashSet<uint>();
+           var relatedTopPartIds = new HashSet<uint>();
 
-                if (relatedTopPartId.HasValue)
+            if (relatedTopPartId.HasValue)
+            {
+                var selectedId = relatedTopPartId.Value;
+
+                // Visi TopPart, kas ietilpst izvēlētajā TopPart.
+                var childPending = new Stack<uint>();
+                var visitedChildren = new HashSet<uint>();
+                childPending.Push(selectedId);
+
+                while (childPending.Count > 0)
                 {
-                    var pending = new Stack<uint>();
-                    pending.Push(relatedTopPartId.Value);
+                    var currentId = childPending.Pop();
 
-                    while (pending.Count > 0)
+                    if (!visitedChildren.Add(currentId))
+                        continue;
+
+                    relatedTopPartIds.Add(currentId);
+
+                    foreach (var childId in topPartLinks
+                        .Where(x => x.FromTopPartId == currentId)
+                        .Select(x => x.ToTopPartId))
                     {
-                        var currentId = pending.Pop();
-
-                        if (!relatedTopPartIds.Add(currentId))
-                            continue;
-
-                        foreach (var link in topPartLinks)
-                        {
-                            if (link.FromTopPartId == currentId)
-                                pending.Push(link.ToTopPartId);
-
-                            if (link.ToTopPartId == currentId)
-                                pending.Push(link.FromTopPartId);
-                        }
+                        childPending.Push(childId);
                     }
                 }
 
+                // Visi TopPart, kuros izvēlētais TopPart ietilpst.
+                var parentPending = new Stack<uint>();
+                var visitedParents = new HashSet<uint>();
+                parentPending.Push(selectedId);
+
+                while (parentPending.Count > 0)
+                {
+                    var currentId = parentPending.Pop();
+
+                    if (!visitedParents.Add(currentId))
+                        continue;
+
+                    relatedTopPartIds.Add(currentId);
+
+                    foreach (var parentId in topPartLinks
+                        .Where(x => x.ToTopPartId == currentId)
+                        .Select(x => x.FromTopPartId))
+                    {
+                        parentPending.Push(parentId);
+                    }
+                }
+            }
             var rows = await query
                 .Select(x => new TopPartListItemDto
                 {
@@ -312,7 +337,14 @@ namespace ManiApi.Controllers
                                 item.Workflow_ID == workflow.Id &&
                                 item.IsActive &&
                                 item.Batch!.IsActive)
-                            .Sum(item => (int?)item.Planned_Qty) ?? 0
+                            .Sum(item => (int?)item.Planned_Qty) ?? 0,
+
+                        InProductionQty = _db.ProductionExecutions
+                            .Where(execution =>
+                                execution.TopPart_ID == sparePart.Id &&
+                                execution.Status == ProductionExecutionStatus.IN_PRODUCTION &&
+                                execution.IsActive)
+                            .Sum(execution => (int?)execution.Quantity) ?? 0
 
                     })
                     .ToListAsync();
@@ -353,7 +385,8 @@ namespace ManiApi.Controllers
                                             Name = row.SparePartName,
                                             Code = row.SparePartCode,
                                             PlanQty = row.PlanQty,
-                                            WaitingQty = row.WaitingQty
+                                            WaitingQty = row.WaitingQty,
+                                            InProductionQty = row.InProductionQty
                                         };
                                     })
                                     .OrderBy(x => x.Name)
@@ -382,7 +415,8 @@ namespace ManiApi.Controllers
                                                     Name = row.SparePartName,
                                                     Code = row.SparePartCode,
                                                     PlanQty = row.PlanQty,
-                                                    WaitingQty = row.WaitingQty
+                                                    WaitingQty = row.WaitingQty,
+                                                    InProductionQty = row.InProductionQty
                                                 };
                                             })
                                             .OrderBy(x => x.Name)

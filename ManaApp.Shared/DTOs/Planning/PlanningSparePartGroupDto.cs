@@ -25,6 +25,7 @@ public sealed class PlanningSparePartDto
 
     public int PlanQty { get; set; }
     public int WaitingQty { get; set; }
+    public int InProductionQty { get; set; }
 }
 
 public sealed class PlanningSparePartWorkflowDto

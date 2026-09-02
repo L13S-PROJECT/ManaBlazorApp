@@ -146,9 +146,30 @@ namespace ManiApi.Controllers
                 return UnprocessableEntity(exception.Message);
             }
 
+            var progress =
+                await _partRequirementService
+                    .CalculateApprovedPartProgressAsync();
+            
+            var stockSummary =
+                await _partRequirementService
+                    .CalculateStockSummaryAsync();
+
             var partIds = plannedQuantities
                 .Where(row => row.Value > 0)
                 .Select(row => row.Key)
+                .Concat(progress.Waiting
+                    .Where(row => row.Value > 0)
+                    .Select(row => row.Key))
+                .Concat(progress.InProduction
+                    .Where(row => row.Value > 0)
+                    .Select(row => row.Key))
+                .Concat(stockSummary.Stock
+                    .Where(row => row.Value > 0)
+                    .Select(row => row.Key))
+                .Concat(stockSummary.Reserved
+                    .Where(row => row.Value > 0)
+                    .Select(row => row.Key))
+                .Distinct()
                 .ToList();
 
             var rows = await _db.TopParts
@@ -162,12 +183,31 @@ namespace ManiApi.Controllers
                 {
                     TopPartId = topPart.Id,
                     PartName = topPart.TopPartName,
-                    PartCode = topPart.TopPartCode
+                    PartCode = topPart.TopPartCode,
+                    TopPartCategoryId = topPart.TopPartCategoryID
                 })
                 .ToListAsync();
 
             foreach (var row in rows)
-                row.PlanQty = plannedQuantities[row.TopPartId];
+                {
+                    row.PlanQty =
+                        plannedQuantities.GetValueOrDefault(row.TopPartId);
+
+                    row.WaitingQty =
+                        progress.Waiting.GetValueOrDefault(row.TopPartId);
+
+                    row.InProductionQty =
+                        progress.InProduction.GetValueOrDefault(row.TopPartId);
+
+                    row.StockQty =
+                        stockSummary.Stock.GetValueOrDefault(row.TopPartId);
+
+                    row.ReservedQty =
+                        stockSummary.Reserved.GetValueOrDefault(row.TopPartId);
+
+                    row.FreeQty =
+                        stockSummary.Free.GetValueOrDefault(row.TopPartId);
+                }
 
             return Ok(rows);
         }
@@ -210,17 +250,64 @@ namespace ManiApi.Controllers
                                 item.Draft.Status == ProductionPlanningDraftStatus.Draft)
                         .Sum(item => (int?)item.Planned_Qty) ?? 0,
 
-                    WaitingQty = _db.ProductionBatchTopParts
-                        .Where(item =>
-                            item.TopPart_ID == topPart.Id &&
-                            item.IsActive &&
-                            item.Batch!.IsActive)
-                        .Sum(item => (int?)item.Planned_Qty) ?? 0
+                    WaitingQty = _db.ProductionExecutions
+                        .Where(execution =>
+                            execution.TopPart_ID == topPart.Id &&
+                            execution.Status == ProductionExecutionStatus.WAITING &&
+                            execution.IsActive)
+                        .Sum(execution => (int?)execution.Quantity) ?? 0,
+
+                    InProductionQty = _db.ProductionExecutions
+                        .Where(execution =>
+                            execution.TopPart_ID == topPart.Id &&
+                            execution.Status == ProductionExecutionStatus.IN_PRODUCTION &&
+                            execution.IsActive)
+                        .Sum(execution => (int?)execution.Quantity) ?? 0
                 })
                 .ToListAsync();
 
             return Ok(rows);
         }
+        
+
+        [HttpGet("products/{topPartId:int}/production-flow")]
+            public async Task<ActionResult<List<PlanningProductionFlowItemDto>>>
+                GetProductProductionFlow(int topPartId)
+            {
+                var rows = await (
+                    from batchTopPart in _db.ProductionBatchTopParts.AsNoTracking()
+
+                    join batch in _db.ProductionBatches.AsNoTracking()
+                        on batchTopPart.Batch_ID equals batch.ID
+
+                    join workflow in _db.Workflows.AsNoTracking()
+                        on batchTopPart.Workflow_ID equals workflow.Id
+
+                    where batchTopPart.TopPart_ID == topPartId
+                        && batchTopPart.IsActive
+                        && batch.IsActive
+                        && workflow.IsActive
+
+                    orderby batch.ID descending
+
+                    select new PlanningProductionFlowItemDto
+                    {
+                        BatchCode = batch.Batch_Code,
+                                WorkflowVersion = workflow.WorkflowVersion,
+                                PlannedQty = (int)batchTopPart.Planned_Qty,
+
+                                InProductionQty = _db.ProductionExecutions
+                                    .Where(execution =>
+                                        execution.ProductionBatchTopPart_ID == batchTopPart.ID &&
+                                        execution.Status ==
+                                            ProductionExecutionStatus.IN_PRODUCTION &&
+                                        execution.IsActive)
+                                    .Sum(execution => (int?)execution.Quantity) ?? 0
+                            })
+                            .ToListAsync();
+
+                        return Ok(rows);
+                    }
 
         [HttpGet("products/{topPartId:int}/workflows")]
         public async Task<ActionResult<List<PlanningWorkflowOptionDto>>> GetWorkflows(
@@ -558,6 +645,7 @@ namespace ManiApi.Controllers
                         on processComponent.WorkflowComponentId equals workflowComponent.Id
 
                     where processNodeIds.Contains(processComponent.ProcessNodeId)
+                        && processComponent.RequiresStaging
                         && workflowComponent.ComponentType == 1
                         && workflowComponent.IsActive
 

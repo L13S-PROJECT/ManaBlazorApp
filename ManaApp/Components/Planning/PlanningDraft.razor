@@ -472,11 +472,11 @@ protected override async Task OnParametersSetAsync()
                             "alert",
                             "Dati saglabāti");
                     }
-                    catch (HttpRequestException)
+                    catch (HttpRequestException ex)
                     {
                         await JS.InvokeVoidAsync(
                             "alert",
-                            "Datus neizdevās saglabāt.");
+                            $"Datus neizdevās saglabāt. {ex.Message}");
                     }
                     finally
                     {
@@ -504,11 +504,11 @@ protected override async Task OnParametersSetAsync()
                     "alert",
                     "Dati saglabāti");
             }
-            catch (HttpRequestException)
+            catch (HttpRequestException ex)
             {
                 await JS.InvokeVoidAsync(
                     "alert",
-                    "Datus neizdevās saglabāt.");
+                    $"Datus neizdevās saglabāt. {ex.Message}");
             }
             finally
             {

@@ -78,6 +78,11 @@
 
         </section>
 
-        <PlanningProductionFlow />
+        <PlanningProductionFlow TopPartId="@TopPartId" />
     </div>
 </div>
+
+@code {
+    [Parameter]
+    public int TopPartId { get; set; }
+}

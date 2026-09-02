@@ -100,6 +100,12 @@
                                                     <span class="flow-component-name">
                                                         @part.Component!.TopPartCode - @part.Component.TopPartName
 
+                                                        <span class="flow-staging-indicator @(part.Link.RequiresStaging ? "flow-staging-indicator-active" : "")"
+                                                              title="@(part.Link.RequiresStaging ? "Nepieciešama komplektēšana" : "Komplektēšana nav nepieciešama")"
+                                                              aria-label="@(part.Link.RequiresStaging ? "Nepieciešama komplektēšana" : "Komplektēšana nav nepieciešama")">
+                                                            @(part.Link.RequiresStaging ? "☑" : "☐")
+                                                        </span>
+
                                                         @if (!string.IsNullOrWhiteSpace(
                                                                 part.Component.RequiredWorkflowNodeName))
                                                         {

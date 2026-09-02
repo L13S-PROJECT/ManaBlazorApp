@@ -261,7 +261,8 @@ namespace ManiApi.Services.TopParts
                             ProcessNodeId = nodeIdMap[sourceProcessComponent.ProcessNodeId],
                             WorkflowComponentId =
                                 componentIdMap[sourceProcessComponent.WorkflowComponentId],
-                            Quantity = sourceProcessComponent.Quantity
+                            Quantity = sourceProcessComponent.Quantity,
+                            RequiresStaging = sourceProcessComponent.RequiresStaging
                         });
                     }
 

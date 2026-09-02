@@ -146,6 +146,7 @@ namespace ManiApi.Controllers
                         where
                             processComponent.ProcessNodeId ==
                                 task.WorkflowNode_ID &&
+                            processComponent.RequiresStaging &&
                             workflowComponent.IsActive &&
                             workflowComponent.ComponentType == 1 &&
                             !_db.ProductionComponentStagings.Any(staging =>
@@ -340,6 +341,7 @@ namespace ManiApi.Controllers
                     taskIds.Contains(task.ID) &&
                     processComponent.ProcessNodeId ==
                         task.WorkflowNode_ID &&
+                    processComponent.RequiresStaging &&
                     workflowComponent.IsActive &&
                     workflowComponent.ComponentType == 1 &&
                     !_db.ProductionComponentStagings.Any(staging =>
@@ -475,6 +477,7 @@ namespace ManiApi.Controllers
                 where
                     processComponent.ProcessNodeId ==
                         row.WorkflowNodeId &&
+                    processComponent.RequiresStaging &&
                     workflowComponent.IsActive &&
                     workflowComponent.ComponentType == 1 &&
                     !_db.ProductionComponentStagings.Any(staging =>
@@ -572,25 +575,61 @@ namespace ManiApi.Controllers
 
             if (task.Status != TaskNewStatus.WAITING)
                 return BadRequest("Sadalīt drīkst tikai WAITING Task.");
+            
+            var executionTasks = await _db.TasksNew
+                .Where(x =>
+                    x.ProductionExecution_ID == task.ProductionExecution_ID &&
+                    x.IsActive)
+                .ToListAsync();
+
+            if (executionTasks.Any(x =>
+                    x.Status != TaskNewStatus.WAITING))
+            {
+                return BadRequest(
+                    "Sadalīt drīkst tikai pilnībā nesāktu ražošanas izpildi.");
+            }
+
+            var selectedTaskHasIncomingDependency =
+                await _db.TaskNewDependencies.AnyAsync(x =>
+                    x.TaskNew_ID == task.ID);
+
+            if (selectedTaskHasIncomingDependency)
+            {
+                return BadRequest(
+                    "Ražošanas apjomu drīkst sadalīt tikai pirmajā Flow procesā.");
+            }
+
+            var executionAlreadySplit = executionTasks
+                .GroupBy(x => x.WorkflowNode_ID)
+                .Any(group => group.Count() > 1);
+
+            if (executionAlreadySplit)
+            {
+                return BadRequest(
+                    "Šī ražošanas izpilde jau ir sadalīta.");
+            }
 
             if (dto.Parts.Sum(x => x.Quantity) != task.Quantity)
                 return BadRequest(
                     "Task daļu daudzumu summai jāsakrīt ar sākotnējo daudzumu.");
             
-            var incomingDependencies = await _db.TaskNewDependencies
-                .AsNoTracking()
-                .Where(x => x.TaskNew_ID == task.ID)
-                .ToListAsync();
+            var executionTaskIds = executionTasks
+                .Select(x => x.ID)
+                .ToList();
 
-            var downstreamDependencies = await _db.TaskNewDependencies
+            var executionDependencies = await _db.TaskNewDependencies
                 .AsNoTracking()
-                .Where(x => x.DependsOnTaskNew_ID == task.ID)
+                .Where(x =>
+                    executionTaskIds.Contains(x.TaskNew_ID) &&
+                    executionTaskIds.Contains(x.DependsOnTaskNew_ID))
                 .ToListAsync();
 
             var now = DateTime.UtcNow;
             var firstPart = dto.Parts[0];
 
-            task.Quantity = firstPart.Quantity;
+            foreach (var executionTask in executionTasks)
+                executionTask.Quantity = firstPart.Quantity;
+
             task.Employee_ID = firstPart.EmployeeId;
             task.Assigned_At = firstPart.EmployeeId.HasValue
                 ? now
@@ -598,44 +637,59 @@ namespace ManiApi.Controllers
 
             foreach (var part in dto.Parts.Skip(1))
             {
-                var newTask = new TaskNew
-                {
-                    ProductionExecution_ID = task.ProductionExecution_ID,
-                    WorkflowNode_ID = task.WorkflowNode_ID,
-                    Employee_ID = part.EmployeeId,
-                    WorkCenter_ID = task.WorkCenter_ID,
-                    Quantity = part.Quantity,
-                    Status = TaskNewStatus.WAITING,
-                    Created_At = now,
-                    Assigned_At = part.EmployeeId.HasValue ? now : null,
-                    IsActive = true
-                };
+                var cloneByOriginalTaskId =
+                    new Dictionary<uint, TaskNew>();
 
-                _db.TasksNew.Add(newTask);
+                foreach (var originalTask in executionTasks)
+                {
+                    var employeeId = originalTask.ID == task.ID
+                        ? part.EmployeeId
+                        : originalTask.Employee_ID;
+
+                    var clonedTask = new TaskNew
+                    {
+                        ProductionExecution_ID =
+                            originalTask.ProductionExecution_ID,
+                        WorkflowNode_ID = originalTask.WorkflowNode_ID,
+                        Employee_ID = employeeId,
+                        WorkCenter_ID = originalTask.WorkCenter_ID,
+                        Quantity = part.Quantity,
+                        Status = TaskNewStatus.WAITING,
+                        Created_At = now,
+                        Assigned_At = employeeId.HasValue ? now : null,
+                        IsActive = true
+                    };
+
+                    cloneByOriginalTaskId[originalTask.ID] = clonedTask;
+                    _db.TasksNew.Add(clonedTask);
+                }
+
                 await _db.SaveChangesAsync();
 
-                _db.TaskNewDependencies.AddRange(
-                    incomingDependencies.Select(x => new TaskNewDependency
-                    {
-                        TaskNew_ID = newTask.ID,
-                        DependsOnTaskNew_ID = x.DependsOnTaskNew_ID
-                    }));
-
-                _db.TaskNewDependencies.AddRange(
-                    downstreamDependencies.Select(x => new TaskNewDependency
-                    {
-                        TaskNew_ID = x.TaskNew_ID,
-                        DependsOnTaskNew_ID = newTask.ID
-                    }));
-
-                _db.TaskNewStatusHistories.Add(new TaskNewStatusHistory
+                foreach (var dependency in executionDependencies)
                 {
-                    TaskNew_ID = newTask.ID,
-                    FromStatus = null,
-                    ToStatus = TaskNewStatus.WAITING,
-                    Changed_At = now,
-                    Comment = "Task izveidots sadalīšanas rezultātā."
-                });
+                    _db.TaskNewDependencies.Add(
+                        new TaskNewDependency
+                        {
+                            TaskNew_ID =
+                                cloneByOriginalTaskId[dependency.TaskNew_ID].ID,
+                            DependsOnTaskNew_ID =
+                                cloneByOriginalTaskId[
+                                    dependency.DependsOnTaskNew_ID].ID
+                        });
+                }
+
+                _db.TaskNewStatusHistories.AddRange(
+                    cloneByOriginalTaskId.Values.Select(clonedTask =>
+                        new TaskNewStatusHistory
+                        {
+                            TaskNew_ID = clonedTask.ID,
+                            FromStatus = null,
+                            ToStatus = TaskNewStatus.WAITING,
+                            Changed_At = now,
+                            Comment =
+                                "Task izveidots ražošanas izpildes sadalīšanas rezultātā."
+                        }));
             }
 
             await _db.SaveChangesAsync();

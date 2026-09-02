@@ -158,7 +158,9 @@
                                 <td class="production-group production-group-start">
                                     @sparePart.WaitingQty
                                 </td>
-                                <td class="production-group"></td>
+                                <td class="production-group">
+                                    @sparePart.InProductionQty
+                                </td>
                                 <td class="production-group"></td>
                                 <td class="production-group production-group-end"></td>
                             </tr>
@@ -179,7 +181,7 @@
                                                 </span>
                                             </div>
 
-                                            <PlanningSparePartDetails />
+                                            <PlanningSparePartDetails TopPartId="@sparePart.Id" />
                                         </td>
                                     </tr>
                                 }
