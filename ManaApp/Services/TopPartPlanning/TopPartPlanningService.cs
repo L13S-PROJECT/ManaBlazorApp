@@ -24,6 +24,24 @@ namespace ManaApp.Services.TopPartPlanning
                     "api/production-planning/parts") ?? [];
             }
 
+        public async Task<List<PlanningPartStockDetailDto>>
+            GetPartStockDetailsAsync(int topPartId)
+        {
+            return await _http.GetFromJsonAsync<
+                List<PlanningPartStockDetailDto>>(
+                    $"api/production-planning/parts/{topPartId}/stock-details")
+                ?? [];
+        }
+
+        public async Task<List<PlanningPartRequirementDetailDto>>
+            GetPartProductionRequirementsAsync(int topPartId)
+        {
+            return await _http.GetFromJsonAsync<
+                List<PlanningPartRequirementDetailDto>>(
+                    $"api/production-planning/parts/{topPartId}/production-requirements")
+                ?? [];
+        }
+
         public async Task<List<PlanningWorkflowOptionDto>> GetWorkflowsAsync(
                 int topPartId)
             {

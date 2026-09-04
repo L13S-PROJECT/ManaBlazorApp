@@ -12,6 +12,7 @@
         <thead>
 
             <tr>
+                <th class="details-column"></th>
                 <th>Nosaukums</th>
                 <th>Kods</th>
                 <th class="flow-column">Flow</th>
@@ -36,7 +37,7 @@
         {
             <tbody class="category-group">
                 <tr class="category-row">
-                    <td colspan="10">
+                    <td colspan="11">
                         <span class="category-name">
                             @category.CategoryName
                         </span>
@@ -50,7 +51,18 @@
                     part.PartName.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
                     part.PartCode.Contains(SearchText, StringComparison.OrdinalIgnoreCase))))
                 {
-                    <tr class="part-row">
+                    var isOpen = openTopPartId == part.TopPartId;
+
+                    <tr class="part-row @(isOpen ? "is-expanded" : null)">
+                        <td class="details-column">
+                            <button type="button"
+                                    class="details-button @(isOpen ? "is-open" : null)"
+                                    aria-expanded="@isOpen"
+                                    title="@(isOpen ? "Aizvērt detalizāciju" : "Atvērt detalizāciju")"
+                                    @onclick="() => ToggleDetails(part.TopPartId)">
+                                <span aria-hidden="true">@(isOpen ? "▼" : "▶")</span>
+                            </button>
+                        </td>
                         <td>@part.PartName</td>
                         <td>@part.PartCode</td>
                         <td class="flow-column"></td>
@@ -62,6 +74,21 @@
                         <td class="quantity-column">@part.ReservedQty</td>
                         <td class="quantity-column">@part.FreeQty</td>
                     </tr>
+
+                    @if (isOpen)
+                    {
+                        <tr class="part-details-row">
+                            <td class="part-details-cell" colspan="11">
+                                <div class="details-context">
+                                    <strong>@part.PartName</strong>
+                                    <span aria-hidden="true">·</span>
+                                    <span>@part.PartCode</span>
+                                    <span class="details-context-label">— detalizācija</span>
+                                </div>
+                                <PlanningPartDetails TopPartId="@part.TopPartId" />
+                            </td>
+                        </tr>
+                    }
                 }
             </tbody>
         }
@@ -83,6 +110,14 @@
     public int RefreshVersion { get; set; }
 
     private int loadedRefreshVersion = -1;
+    private int? openTopPartId;
+
+    private void ToggleDetails(int topPartId)
+    {
+        openTopPartId = openTopPartId == topPartId
+            ? null
+            : topPartId;
+    }
 
     private static bool HasVisibleQuantity(
             ManaApp.Shared.DTOs.Planning.PlanningPartListItemDto part)

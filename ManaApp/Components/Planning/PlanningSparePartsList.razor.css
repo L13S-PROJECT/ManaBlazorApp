@@ -558,3 +558,27 @@
 .draft-add-button {
     min-height: 27px;
 }
+
+/* Atvērtā TopPart rinda izmanto vienotu Planning atlases stāvokli. */
+.planning-products-table .product-row.is-expanded td {
+    background: #e3edf3;
+    border-top: 2px solid #55758a;
+}
+
+.planning-products-table .product-row.is-expanded td:first-child {
+    border-left: 2px solid #55758a;
+}
+
+.planning-products-table .product-row.is-expanded td:last-child {
+    border-right: 2px solid #55758a;
+}
+
+.planning-products-table .product-row.is-expanded .planning-group,
+.planning-products-table .product-row.is-expanded .production-group {
+    color: #1f3440;
+    font-weight: 700;
+}
+
+.planning-products-table .product-details-row td.product-details-cell {
+    border-left: 2px solid #55758a;
+}

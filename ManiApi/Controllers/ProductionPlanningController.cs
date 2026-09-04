@@ -212,6 +212,42 @@ namespace ManiApi.Controllers
             return Ok(rows);
         }
 
+        [HttpGet("parts/{topPartId:int}/stock-details")]
+        public async Task<ActionResult<List<PlanningPartStockDetailDto>>>
+            GetPartStockDetails(int topPartId)
+        {
+            var partExists = await _db.TopParts
+                .AsNoTracking()
+                .AnyAsync(topPart =>
+                    topPart.Id == topPartId &&
+                    topPart.IsActive &&
+                    topPart.TopPartType == TopPartType.Part);
+
+            if (!partExists)
+                return NotFound();
+
+            return Ok(await _partRequirementService
+                .GetStockDetailsAsync(topPartId));
+        }
+
+        [HttpGet("parts/{topPartId:int}/production-requirements")]
+        public async Task<ActionResult<List<PlanningPartRequirementDetailDto>>>
+            GetPartProductionRequirements(int topPartId)
+        {
+            var partExists = await _db.TopParts
+                .AsNoTracking()
+                .AnyAsync(topPart =>
+                    topPart.Id == topPartId &&
+                    topPart.IsActive &&
+                    topPart.TopPartType == TopPartType.Part);
+
+            if (!partExists)
+                return NotFound();
+
+            return Ok(await _partRequirementService
+                .GetProductionRequirementDetailsAsync(topPartId));
+        }
+
         [HttpGet("products")]
         public async Task<ActionResult<List<PlanningProductListItemDto>>> GetProducts()
         {

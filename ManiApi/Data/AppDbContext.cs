@@ -43,7 +43,7 @@ namespace ManiApi.Data
         public DbSet<WorkflowNode> WorkflowNodes { get; set; }
         public DbSet<WorkflowNodeConnection> WorkflowNodeConnections { get; set; }
         public DbSet<WorkflowDependency> WorkflowDependencies { get; set; }
-
+        
         public DbSet<ItemType> ItemTypes { get; set; }
         public DbSet<Item> Items { get; set; }
         public DbSet<Unit> Units => Set<Unit>();
@@ -64,6 +64,12 @@ namespace ManiApi.Data
         public DbSet<TaskNew> TasksNew { get; set; }
         public DbSet<TaskNewStatusHistory> TaskNewStatusHistories { get; set; }
         public DbSet<TaskNewDependency> TaskNewDependencies { get; set; }
+
+        public DbSet<OrderNew> OrdersNew { get; set; }
+        public DbSet<OrderItemNew> OrderItemsNew { get; set; }
+        public DbSet<OrderDraftNew> OrderDraftsNew { get; set; }
+        public DbSet<OrderDraftItemNew> OrderDraftItemsNew { get; set; }
+        public DbSet<CustomerCodeMapNew> CustomerCodeMapsNew { get; set; }
 
         public DbSet<ProductionComponentStaging> ProductionComponentStagings { get; set; }
 
@@ -717,6 +723,129 @@ modelBuilder.Entity<OrderItem>()
 modelBuilder.Entity<WorkflowDependency>()
     .HasIndex(x => new { x.NodeId, x.DependsOnNodeId })
     .IsUnique();
+
+modelBuilder.Entity<OrderItemNew>()
+    .HasOne<OrderNew>()
+    .WithMany()
+    .HasForeignKey(x => x.OrderId)
+    .OnDelete(DeleteBehavior.Restrict);
+
+modelBuilder.Entity<OrderItemNew>()
+    .HasIndex(x => x.OrderId)
+    .HasDatabaseName("IX_order_items_new_order");
+
+modelBuilder.Entity<OrderDraftItemNew>()
+    .HasOne<OrderDraftNew>()
+    .WithMany()
+    .HasForeignKey(x => x.OrderDraftId)
+    .OnDelete(DeleteBehavior.Restrict);
+
+modelBuilder.Entity<OrderDraftItemNew>()
+    .HasIndex(x => x.OrderDraftId)
+    .HasDatabaseName("IX_order_draft_items_new_draft");
+
+modelBuilder.Entity<OrderItemNew>()
+    .HasOne<TopPart>()
+    .WithMany()
+    .HasForeignKey(x => x.TopPartId)
+    .OnDelete(DeleteBehavior.Restrict);
+
+modelBuilder.Entity<OrderItemNew>()
+    .HasIndex(x => x.TopPartId)
+    .HasDatabaseName("IX_order_items_new_toppart");
+
+modelBuilder.Entity<OrderItemNew>()
+    .HasOne<Workflow>()
+    .WithMany()
+    .HasForeignKey(x => x.WorkflowId)
+    .OnDelete(DeleteBehavior.Restrict);
+
+modelBuilder.Entity<OrderItemNew>()
+    .HasIndex(x => x.WorkflowId)
+    .HasDatabaseName("IX_order_items_new_workflow");
+
+modelBuilder.Entity<OrderDraftItemNew>()
+    .HasOne<TopPart>()
+    .WithMany()
+    .HasForeignKey(x => x.TopPartId)
+    .OnDelete(DeleteBehavior.Restrict);
+
+modelBuilder.Entity<OrderDraftItemNew>()
+    .HasIndex(x => x.TopPartId)
+    .HasDatabaseName("IX_order_draft_items_new_toppart");
+
+modelBuilder.Entity<OrderDraftItemNew>()
+    .HasOne<Workflow>()
+    .WithMany()
+    .HasForeignKey(x => x.WorkflowId)
+    .OnDelete(DeleteBehavior.Restrict);
+
+modelBuilder.Entity<OrderDraftItemNew>()
+    .HasIndex(x => x.WorkflowId)
+    .HasDatabaseName("IX_order_draft_items_new_workflow");
+
+modelBuilder.Entity<OrderItemNew>()
+    .HasOne<RalColor>()
+    .WithMany()
+    .HasForeignKey(x => x.RalColorId)
+    .OnDelete(DeleteBehavior.Restrict);
+
+modelBuilder.Entity<OrderItemNew>()
+    .HasIndex(x => x.RalColorId)
+    .HasDatabaseName("IX_order_items_new_ral_color");
+
+modelBuilder.Entity<OrderDraftItemNew>()
+    .HasOne<RalColor>()
+    .WithMany()
+    .HasForeignKey(x => x.RalColorId)
+    .OnDelete(DeleteBehavior.Restrict);
+
+modelBuilder.Entity<OrderDraftItemNew>()
+    .HasIndex(x => x.RalColorId)
+    .HasDatabaseName("IX_order_draft_items_new_ral_color");
+
+modelBuilder.Entity<CustomerCodeMapNew>()
+    .HasOne<TopPart>()
+    .WithMany()
+    .HasForeignKey(x => x.TopPartId)
+    .OnDelete(DeleteBehavior.Restrict);
+
+modelBuilder.Entity<CustomerCodeMapNew>()
+    .HasIndex(x => x.TopPartId)
+    .HasDatabaseName("IX_customer_code_map_new_toppart");
+
+modelBuilder.Entity<CustomerCodeMapNew>()
+    .HasOne<Workflow>()
+    .WithMany()
+    .HasForeignKey(x => x.WorkflowId)
+    .OnDelete(DeleteBehavior.Restrict);
+
+modelBuilder.Entity<CustomerCodeMapNew>()
+    .HasIndex(x => x.WorkflowId)
+    .HasDatabaseName("IX_customer_code_map_new_workflow");
+
+modelBuilder.Entity<CustomerCodeMapNew>()
+    .HasOne<RalColor>()
+    .WithMany()
+    .HasForeignKey(x => x.RalColorId)
+    .OnDelete(DeleteBehavior.Restrict);
+
+modelBuilder.Entity<CustomerCodeMapNew>()
+    .HasIndex(x => x.RalColorId)
+    .HasDatabaseName("IX_customer_code_map_new_ral_color");
+
+modelBuilder.Entity<CustomerCodeMapNew>()
+    .HasIndex(x => new { x.CustomerName, x.CustomerCode })
+    .IsUnique()
+    .HasDatabaseName("UX_customer_code_map_new_customer_code");
+
+modelBuilder.Entity<OrderNew>()
+    .HasIndex(x => new { x.IsActive, x.CreatedAt })
+    .HasDatabaseName("IX_orders_new_active_created");
+
+modelBuilder.Entity<OrderDraftNew>()
+    .HasIndex(x => new { x.IsActive, x.CreatedAt })
+    .HasDatabaseName("IX_order_drafts_new_active_created");
 
 }
   

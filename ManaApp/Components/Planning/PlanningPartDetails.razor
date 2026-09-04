@@ -1,0 +1,169 @@
+@using ManaApp.Shared.DTOs.Planning
+@using ManaApp.Services.TopPartPlanning
+@inject TopPartPlanningService PlanningService
+
+@namespace ManaApp.Components.Planning
+
+<div class="planning-part-details">
+    <section class="stock-details-card">
+        <h3 class="stock-details-title">NOLIKTAVAS ATLIKUMS PA FLOW UN MEZGLIEM</h3>
+
+        @if (loading)
+        {
+            <div class="details-message">Ielādē...</div>
+        }
+        else if (loadFailed)
+        {
+            <div class="details-message details-error">Neizdevās ielādēt detalizāciju.</div>
+        }
+        else if (stockRows.Count == 0)
+        {
+            <div class="details-message">Noliktavas atlikums nav atrasts.</div>
+        }
+        else
+        {
+            <div class="details-table-scroll">
+            <table class="details-table stock-details-table">
+                <colgroup>
+                    <col class="flow-column" />
+                    <col class="node-type-column" />
+                    <col class="node-name-column" />
+                    <col class="number-column" span="3" />
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th title="Flow versija">Flow</th>
+                        <th title="Mezgla tips">Tips</th>
+                        <th title="Mezgla nosaukums">Mezgla nosaukums</th>
+                        <th class="number-column" title="Kopējais daudzums">Kopā</th>
+                        <th class="number-column" title="Rezervētais daudzums">Rez.</th>
+                        <th class="number-column" title="Brīvais daudzums">Brīvs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in stockRows)
+                    {
+                        <tr>
+                            <td title="Flow versija @row.WorkflowVersion">v@(row.WorkflowVersion)</td>
+                            <td title="@row.NodeType">@row.NodeType</td>
+                            <td title="@row.NodeName">@row.NodeName</td>
+                            <td class="number-column">@row.StockQty</td>
+                            <td class="number-column">@row.ReservedQty</td>
+                            <td class="number-column">@row.FreeQty</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            </div>
+        }
+    </section>
+
+    <section class="stock-details-card requirements-card">
+        <h3 class="stock-details-title">RAŽOŠANAS VAJADZĪBAS</h3>
+
+        @if (loading)
+        {
+            <div class="details-message">Ielādē...</div>
+        }
+        else if (loadFailed)
+        {
+            <div class="details-message details-error">Neizdevās ielādēt detalizāciju.</div>
+        }
+        else if (requirementRows.Count == 0)
+        {
+            <div class="details-message">Aktīvas ražošanas vajadzības nav atrastas.</div>
+        }
+        else
+        {
+            <div class="details-table-scroll">
+                <table class="details-table requirements-table">
+                    <colgroup>
+                        <col class="batch-column" />
+                        <col class="product-name-column" />
+                        <col class="product-code-column" />
+                        <col class="flow-column" />
+                        <col class="process-column" />
+                        <col class="node-type-column" />
+                        <col class="node-name-column" />
+                        <col class="number-column" span="4" />
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th title="Batch Nr.">Batch</th>
+                            <th title="Avota prece">Avota prece</th>
+                            <th title="Avota preces kods">Kods</th>
+                            <th title="Flow versija">Flow</th>
+                            <th title="Process">Process</th>
+                            <th title="Nepieciešamā mezgla tips">Tips</th>
+                            <th title="Nepieciešamais mezgls">Mezgls</th>
+                            <th class="number-column" title="Bruto vajadzība">Bruto</th>
+                            <th class="number-column" title="Segts no noliktavas">Nolikt.</th>
+                            <th class="number-column" title="Segts ar ienākošo ražošanu">Ienākošs</th>
+                            <th class="number-column" title="Neto atlikums">Neto</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in requirementRows)
+                        {
+                            <tr>
+                                <td title="@row.BatchCode">@(string.IsNullOrWhiteSpace(row.BatchCode) ? "—" : row.BatchCode)</td>
+                                <td class="truncate-cell" title="@row.SourceTopPartName">@row.SourceTopPartName</td>
+                                <td title="@row.SourceTopPartCode">@row.SourceTopPartCode</td>
+                                <td title="Flow versija @row.WorkflowVersion">v@(row.WorkflowVersion)</td>
+                                <td class="truncate-cell" title="@row.ProcessName">@row.ProcessName</td>
+                                <td title="@row.NodeType">@row.NodeType</td>
+                                <td class="truncate-cell" title="@row.NodeName">@row.NodeName</td>
+                                <td class="number-column">@row.GrossQuantity</td>
+                                <td class="number-column">@row.StockCoveredQuantity</td>
+                                <td class="number-column">@row.IncomingCoveredQuantity</td>
+                                <td class="number-column">@row.NetQuantity</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    [Parameter] public int TopPartId { get; set; }
+
+    private List<PlanningPartStockDetailDto> stockRows = [];
+    private List<PlanningPartRequirementDetailDto> requirementRows = [];
+    private bool loading;
+    private bool loadFailed;
+    private int loadedTopPartId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedTopPartId == TopPartId)
+            return;
+
+        loading = true;
+        loadFailed = false;
+
+        try
+        {
+            var stockTask = PlanningService.GetPartStockDetailsAsync(TopPartId);
+            var requirementsTask = PlanningService
+                .GetPartProductionRequirementsAsync(TopPartId);
+
+            await Task.WhenAll(stockTask, requirementsTask);
+
+            stockRows = await stockTask;
+            requirementRows = await requirementsTask;
+            loadedTopPartId = TopPartId;
+        }
+        catch (HttpRequestException)
+        {
+            stockRows = [];
+            requirementRows = [];
+            loadFailed = true;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+}

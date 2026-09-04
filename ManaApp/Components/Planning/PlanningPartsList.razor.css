@@ -28,18 +28,24 @@
 }
 
 .planning-parts-table th:first-child {
-    text-align: left;
-}
-
-.planning-parts-table th:first-child,
-.planning-parts-table td:first-child {
-    width: 36%;
-    text-align: left;
+    text-align: center;
 }
 
 .planning-parts-table th:nth-child(2),
 .planning-parts-table td:nth-child(2) {
+    width: 36%;
+    text-align: left;
+}
+
+.planning-parts-table th:nth-child(3),
+.planning-parts-table td:nth-child(3) {
     width: 8%;
+}
+
+.planning-parts-table .details-column {
+    width: 34px;
+    padding-left: 3px;
+    padding-right: 3px;
 }
 
 .planning-parts-table .flow-column {
@@ -114,45 +120,110 @@
 }
 
 /* Plānošanas bloks: Plān. + Pl. scrap */
-.planning-parts-table th:nth-child(4),
-.planning-parts-table th:nth-child(5) {
+.planning-parts-table th:nth-child(5),
+.planning-parts-table th:nth-child(6) {
     background: #59656c;
 }
 
-.planning-parts-table .part-row td:nth-child(4),
-.planning-parts-table .part-row td:nth-child(5) {
+.planning-parts-table .part-row td:nth-child(5),
+.planning-parts-table .part-row td:nth-child(6) {
     background: #eef2f4;
-}
-
-.planning-parts-table th:nth-child(4),
-.planning-parts-table .part-row td:nth-child(4) {
-    border-left: 2px solid #626a70;
 }
 
 .planning-parts-table th:nth-child(5),
 .planning-parts-table .part-row td:nth-child(5) {
+    border-left: 2px solid #626a70;
+}
+
+.planning-parts-table th:nth-child(6),
+.planning-parts-table .part-row td:nth-child(6) {
     border-right: 2px solid #626a70;
 }
 
 /* Noliktavas bloks: Nolikt. + Rez. + Brīvs */
-.planning-parts-table th:nth-child(8),
 .planning-parts-table th:nth-child(9),
-.planning-parts-table th:nth-child(10) {
+.planning-parts-table th:nth-child(10),
+.planning-parts-table th:nth-child(11) {
     background: #626159;
 }
 
-.planning-parts-table .part-row td:nth-child(8),
 .planning-parts-table .part-row td:nth-child(9),
-.planning-parts-table .part-row td:nth-child(10) {
+.planning-parts-table .part-row td:nth-child(10),
+.planning-parts-table .part-row td:nth-child(11) {
     background: #f3f1ea;
 }
 
-.planning-parts-table th:nth-child(8),
-.planning-parts-table .part-row td:nth-child(8) {
+.planning-parts-table th:nth-child(9),
+.planning-parts-table .part-row td:nth-child(9) {
     border-left: 2px solid #626a70;
 }
 
-.planning-parts-table th:nth-child(10),
-.planning-parts-table .part-row td:nth-child(10) {
+.planning-parts-table th:nth-child(11),
+.planning-parts-table .part-row td:nth-child(11) {
     border-right: 2px solid #626a70;
+}
+
+.details-button {
+    display: inline-flex;
+    width: 24px;
+    height: 22px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: #56636b;
+    background: #fff;
+    border: 1px solid #c8d0d5;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.details-button:hover {
+    background: #f0f2f1;
+}
+
+.details-button.is-open {
+    color: #fff;
+    background: #66776e;
+    border-color: #596a61;
+}
+
+.part-details-row td.part-details-cell {
+    padding: 0;
+    text-align: left;
+    background: #fff;
+    border-color: #aab6af;
+    border-left: 2px solid #55758a;
+}
+
+.details-context {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 7px 12px;
+    color: #37433d;
+    background: #edf1ef;
+    border-bottom: 1px solid #d0d8d3;
+}
+
+.details-context-label {
+    color: #6c7771;
+}
+
+/* Atvērtās PART rindas skaidrs atlases stāvoklis. */
+.planning-parts-table .part-row.is-expanded td {
+    background: #e3edf3;
+    border-top: 2px solid #55758a;
+}
+
+.planning-parts-table .part-row.is-expanded td:first-child {
+    border-left: 2px solid #55758a;
+}
+
+.planning-parts-table .part-row.is-expanded td:last-child {
+    border-right: 2px solid #55758a;
+}
+
+.planning-parts-table .part-row.is-expanded .quantity-column {
+    color: #1f3440;
+    font-weight: 700;
 }

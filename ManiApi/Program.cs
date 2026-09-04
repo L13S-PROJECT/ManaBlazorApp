@@ -17,6 +17,8 @@ using ManiApi.Services.ProductionFlows.ParentInline;
 using ManiApi.Services.Workflow;
 using ManiApi.Services.TopParts;
 using ManiApi.Services.Planning;
+using ManiApi.Services.OrdersNew;
+
 
 
 
@@ -69,6 +71,8 @@ builder.Services.AddScoped<TopPartWorkflowService>();
 builder.Services.AddScoped<TopPartWorkflowGraphService>();
 builder.Services.AddScoped<ManiApi.Services.Planning.PlanningPartRequirementService>();
 builder.Services.AddScoped<ProductionRequirementService>();
+builder.Services.AddScoped<OrderDraftNewService>();
+builder.Services.AddScoped<OrderNewService>();
 
 builder.Services.AddScoped<TaskNewDependencyService>();
 

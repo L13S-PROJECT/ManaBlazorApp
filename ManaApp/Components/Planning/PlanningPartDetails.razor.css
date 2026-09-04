@@ -1,0 +1,134 @@
+.planning-part-details {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 4px 6px;
+    background: #fff;
+}
+
+.stock-details-card {
+    padding: 10px 12px;
+    border: 1px solid #dfe5e1;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.requirements-card {
+    margin-top: 6px;
+}
+
+.stock-details-title {
+    margin: 0 0 10px;
+    color: #20242a;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.details-table-scroll {
+    width: 100%;
+    overflow: hidden;
+}
+
+.details-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    color: #20242a;
+}
+
+.details-table th,
+.details-table td {
+    overflow: hidden;
+    padding: 4px 6px;
+    font-size: 12px;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.details-table th {
+    font-weight: 700;
+}
+
+.details-table .number-column {
+    text-align: right;
+}
+
+.stock-details-table {
+    width: 100%;
+}
+
+.stock-details-table .flow-column {
+    width: 10%;
+}
+
+.stock-details-table .node-type-column {
+    width: 10%;
+}
+
+.stock-details-table .node-name-column {
+    width: 53%;
+}
+
+.stock-details-table .number-column {
+    width: 9%;
+}
+
+.requirements-table {
+    width: 100%;
+}
+
+.requirements-table .batch-column {
+    width: 8%;
+}
+
+.requirements-table .product-name-column {
+    width: 21%;
+}
+
+.requirements-table .product-code-column {
+    width: 9%;
+}
+
+.requirements-table .flow-column {
+    width: 6%;
+}
+
+.requirements-table .process-column {
+    width: 12%;
+}
+
+.requirements-table .node-type-column {
+    width: 7%;
+}
+
+.requirements-table .node-name-column {
+    width: 15%;
+}
+
+.requirements-table .number-column {
+    width: 5.5%;
+}
+
+.requirements-table th,
+.requirements-table td {
+    padding-right: 4px;
+    padding-left: 4px;
+    font-size: 11px;
+}
+
+.truncate-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.details-message {
+    padding: 8px 0;
+    color: #6c757d;
+    font-size: 12px;
+}
+
+.details-error {
+    color: #b42318;
+}
